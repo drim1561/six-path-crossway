@@ -16,7 +16,8 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-        run: curl -fsS "$SUPABASE_URL/rest/v1/sightings?select=id&limit=1" -H "apikey: $SUPABASE_ANON_KEY" -o /dev/null
+        run: |
+          curl -fsS "$SUPABASE_URL/rest/v1/sightings?select=id&limit=1" -H "apikey: $SUPABASE_ANON_KEY" -o /dev/null
       - uses: actions/checkout@v4
       - name: Monthly stamp so GitHub keeps this schedule on
         run: |
