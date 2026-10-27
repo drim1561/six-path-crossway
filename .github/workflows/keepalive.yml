@@ -1,0 +1,29 @@
+# Supabase pauses free projects after a week with no traffic. One tiny read every 3 days keeps it awake.
+# GitHub also turns off schedules in repos with no activity for 60 days, so once a month (the run on
+# day 1) this commits a date stamp to count as activity.
+name: Keep the timer database awake
+on:
+  schedule:
+    - cron: '17 6 */3 * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Read one row
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: curl -fsS "$SUPABASE_URL/rest/v1/sightings?select=id&limit=1" -H "apikey: $SUPABASE_ANON_KEY" -o /dev/null
+      - uses: actions/checkout@v4
+      - name: Monthly stamp so GitHub keeps this schedule on
+        run: |
+          if [ "$(date -u +%d)" -le 3 ]; then
+            date -u +%F > .github/keepalive-stamp
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add .github/keepalive-stamp
+            git commit -m "Keep the schedule alive" && git push || echo "Nothing to commit"
+          fi

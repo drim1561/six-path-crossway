@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Boss Timer</title>
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #0f171d;
+  --surface: #17232c;
+  --surface-2: #1d2c37;
+  --ink: #e7eef2;
+  --muted: #95a8b5;
+  --line: #2c4251;
+  --accent: #f0b84a;
+  --accent-bg: #3a2e10;
+  --good: #5fd68f;
+  --good-bg: #173826;
+  --soon: #6db3ff;
+  --bad: #ff8a7d;
+  --bad-bg: #42201c;
+  --focus: #6db3ff;
+  --font-body: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-num: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 var(--font-body); }
+main { max-width: 1200px; margin: 0 auto; padding: 16px; }
+h1 { font-size: 22px; margin: 0; }
+.muted { color: var(--muted); }
+small, .small { font-size: 12px; color: var(--muted); }
+.top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-bottom: 12px; }
+select, input, button { font: inherit; color: inherit; }
+select, input { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+button { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+button:hover { border-color: var(--muted); }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+#bossinfo { flex-basis: 100%; }
+#estimate { font-weight: 600; }
+#status { color: var(--bad); min-height: 1em; margin: 4px 0; }
+#status:empty { display: none; }
+#timeline { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.axis, .row .main { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 10px; align-items: center; }
+.axis .ticks { position: relative; height: 18px; font: 12px var(--font-num); color: var(--muted); }
+.axis .ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.track { position: relative; height: 22px; background: var(--surface-2); border-radius: 6px; overflow: hidden; }
+.bar { position: absolute; top: 3px; bottom: 3px; border-radius: 4px; }
+.state-soon .bar { background: var(--soon); opacity: .75; }
+.state-due .bar { background: var(--accent); }
+.state-watched .bar { background: var(--accent); opacity: .55; }
+.state-overdue { opacity: .55; }
+.state-overdue .bar { background: var(--bad); opacity: .6; }
+.secondhand .bar { background: transparent !important; border: 2px dashed var(--muted); opacity: .8; }
+.mark { position: absolute; top: 2px; bottom: 2px; width: 6px; margin-left: -3px; border-radius: 3px; background: var(--good); }
+.now { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--bad); }
+.lanes { position: relative; }
+#nowline { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--bad); pointer-events: none; }
+.row { border-top: 1px solid var(--line); padding: 8px 0; cursor: pointer; }
+.row .ch { font: 600 15px var(--font-num); }
+.row .what { grid-column: 2; margin-top: 4px; }
+.postlist { grid-column: 2; margin: 6px 0 0; padding: 0; list-style: none; font-size: 13px; }
+.postlist li { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 2px 0; }
+.postlist button { padding: 1px 8px; font-size: 12px; }
+.empty { padding: 16px 0 4px; color: var(--muted); }
+#hiddenlist { margin-top: 12px; padding: 12px; border: 1px dashed var(--line); border-radius: 12px; }
+#hiddenlist h2 { font-size: 14px; margin: 0 0 6px; color: var(--muted); }
+b.t { font-family: var(--font-num); }
+.postbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; }
+#entry { flex: 1 1 260px; min-width: 0; }
+.quick { display: flex; flex-wrap: wrap; gap: 6px; }
+#entryhint { flex-basis: 100%; margin: 0; }
+#signin { background: #5865f2; border-color: #5865f2; color: #fff; }
+button:disabled, input:disabled { opacity: .5; cursor: not-allowed; }
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <h1>Boss Timer</h1>
+    <label>Boss <select id="boss" aria-label="Boss"></select></label>
+    <span id="estimate"></span>
+    <span id="bossinfo" class="small"></span>
+  </div>
+  <div class="postbar">
+    <button id="signin" type="button">Sign in with Discord</button>
+    <span id="who" class="small" hidden></span>
+    <button id="signout" type="button" hidden>Sign out</button>
+    <input id="entry" autocomplete="off" spellcheck="false" aria-label="Post a sighting" aria-describedby="entryhint">
+    <span class="quick">
+      <button id="btn-spawned" type="button">Spawned now</button>
+      <button id="btn-killed" type="button">Killed now</button>
+      <button id="btn-waiting" type="button">Still waiting</button>
+    </span>
+    <p id="entryhint" class="small" aria-live="polite"></p>
+  </div>
+  <p id="status" role="status"></p>
+  <section id="timeline" aria-label="Spawn windows by channel"></section>
+  <section id="hiddenlist" hidden></section>
+  <p class="small">Times are game chat time, your local time is beside them in grey. Windows learn from players who camp a kill until the next spawn.</p>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
+<script>
+const CONFIG = {
+  supabaseUrl: 'https://umnomoiwjtaorvljisqu.supabase.co',
+  supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtbm9tb2l3anRhb3J2bGppc3F1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMwNTkyODUsImV4cCI6MjEwODYzNTI4NX0.43QM25wqDaU5XIcZ235_A0UiMT_EmcUMCOumICu4fyY',
+};
+
+/* BOSSES:START */
+const BOSSES = [
+ {"id":700004,"name":"Mano","level":20,"map":"Victoria Road : Thicket Around the Beach III","timer":60},
+ {"id":700007,"name":"Stumpy","level":35,"map":"Victoria Road : Parched Land","timer":60},
+ {"id":700000,"name":"Mushmom","level":40,"map":"Hidden Street : Someone Else's House","timer":60},
+ {"id":700006,"name":"Shade","level":48,"map":"Hidden Street : Cabin of the Forsaken","timer":60},
+ {"id":700002,"name":"Zombie Mushmom","level":55,"map":"Dungeon : The Grave of Mushmom","timer":60},
+ {"id":700001,"name":"Jr. Balrog","level":80,"map":"Dungeon : The Cursed Sanctuary","timer":180}
+];
+/* BOSSES:END */
+
+const MIN = 60000, HOUR = 60 * MIN, DAY = 24 * HOUR;
+const KIND_WORDS = {
+  k: 'kill', kill: 'kill', killed: 'kill', dead: 'kill',
+  s: 'spawn', spawn: 'spawn', spawned: 'spawn', up: 'spawn',
+  h: 'heard', heard: 'heard', tip: 'heard',
+  w: 'waiting', waiting: 'waiting', nothing: 'waiting', notup: 'waiting',
+};
+const ERR = {
+  channel: 'Which channel? Try ch35 kill 7:35.',
+  range: 'Channels go from 1 to 40.',
+  kind: 'Add what happened: kill, spawned, waiting or heard.',
+  time: "That time doesn't look right. Try 7:35 or xx:35.",
+};
+
+// "ch35 kill 7:35", "35 spawned", "ch12 heard xx:04". Times are game chat time (UTC) and mean the most recent past moment.
+function parseLine(text, now) {
+  const tokens = String(text).toLowerCase().replace(/\bnot\s+up\b/g, 'notup').replace(/\bch\s+(\d)/g, 'ch$1').trim().split(/\s+/).filter(Boolean);
+  let channel = null, kind = null, at = now, unknown = false;
+  for (const t of tokens) {
+    if (t.includes(':')) {
+      const m = t.match(/^(xx|\d{1,2})?:(\d{2})$/);
+      const minute = m && +m[2];
+      if (!m || minute > 59) return { ok: false, error: ERR.time };
+      if (m[1] === undefined || m[1] === 'xx') {
+        at = Math.floor(now / HOUR) * HOUR + minute * MIN;
+        if (at > now) at -= HOUR;
+      } else {
+        if (+m[1] > 23) return { ok: false, error: ERR.time };
+        at = Math.floor(now / DAY) * DAY + +m[1] * HOUR + minute * MIN;
+        if (at > now) at -= DAY;
+      }
+    } else if (/^(ch)?\d{1,2}$/.test(t)) channel = +t.replace('ch', '');
+    else if (KIND_WORDS[t]) kind = KIND_WORDS[t];
+    else unknown = true;
+  }
+  if (unknown) return { ok: false, error: ERR.kind };
+  if (channel === null) return { ok: false, error: ERR.channel };
+  if (channel < 1 || channel > 40) return { ok: false, error: ERR.range };
+  if (!kind) return { ok: false, error: ERR.kind };
+  return { ok: true, channel, kind, at };
+}
+
+const pad = n => String(n).padStart(2, '0');
+const fmtGame = ms => { const d = new Date(ms); return pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()); };
+const fmtLocal = ms => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+const LIVE_SPAWN = 2 * MIN, DAILY_CAP = 3, MIN_EXACT = 5;
+
+// One measurement per kill whose poster stayed on the channel: their live spawn (exact)
+// or their last "still waiting" post (longer than). Anyone's next kill ends the cycle.
+function measurements(posts, timer) {
+  const byChannel = {};
+  for (const p of posts) (byChannel[p.channel] = byChannel[p.channel] || []).push(p);
+  const found = [];
+  for (const list of Object.values(byChannel)) {
+    list.sort((a, b) => a.at - b.at);
+    list.forEach((kill, i) => {
+      if (kill.kind !== 'kill') return;
+      let spawn = null, waiting = null;
+      for (const p of list.slice(i + 1)) {
+        if (p.kind === 'kill') break;
+        if (p.user_id !== kill.user_id) continue;
+        if (p.kind === 'spawn' && p.posted_at - p.at <= LIVE_SPAWN) { spawn = p; break; }
+        if (p.kind === 'waiting') waiting = p;
+      }
+      const end = spawn || waiting;
+      if (!end) return;
+      const minutes = Math.round((end.at - kill.at) / MIN);
+      if (minutes > timer * 4) return;
+      // posted_at comes from the server clock, so a real camp spans the timer there too (no backdated kills).
+      if (spawn && (minutes < timer - 2 || spawn.posted_at - kill.posted_at < (timer - 2) * MIN)) return;
+      found.push({ user_id: kill.user_id, killAt: kill.at, minutes, exact: !!spawn, day: Math.floor(kill.posted_at / DAY) });
+    });
+  }
+  found.sort((a, b) => a.killAt - b.killAt);
+  const perDay = {};
+  return found.filter(m => {
+    const key = m.user_id + '|' + m.day;
+    perDay[key] = (perDay[key] || 0) + 1;
+    return perDay[key] <= DAILY_CAP;
+  }).map(({ day, ...m }) => m);
+}
+
+// Kaplan Meier, so "longer than" waits push the window later instead of being ignored.
+function estimateWindow(ms, timer) {
+  const n = ms.length;
+  if (ms.filter(m => m.exact).length < MIN_EXACT) return { lo: timer, hi: timer * 2, typical: null, n, learned: false };
+  const sorted = [...ms].sort((a, b) => a.minutes - b.minutes || (b.exact - a.exact));
+  let S = 1, atRisk = n;
+  const curve = [];
+  for (const m of sorted) {
+    if (m.exact) { S *= (atRisk - 1) / atRisk; curve.push([m.minutes, 1 - S]); }
+    atRisk--;
+  }
+  const quantile = q => { const hit = curve.find(([, F]) => F >= q - 1e-9); return hit ? hit[0] : null; };
+  // When too many camps end in "longer than" to reach 90%, fall back on exact camps only, so one stale wait can't stretch it.
+  const longestExact = Math.max(...ms.filter(m => m.exact).map(m => m.minutes));
+  const hi = quantile(0.9) ?? Math.min(timer * 4, Math.max(longestExact, timer * 2));
+  return { lo: quantile(0.1) ?? timer, hi, typical: quantile(0.5), n, learned: true };
+}
+
+const UP_FOR = HOUR, OVERDUE_FOR = HOUR, WATCH_FRESH = 15 * MIN;
+const STATE_ORDER = { due: 0, soon: 1, watched: 2, up: 3, overdue: 4 };
+
+// One timeline row per channel, anchored on its latest kill, spawn or heard post.
+function channelRows(posts, win, now) {
+  const byChannel = {}, history = win.hi * MIN + OVERDUE_FOR + HOUR;
+  for (const p of posts) if (now - p.at <= history) (byChannel[p.channel] = byChannel[p.channel] || []).push(p);
+  const rows = [];
+  for (const [ch, list] of Object.entries(byChannel)) {
+    list.sort((a, b) => b.at - a.at);
+    const anchor = list.find(p => p.kind !== 'waiting');
+    const row = { channel: +ch, state: null, killAt: null, openAt: null, closeAt: null, seenUpAt: null,
+      secondhand: !!anchor && anchor.kind === 'heard', watchers: 0, lastWaitingAt: null, posts: list };
+    if (!anchor) {
+      // Campers who don't know the kill time still tell everyone the channel is taken.
+      const waits = list.filter(p => now - p.at <= WATCH_FRESH);
+      if (!waits.length) continue;
+      row.state = 'watched';
+      row.watchers = new Set(waits.map(p => p.user_id)).size;
+      row.lastWaitingAt = waits[0].at;
+    } else if (anchor.kind === 'spawn') {
+      if (now - anchor.at >= UP_FOR) continue;
+      row.state = 'up';
+      row.seenUpAt = anchor.at;
+    } else {
+      const waits = list.filter(p => p.kind === 'waiting' && p.at > anchor.at && now - p.at <= WATCH_FRESH);
+      row.watchers = new Set(waits.map(p => p.user_id)).size;
+      row.lastWaitingAt = waits.length ? waits[0].at : null;
+      row.killAt = anchor.at;
+      row.openAt = anchor.at + win.lo * MIN;
+      row.closeAt = anchor.at + win.hi * MIN;
+      if (now < row.openAt) row.state = 'soon';
+      else if (now <= row.closeAt) row.state = 'due';
+      else if (row.watchers) row.state = 'watched';
+      else if (now - row.closeAt <= OVERDUE_FOR) row.state = 'overdue';
+      else continue;
+    }
+    rows.push(row);
+  }
+  const key = r => r.state === 'due' ? r.closeAt : r.state === 'soon' ? r.openAt : 0;
+  return rows.sort((a, b) => STATE_ORDER[a.state] - STATE_ORDER[b.state] || key(a) - key(b) || a.channel - b.channel);
+}
+
+window.BossTimer = { parseLine, fmtGame, fmtLocal, measurements, estimateWindow, channelRows };
+
+/* ---------- API adapter ---------- */
+
+// Supabase behind the small API the page uses. Times cross this line as ISO strings and come back as ms.
+// With no backend configured (or the CDN blocked), every read fails so the page shows the "can't reach" line.
+function makeSupabaseApi(cfg) {
+  const down = () => Promise.reject(new Error('The timer database is not set up yet.'));
+  if (!cfg.supabaseUrl || !window.supabase) {
+    return { getSession: async () => null, onAuth() {}, signIn: down, signOut: down, list: down, subscribe: () => () => {},
+      post: down, remove: down, hide: down, unhide: down, block: down, isAdmin: async () => false };
+  }
+  const COLUMNS = 'id,boss_id,channel,kind,at,posted_at,user_id,user_name,hidden';
+  const sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+  const who = s => {
+    if (!s || !s.user) return null;
+    const m = s.user.user_metadata || {};
+    return { user_id: s.user.id, user_name: (m.custom_claims && m.custom_claims.global_name) || m.full_name || m.name || 'You' };
+  };
+  const check = ({ error }) => { if (error) throw new Error(error.message); };
+  return {
+    async getSession() { const { data } = await sb.auth.getSession(); return who(data.session); },
+    // supabase-js awaits these callbacks while holding its auth lock; calling back into Supabase from
+    // inside one (isAdmin does) waits on that same lock forever. Hand off to a fresh task instead.
+    onAuth(cb) { sb.auth.onAuthStateChange((_event, s) => { setTimeout(() => cb(who(s)), 0); }); },
+    async signIn() { check(await sb.auth.signInWithOAuth({ provider: 'discord', options: { redirectTo: location.href.split('#')[0] } })); },
+    async signOut() { check(await sb.auth.signOut()); },
+    async list(bossId, sinceMs) {
+      const { data, error } = await sb.from('sightings').select(COLUMNS).eq('boss_id', bossId)
+        .gte('at', new Date(sinceMs).toISOString()).order('at', { ascending: false }).limit(1000);
+      if (error) throw new Error(error.message);
+      return data.map(r => ({ ...r, at: Date.parse(r.at), posted_at: Date.parse(r.posted_at) }));
+    },
+    subscribe(bossId, cb, onStatus) {
+      const channel = sb.channel('sightings-' + bossId)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'sightings', filter: 'boss_id=eq.' + bossId }, () => cb())
+        .subscribe(status => onStatus && onStatus(status));
+      return () => sb.removeChannel(channel);
+    },
+    // A null time means "now" by the server's clock, so a PC clock that's off can't spoil a live spawn.
+    async post(p) {
+      const row = { boss_id: p.boss_id, channel: p.channel, kind: p.kind };
+      if (p.at != null) row.at = new Date(p.at).toISOString();
+      check(await sb.from('sightings').insert(row));
+    },
+    async remove(id) { check(await sb.from('sightings').delete().eq('id', id)); },
+    async hide(id) { check(await sb.from('sightings').update({ hidden: true }).eq('id', id)); },
+    async unhide(id) { check(await sb.from('sightings').update({ hidden: false }).eq('id', id)); },
+    async block(userId) { check(await sb.from('blocked_users').insert({ user_id: userId })); },
+    async isAdmin() { const { data } = await sb.rpc('is_admin'); return data === true; },
+  };
+}
+
+/* ---------- UI ---------- */
+
+const api = window.BT_API || makeSupabaseApi(CONFIG);
+const $ = id => document.getElementById(id);
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch { /* private window */ } },
+};
+const savedBoss = +store.get('bt.boss');
+const savedChannel = +store.get('bt.channel');
+// full: 30 days for the estimate, fetched rarely. recent: the last few hours, refreshed on every change.
+const state = { bossId: BOSSES.some(b => b.id === savedBoss) ? savedBoss : 700000, full: [], recent: [], recentCut: 0,
+  open: null, down: false, live: false, gen: 0,
+  session: null, admin: false, channel: savedChannel >= 1 && savedChannel <= 40 ? savedChannel : null };
+const boss = () => BOSSES.find(b => b.id === state.bossId);
+const allPosts = () => state.full.filter(p => p.at < state.recentCut).concat(state.recent);
+const KIND_LABEL = { kill: 'killed it', spawn: 'saw it spawn', heard: 'heard a tip', waiting: 'still waiting' };
+
+function el(tag, attrs = {}, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'style') e.style.cssText = v;
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else e.setAttribute(k, v);
+  }
+  for (const kid of kids.flat()) if (kid != null && kid !== false) e.append(kid);
+  return e;
+}
+const when = ms => el('span', {}, el('b', { class: 't' }, fmtGame(ms)), ' ', el('small', {}, fmtLocal(ms)));
+
+function estimateText(win) {
+  if (!win.learned) return `Usually ${win.lo} to ${win.hi} min. Not enough camps yet to learn more.`;
+  return `Usually ${win.lo} to ${win.hi} min${win.typical != null ? `, typically ${win.typical}` : ''}. Based on ${win.n} camps.`;
+}
+
+function rowWhat(r) {
+  const parts = [];
+  if (r.killAt != null) parts.push(r.secondhand ? 'Tip says ' : 'Killed ', when(r.killAt), '. ');
+  if (r.state === 'due') parts.push('Could spawn any time now, window ends ', when(r.closeAt), '.');
+  if (r.state === 'soon') parts.push('Window opens ', when(r.openAt), '.');
+  if (r.state === 'watched') parts.push(`Being watched by ${r.watchers}, nothing as of `, when(r.lastWaitingAt), '.');
+  if (r.state === 'up') parts.push('Seen up at ', when(r.seenUpAt), ', may still be alive.');
+  if (r.state === 'overdue') parts.push('Overdue since ', when(r.closeAt), ', probably killed by someone.');
+  if (r.watchers && r.state !== 'watched') parts.push(` ${r.watchers} camping now.`);
+  return el('div', { class: 'what small' }, parts);
+}
+
+const UNDO_FOR = 10 * MIN;
+// Runs a backend action from a button inside a row without toggling the row, then reloads.
+const act = fn => e => { e.stopPropagation(); fn().catch(err => hint(err.message)).then(fetchRecent); };
+
+function postList(r) {
+  const me = state.session && state.session.user_id;
+  return el('ul', { class: 'postlist' }, r.posts.map(p => el('li', {},
+    when(p.at), el('span', {}, KIND_LABEL[p.kind]), el('span', { class: 'muted' }, p.user_name || 'Someone'),
+    p.user_id === me && Date.now() - p.posted_at < UNDO_FOR ? el('button', { type: 'button', onclick: act(() => api.remove(p.id)) }, 'Undo') : null,
+    state.admin ? el('button', { type: 'button', onclick: act(() => api.hide(p.id)) }, 'Hide') : null,
+    state.admin && p.user_id !== me ? el('button', { type: 'button', onclick: act(() => api.block(p.user_id)) }, 'Block') : null)));
+}
+
+function renderHidden(posts) {
+  const box = $('hiddenlist');
+  const hidden = state.admin ? posts.filter(p => p.hidden) : [];
+  box.hidden = !hidden.length;
+  box.replaceChildren(el('h2', {}, 'Hidden posts (only admins see these)'), el('ul', { class: 'postlist' }, hidden.map(p => el('li', {},
+    when(p.at), el('span', {}, `ch${p.channel} ${KIND_LABEL[p.kind]}`), el('span', { class: 'muted' }, p.user_name || 'Someone'),
+    el('button', { type: 'button', onclick: act(() => api.unhide(p.id)) }, 'Unhide')))));
+}
+
+function render() {
+  const now = Date.now(), b = boss(), every = allPosts();
+  const posts = every.filter(p => !p.hidden);
+  const win = estimateWindow(measurements(posts, b.timer), b.timer);
+  $('estimate').textContent = estimateText(win);
+  $('bossinfo').textContent = `Level ${b.level}, ${b.map}. The game files say ${b.timer} min.`;
+  $('status').textContent = state.down ? "Can't reach the timer right now. Retrying." : '';
+  renderHidden(every);
+
+  const rows = channelRows(posts, win, now);
+  const start = now - 30 * MIN;
+  const furthest = Math.max(0, ...rows.map(r => r.closeAt || 0));
+  const end = Math.max(now + 2 * HOUR, Math.min(furthest + 10 * MIN, now + 7 * HOUR));
+  const pct = t => Math.min(100, Math.max(0, (t - start) / (end - start) * 100)) + '%';
+  const step = end - start > 4 * HOUR ? HOUR : 30 * MIN;
+  const ticks = [];
+  for (let t = Math.ceil(start / step) * step; t <= end; t += step) ticks.push(el('span', { style: `left:${pct(t)}` }, fmtGame(t)));
+
+  const tl = $('timeline');
+  tl.replaceChildren(el('div', { class: 'axis' }, el('span', { class: 'small' }, 'Channel'),
+    el('div', { class: 'ticks' }, ticks, el('div', { id: 'nowline', style: `left:${pct(now)}`, title: 'Now' }))));
+  if (!rows.length) {
+    tl.append(el('p', { class: 'empty' }, `No sightings for ${b.name} in the last few hours. Be the first to post one.`));
+    return;
+  }
+  for (const r of rows) {
+    const marks = r.state === 'up' ? el('div', { class: 'mark', style: `left:${pct(r.seenUpAt)}` })
+      : r.openAt != null ? el('div', { class: 'bar', style: `left:${pct(r.openAt)};width:calc(${pct(r.closeAt)} - ${pct(r.openAt)})` })
+      : null;
+    tl.append(el('div', {
+      class: `row state-${r.state}${r.secondhand ? ' secondhand' : ''}`, 'data-channel': r.channel, tabindex: '0',
+      onclick: () => { state.open = state.open === r.channel ? null : r.channel; render(); },
+      onkeydown: e => { if (e.key === 'Enter') e.currentTarget.click(); },
+    }, el('div', { class: 'main' }, el('span', { class: 'ch' }, 'ch ' + r.channel),
+      el('div', { class: 'track' }, marks, el('div', { class: 'now', style: `left:${pct(now)}` })),
+      rowWhat(r), state.open === r.channel ? postList(r) : null)));
+  }
+}
+
+// Long enough to cover any row: the widest possible window plus an hour overdue and some slack.
+const recentSpan = () => boss().timer * 4 * MIN + 2 * HOUR;
+
+// Results from a boss the player has since switched away from are dropped (gen changes on switch).
+async function load(since, apply) {
+  const gen = state.gen;
+  try {
+    const posts = await api.list(state.bossId, since);
+    if (gen !== state.gen) return;
+    apply(posts);
+    state.down = false;
+  } catch {
+    if (gen !== state.gen) return;
+    state.down = true;
+  }
+  render();
+}
+function fetchFull() {
+  const cut = Date.now() - recentSpan();
+  return load(Date.now() - 30 * DAY, posts => { state.full = posts; state.recentCut = cut; state.recent = posts.filter(p => p.at >= cut); });
+}
+function fetchRecent() {
+  const cut = Date.now() - recentSpan();
+  return load(cut, posts => { state.recentCut = cut; state.recent = posts; });
+}
+
+// Live changes for the chosen boss only; a burst of changes becomes one refresh.
+let unsubscribe = () => {}, changeTimer = null;
+function subscribeBoss() {
+  try { unsubscribe(); } catch { /* already gone */ }
+  state.live = false;
+  try {
+    unsubscribe = api.subscribe(state.bossId,
+      () => { clearTimeout(changeTimer); changeTimer = setTimeout(fetchRecent, 2000); },
+      status => { state.live = status === 'SUBSCRIBED'; });
+  } catch { unsubscribe = () => {}; }
+}
+
+const defaultHint = () => !state.session ? ''
+  : state.channel ? `Quick buttons post for ch${state.channel}.` : 'Type a channel first, like ch35.';
+const hint = msg => { $('entryhint').textContent = msg; };
+
+function renderAuth() {
+  const s = state.session;
+  $('signin').hidden = !!s;
+  $('signout').hidden = !s;
+  $('who').hidden = !s;
+  $('who').textContent = s ? `Posting as ${s.user_name}` : '';
+  $('entry').disabled = !s;
+  $('entry').placeholder = s ? 'ch35 kill 7:35  /  ch35 spawned  /  ch35 waiting  /  ch12 heard xx:04' : 'Sign in with Discord to post';
+  for (const id of ['btn-spawned', 'btn-killed', 'btn-waiting']) $(id).disabled = !s || !state.channel;
+  hint(defaultHint());
+}
+
+async function setSession(s) {
+  state.session = s;
+  state.admin = s ? await api.isAdmin().catch(() => false) : false;
+  renderAuth();
+  render();
+}
+
+async function send(channel, kind, at) {
+  await api.post({ boss_id: state.bossId, channel, kind, at });
+  state.channel = channel;
+  store.set('bt.channel', channel);
+  renderAuth();
+  await fetchRecent();
+}
+
+$('entry').addEventListener('keydown', async e => {
+  if (e.key !== 'Enter') return;
+  const parsed = parseLine($('entry').value, Date.now());
+  if (!parsed.ok) return hint(parsed.error);
+  try {
+    await send(parsed.channel, parsed.kind, parsed.at);
+    $('entry').value = '';
+  } catch (err) { hint(err.message); }
+});
+for (const [id, kind] of [['btn-spawned', 'spawn'], ['btn-killed', 'kill'], ['btn-waiting', 'waiting']]) {
+  $(id).addEventListener('click', () => send(state.channel, kind, null).catch(err => hint(err.message)));
+}
+$('signin').addEventListener('click', () => api.signIn().catch(err => hint(err.message)));
+$('signout').addEventListener('click', () => api.signOut().catch(() => {}).then(() => setSession(null)));
+
+$('boss').append(...BOSSES.map(b => el('option', { value: b.id }, `${b.name} (Lv ${b.level})`)));
+$('boss').value = state.bossId;
+$('boss').addEventListener('change', () => {
+  state.bossId = +$('boss').value;
+  store.set('bt.boss', state.bossId);
+  state.full = []; state.recent = []; state.open = null; state.gen++;
+  render(); subscribeBoss(); fetchFull();
+});
+renderAuth();
+render();
+fetchFull();
+subscribeBoss();
+api.getSession().then(setSession, () => setSession(null));
+try { api.onAuth(s => setSession(s)); } catch { /* sign in still works after a reload */ }
+setInterval(() => { if (!state.live) fetchRecent(); }, 60 * 1000);
+setInterval(fetchFull, 15 * 60 * 1000);
+setInterval(render, 30 * 1000);
+</script>
+</body>
+</html>
