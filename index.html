@@ -4,88 +4,242 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Boss Timer</title>
+<script>
+// Theme before first paint: the player's saved choice, else their system setting.
+(function () {
+  var t = null;
+  try { t = localStorage.getItem('bt.theme'); } catch (e) { /* blocked storage */ }
+  if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  document.documentElement.dataset.theme = t;
+})();
+</script>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap">
 <style>
 :root {
+  color-scheme: light;
+  --page: #fbf7ef;
+  --surface: #fff;
+  --surface-2: #faf6ee;
+  --band: #f1eadb;
+  --ink: #2a2433;
+  --muted: #7d7287;
+  --line: #e2d7c1;
+  --row-line: #f1eadb;
+  --track: #f4efe4;
+  --num: #2a2433;
+  --nav: #141a2e;
+  --nav-ink: #e9e6f5;
+  --nav-muted: #aab0cc;
+  --nav-on: #2a3352;
+  --accent: #ffb648;
+  --btn: #fff;
+  --btn-line: #e2d7c1;
+  --btn-k: #2a2433;
+  --btn-k-ink: #fff;
+  --now: #e0525a;
+  --bad: #b3363d;
+  --focus: #4f8cff;
+  --due-bg: #ffb648; --due-fg: #3a2400; --due-bar: #ffb648;
+  --soon-bg: #cfe5fa; --soon-fg: #1f5f99; --soon-bar: #7cb7f0;
+  --up-bg: #dcf3cf; --up-fg: #2f7a12; --up-dot: #6cbf3f;
+  --watch-bg: #fff0d6; --watch-fg: #9a5d00; --watch-bar: repeating-linear-gradient(45deg, #ffcf8a 0 6px, #ffe3b8 6px 12px);
+  --over-bg: #f6dfe0; --over-fg: #a2353b; --over-bar: repeating-linear-gradient(45deg, #f2a3a7 0 6px, #f9d2d4 6px 12px);
+  --font-title: Fredoka, 'Trebuchet MS', system-ui, sans-serif;
+  --font-body: Nunito, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-num: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+:root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0f171d;
-  --surface: #17232c;
-  --surface-2: #1d2c37;
-  --ink: #e7eef2;
-  --muted: #95a8b5;
-  --line: #2c4251;
-  --accent: #f0b84a;
-  --accent-bg: #3a2e10;
-  --good: #5fd68f;
-  --good-bg: #173826;
-  --soon: #6db3ff;
-  --bad: #ff8a7d;
-  --bad-bg: #42201c;
-  --focus: #6db3ff;
-  --font-body: system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-num: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --page: #10131c;
+  --surface: #141927;
+  --surface-2: #161b2b;
+  --band: #161b2b;
+  --ink: #ece8f6;
+  --muted: #8d93ad;
+  --line: #2c3450;
+  --row-line: #1e2436;
+  --track: #1e2436;
+  --num: #ffcf7a;
+  --btn: #1b2134;
+  --btn-line: #2c3450;
+  --btn-k: #ffb648;
+  --btn-k-ink: #2a1a00;
+  --bad: #ff9aa2;
+  --due-fg: #2a1a00;
+  --soon-bg: #18324d; --soon-fg: #8cc6ff; --soon-bar: #4b8fd1;
+  --up-bg: #173a22; --up-fg: #7be29c;
+  --watch-bg: #3a2c12; --watch-fg: #ffcf7a; --watch-bar: repeating-linear-gradient(45deg, #8a6420 0 6px, #5a4214 6px 12px);
+  --over-bg: #3a1d22; --over-fg: #ff9aa2; --over-bar: repeating-linear-gradient(45deg, #6a2f36 0 6px, #43222a 6px 12px);
 }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 var(--font-body); }
+body { margin: 0; background: var(--page); color: var(--ink); font: 500 15px/1.45 var(--font-body); }
 main { max-width: 1200px; margin: 0 auto; padding: 16px; }
 h1 { font-size: 22px; margin: 0; }
+
+/* top bar: dark navy in both themes */
+.topbar { background: var(--nav); color: var(--nav-ink); }
+.topbar .in { max-width: 1200px; margin: 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 10px 16px; }
+.logo { font: 700 20px var(--font-title); margin: 0; }
+.logo b { color: var(--accent); font-weight: 700; }
+.tabs { display: flex; gap: 4px; }
+.tabs button { background: none; border: 0; color: var(--nav-muted); font: 700 14px var(--font-body); padding: 5px 12px; border-radius: 99px; }
+.tabs button[aria-selected="true"] { background: var(--nav-on); color: #fff; }
+.tabs button:hover { color: #fff; }
+.auth { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.auth #who { color: var(--nav-muted); font-size: 13px; }
+.auth #signout { background: none; border: 1px solid var(--nav-on); color: var(--nav-ink); }
+#theme { background: none; border: 1px solid var(--nav-on); color: var(--nav-ink); width: 34px; height: 34px; padding: 0; display: grid; place-items: center; }
+#theme svg { width: 18px; height: 18px; }
+:root[data-theme="dark"] #theme .moon, :root:not([data-theme="dark"]) #theme .sun { display: none; }
+
+/* How it works */
+#view-how { max-width: 760px; }
+#view-how h2 { font: 600 30px/1.2 var(--font-title); margin: 8px 0 4px; }
+#view-how h3 { font: 600 20px var(--font-title); margin: 26px 0 6px; }
+#view-how p, #view-how li { color: var(--ink); }
+#view-how .lead { font-size: 17px; }
+#view-how code { font: 500 14px var(--font-num); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; }
+.legend, .examples { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.legend li { display: grid; grid-template-columns: 120px 1fr; gap: 12px; align-items: center; }
+.examples li { display: grid; grid-template-columns: 150px 1fr; gap: 12px; align-items: baseline; }
+.examples code { justify-self: start; }
+.smallprint { margin-top: 30px; padding-top: 12px; border-top: 1px solid var(--line); }
+.pill { font: 800 12px var(--font-body); letter-spacing: .06em; text-transform: uppercase; padding: 3px 9px; border-radius: 99px; justify-self: start; white-space: nowrap; }
+.pill-due { background: var(--due-bg); color: var(--due-fg); }
+.pill-soon { background: var(--soon-bg); color: var(--soon-fg); }
+.pill-watched { background: var(--watch-bg); color: var(--watch-fg); }
+.pill-up { background: var(--up-bg); color: var(--up-fg); }
+.pill-overdue { background: var(--over-bg); color: var(--over-fg); }
 .muted { color: var(--muted); }
 small, .small { font-size: 12px; color: var(--muted); }
-.top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-bottom: 12px; }
+/* stage: dusk sky, the boss walking on a Maple ledge */
+#stage { position: relative; height: 210px; border-radius: 14px; overflow: hidden; color: #fff;
+  background: linear-gradient(180deg, #1c2547 0%, #3d3a73 55%, #c9797a 92%, #eaa67a 100%); }
+.stars { position: absolute; inset: 0; background-image: radial-gradient(1.5px 1.5px at 12% 22%, #fff9, transparent), radial-gradient(1px 1px at 33% 12%, #fff8, transparent),
+  radial-gradient(1.5px 1.5px at 71% 18%, #fffa, transparent), radial-gradient(1px 1px at 86% 35%, #fff7, transparent), radial-gradient(1px 1px at 55% 30%, #fff6, transparent),
+  radial-gradient(1px 1px at 22% 40%, #fff5, transparent), radial-gradient(1.5px 1.5px at 93% 10%, #fff8, transparent); }
+.ground { position: absolute; left: 0; right: 0; bottom: 0; height: 22px; background: #8a5a33; border-top: 7px solid #6cbf3f; box-shadow: inset 0 3px 0 #4f9a2c; }
+.stage-row { position: absolute; left: 0; right: 0; bottom: 22px; display: flex; align-items: flex-end; gap: 8px 24px; padding: 0 24px 0 32px; }
+#spritebox { position: relative; flex: none; }
+#sprite { position: absolute; background-repeat: no-repeat; }
+.title { padding-bottom: 16px; min-width: 0; }
+#bossname { font: 700 40px/1 var(--font-title); margin: 0; text-shadow: 0 2px 0 #0004; }
+#bossmap { margin: 6px 0 0; color: #f3e6ff; font-weight: 700; }
+.stat { margin-left: auto; text-align: right; padding-bottom: 16px; flex: none; }
+#estimate { font: 700 32px/1 var(--font-title); text-shadow: 0 2px 0 #0003; }
+#estimate small { font-size: 15px; color: inherit; opacity: .85; }
+#estimatenote { margin: 6px 0 0; font-size: 13px; font-weight: 700; color: #ffe9d6; }
+#bossinfo { margin: 2px 0 0; font-size: 12px; color: #ffe9d6; opacity: .8; }
+
+/* boss buttons */
+.picker { display: flex; gap: 6px; padding: 10px 0; overflow-x: auto; }
+.boss { flex: none; display: flex; align-items: center; gap: 6px; padding: 4px 12px 4px 4px; border: 0; border-radius: 10px; background: none;
+  color: var(--muted); font: 800 13px var(--font-body); white-space: nowrap; }
+.boss:hover { color: var(--ink); }
+.boss[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 2px var(--accent); }
+.boss .mini { display: block; flex: none; background-repeat: no-repeat; }
 select, input, button { font: inherit; color: inherit; }
-select, input { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
-button { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+input { background: var(--surface); border: 1.5px solid var(--btn-line); border-radius: 10px; padding: 8px 12px; }
+button { background: var(--btn); border: 1.5px solid var(--btn-line); border-radius: 10px; padding: 7px 14px; font-weight: 800; font-size: 13px; cursor: pointer; }
 button:hover { border-color: var(--muted); }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-#bossinfo { flex-basis: 100%; }
-#estimate { font-weight: 600; }
-#status { color: var(--bad); min-height: 1em; margin: 4px 0; }
+button:disabled, input:disabled { opacity: .5; cursor: not-allowed; }
+#signin { background: #5865f2; border-color: #5865f2; color: #fff; }
+
+/* post line */
+.postbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 6px; }
+#entry { flex: 1 1 260px; min-width: 0; font: 500 14px var(--font-num); }
+.quick { display: flex; flex-wrap: wrap; gap: 6px; }
+#btn-killed { background: var(--btn-k); border-color: var(--btn-k); color: var(--btn-k-ink); }
+#entryhint { flex-basis: 100%; margin: 0; }
+#entryhint:empty { display: none; }
+#status { color: var(--bad); font-weight: 700; margin: 4px 0; }
 #status:empty { display: none; }
-#timeline { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
-.axis, .row .main { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 10px; align-items: center; }
-.axis .ticks { position: relative; height: 18px; font: 12px var(--font-num); color: var(--muted); }
-.axis .ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
-.track { position: relative; height: 22px; background: var(--surface-2); border-radius: 6px; overflow: hidden; }
-.bar { position: absolute; top: 3px; bottom: 3px; border-radius: 4px; }
-.state-soon .bar { background: var(--soon); opacity: .75; }
-.state-due .bar { background: var(--accent); }
-.state-watched .bar { background: var(--accent); opacity: .55; }
+
+/* board: one line per channel */
+#timeline { margin-top: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.axis, .row .main { display: grid; grid-template-columns: 56px 128px minmax(0, 1fr) 120px; gap: 6px 16px; align-items: center; padding: 10px 16px; }
+.axis { background: var(--surface-2); font: 700 11px var(--font-num); letter-spacing: .12em; color: var(--muted); padding-block: 8px 4px; }
+.axis .label { display: block; }
+.axis .ticks { position: relative; height: 18px; font: 500 11px var(--font-num); letter-spacing: 0; }
+.axis .ticks span { position: absolute; top: 2px; z-index: 1; transform: translateX(-50%); white-space: nowrap; background: var(--surface-2); padding: 0 3px; }
+#nowline { position: absolute; top: 0; bottom: -4px; width: 2px; background: var(--now); pointer-events: none; }
+.row { border-top: 1px solid var(--row-line); cursor: pointer; }
+.row:hover { background: var(--surface-2); }
+.row .ch { font: 700 22px var(--font-num); color: var(--num); }
+.row .when { font: 700 17px var(--font-num); color: var(--num); text-align: right; white-space: nowrap; }
+.row .what { margin-top: 6px; font-size: 12px; }
+.track { position: relative; height: 10px; border-radius: 99px; background: var(--track); }
+.bar { position: absolute; top: 0; bottom: 0; border-radius: 99px; }
+.state-due .bar { background: var(--due-bar); }
+.state-soon .bar { background: var(--soon-bar); }
+.state-watched .bar { background: var(--watch-bar); }
 .state-overdue { opacity: .55; }
-.state-overdue .bar { background: var(--bad); opacity: .6; }
-.secondhand .bar { background: transparent !important; border: 2px dashed var(--muted); opacity: .8; }
-.mark { position: absolute; top: 2px; bottom: 2px; width: 6px; margin-left: -3px; border-radius: 3px; background: var(--good); }
-.now { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--bad); }
-.lanes { position: relative; }
-#nowline { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--bad); pointer-events: none; }
-.row { border-top: 1px solid var(--line); padding: 8px 0; cursor: pointer; }
-.row .ch { font: 600 15px var(--font-num); }
-.row .what { grid-column: 2; margin-top: 4px; }
-.postlist { grid-column: 2; margin: 6px 0 0; padding: 0; list-style: none; font-size: 13px; }
+.state-overdue .bar { background: var(--over-bar); }
+.secondhand .bar { background: transparent !important; border: 2px dashed var(--muted); }
+.mark { position: absolute; top: -3px; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: var(--up-dot); border: 3px solid var(--surface); box-shadow: 0 0 0 1px var(--up-dot); }
+.now { position: absolute; top: -5px; bottom: -5px; width: 2px; background: var(--now); }
+.postlist { grid-column: 1 / -1; margin: 4px 0 0 72px; padding: 0; list-style: none; font-size: 13px; }
 .postlist li { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 2px 0; }
-.postlist button { padding: 1px 8px; font-size: 12px; }
-.empty { padding: 16px 0 4px; color: var(--muted); }
+.postlist button { padding: 1px 8px; font-size: 12px; border-radius: 8px; }
+.empty { margin: 0; padding: 18px 16px; color: var(--muted); }
 #hiddenlist { margin-top: 12px; padding: 12px; border: 1px dashed var(--line); border-radius: 12px; }
 #hiddenlist h2 { font-size: 14px; margin: 0 0 6px; color: var(--muted); }
+#hiddenlist .postlist { margin-left: 0; }
 b.t { font-family: var(--font-num); }
-.postbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; }
-#entry { flex: 1 1 260px; min-width: 0; }
-.quick { display: flex; flex-wrap: wrap; gap: 6px; }
-#entryhint { flex-basis: 100%; margin: 0; }
-#signin { background: #5865f2; border-color: #5865f2; color: #fff; }
-button:disabled, input:disabled { opacity: .5; cursor: not-allowed; }
+
+/* phone: shorter stage with the stats under the name, board keeps CH, STATUS and the time */
+@media (max-width: 640px) {
+  main { padding: 12px; }
+  #stage { height: 170px; }
+  .stage-row { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: end; gap: 0 14px; padding: 0 14px; }
+  #spritebox { grid-row: 1 / 3; }
+  .title { padding-bottom: 6px; }
+  #bossname { font-size: 26px; }
+  #bossmap { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stat { margin-left: 0; text-align: left; padding-bottom: 10px; }
+  #estimate { font-size: 22px; }
+  #estimatenote { margin-top: 2px; }
+  .axis, .row .main { grid-template-columns: 40px minmax(0, 1fr) auto; gap: 4px 10px; padding-inline: 12px; }
+  .axis .win, .row .track { display: none; }
+  .row .win { grid-column: 1 / -1; grid-row: 2; }
+  .row .what { margin-top: 0; }
+  .row .ch { font-size: 18px; }
+  .row .when { font-size: 15px; }
+  .postlist { margin-left: 0; }
+}
 </style>
 </head>
 <body>
-<main>
-  <div class="top">
-    <h1>Boss Timer</h1>
-    <label>Boss <select id="boss" aria-label="Boss"></select></label>
-    <span id="estimate"></span>
-    <span id="bossinfo" class="small"></span>
-  </div>
-  <div class="postbar">
-    <button id="signin" type="button">Sign in with Discord</button>
-    <span id="who" class="small" hidden></span>
+<header class="topbar"><div class="in">
+  <h1 class="logo">Boss<b>Timer</b></h1>
+  <nav class="tabs" role="tablist" aria-label="Pages">
+    <button id="tab-timer" type="button" role="tab" aria-controls="view-timer" aria-selected="true">Timer</button>
+    <button id="tab-how" type="button" role="tab" aria-controls="view-how" aria-selected="false">How it works</button>
+  </nav>
+  <span class="auth">
+    <span id="who" hidden></span>
     <button id="signout" type="button" hidden>Sign out</button>
+    <button id="signin" type="button">Sign in with Discord</button>
+  </span>
+  <button id="theme" type="button" aria-label="Switch to dark theme" title="Switch to dark theme">
+    <svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg>
+    <svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="currentColor"/><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg>
+  </button>
+</div></header>
+<main id="view-timer" role="tabpanel" aria-labelledby="tab-timer">
+  <section id="stage" aria-label="Selected boss">
+    <div class="stars"></div>
+    <div class="ground"></div>
+    <div class="stage-row">
+      <div id="spritebox" aria-hidden="true"><div id="sprite"></div></div>
+      <div class="title"><h2 id="bossname"></h2><p id="bossmap"></p></div>
+      <div class="stat"><div id="estimate"></div><p id="estimatenote"></p><p id="bossinfo"></p></div>
+    </div>
+  </section>
+  <div id="bosses" class="picker" role="group" aria-label="Boss"></div>
+  <div class="postbar">
     <input id="entry" autocomplete="off" spellcheck="false" aria-label="Post a sighting" aria-describedby="entryhint">
     <span class="quick">
       <button id="btn-spawned" type="button">Spawned now</button>
@@ -99,6 +253,41 @@ button:disabled, input:disabled { opacity: .5; cursor: not-allowed; }
   <section id="hiddenlist" hidden></section>
   <p class="small">Times are game chat time, your local time is beside them in grey. Windows learn from players who camp a kill until the next spawn.</p>
 </main>
+<main id="view-how" role="tabpanel" aria-labelledby="tab-how" hidden>
+  <h2>How it works</h2>
+
+  <h3>Why post</h3>
+  <p class="lead">Boss camping comes down to patience and luck, and whoever does the most damage takes the loot. A timer won't change that. What it does change is how long everyone waits. Every kill or spawn you share makes the window sharper for the next person, and for you next time.</p>
+
+  <h3>Reading the board</h3>
+  <p>Each line is one channel. The bar shows when the boss could spawn, and the red line is now.</p>
+  <ul class="legend">
+    <li><span class="pill pill-due">Due now</span><span>The window is open. It could appear any minute.</span></li>
+    <li><span class="pill pill-soon">Opens soon</span><span>Someone posted a kill and the window hasn't started yet.</span></li>
+    <li><span class="pill pill-watched">Watched</span><span>Someone is camping the channel and hasn't seen it spawn.</span></li>
+    <li><span class="pill pill-up">Up</span><span>It just spawned and may still be alive.</span></li>
+    <li><span class="pill pill-overdue">Overdue</span><span>The window passed with no report. Someone probably killed it without posting.</span></li>
+  </ul>
+  <p>Times are game chat time, with your local time in grey beside them. Click a channel to see who posted what.</p>
+
+  <h3>Posting</h3>
+  <p>Sign in with Discord, then press a button or type a line and hit Enter.</p>
+  <ul class="examples">
+    <li><code>ch35 kill 7:35</code><span>You killed it on channel 35 at 7:35 game time.</span></li>
+    <li><code>ch12 spawned</code><span>It's up on channel 12 right now.</span></li>
+    <li><code>ch7 waiting</code><span>You're camping channel 7 and it hasn't shown yet.</span></li>
+    <li><code>heard ch3 9:10</code><span>Someone told you it died on channel 3 at 9:10.</span></li>
+  </ul>
+  <p>The buttons post for the last channel you used. Made a mistake? Click the channel and press Undo, any time in the next 10 minutes.</p>
+
+  <h3>How the window learns</h3>
+  <p>The game files say 60 minutes for Mushmom, but real camps run longer. Only a kill followed by a spawn that the same person watched counts as a camp, and their Still waiting posts help too. Until a boss has 5 camps the window is a wide guess, from the game timer to twice that. Heard posts show dashed and never count.</p>
+
+  <h3>Fair play</h3>
+  <p>One post every 15 seconds. Your Discord name shows on everything you post. False posts get hidden and the account blocked.</p>
+
+  <p class="small smallprint">Fan made, not affiliated with Nexon. Boss art comes from the MapleStory client and belongs to Nexon.</p>
+</main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
 <script>
 const CONFIG = {
@@ -108,12 +297,12 @@ const CONFIG = {
 
 /* BOSSES:START */
 const BOSSES = [
- {"id":700004,"name":"Mano","level":20,"map":"Victoria Road : Thicket Around the Beach III","timer":60},
- {"id":700007,"name":"Stumpy","level":35,"map":"Victoria Road : Parched Land","timer":60},
- {"id":700000,"name":"Mushmom","level":40,"map":"Hidden Street : Someone Else's House","timer":60},
- {"id":700006,"name":"Shade","level":48,"map":"Hidden Street : Cabin of the Forsaken","timer":60},
- {"id":700002,"name":"Zombie Mushmom","level":55,"map":"Dungeon : The Grave of Mushmom","timer":60},
- {"id":700001,"name":"Jr. Balrog","level":80,"map":"Dungeon : The Cursed Sanctuary","timer":180}
+ {"id":700004,"name":"Mano","level":20,"map":"Victoria Road : Thicket Around the Beach III","timer":60,"frames":[{"x":0,"w":104,"h":97,"ox":51,"oy":97,"delay":150},{"x":104,"w":104,"h":96,"ox":51,"oy":96,"delay":150},{"x":208,"w":105,"h":96,"ox":51,"oy":96,"delay":150},{"x":313,"w":105,"h":98,"ox":51,"oy":98,"delay":150},{"x":418,"w":106,"h":99,"ox":52,"oy":99,"delay":150},{"x":524,"w":104,"h":99,"ox":51,"oy":99,"delay":150}]},
+ {"id":700007,"name":"Stumpy","level":35,"map":"Victoria Road : Parched Land","timer":60,"frames":[{"x":0,"w":181,"h":177,"ox":91,"oy":176,"delay":120},{"x":181,"w":180,"h":177,"ox":91,"oy":177,"delay":120},{"x":361,"w":176,"h":178,"ox":91,"oy":178,"delay":120},{"x":537,"w":175,"h":177,"ox":91,"oy":177,"delay":120},{"x":712,"w":176,"h":176,"ox":91,"oy":176,"delay":120},{"x":888,"w":178,"h":175,"ox":91,"oy":175,"delay":120}]},
+ {"id":700000,"name":"Mushmom","level":40,"map":"Hidden Street : Someone Else's House","timer":60,"frames":[{"x":0,"w":119,"h":110,"ox":59,"oy":110,"delay":500},{"x":119,"w":120,"h":105,"ox":60,"oy":105,"delay":100},{"x":239,"w":118,"h":102,"ox":59,"oy":102,"delay":100},{"x":357,"w":118,"h":125,"ox":59,"oy":180,"delay":300},{"x":475,"w":118,"h":125,"ox":59,"oy":160,"delay":100},{"x":593,"w":120,"h":105,"ox":60,"oy":105,"delay":100}]},
+ {"id":700006,"name":"Shade","level":48,"map":"Hidden Street : Cabin of the Forsaken","timer":60,"frames":[{"x":0,"w":101,"h":98,"ox":38,"oy":105,"delay":180},{"x":101,"w":102,"h":96,"ox":39,"oy":101,"delay":180},{"x":203,"w":99,"h":92,"ox":39,"oy":96,"delay":180},{"x":302,"w":101,"h":91,"ox":37,"oy":99,"delay":180},{"x":403,"w":104,"h":92,"ox":37,"oy":100,"delay":180},{"x":507,"w":100,"h":97,"ox":38,"oy":106,"delay":180}]},
+ {"id":700002,"name":"Zombie Mushmom","level":55,"map":"Dungeon : The Grave of Mushmom","timer":60,"frames":[{"x":0,"w":118,"h":102,"ox":59,"oy":102,"delay":500},{"x":118,"w":118,"h":106,"ox":60,"oy":105,"delay":100},{"x":236,"w":118,"h":102,"ox":59,"oy":102,"delay":100},{"x":354,"w":118,"h":125,"ox":59,"oy":180,"delay":300},{"x":472,"w":118,"h":125,"ox":59,"oy":180,"delay":100},{"x":590,"w":118,"h":106,"ox":60,"oy":105,"delay":100}]},
+ {"id":700001,"name":"Jr. Balrog","level":80,"map":"Dungeon : The Cursed Sanctuary","timer":180,"frames":[{"x":0,"w":171,"h":162,"ox":85,"oy":162,"delay":180},{"x":171,"w":158,"h":156,"ox":90,"oy":156,"delay":180},{"x":329,"w":177,"h":166,"ox":95,"oy":166,"delay":180},{"x":506,"w":169,"h":158,"ox":99,"oy":158,"delay":180},{"x":675,"w":177,"h":170,"ox":95,"oy":170,"delay":180}]}
 ];
 /* BOSSES:END */
 
@@ -261,7 +450,46 @@ function channelRows(posts, win, now) {
   return rows.sort((a, b) => STATE_ORDER[a.state] - STATE_ORDER[b.state] || key(a) - key(b) || a.channel - b.channel);
 }
 
-window.BossTimer = { parseLine, fmtGame, fmtLocal, measurements, estimateWindow, channelRows };
+// Every frame placed by its foot anchor inside one box, so the sprite doesn't jitter between frames.
+function spriteLayout(frames) {
+  const left = Math.max(...frames.map(f => f.ox)), right = Math.max(...frames.map(f => f.w - f.ox));
+  const up = Math.max(...frames.map(f => f.oy)), down = Math.max(0, ...frames.map(f => f.h - f.oy));
+  return { w: left + right, h: up + down, pos: frames.map(f => ({ left: left - f.ox, top: up - f.oy })) };
+}
+
+// The frame showing ms into the walk loop, using the game's own frame delays.
+function frameAt(frames, ms) {
+  let t = ms % frames.reduce((sum, f) => sum + f.delay, 0);
+  for (let i = 0; i < frames.length; i++) {
+    if (t < frames[i].delay) return i;
+    t -= frames[i].delay;
+  }
+  return 0;
+}
+
+// Whole minutes, as "14m", "2h 5m" or "2h". Countdowns round up like a clock (34m 59s left is 35m).
+function dur(ms, countdown = false) {
+  const m = Math.max(0, (countdown ? Math.ceil : Math.floor)(ms / MIN)), h = Math.floor(m / 60);
+  if (!h) return `${m}m`;
+  return m % 60 ? `${h}h ${m % 60}m` : `${h}h`;
+}
+
+// The big time on the right of a board line.
+function rightTime(r, now) {
+  if (r.state === 'due') return `${dur(r.closeAt - now, true)} left`;
+  if (r.state === 'soon') return `in ${dur(r.openAt - now, true)}`;
+  if (r.state === 'up') return `${dur(now - r.seenUpAt)} ago`;
+  if (r.state === 'overdue') return `${dur(now - r.closeAt)} late`;
+  return 'watching';
+}
+
+function estimateParts(win) {
+  const range = `${win.lo} to ${win.hi} min`;
+  if (!win.learned) return { range, note: 'Not enough camps yet' };
+  return { range, note: win.typical != null ? `Typically ${win.typical}, learned from ${win.n} camps` : `Learned from ${win.n} camps` };
+}
+
+window.BossTimer = { parseLine, fmtGame, fmtLocal, measurements, estimateWindow, channelRows, spriteLayout, frameAt, estimateParts, rightTime };
 
 /* ---------- API adapter ---------- */
 
@@ -330,6 +558,7 @@ const state = { bossId: BOSSES.some(b => b.id === savedBoss) ? savedBoss : 70000
   session: null, admin: false, channel: savedChannel >= 1 && savedChannel <= 40 ? savedChannel : null };
 const boss = () => BOSSES.find(b => b.id === state.bossId);
 const allPosts = () => state.full.filter(p => p.at < state.recentCut).concat(state.recent);
+const PILL = { due: 'Due now', soon: 'Opens soon', watched: 'Watched', up: 'Up', overdue: 'Overdue' };
 const KIND_LABEL = { kill: 'killed it', spawn: 'saw it spawn', heard: 'heard a tip', waiting: 'still waiting' };
 
 function el(tag, attrs = {}, ...kids) {
@@ -344,9 +573,58 @@ function el(tag, attrs = {}, ...kids) {
 }
 const when = ms => el('span', {}, el('b', { class: 't' }, fmtGame(ms)), ' ', el('small', {}, fmtLocal(ms)));
 
-function estimateText(win) {
-  if (!win.learned) return `Usually ${win.lo} to ${win.hi} min. Not enough camps yet to learn more.`;
-  return `Usually ${win.lo} to ${win.hi} min${win.typical != null ? `, typically ${win.typical}` : ''}. Based on ${win.n} camps.`;
+/* ---------- stage sprite ---------- */
+
+// Walks in place on the ledge. Starts on a boss switch only, so the 30 second re-render never restarts it.
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const sprite = { frames: [], lay: null, scale: 1, start: 0, timer: null };
+const stripSize = frames => ({ w: frames.reduce((sum, f) => sum + f.w, 0), h: Math.max(...frames.map(f => f.h)) });
+
+function placeSprite() {
+  const b = boss(), lay = spriteLayout(b.frames), strip = stripSize(b.frames);
+  const room = $('stage').clientHeight - 22 - 12, roomW = $('stage').clientWidth * 0.42;
+  const s = sprite.scale = room > 0 ? Math.min(1.25, room / lay.h, roomW / lay.w) : 1;
+  Object.assign(sprite, { frames: b.frames, lay });
+  $('spritebox').style.cssText = `width:${Math.round(lay.w * s)}px;height:${Math.round(lay.h * s)}px`;
+  const st = $('sprite').style;
+  st.backgroundImage = `url("sprites/${b.id}.png")`;
+  st.backgroundSize = `${strip.w * s}px ${strip.h * s}px`;
+  st.imageRendering = s >= 1 ? 'pixelated' : 'auto';
+}
+
+function showFrame(i) {
+  const f = sprite.frames[i], pos = sprite.lay.pos[i], s = sprite.scale, st = $('sprite').style;
+  st.left = pos.left * s + 'px'; st.top = pos.top * s + 'px';
+  st.width = f.w * s + 'px'; st.height = f.h * s + 'px';
+  st.backgroundPosition = `${-f.x * s}px 0px`;
+}
+
+function walk() {
+  clearTimeout(sprite.timer);
+  const ms = Date.now() - sprite.start, i = reduceMotion ? 0 : frameAt(sprite.frames, ms);
+  showFrame(i);
+  if (reduceMotion || document.visibilityState === 'hidden') return;
+  const total = sprite.frames.reduce((sum, f) => sum + f.delay, 0);
+  const ends = sprite.frames.slice(0, i + 1).reduce((sum, f) => sum + f.delay, 0);
+  sprite.timer = setTimeout(walk, ends - ms % total);
+}
+
+function startWalk() { placeSprite(); sprite.start = Date.now(); walk(); }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') clearTimeout(sprite.timer); else walk(); });
+let resizeTimer = null;
+addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { placeSprite(); walk(); }, 150); });
+
+// Boss buttons show frame 0 of the same strip, scaled to a small chip. Built once, so a switch keeps keyboard focus.
+function markBosses() {
+  for (const btn of $('bosses').children) btn.setAttribute('aria-pressed', String(+btn.dataset.id === state.bossId));
+}
+function renderBosses() {
+  $('bosses').replaceChildren(...BOSSES.map(b => {
+    const f = b.frames[0], strip = stripSize(b.frames), s = 30 / f.h;
+    const mini = el('span', { class: 'mini', 'aria-hidden': 'true', style: `width:${Math.round(f.w * s)}px;height:30px;`
+      + `background-image:url("sprites/${b.id}.png");background-size:${strip.w * s}px ${strip.h * s}px;background-position:0 0` });
+    return el('button', { type: 'button', class: 'boss', 'data-id': b.id, 'aria-pressed': String(b.id === state.bossId), onclick: () => chooseBoss(b.id) }, mini, b.name);
+  }));
 }
 
 function rowWhat(r) {
@@ -387,8 +665,12 @@ function render() {
   const now = Date.now(), b = boss(), every = allPosts();
   const posts = every.filter(p => !p.hidden);
   const win = estimateWindow(measurements(posts, b.timer), b.timer);
-  $('estimate').textContent = estimateText(win);
-  $('bossinfo').textContent = `Level ${b.level}, ${b.map}. The game files say ${b.timer} min.`;
+  const est = estimateParts(win);
+  $('estimate').replaceChildren(est.range.replace(/ min$/, ' '), el('small', {}, 'min'));
+  $('estimatenote').textContent = est.note;
+  $('bossname').textContent = b.name;
+  $('bossmap').textContent = `Level ${b.level}, ${b.map.replace(' : ', ': ')}`;
+  $('bossinfo').textContent = `Game files say ${b.timer} min`;
   $('status').textContent = state.down ? "Can't reach the timer right now. Retrying." : '';
   renderHidden(every);
 
@@ -402,8 +684,10 @@ function render() {
   for (let t = Math.ceil(start / step) * step; t <= end; t += step) ticks.push(el('span', { style: `left:${pct(t)}` }, fmtGame(t)));
 
   const tl = $('timeline');
-  tl.replaceChildren(el('div', { class: 'axis' }, el('span', { class: 'small' }, 'Channel'),
-    el('div', { class: 'ticks' }, ticks, el('div', { id: 'nowline', style: `left:${pct(now)}`, title: 'Now' }))));
+  tl.replaceChildren(el('div', { class: 'axis' }, el('span', {}, 'CH'), el('span', {}, 'STATUS'),
+    el('div', { class: 'win' }, el('span', { class: 'label' }, 'WINDOW'),
+      el('div', { class: 'ticks' }, ticks, el('div', { id: 'nowline', style: `left:${pct(now)}`, title: 'Now' }))),
+    el('span', {})));
   if (!rows.length) {
     tl.append(el('p', { class: 'empty' }, `No sightings for ${b.name} in the last few hours. Be the first to post one.`));
     return;
@@ -416,9 +700,11 @@ function render() {
       class: `row state-${r.state}${r.secondhand ? ' secondhand' : ''}`, 'data-channel': r.channel, tabindex: '0',
       onclick: () => { state.open = state.open === r.channel ? null : r.channel; render(); },
       onkeydown: e => { if (e.key === 'Enter') e.currentTarget.click(); },
-    }, el('div', { class: 'main' }, el('span', { class: 'ch' }, 'ch ' + r.channel),
-      el('div', { class: 'track' }, marks, el('div', { class: 'now', style: `left:${pct(now)}` })),
-      rowWhat(r), state.open === r.channel ? postList(r) : null)));
+    }, el('div', { class: 'main' }, el('span', { class: 'ch', 'aria-label': 'Channel ' + r.channel }, String(r.channel)),
+      el('span', { class: `pill pill-${r.state}` }, PILL[r.state]),
+      el('div', { class: 'win' }, el('div', { class: 'track' }, marks, el('div', { class: 'now', style: `left:${pct(now)}` })), rowWhat(r)),
+      el('span', { class: 'when' }, rightTime(r, now)),
+      state.open === r.channel ? postList(r) : null)));
   }
 }
 
@@ -506,14 +792,44 @@ for (const [id, kind] of [['btn-spawned', 'spawn'], ['btn-killed', 'kill'], ['bt
 $('signin').addEventListener('click', () => api.signIn().catch(err => hint(err.message)));
 $('signout').addEventListener('click', () => api.signOut().catch(() => {}).then(() => setSession(null)));
 
-$('boss').append(...BOSSES.map(b => el('option', { value: b.id }, `${b.name} (Lv ${b.level})`)));
-$('boss').value = state.bossId;
-$('boss').addEventListener('change', () => {
-  state.bossId = +$('boss').value;
+// The How it works tab is #how, so it can be linked; back and forward switch views too.
+function showView() {
+  const how = location.hash === '#how';
+  $('view-how').hidden = !how;
+  $('view-timer').hidden = how;
+  $('tab-how').setAttribute('aria-selected', String(how));
+  $('tab-timer').setAttribute('aria-selected', String(!how));
+  // The stage has no size while hidden, so the sprite is sized again when it shows.
+  if (!how && sprite.lay) { placeSprite(); walk(); }
+}
+$('tab-how').addEventListener('click', () => { if (location.hash !== '#how') location.hash = '#how'; });
+$('tab-timer').addEventListener('click', () => { if (location.hash) history.pushState(null, '', location.pathname + location.search); showView(); });
+addEventListener('hashchange', showView);
+addEventListener('popstate', showView);
+showView();
+
+function labelTheme() {
+  const label = document.documentElement.dataset.theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme';
+  $('theme').setAttribute('aria-label', label);
+  $('theme').title = label;
+}
+$('theme').addEventListener('click', () => {
+  const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  store.set('bt.theme', next);
+  labelTheme();
+});
+labelTheme();
+
+function chooseBoss(id) {
+  if (id === state.bossId) return;
+  state.bossId = id;
   store.set('bt.boss', state.bossId);
   state.full = []; state.recent = []; state.open = null; state.gen++;
-  render(); subscribeBoss(); fetchFull();
-});
+  markBosses(); startWalk(); render(); subscribeBoss(); fetchFull();
+}
+renderBosses();
+startWalk();
 renderAuth();
 render();
 fetchFull();
