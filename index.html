@@ -130,6 +130,24 @@ select { background: var(--surface); border: 1.5px solid var(--btn-line); border
 .b-card img { width: 100%; border-radius: 8px; border: 1px solid var(--line); }
 .b-card .b-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .b-card .b-actions button { padding: 3px 10px; font-size: 12px; }
+/* Builds: My builds, the four 1st job tiles and their 2nd job paths, the Estimated note */
+.b-mine { margin: 0 0 12px; }
+.b-mine h3 { margin: 0 0 6px; }
+.b-mine-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.b-mine-card { padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); font: inherit; font-size: 14px; cursor: pointer; }
+.b-mine-card:hover, .b-mine-card:focus-visible { border-color: var(--focus); }
+.b-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 12px 0 8px; }
+@media (max-width: 560px) { .b-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.b-tile { padding: 14px 8px; border: 2px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--ink); font: inherit; font-weight: 800; font-size: 15px; cursor: pointer; }
+.b-tile[aria-pressed="true"] { border-color: var(--focus); background: var(--up-bg); }
+.b-paths { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0 0 4px; }
+.b-paths-label { font-size: 13px; font-weight: 700; color: var(--muted); margin-right: 4px; }
+.b-paths button { padding: 6px 12px; border: 1px solid var(--btn-line); border-radius: 999px; background: transparent; color: var(--ink); font: inherit; font-size: 14px; cursor: pointer; }
+.b-paths button[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.b-badge { margin: 0 0 8px; padding: 8px 12px; border-radius: 10px; background: var(--watch-bg, var(--surface)); border: 1px solid var(--line); font-size: 13px; }
+.b-badge[hidden] { display: none; }
+.linkish { background: none; border: 0; padding: 0; color: var(--focus); font: inherit; text-decoration: underline; cursor: pointer; }
+
 /* Read from game (reader.js draws .r-bar and .r-drop) */
 .b-reader { margin: 14px 0 0; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; display: grid; gap: 8px; }
 .b-reader p { margin: 0; }
@@ -377,7 +395,7 @@ b.t { font-family: var(--font-num); }
   <h3>Builds</h3>
   <p>The Builds tab turns your stat window into a leveling guide: where to train, where your skill and ability points go, and what to wear and scroll. Monster, skill and item numbers come from the game's own files, and the damage math is meowdb's Classic formulas. Where to train is ranked by EXP per cast, from a few thousand simulated kills with your damage range, crits, monster defense and hit chance.</p>
   <p>Tired of typing your stats? The Read from game button on the Builds tab reads them off your screen. Press it, share your game window or paste a screenshot, then open your Character Stat window with DETAIL and your Skill window and click through your 1st and 2nd job tabs. It fills in your level, stats, attack or magic, accuracy, crits and skill levels, marks every box it filled so you can check it, and stops by itself once it has everything. If it isn't sure about a number it leaves the box empty and tells you which one to type. The reader never sends your game pictures anywhere, because the reading happens on your computer. Saving a build is separate. It stores the numbers in the form and the name and note you type, and uploads only the equip screenshot you pick yourself.</p>
-  <p>A class only gets a guide once its math matches a real stat window, so far Cleric and Assassin. Every class can still save and browse builds. Want yours checked? Send Rimmah a screenshot of your stat window and skills.</p>
+  <p>Pick your 1st job tile, then where you're heading or your 2nd job, and type just your level to get a guide. Every other box makes it sharper. Physical classes also pick their weapon, since damage depends on it. Each weapon type has its own damage multiplier from meowdb's Classic table. Claws, one handed swords and polearms have been matched to real stat windows, and a guide for any other weapon carries an Estimated note until one is. Want yours checked? Send Rimmah a screenshot of your stat window with DETAIL open and say what weapon you're holding.</p>
   <p>Saving needs Discord, and a build shows the character name you type, never your Discord name. Screenshots are shown as they are and the numbers are what each player typed, so take other people's builds as their word.</p>
 
   <h3>Appraiser</h3>
@@ -645,9 +663,10 @@ function makeSupabaseApi(cfg) {
     async isAdmin() { const { data } = await sb.rpc('is_admin'); return data === true; },
 
     // Builds tab. The database stamps user_id, hidden and the times itself (supabase/builds.sql).
-    async listBuilds({ cls, minLv, maxLv, sort } = {}) {
+    async listBuilds({ cls, minLv, maxLv, sort, userId } = {}) {
       let q = sb.from('builds').select(BUILD_COLUMNS);
       if (cls) q = q.eq('class', cls);
+      if (userId) q = q.eq('user_id', userId);
       if (minLv) q = q.gte('level', minLv);
       if (maxLv) q = q.lte('level', maxLv);
       q = sort === 'new' ? q.order('updated_at', { ascending: false }) : q.order('level', { ascending: false }).order('updated_at', { ascending: false });

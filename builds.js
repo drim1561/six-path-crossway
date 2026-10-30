@@ -8,27 +8,64 @@
 
 // jobMask is the client's reqJob bit: 1 warrior, 2 mage, 4 bowman, 8 thief.
 const CLASSES = {
-  cleric: { id: 'cleric', name: 'Cleric', checked: true, family: 'spell', jobMask: 2, job2: 230,
-    mainStat: 'int', reqStat: 'luk', weaponSlot: 'Wand', attack: 2301004, element: 'H',
+  cleric: { id: 'cleric', name: 'Cleric', family: 'spell', jobMask: 2, job2: 230,
+    mainStat: 'int', reqStat: 'luk', weaponSlot: 'Wand', weapons: ['Wand', 'Staff'], attack: 2301004, attack1: 2001003, element: 'H',
     fields: ['level', 'str', 'dex', 'int', 'luk', 'magic', 'acc'],
     skills: [2301004, 2301001, 2301002, 2301003, 2300000, 2301000],
     // Holy Arrow is usually maxed by now; MP Eater stays at 1 (monsters near this level have too little MP).
     skillOrder: [[2301004, 30], [2301001, 30], [2301002, 20], [2301003, 20], [2301000, 20]] },
-  assassin: { id: 'assassin', name: 'Assassin', checked: true, family: 'claw', jobMask: 8, job2: 410,
-    mainStat: 'luk', reqStat: 'dex', weaponSlot: 'Claw', attack: 4001003, mastery: 4100000,
+  assassin: { id: 'assassin', name: 'Assassin', family: 'claw', jobMask: 8, job2: 410,
+    mainStat: 'luk', reqStat: 'dex', weaponSlot: 'Claw', weapons: ['Claw'], attack: 4001003, attack1: 4001003, mastery: 4100000,
     fields: ['level', 'str', 'dex', 'int', 'luk', 'atk', 'acc', 'crit'],
     skills: [4001003, 4100000, 4100001, 4100002, 4101000, 4101001, 4101002],
     // Claw Booster's speed is the same at level 1, so its points come last.
     skillOrder: [[4100000, 20], [4100001, 30], [4100002, 3], [4101001, 20], [4101002, 30], [4101000, 20]] },
-  fighter: { id: 'fighter', name: 'Fighter', checked: false, jobMask: 1 },
-  page: { id: 'page', name: 'Page', checked: false, jobMask: 1 },
-  spearman: { id: 'spearman', name: 'Spearman', checked: false, jobMask: 1 },
-  fpwizard: { id: 'fpwizard', name: 'Fire/Poison Wizard', checked: false, jobMask: 2 },
-  ilwizard: { id: 'ilwizard', name: 'Ice/Lightning Wizard', checked: false, jobMask: 2 },
-  hunter: { id: 'hunter', name: 'Hunter', checked: false, jobMask: 4 },
-  crossbowman: { id: 'crossbowman', name: 'Crossbowman', checked: false, jobMask: 4 },
-  bandit: { id: 'bandit', name: 'Bandit', checked: false, jobMask: 8 },
+  // Warriors: Power Strike stays the attack in 2nd job. Mastery, booster and final attack follow the weapon type.
+  fighter: { id: 'fighter', name: 'Fighter', family: 'phys', jobMask: 1, job2: 110, mainStat: 'str', reqStat: 'dex',
+    weapons: ['Two-handed Sword', 'One-Handed Sword', 'Two-handed Axe', 'One-Handed Axe'], attack: 1001001, attack1: 1001001,
+    mastery: { 'One-Handed Sword': 1100000, 'Two-handed Sword': 1100000, 'One-Handed Axe': 1100001, 'Two-handed Axe': 1100001 },
+    byType: { sword: [1100000, 1101002, 1101000], axe: [1100001, 1101003, 1101001] }, typeOf: slot => /Axe/.test(slot) ? 'axe' : 'sword',
+    skillOrder: [['M', 20], ['B', 20], ['F', 30], [1101004, 30], [1101005, 20]] },
+  page: { id: 'page', name: 'Page', family: 'phys', jobMask: 1, job2: 120, mainStat: 'str', reqStat: 'dex',
+    weapons: ['Two-handed Blunt Weapon', 'One-Handed Sword', 'Two-handed Sword', 'One-Handed Blunt Weapon'], attack: 1001001, attack1: 1001001,
+    mastery: { 'One-Handed Sword': 1200000, 'Two-handed Sword': 1200000, 'One-Handed Blunt Weapon': 1200001, 'Two-handed Blunt Weapon': 1200001 },
+    byType: { sword: [1200000, 1201002, 1201000], blunt: [1200001, 1201003, 1201001] }, typeOf: slot => /Blunt/.test(slot) ? 'blunt' : 'sword',
+    skillOrder: [['M', 20], ['B', 20], ['F', 30], [1201004, 20], [1201005, 20]] },
+  spearman: { id: 'spearman', name: 'Spearman', family: 'phys', jobMask: 1, job2: 130, mainStat: 'str', reqStat: 'dex',
+    weapons: ['Polearm', 'Spear'], attack: 1001001, attack1: 1001001, mastery: { Spear: 1300000, Polearm: 1300001 },
+    byType: { spear: [1300000, 1301002, 1301000], polearm: [1300001, 1301003, 1301001] }, typeOf: slot => slot === 'Spear' ? 'spear' : 'polearm',
+    skillOrder: [['M', 20], ['B', 20], ['F', 30], [1301004, 20], [1301005, 20]] },
+  fpwizard: { id: 'fpwizard', name: 'Fire/Poison Wizard', family: 'spell', jobMask: 2, job2: 210, mainStat: 'int', reqStat: 'luk',
+    weapons: ['Wand', 'Staff'], weaponSlot: 'Wand', attack: 2101003, attack1: 2001003, element: 'F',
+    skillOrder: [[2101003, 30], [2101001, 20], [2100000, 1], [2101000, 20], [2101004, 30], [2101002, 20]] },
+  ilwizard: { id: 'ilwizard', name: 'Ice/Lightning Wizard', family: 'spell', jobMask: 2, job2: 220, mainStat: 'int', reqStat: 'luk',
+    weapons: ['Wand', 'Staff'], weaponSlot: 'Wand', attack: 2201003, attack1: 2001003, element: 'I',
+    skillOrder: [[2201003, 30], [2201004, 30], [2201001, 20], [2201000, 20], [2200000, 1], [2201002, 20]] },
+  hunter: { id: 'hunter', name: 'Hunter', family: 'phys', jobMask: 4, job2: 310, mainStat: 'dex', reqStat: 'str',
+    weapons: ['Bow'], attack: 3001002, attack1: 3001002, mastery: { Bow: 3100000 },
+    skillOrder: [[3100000, 20], [3101001, 20], [3101003, 20], [3100001, 30], [3101000, 30], [3101004, 30]] },
+  crossbowman: { id: 'crossbowman', name: 'Crossbowman', family: 'phys', jobMask: 4, job2: 320, mainStat: 'dex', reqStat: 'str',
+    weapons: ['Crossbow'], attack: 3001002, attack1: 3001002, mastery: { Crossbow: 3200000 },
+    skillOrder: [[3200000, 20], [3201001, 20], [3201003, 20], [3200001, 30], [3201000, 30], [3201004, 30]] },
+  bandit: { id: 'bandit', name: 'Bandit', family: 'phys', jobMask: 8, job2: 420, mainStat: 'luk', reqStat: 'dex', secBoth: true,
+    weapons: ['Dagger'], attack: 4201003, attack1: 4001002, mastery: { Dagger: 4200000 },
+    skillOrder: [[4200000, 20], [4201000, 20], [4201003, 30], [4201001, 20], [4200001, 20], [4201002, 1]] },
 };
+// The four 1st jobs: when they start, who advances them, the 2nd job paths, and the 1st job skill order (my call;
+// a thief's depends on where they're heading). Targets cap at each skill's max.
+const BRANCHES = {
+  warrior: { id: 'warrior', name: 'Warrior', job1: 100, advance: 10, npc: 'Dances with Balrog in Perion', paths: ['fighter', 'page', 'spearman'],
+    skillOrder: [[1001001, 1], [1001002, 1], [1001001, 20], [1000002, 15], [1000000, 3], [1000001, 15], [1001002, 20], [1001000, 20]] },
+  magician: { id: 'magician', name: 'Magician', job1: 200, advance: 8, npc: 'Grendel the Really Old in Ellinia', paths: ['fpwizard', 'ilwizard', 'cleric'],
+    skillOrder: [[2001002, 1], [2001003, 20], [2001000, 20], [2000000, 15], [2000001, 10], [2001001, 20]] },
+  bowman: { id: 'bowman', name: 'Bowman', job1: 300, advance: 10, npc: 'Athena Pierce in Henesys', paths: ['hunter', 'crossbowman'],
+    skillOrder: [[3001001, 1], [3001002, 20], [3000001, 20], [3000000, 20], [3001000, 20], [3001001, 20]] },
+  thief: { id: 'thief', name: 'Thief', job1: 400, advance: 10, npc: 'the Dark Lord in Kerning City', paths: ['assassin', 'bandit'],
+    skillOrder: [[4001003, 20], [4000000, 20], [4000001, 8], [4001001, 1]],
+    byPath: { bandit: [[4001002, 20], [4000000, 20], [4001001, 1], [4000001, 8]] } },
+};
+for (const c of Object.values(CLASSES)) if (!c.fields) c.fields = c.family === 'spell' ? CLASSES.cleric.fields : ['level', 'str', 'dex', 'int', 'luk', 'weapon', 'atk', 'acc', 'crit'];
+const branchOf = clsId => { const b = Object.values(BRANCHES).find(b => b.paths.includes(clsId)); return b ? b.id : undefined; };
 const ADVANCE = 30, NEXT_ADVANCE = 70;
 
 /* ---------- Formulas ---------- */
@@ -46,6 +83,24 @@ function spellRange({ S, magic, int, M }) {
 function weaponAttackFromMax(max, { P, sec, mult, ap }) {
   const W = max / (1 + (P * mult + sec) / 100 + ap / 50);
   return W > 0 && isFinite(W) ? W : NaN;
+}
+// Classic weapon multipliers on the main stat (meowdb's Classic damage formulas page). Skills swing, stab or shoot;
+// the stat window shows MAX with the largest one and MIN with the smallest melee one (or shoot for ranged weapons).
+const WEAPONS = {
+  'One-Handed Sword': { swing: 1.8, stab: 1.8, mixed: 1.8 }, 'Two-handed Sword': { swing: 2.5, stab: 2.5, mixed: 2.5 },
+  'One-Handed Axe': { swing: 2.4, stab: 1.2, mixed: 1.8 }, 'One-Handed Blunt Weapon': { swing: 2.4, stab: 1.2, mixed: 1.8 },
+  'Two-handed Axe': { swing: 3.0, stab: 2.0, mixed: 2.5 }, 'Two-handed Blunt Weapon': { swing: 3.0, stab: 2.0, mixed: 2.5 },
+  Spear: { swing: 1.5, stab: 3.5, mixed: 2.5 }, Polearm: { swing: 3.5, stab: 1.5, mixed: 2.5 }, Dagger: { swing: 1.0, stab: 2.0, mixed: 1.5 },
+  Bow: { swing: 1.0, stab: 1.0, shoot: 2.5, mixed: 1.0 }, Crossbow: { swing: 1.0, stab: 1.0, shoot: 2.5, mixed: 1.0 },
+  Claw: { swing: 1.0, stab: 1.0, shoot: 2.5, mixed: 1.0 },
+};
+// Weapon types whose multiplier a real stat window has matched (Claw: 808s and JPark; sword and polearm: Ohmohnah).
+const CHECKED_WEAPONS = new Set(['Claw', 'One-Handed Sword', 'Polearm']);
+const windowMults = slot => { const w = WEAPONS[slot]; return w.shoot ? [w.shoot, w.shoot] : [Math.min(w.swing, w.stab), Math.max(w.swing, w.stab)]; };
+// The stat window's ATTACK range for a weapon type: S 1, floored like the game shows it.
+function windowRange({ W, P, sec, slot, M, ap = 0 }) {
+  const [lo, hi] = windowMults(slot);
+  return [Math.floor(physRange({ S: 1, W, P, sec, mult: lo, M, ap })[0]), Math.floor(physRange({ S: 1, W, P, sec, mult: hi, M, ap })[1])];
 }
 function levelScale(mobLv, lv) {
   const g = mobLv - lv;
@@ -95,16 +150,49 @@ function castsToKill({ hp, range, hits, crit, hit, mult }, rng, n = 2000) {
 
 /* ---------- Inputs ---------- */
 
-const LABEL = { level: 'level', str: 'STR', dex: 'DEX', int: 'INT', luk: 'LUK', magic: 'Magic', acc: 'accuracy',
+const LABEL = { level: 'level', str: 'STR', dex: 'DEX', int: 'INT', luk: 'LUK', magic: 'Magic', acc: 'accuracy', wat: 'weapon attack',
   atkMin: 'attack', atkMax: 'attack', critRate: 'crit rate', critDmg: 'crit damage' };
-const LIMIT = { str: 999, dex: 999, int: 999, luk: 999, magic: 9999, acc: 999, atkMin: 99999, atkMax: 99999, critRate: 100, critDmg: 500 };
+const LIMIT = { str: 999, dex: 999, int: 999, luk: 999, magic: 9999, acc: 999, wat: 999, atkMin: 99999, atkMax: 99999, critRate: 100, critDmg: 500 };
 const blank = v => v === undefined || v === null || String(v).trim() === '';
 // A skill's numbers at level n, or undefined at level 0 (no points, no bonus).
 const level = (row, n) => row && n >= 1 ? row.lv[Math.min(n, row.lv.length) - 1] : undefined;
+const num = v => Number(v) || 0;
 let DATA = null; // set by rankMobs/buildGuide, used for gear based defaults
 function bestWeapon(slot, lv, key) {
   if (!DATA) return 0;
   return DATA.gear.filter(g => g.slot === slot && g.level <= lv).reduce((m, g) => Math.max(m, g.inc[key] || 0), 0);
+}
+// The weapons a class can hold at a level, best attack first per type, in the order of cls.weapons.
+function weaponsFor(clsId, lv) {
+  const cls = CLASSES[clsId];
+  if (!cls || !DATA) return [];
+  return DATA.gear.filter(g => cls.weapons.includes(g.slot) && fits(g, cls) && g.level <= lv)
+    .sort((a, b) => cls.weapons.indexOf(a.slot) - cls.weapons.indexOf(b.slot) || (b.inc.wat || 0) - (a.inc.wat || 0) || a.level - b.level);
+}
+// The weapon a physical build holds: the picked one when the class can use it, else the best of its first type.
+const weaponOf = (cls, lv, id) => { const all = weaponsFor(cls.id, Math.max(lv, 10)); return all.find(g => g.id === Number(id)) || all[0] || null; };
+
+// Under the 2nd job advancement a character plays its branch's 1st job; from 30 its class.
+const ADV1 = clsId => BRANCHES[branchOf(clsId)].advance;
+function phaseOf(cls, lv) {
+  const br = BRANCHES[branchOf(cls.id)];
+  if (lv < ADVANCE) return { phase: 1, job: br.job1, until: ADVANCE, attack: cls.attack1,
+    order: (br.byPath && br.byPath[cls.id]) || br.skillOrder, branch: br };
+  return { phase: 2, job: cls.job2, until: NEXT_ADVANCE, attack: cls.attack, order: cls.skillOrder, branch: br };
+}
+// A physical class's skill order names its mastery, booster and final attack as 'M', 'B', 'F': the ids for its weapon type.
+function orderFor(cls, P, slot) {
+  if (!cls.byType) return P.order;
+  const t = cls.byType[cls.typeOf(slot)];
+  return P.order.map(([id, n]) => [id === 'M' ? t[0] : id === 'B' ? t[1] : id === 'F' ? t[2] : id, n]);
+}
+// The skill boxes the form shows: the 1st job's skills under 30, the class's own (plus its attack) from 30.
+function skillsFor(cls, lv) {
+  if (!DATA) return cls.skills || [];
+  const P = phaseOf(cls, lv);
+  if (P.phase === 2 && cls.skills) return cls.skills;
+  const ids = Object.keys(DATA.skills).map(Number).filter(id => DATA.skills[id].job === P.job && DATA.skills[id].name);
+  return P.attack && !ids.includes(P.attack) ? [P.attack].concat(ids) : ids;
 }
 
 // Turns the form into numbers. Blank fields get a typical value for the class and level and are listed in assumed.
@@ -125,12 +213,14 @@ function validateStats(raw, clsId) {
   };
   const main = cls && cls.mainStat, req = cls && cls.reqStat;
   for (const k of ['str', 'dex', 'int', 'luk']) take(k, () => k === main ? 4 + 5 * (lv - 1) : k === req ? 25 : 4);
-  const sk = raw.skills || {};
-  if (cls && cls.skills) for (const id of cls.skills) {
+  const sk = raw.skills || {}, P = cls && phaseOf(cls, lv);
+  if (cls) for (const id of skillsFor(cls, lv)) {
     const max = DATA && DATA.skills[id] ? DATA.skills[id].max : 30;
-    if (blank(sk[id])) { stats.skills[id] = id === cls.attack ? max : 0; if (id === cls.attack) assumed.push('skills'); }
+    // A blank attack skill: as high as the points spent in this job allow (3 a level), up to its max.
+    const typical = Math.max(1, Math.min(max, 1 + 3 * (lv - (P.phase === 1 ? ADV1(cls.id) : ADVANCE))));
+    if (blank(sk[id])) { stats.skills[id] = id === P.attack ? (cls.skills && P.phase === 2 ? max : typical) : 0; if (id === P.attack) assumed.push('skills'); }
     else stats.skills[id] = Math.max(0, Math.min(max, Math.floor(Number(sk[id]) || 0)));
-    if (id === cls.attack && stats.skills[id] < 1) errors.push('Put at least 1 point in ' + (DATA && DATA.skills[id] ? DATA.skills[id].name : 'your attack skill') + ' for a guide.');
+    if (id === P.attack && stats.skills[id] < 1) errors.push('Put at least 1 point in ' + (DATA && DATA.skills[id] ? DATA.skills[id].name : 'your attack skill') + ' for a guide.');
   }
   if (cls && cls.family === 'spell') {
     take('magic', () => Math.floor(stats.int / 2) + bestWeapon(cls.weaponSlot, lv, 'mad'));
@@ -155,7 +245,32 @@ function validateStats(raw, clsId) {
       else if (Number.isNaN(weaponAttackFromMax(stats.atkMax, shape))) errors.push('That attack range looks too low.');
     }
   }
+  if (cls && cls.family === 'phys') {
+    const w = weaponOf(cls, lv, raw.weapon);
+    stats.weapon = w ? w.id : null;
+    take('wat', () => w ? w.inc.wat || 0 : 0);
+    const shape = physShape(stats, cls, w ? w.slot : cls.weapons[0]);
+    const r = windowRange({ W: stats.wat, ...shape });
+    take('atkMin', () => r[0]);
+    take('atkMax', () => r[1]);
+    if (assumed.includes('atkMin') !== assumed.includes('atkMax')) errors.push('Type both ends of the attack range.');
+    take('acc', () => Math.floor(0.8 * stats.dex + 0.5 * stats.luk) + lv);
+    const c = critSkill(stats, cls);
+    take('critRate', () => 5 + num(c.crtX));
+    take('critDmg', () => 120 + num(c.crdX));
+    if (!errors.length && stats.atkMax < stats.atkMin) errors.push('The attack range looks backwards.');
+  }
   return { stats, assumed, errors };
+}
+// Main stat, secondary, mastery and attack power for a physical class holding a weapon type.
+function physShape(s, cls, slot) {
+  const ms = cls.mastery && cls.mastery[slot], row = level(DATA && DATA.skills[ms], s.skills[ms]) || {};
+  return { slot, P: s[cls.mainStat], sec: cls.secBoth ? s.str + s.dex : s[cls.reqStat], M: mastery(num(row.mastery)), ap: num(row.x) };
+}
+// The crit skill a physical class has: Precise Strikes (warriors), Critical Shot (bowmen).
+function critSkill(s, cls) {
+  const id = { 1: 1000002, 4: 3000000 }[cls.jobMask];
+  return (id && level(DATA && DATA.skills[id], s.skills[id])) || {};
 }
 
 /* ---------- Ranking ---------- */
@@ -170,9 +285,19 @@ function attackModel(s, cls, Wover) {
     return { range: physRange({ S: (l7.damage || 0) / 100, W, P: s.luk, sec, mult: 3, M: 0.5, ap }), hits: l7.bulletCount || 2,
       crit: { rate: s.critRate / 100, dmg: s.critDmg / 100 - 1 }, def: 'pdd', element: null, W };
   }
-  const ha = sk(cls.attack);
-  return { range: spellRange({ S: (ha.mad || 0) / 100, magic: s.magic, int: s.int, M: mastery(ha.mastery || 0) }), hits: ha.attackCount || 1,
-    crit: { rate: 0, dmg: 0 }, def: 'mdd', element: cls.element };
+  const P = phaseOf(cls, s.level);
+  if (cls.family === 'phys') {
+    const g = DATA.gear.find(x => x.id === s.weapon), slot = g ? g.slot : cls.weapons[0], sh = physShape(s, cls, slot);
+    // A typed attack range gives the weapon attack back (as the claw does); otherwise the attack box is used.
+    const W = Wover !== undefined ? Wover : weaponAttackFromMax(s.atkMax, { P: sh.P, sec: sh.sec, mult: windowMults(slot)[1], ap: sh.ap });
+    const a = sk(P.attack), w = WEAPONS[slot], mult = w.shoot || w.mixed;
+    return { range: physRange({ S: num(a.damage) / 100, W, P: sh.P, sec: sh.sec, mult, M: sh.M, ap: sh.ap }),
+      hits: Math.max(1, num(a.attackCount)) * Math.max(1, num(a.bulletCount)),
+      crit: { rate: s.critRate / 100, dmg: s.critDmg / 100 - 1 }, def: 'pdd', element: null, W, slot };
+  }
+  const ha = sk(P.attack), el = P.phase === 2 ? cls.element : null;
+  return { range: spellRange({ S: (ha.mad || 0) / 100, magic: s.magic, int: s.int, M: mastery(num(ha.mastery)) }), hits: num(ha.attackCount) || 1,
+    crit: { rate: 0, dmg: 0 }, def: 'mdd', element: el };
 }
 function rankWith(s, cls, data) {
   const am = attackModel(s, cls), seed = hash(JSON.stringify(s)), out = [];
@@ -188,7 +313,7 @@ function rankWith(s, cls, data) {
 function rankMobs(raw, clsId, data) {
   DATA = data;
   const cls = CLASSES[clsId];
-  if (!cls || !cls.checked) return [];
+  if (!cls) return [];
   const v = validateStats(raw, clsId);
   return v.errors.length ? [] : rankWith(v.stats, cls, data);
 }
@@ -198,13 +323,16 @@ function rankMobs(raw, clsId, data) {
 const STAT_NAME = { str: 'STR', dex: 'DEX', int: 'INT', luk: 'LUK', wat: 'weapon attack', mad: 'magic attack', crt: 'crit rate', acc: 'accuracy' };
 const ARMOR = ['Hat', 'Top', 'Bottom', 'Overall', 'Shoes', 'Gloves', 'Cape', 'Earrings'];
 const fits = (g, cls) => g.job === 0 || (g.job & cls.jobMask) !== 0;
+const physical = cls => cls.family === 'claw' || cls.family === 'phys';
+// The weapon type a guide plans around: the one held, else the class's first.
+const slotOf = (s, cls) => { const g = cls.family === 'phys' && DATA.gear.find(x => x.id === s.weapon); return g ? g.slot : cls.weaponSlot || cls.weapons[0]; };
 
 // Expected damage of one cast with a few stats changed (d), for "what is +1 of this worth".
 function avgCast(s, cls, d) {
   d = d || {};
-  if (cls.family === 'claw') {
-    const base = attackModel(s, cls);
-    const s2 = { ...s, luk: s.luk + (d.luk || 0), str: s.str + (d.str || 0), critRate: s.critRate + (d.crt || 0) };
+  if (physical(cls)) {
+    const base = attackModel(s, cls), s2 = { ...s, critRate: s.critRate + (d.crt || 0) };
+    for (const k of ['str', 'dex', 'int', 'luk']) s2[k] = s[k] + (d[k] || 0);
     const am = attackModel(s2, cls, base.W + (d.wat || 0));
     return am.hits * (am.range[0] + am.range[1]) / 2 * (1 + am.crit.rate * am.crit.dmg);
   }
@@ -214,12 +342,13 @@ function avgCast(s, cls, d) {
 }
 const gainPct = (s, cls, d) => Math.round((avgCast(s, cls, d) / avgCast(s, cls) - 1) * 10000) / 100;
 
-// 3 SP a level until the next job advancement, spent down skillOrder (prerequisites first).
+// 3 SP a level until the next job advancement, spent down the phase's skill order (prerequisites first).
 function planSkills(s, cls) {
-  const ids = cls.skills.filter(id => DATA.skills[id] && DATA.skills[id].job === cls.job2);
+  const P = phaseOf(cls, s.level), order = orderFor(cls, P, slotOf(s, cls));
+  const ids = skillsFor(cls, s.level).filter(id => DATA.skills[id] && DATA.skills[id].job === P.job);
   const now = {}, plan = {};
   for (const id of ids) now[id] = plan[id] = s.skills[id] || 0;
-  let left = Math.max(0, 3 * (NEXT_ADVANCE - s.level)), used = 0;
+  let left = Math.max(0, 3 * (P.until - s.level)), used = 0;
   const steps = [];
   const atLevel = i => s.level + 1 + Math.floor(i / 3);
   function raise(id, target) {
@@ -230,19 +359,25 @@ function planSkills(s, cls) {
     steps.push({ from: atLevel(used), to: atLevel(used + add - 1), id, text: row.name + ' to ' + (plan[id] + add) + ' (' + add + (add === 1 ? ' point)' : ' points)') });
     plan[id] += add; left -= add; used += add;
   }
-  for (const [id, target] of cls.skillOrder) if (plan[id] !== undefined) raise(id, Math.min(target, DATA.skills[id].max));
-  return { now, plan, steps, spare: left };
+  for (const [id, target] of order) if (plan[id] !== undefined) raise(id, Math.min(target, DATA.skills[id].max));
+  return { now, plan, steps, spare: left, until: P.until };
 }
 
+// The weapon tiers ahead of a level in one weapon type: the lowest second stat each level needs.
+function weaponTiers(s, cls, slot, until) {
+  const tiers = {};
+  for (const g of DATA.gear) if (g.slot === slot && fits(g, cls) && g.level > s.level && g.level <= until) {
+    const t = tiers[g.level];
+    if (!t || g.req[cls.reqStat] < t.need) tiers[g.level] = { need: g.req[cls.reqStat], name: g.name.replace(/^\S+ /, ''), full: g };
+  }
+  return tiers;
+}
 // 5 AP a level into the main stat, except what the next weapon needs in its second stat, put in just before that level.
 function planAP(s, cls) {
-  const tiers = {};
-  for (const g of DATA.gear) if (g.slot === cls.weaponSlot && fits(g, cls) && g.level > s.level && g.level <= NEXT_ADVANCE) {
-    const t = tiers[g.level];
-    if (!t || g.req[cls.reqStat] < t.need) tiers[g.level] = { need: g.req[cls.reqStat], name: g.name.replace(/^\S+ /, '') };
-  }
+  // AP doesn't change at a job advancement, so the plan runs to 70 in either job.
+  const until = NEXT_ADVANCE, tiers = weaponTiers(s, cls, slotOf(s, cls), until);
   const per = {};
-  for (let lv = s.level + 1; lv < NEXT_ADVANCE; lv++) per[lv] = { req: 0, why: '' };
+  for (let lv = s.level + 1; lv < until; lv++) per[lv] = { req: 0, why: '' };
   let have = s[cls.reqStat];
   for (const T of Object.keys(tiers).map(Number).sort((a, b) => a - b)) {
     let need = tiers[T].need - have;
@@ -255,7 +390,7 @@ function planAP(s, cls) {
     }
   }
   const rows = [];
-  for (let lv = s.level + 1; lv < NEXT_ADVANCE; lv++) {
+  for (let lv = s.level + 1; lv < until; lv++) {
     const p = per[lv], main = 5 - p.req;
     const put = p.req ? p.req + ' ' + STAT_NAME[cls.reqStat] + (main ? ', ' + main + ' ' + STAT_NAME[cls.mainStat] : '') : '5 ' + STAT_NAME[cls.mainStat];
     const why = p.why || 'Your main stat, it adds the most damage.';
@@ -268,13 +403,13 @@ function planAP(s, cls) {
 
 // The best item per level tier in each slot, scored by what it adds to this class's damage.
 function planGear(s, cls) {
-  const atk = cls.family === 'claw' ? 'wat' : 'mad';
+  const atk = physical(cls) ? 'wat' : 'mad', until = phaseOf(cls, s.level).until;
   const score = g => (g.inc[atk] || 0) * 6 + (g.inc[cls.mainStat] || 0) + (g.inc.crt || 0) * 1.5 + (g.inc[cls.reqStat] || 0) * 0.3;
   const out = [];
-  for (const slot of [cls.weaponSlot].concat(ARMOR)) {
+  for (const slot of [slotOf(s, cls)].concat(ARMOR)) {
     const best = {};
     for (const g of DATA.gear) {
-      if (g.slot !== slot || !fits(g, cls) || g.level < s.level - 12 || g.level > NEXT_ADVANCE || !(score(g) > 0)) continue;
+      if (g.slot !== slot || !fits(g, cls) || g.level < s.level - 12 || g.level > until || !(score(g) > 0)) continue;
       if (!best[g.level] || score(g) > score(best[g.level])) best[g.level] = g;
     }
     const rows = Object.values(best).sort((a, b) => a.level - b.level).slice(0, 4)
@@ -286,34 +421,54 @@ function planGear(s, cls) {
 
 // Scroll families that raise this class's damage, by what filling a typical item's slots with Lessers adds.
 function planScrolls(s, cls, gear) {
-  const atk = cls.family === 'claw' ? 'wat' : 'mad';
-  const useful = cls.family === 'claw' ? [atk, cls.mainStat, 'crt'] : [atk, cls.mainStat];
+  const atk = physical(cls) ? 'wat' : 'mad';
+  const useful = physical(cls) ? [atk, cls.mainStat, 'crt'] : [atk, cls.mainStat];
   const out = [];
   for (const f of DATA.scrolls) {
     if (!useful.includes(f.stat)) continue;
     const slot = gear.find(x => x.slot === f.slot);
     if (!slot) continue;
     const slots = slot.rows[0].slots || 5, gain = f.gains[0] * slots;
-    out.push({ slot: f.slot, family: f.family, gainAllLesser: slots + ' slots, +' + gain + ' ' + STAT_NAME[f.stat], pct: gainPct(s, cls, { [f.stat === 'luk' || f.stat === 'int' ? f.stat : f.stat]: gain }) });
+    out.push({ slot: f.slot, family: f.family, gainAllLesser: slots + ' slots, +' + gain + ' ' + STAT_NAME[f.stat], pct: gainPct(s, cls, { [f.stat]: gain }) });
   }
   return out.sort((a, b) => b.pct - a.pct).slice(0, 5).map((x, i) => ({ order: i + 1, ...x }));
+}
+
+// What's ahead: the next weapon worth buying, the job advancement, and the next skill in the plan.
+function planNext(s, cls, P, skills, W) {
+  const out = [], slot = slotOf(s, cls), key = physical(cls) ? 'wat' : 'mad';
+  const up = DATA.gear.filter(g => g.slot === slot && fits(g, cls) && g.level > s.level && g.level <= P.until && (g.inc[key] || 0) > (W || 0))
+    .sort((a, b) => a.level - b.level || (b.inc[key] || 0) - (a.inc[key] || 0))[0];
+  if (up) {
+    const needs = ['str', 'dex', 'int', 'luk'].filter(k => up.req[k]).map(k => up.req[k] + ' ' + STAT_NAME[k]).join(' and ');
+    out.push({ level: up.level, text: up.name + ' (' + (up.inc[key] || 0) + ' ' + STAT_NAME[key] + ')' + (needs ? ', it needs ' + needs : '') + '.' });
+  }
+  if (P.phase === 1) out.push({ level: ADVANCE, text: '2nd job advancement: talk to ' + P.branch.npc + ' and become a ' + cls.name + '.' });
+  const step = skills.steps[0];
+  if (step) out.push({ level: step.from, text: 'Start ' + step.text + '.' });
+  return out.sort((a, b) => a.level - b.level);
 }
 
 function buildGuide(raw, clsId, data) {
   DATA = data;
   const cls = CLASSES[clsId];
   if (!cls) return { ok: false, errors: ['Pick your class.'] };
-  if (!cls.checked) return { ok: false, unchecked: true };
+  const lv = Number(raw && raw.level), br = BRANCHES[branchOf(clsId)];
+  if (Number.isInteger(lv) && lv >= 1 && lv < br.advance) return { ok: false, beginner: true, advance: br.advance, npc: br.npc };
   const v = validateStats(raw, clsId);
   if (v.errors.length) return { ok: false, errors: v.errors };
-  const s = v.stats, am = attackModel(s, cls), sum = am.range[0] + am.range[1];
-  const worth = cls.family === 'claw'
-    ? [['+1 weapon attack (claw, gloves or stars)', { wat: 1 }], ['+1% crit rate', { crt: 1 }], ['+1 LUK', { luk: 1 }], ['+1 DEX or STR', { str: 1 }]]
+  const s = v.stats, P = phaseOf(cls, s.level), am = attackModel(s, cls), sum = am.range[0] + am.range[1];
+  const worth = physical(cls)
+    ? [[cls.family === 'claw' ? '+1 weapon attack (claw, gloves or stars)' : '+1 weapon attack (weapon or gloves)', { wat: 1 }], ['+1% crit rate', { crt: 1 }],
+      ...(cls.family === 'claw' ? [['+1 LUK', { luk: 1 }], ['+1 DEX or STR', { str: 1 }]]
+        : [['+1 ' + STAT_NAME[cls.mainStat], { [cls.mainStat]: 1 }], ['+1 ' + STAT_NAME[cls.reqStat], { [cls.reqStat]: 1 }]])]
     : [['+1 magic attack', { mad: 1 }], ['+1 INT', { int: 1 }]];
-  const gear = planGear(s, cls);
-  return { ok: true, assumed: v.assumed, stats: s,
+  const gear = planGear(s, cls), skills = planSkills(s, cls), slot = slotOf(s, cls);
+  const held = cls.family === 'phys' && DATA.gear.find(x => x.id === s.weapon);
+  const weapon = physical(cls) ? { id: held ? held.id : null, slot, name: held ? held.name : null, wat: held ? held.inc.wat || 0 : null, W: am.W } : null;
+  return { ok: true, phase: P.phase, estimated: cls.family === 'phys' && !CHECKED_WEAPONS.has(slot), weapon, assumed: v.assumed, stats: s,
     attack: { min: Math.round(am.range[0]), max: Math.round(am.range[1]), avg: Math.round(sum / 2 * am.hits) },
-    train: rankWith(s, cls, data).slice(0, 10), skills: planSkills(s, cls), ap: planAP(s, cls), gear,
+    train: rankWith(s, cls, data).slice(0, 10), skills, ap: planAP(s, cls), gear, next: planNext(s, cls, P, skills, physical(cls) ? am.W : bestWeapon(slot, s.level, 'mad')),
     scrolls: planScrolls(s, cls, gear), worth: worth.map(([what, d]) => ({ what, pct: gainPct(s, cls, d) })) };
 }
 
@@ -321,13 +476,15 @@ function buildGuide(raw, clsId, data) {
 
 const INPUTS = { level: [['level', 'Level']], str: [['str', 'STR']], dex: [['dex', 'DEX']], int: [['int', 'INT']], luk: [['luk', 'LUK']],
   magic: [['magic', 'Magic']], acc: [['acc', 'Accuracy']], atk: [['atkMin', 'Attack low'], ['atkMax', 'Attack high']],
-  crit: [['critRate', 'Crit rate %'], ['critDmg', 'Crit damage %']] };
-const OPEN_FIELDS = ['level', 'str', 'dex', 'int', 'luk', 'atk', 'magic', 'acc'];
+  crit: [['critRate', 'Crit rate %'], ['critDmg', 'Crit damage %']], weapon: [['weapon', 'Weapon'], ['wat', 'Weapon attack']] };
 const ASSUMED_LABEL = { ...LABEL, atkMin: 'attack range', atkMax: 'attack range', skills: 'attack skill level' };
 // read: boxes the screen reader filled ('v:luk', 's:4100000'), marked until the player edits them
 const ui = { deps: null, data: null, root: null, form: { cls: 'cleric', v: {}, s: {} }, timer: 0, read: new Set() };
 const E = (...a) => ui.deps.el(...a);
-const fieldsOf = cls => (cls.checked ? cls.fields : OPEN_FIELDS).flatMap(f => INPUTS[f]);
+const fieldsOf = cls => cls.fields.flatMap(f => INPUTS[f]);
+const formLevel = () => Number(ui.form.v.level) || ADVANCE;
+// The weapon the form shows: the picked one when this class can hold it, else the best for the level.
+const formWeapon = cls => weaponOf(cls, formLevel(), ui.form.v.weapon);
 const fmt = n => Math.round(n).toLocaleString('en-US');
 
 function loadForm() {
@@ -343,17 +500,78 @@ function buildForm() {
   const cls = CLASSES[ui.form.cls], box = ui.root.querySelector('.b-form');
   const input = (id, label, value, on, key) => E('label', {}, label, E('input', { id, inputmode: 'numeric', autocomplete: 'off', value: value == null ? '' : String(value),
     ...(ui.read.has(key) ? { class: 'b-read' } : {}), oninput: e => { ui.read.delete(key); e.target.classList.remove('b-read'); on(e); typedIn(key); } }));
-  const kids = [E('label', { class: 'wide' }, 'Class', E('select', { id: 'b-class', onchange: e => { ui.form.cls = e.target.value; saveForm(); buildForm(); renderGuide(); } },
-    Object.values(CLASSES).map(c => { const o = E('option', { value: c.id }, c.name + (c.checked ? '' : ' (no guide yet)')); if (c.id === ui.form.cls) o.selected = true; return o; })))];
-  for (const [k, label] of fieldsOf(cls)) kids.push(input('b-f-' + k, label, ui.form.v[k], e => { ui.form.v[k] = e.target.value; changed(); }, 'v:' + k));
-  if (cls.checked) {
-    kids.push(E('p', { class: 'b-sub' }, 'Skill levels'));
-    for (const id of cls.skills) {
-      const row = ui.data.skills[id];
-      if (row) kids.push(input('b-s-' + id, row.name, ui.form.s[id], e => { ui.form.s[id] = e.target.value; changed(); }, 's:' + id));
-    }
+  const kids = [E('label', { class: 'wide' }, 'Class', E('select', { id: 'b-class', onchange: e => pickClass(e.target.value) },
+    Object.values(CLASSES).map(c => { const o = E('option', { value: c.id }, c.name); if (c.id === ui.form.cls) o.selected = true; return o; })))];
+  for (const [k, label] of fieldsOf(cls)) {
+    if (k === 'weapon') {
+      const w = formWeapon(cls);
+      kids.push(E('label', { class: 'wide' }, label, E('select', { id: 'b-f-weapon', onchange: e => {
+        const g = ui.data.gear.find(x => x.id === Number(e.target.value));
+        ui.form.v.weapon = e.target.value; ui.form.v.wat = g ? String(g.inc.wat || 0) : '';
+        const wat = ui.root.querySelector('#b-f-wat'); if (wat) wat.value = ui.form.v.wat;
+        changed();
+      } }, weaponsFor(cls.id, Math.max(formLevel(), 10)).map(g => {
+        const o = E('option', { value: String(g.id) }, g.name + ' (' + g.slot + ', ' + (g.inc.wat || 0) + ' attack, level ' + g.level + ')');
+        if (w && g.id === w.id) o.selected = true; return o;
+      }))));
+    } else if (k === 'wat') {
+      const w = formWeapon(cls), shown = blank(ui.form.v.wat) ? (w ? w.inc.wat || 0 : '') : ui.form.v.wat;
+      kids.push(input('b-f-wat', label, shown, e => { ui.form.v.wat = e.target.value; changed(); }, 'v:wat'));
+    } else kids.push(input('b-f-' + k, label, ui.form.v[k], e => { ui.form.v[k] = e.target.value; k === 'level' ? levelChanged() : changed(); }, 'v:' + k));
   }
+  ui.formPhase = phaseOf(cls, formLevel()).phase;
+  const ids = skillsFor(cls, formLevel()).filter(id => ui.data.skills[id]);
+  if (ids.length) kids.push(E('p', { class: 'b-sub' }, ui.formPhase === 1 ? BRANCHES[branchOf(cls.id)].name + ' skill levels' : 'Skill levels'));
+  for (const id of ids) kids.push(input('b-s-' + id, ui.data.skills[id].name, ui.form.s[id], e => { ui.form.s[id] = e.target.value; changed(); }, 's:' + id));
   box.replaceChildren(...kids);
+  // every way the class changes (tiles, the select, a loaded card, Read from game) redraws the form, so the tiles follow here
+  renderTiles();
+}
+// A level that crosses 30 swaps the skill boxes (1st job or 2nd job) and the weapon list, so the form is redrawn
+// with the cursor kept in the level box.
+function levelChanged() {
+  const cls = CLASSES[ui.form.cls];
+  if (phaseOf(cls, formLevel()).phase !== ui.formPhase || cls.family === 'phys') {
+    const el = ui.root.querySelector('#b-f-level'), at = el ? el.selectionStart : null;
+    buildForm();
+    const again = ui.root.querySelector('#b-f-level');
+    if (again && document.activeElement !== again) { again.focus(); if (at !== null) again.setSelectionRange(at, at); }
+  }
+  changed();
+}
+// Switching class keeps the numbers but drops a weapon the new class can't hold.
+function pickClass(id) {
+  if (!CLASSES[id]) return;
+  ui.form.cls = id;
+  const w = ui.form.v.weapon && ui.data.gear.find(x => x.id === Number(ui.form.v.weapon));
+  if (w && !(CLASSES[id].weapons || []).includes(w.slot)) { delete ui.form.v.weapon; delete ui.form.v.wat; }
+  saveForm(); buildForm(); renderGuide();
+}
+// The four 1st job tiles and, under them, the picked tile's 2nd job paths.
+function renderTiles() {
+  const br = branchOf(ui.form.cls), lv = formLevel();
+  ui.root.querySelector('#b-tiles').replaceChildren(...Object.values(BRANCHES).map(b => E('button', { type: 'button', class: 'b-tile', 'data-branch': b.id,
+    'aria-pressed': String(b.id === br), onclick: () => pickClass(b.paths.includes(ui.form.cls) ? ui.form.cls : b.paths[0]) }, b.name)));
+  ui.root.querySelector('#b-paths').replaceChildren(E('span', { class: 'b-paths-label' }, lv < ADVANCE ? "Where you're heading" : 'Your 2nd job'),
+    ...BRANCHES[br].paths.map(id => E('button', { type: 'button', 'data-path': id, 'aria-pressed': String(id === ui.form.cls), onclick: () => pickClass(id) }, CLASSES[id].name)));
+}
+// The signed in player's own builds, one tap to open each; signed out, a nudge to sign in.
+async function renderMine() {
+  const box = ui.root.querySelector('#b-mine'), s = me(), gen = ui.mineGen = (ui.mineGen || 0) + 1;
+  if (!s) {
+    box.replaceChildren(E('p', { class: 'small' }, 'Sign in with Discord to keep your characters here. ',
+      E('button', { type: 'button', class: 'linkish', onclick: () => ui.deps.signIn && ui.deps.signIn() }, 'Sign in')));
+    return;
+  }
+  try {
+    const rows = await ui.deps.api.listBuilds({ userId: s.user_id, sort: 'new' });
+    if (gen !== ui.mineGen) return;
+    const mine = rows.filter(b => b.user_id === s.user_id);
+    box.replaceChildren(E('h3', {}, 'My builds'), mine.length
+      ? E('div', { class: 'b-mine-list' }, mine.map(b => E('button', { type: 'button', class: 'b-mine-card', onclick: () => fill(b.stats, b.class) },
+        E('b', {}, b.ign), ' Lv ' + b.level + ' ' + (CLASSES[b.class] ? CLASSES[b.class].name : b.class))))
+      : E('p', { class: 'small' }, 'Builds you save show up here.'));
+  } catch (e) { if (gen === ui.mineGen) box.replaceChildren(E('p', { class: 'small' }, "Couldn't load your builds: " + e.message)); }
 }
 function changed() { saveForm(); clearTimeout(ui.timer); ui.timer = setTimeout(renderGuide, 150); }
 
@@ -371,7 +589,7 @@ function renderGuide() {
   if (!g.ok) {
     out.hidden = true;
     out.querySelectorAll('tbody').forEach(t => t.replaceChildren());
-    if (g.unchecked) { msg.className = 'note'; msg.textContent = "We haven't checked this class's damage math yet, so there's no guide for it. You can still save and browse " + cls.name + ' builds below.'; }
+    if (g.beginner) { msg.className = 'note'; msg.textContent = 'Your 1st job starts at level ' + g.advance + '. Talk to ' + g.npc + ' then come back for a guide.'; }
     else { msg.className = 'error'; msg.textContent = g.errors.join(' '); }
     return g;
   }
@@ -379,7 +597,8 @@ function renderGuide() {
   const guessed = [...new Set(g.assumed.map(k => ASSUMED_LABEL[k]))];
   if (guessed.length) { msg.className = 'note'; msg.textContent = 'Guessed from your level because these boxes are empty: ' + guessed.join(', ') + '. Fill them in for a sharper guide.'; }
   else msg.textContent = '';
-  const atk = ui.data.skills[cls.attack].name;
+  const atk = ui.data.skills[g.phase === 1 ? cls.attack1 : cls.attack].name;
+  out.querySelector('#b-estimated').hidden = !g.estimated;
   out.querySelector('#b-attack').textContent = 'One ' + atk + ' does ' + fmt(g.attack.min) + ' to ' + fmt(g.attack.max) + ' a hit, about ' + fmt(g.attack.avg) + ' a cast before monster defense.';
   out.querySelector('#train').replaceChildren(table(['Monster', 'Map', 'HP', 'Def', 'EXP', 'Casts', 'EXP a cast', 'Hit'],
     g.train.map(m => [m.name + ' (' + m.level + ')', m.map + ' (' + m.count + ')', fmt(m.hp), String(m.def), fmt(m.exp), m.casts.toFixed(1), m.expPerCast.toFixed(0), m.hit + '%']), [2, 3, 4, 5, 6, 7]));
@@ -388,12 +607,13 @@ function renderGuide() {
   out.querySelector('#skills').replaceChildren(E('ul', { class: 'b-steps' },
     E('li', {}, E('b', {}, 'Now (' + g.stats.level + ')'), E('span', {}, nowText)),
     sk.steps.map(st => E('li', {}, E('b', {}, st.from === st.to ? 'Lv ' + st.from : 'Lv ' + st.from + ' to ' + st.to), E('span', {}, st.text))),
-    sk.spare ? E('li', {}, E('b', {}, 'Spare'), E('span', {}, sk.spare + ' points left over by level ' + NEXT_ADVANCE + '.')) : null));
+    sk.spare ? E('li', {}, E('b', {}, 'Spare'), E('span', {}, sk.spare + ' points left over by level ' + sk.until + '.')) : null));
   out.querySelector('#ap').replaceChildren(table(['Levels', 'Put AP in', 'Why'],
     g.ap.map(a => [a.from === a.to ? String(a.from) : a.from + ' to ' + a.to, a.put, a.why])));
   out.querySelector('#worth').replaceChildren(table(['Gain', 'Damage'], g.worth.map(w => [w.what, '+' + w.pct + '%']), [1]));
   out.querySelector('#gear').replaceChildren(table(['Slot', 'By level'], g.gear.map(s => [s.slot,
     E('span', {}, s.rows.flatMap((r, i) => [i ? E('br') : null, E('b', {}, r.name), ' (' + r.level + (incText(r.inc) ? ', ' + incText(r.inc) : '') + ') ', r.craft ? E('span', { class: 'b-craft' }, 'craft') : null]))])));
+  out.querySelector('#next').replaceChildren(E('ul', { class: 'b-steps' }, g.next.map(n => E('li', {}, E('b', {}, 'Lv ' + n.level), E('span', {}, n.text)))));
   out.querySelector('#scrolls').replaceChildren(table(['Order', 'Item', 'Scroll', 'All slots with Lesser', 'Damage'],
     g.scrolls.map(s => [String(s.order), s.slot, s.family, s.gainAllLesser, '+' + s.pct + '%']), [0, 4]));
   return g;
@@ -448,7 +668,7 @@ function take({ cls, values = {}, skills = {} } = {}) {
   for (const [id, x] of Object.entries(skills)) {
     const row = ui.data.skills[id], n = Number(x);
     if (!row || !Number.isInteger(n) || n < 0 || n > row.max) { skipped.push(String(id)); continue; }
-    if (c.checked && c.skills.includes(Number(id))) { ui.form.s[id] = String(n); ui.read.add('s:' + id); filled.push(String(id)); }
+    if (skillsFor(c, formLevel()).includes(Number(id))) { ui.form.s[id] = String(n); ui.read.add('s:' + id); filled.push(String(id)); }
   }
   clearTimeout(ui.timer);
   saveForm(); buildForm(); renderGuide();
@@ -486,7 +706,7 @@ function typedIn(inputKey) {
 // Whether the form has a box for a key ('luk', or 's4100000' for a skill), so the player could type it.
 function inForm(k) {
   const c = CLASSES[ui.form.cls];
-  return /^s\d+$/.test(k) ? !!c.checked && c.skills.includes(Number(k.slice(1))) : formKeys(c).includes(k);
+  return /^s\d+$/.test(k) ? skillsFor(c, formLevel()).includes(Number(k.slice(1))) : formKeys(c).includes(k);
 }
 // Where each checklist item stands: 'done', 'part' (some read) or '' (nothing yet), with a count for skill tabs.
 // A skill tab only needs the skills the form has a box for (a Cleric's form has none for the 1st job tab), and a
@@ -664,7 +884,7 @@ async function save() {
     if (ed && ed.shot_path && shot !== ed.shot_path) ui.deps.api.removeShot(ed.shot_path).catch(() => {});
     ui.lastIgn = ign; ui.editing = null;
     renderSave(); say(note || 'Saved.');
-    loadList();
+    loadList(); renderMine();
   } catch (e) {
     if (shot && (!ed || shot !== ed.shot_path)) ui.deps.api.removeShot(shot).catch(() => {});
     say("Couldn't save: " + e.message);
@@ -731,7 +951,7 @@ function refresh() {
   const s = me(), who = (s ? s.user_id : '') + '|' + !!(ui.deps.admin && ui.deps.admin());
   if (who === ui.who) return;
   ui.who = who;
-  renderSave(); loadList();
+  renderSave(); loadList(); renderMine();
 }
 
 function mount(root, deps) {
@@ -741,17 +961,20 @@ function mount(root, deps) {
   const sec = (title, id, extra) => [E('h3', {}, title), extra || null, E('div', { id })];
   root.replaceChildren(
     E('section', { class: 'b-calc' },
+      E('div', { id: 'b-mine', class: 'b-mine' }),
       E('h2', {}, 'Your build'),
       E('p', { class: 'lead' }, 'Type in your stat window and get a leveling guide for your character: where to train, where your points go, and what to wear and scroll.'),
+      E('div', { id: 'b-tiles', class: 'b-tiles' }), E('div', { id: 'b-paths', class: 'b-paths' }),
       E('div', { id: 'b-reader', class: 'b-reader' },
         E('button', { id: 'b-readbtn', type: 'button', onclick: openReader }, 'Read from game'),
         E('p', { id: 'b-readnote', class: 'small' }, 'Or let the page read your stat and skill windows, from a shared game window or a screenshot.')),
       E('div', { class: 'b-form' }),
       E('p', { id: 'b-msg' })),
     E('section', { id: 'b-guide', hidden: '' },
+      estimatedNote(),
       sec('Where to train', 'train', E('p', { class: 'small', id: 'b-attack' })),
       E('p', { class: 'small' }, 'Ranked by EXP per cast at your level, over a few thousand simulated kills with your damage range, crits, monster defense and hit chance. Walking time is not counted.'),
-      sec('Skill points', 'skills'), sec('Ability points', 'ap'), sec('What each stat is worth', 'worth'), sec('Gear', 'gear'), sec('Scrolls', 'scrolls'),
+      sec('Skill points', 'skills'), sec('Ability points', 'ap'), sec('What each stat is worth', 'worth'), sec('Gear', 'gear'), sec('Coming up', 'next'), sec('Scrolls', 'scrolls'),
       E('p', { class: 'small' }, 'Gear and scrolls come from the game files. They have no drop tables, so check in game where the items drop.')),
     E('section', { id: 'b-save', class: 'b-panel' }),
     E('section', { id: 'b-browse' }, E('h2', {}, 'Builds'),
@@ -761,7 +984,8 @@ function mount(root, deps) {
   renderGuide();
   refresh();
 }
+const estimatedNote = () => E('p', { id: 'b-estimated', class: 'b-badge', hidden: '' }, E('b', {}, 'Estimated. '), "Damage for this weapon comes from meowdb's table and hasn't been checked against a real stat window yet.");
 
-window.Builds = { CLASSES, mastery, physRange, spellRange, weaponAttackFromMax, levelScale, hitChance, defend, elemMult, makeRng, castsToKill,
+window.Builds = { CLASSES, BRANCHES, branchOf, weaponsFor, mastery, physRange, spellRange, weaponAttackFromMax, WEAPONS, CHECKED_WEAPONS, windowRange, levelScale, hitChance, defend, elemMult, makeRng, castsToKill,
   validateStats, rankMobs, buildGuide, mount, fill, refresh, shrinkImage, take, classOf };
 })();
