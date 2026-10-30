@@ -432,7 +432,7 @@ function readOk(keys, vals) {
 }
 
 // Puts what the screen reader read into the form without clearing anything else. A value validateStats rejects or a
-// skill level above its max is skipped, and only boxes the form shows get filled. Filled boxes are marked.
+// skill level above its max is skipped. Boxes the form doesn't show are kept for when the class changes. Filled boxes are marked.
 function take({ cls, values = {}, skills = {} } = {}) {
   const filled = [], skipped = [];
   if (CLASSES[cls] && cls !== ui.form.cls) ui.form.cls = cls;
@@ -443,7 +443,8 @@ function take({ cls, values = {}, skills = {} } = {}) {
     if (!readOk(['atkMin', 'atkMax'], pair)) for (const k of ['atkMin', 'atkMax']) if (k in vals) { skipped.push(k); delete vals[k]; }
   }
   for (const k of Object.keys(vals)) if (!/^atk/.test(k) && !readOk([k], vals)) { skipped.push(k); delete vals[k]; }
-  for (const [k, x] of Object.entries(vals)) if (shown.includes(k)) { ui.form.v[k] = String(x); ui.read.add('v:' + k); filled.push(k); }
+  // A box this class hides is kept too: a 1st job window names no class, so the player often picks it after reading.
+  for (const [k, x] of Object.entries(vals)) { ui.form.v[k] = String(x); ui.read.add('v:' + k); if (shown.includes(k)) filled.push(k); }
   for (const [id, x] of Object.entries(skills)) {
     const row = ui.data.skills[id], n = Number(x);
     if (!row || !Number.isInteger(n) || n < 0 || n > row.max) { skipped.push(String(id)); continue; }
