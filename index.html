@@ -93,6 +93,72 @@ h1 { font-size: 22px; margin: 0; }
 #theme svg { width: 18px; height: 18px; }
 :root[data-theme="dark"] #theme .moon, :root:not([data-theme="dark"]) #theme .sun { display: none; }
 
+/* Builds */
+#view-builds { max-width: 1000px; }
+#view-builds h2 { font: 600 30px/1.2 var(--font-title); margin: 8px 0 4px; }
+#view-builds h3 { font: 600 20px var(--font-title); margin: 26px 0 8px; }
+.b-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px 12px; margin: 14px 0 6px; }
+.b-form label, .b-row label { display: grid; gap: 4px; font-size: 12px; font-weight: 800; color: var(--muted); }
+.b-form input, .b-form select, .b-row input, .b-row select { width: 100%; min-width: 0; font: 600 15px var(--font-num); color: var(--ink); }
+select { background: var(--surface); border: 1.5px solid var(--btn-line); border-radius: 10px; padding: 7px 10px; }
+.b-form .wide { grid-column: span 2; }
+.b-sub { grid-column: 1 / -1; margin: 6px 0 0; font: 800 12px var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+#b-msg { margin: 8px 0; font-weight: 700; }
+#b-msg:empty { display: none; }
+#b-msg.error { color: var(--bad); }
+#b-msg.note { color: var(--muted); }
+.b-table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; font-size: 14px; }
+.b-wrap { overflow-x: auto; }
+.b-table th, .b-table td { text-align: left; padding: 8px 12px; border-top: 1px solid var(--row-line); vertical-align: top; }
+.b-table th { border-top: 0; background: var(--surface-2); font: 700 11px var(--font-num); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.b-table td.n, .b-table th.n { text-align: right; font-family: var(--font-num); white-space: nowrap; }
+.b-steps { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.b-steps li { display: grid; grid-template-columns: 110px 1fr; gap: 12px; }
+.b-steps b { font: 700 13px var(--font-num); color: var(--num); }
+.b-craft { color: var(--up-fg, #2a7a4b); font-weight: 800; font-size: 12px; }
+.b-panel { margin-top: 30px; padding: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.b-row { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: end; margin: 10px 0; }
+.b-row label { flex: 1 1 160px; }
+.b-row .grow { flex: 3 1 280px; }
+#b-savemsg { margin: 6px 0 0; font-weight: 700; }
+#b-savemsg:empty { display: none; }
+#b-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-top: 12px; }
+.b-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; display: grid; gap: 6px; align-content: start; }
+.b-card h4 { margin: 0; font: 600 20px var(--font-title); overflow-wrap: anywhere; }
+.b-card p { margin: 0; font-size: 13px; overflow-wrap: anywhere; }
+.b-card .b-nums { font: 600 12px var(--font-num); color: var(--muted); }
+.b-card img { width: 100%; border-radius: 8px; border: 1px solid var(--line); }
+.b-card .b-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.b-card .b-actions button { padding: 3px 10px; font-size: 12px; }
+
+/* Appraiser */
+#view-appraiser { max-width: 1000px; }
+#view-appraiser h2 { font: 600 30px/1.2 var(--font-title); margin: 8px 0 4px; }
+.ap-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 14px; align-items: start; margin-top: 14px; }
+@media (max-width: 760px) { .ap-grid { grid-template-columns: minmax(0, 1fr); } }
+.ap-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; display: grid; gap: 10px; min-width: 0; }
+.ap-card label { display: grid; gap: 4px; font-size: 12px; font-weight: 800; color: var(--muted); min-width: 0; }
+.ap-card input, .ap-card select { width: 100%; min-width: 0; font: 600 15px var(--font-num); color: var(--ink); }
+.ap-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 10px; }
+#ap-facts { margin: 0; padding: 8px 10px; border-radius: 10px; background: var(--track); color: var(--muted); font-size: 13px; }
+#ap-facts:empty { display: none; }
+.ap-label { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; overflow-wrap: anywhere; }
+button.cozy { padding: 2px 9px; font-size: 11px; border-radius: 999px; }
+#ap-note { margin: 0; font-size: 13px; font-weight: 700; }
+#ap-note:empty { display: none; }
+#ap-note input { margin-top: 4px; }
+#ap-stories { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); font-weight: 800; }
+#ap-stories:empty { display: none; }
+#ap-stories button { padding: 3px 10px; font-size: 12px; }
+#ap-stories button[aria-pressed="true"] { border-color: var(--accent); }
+#ap-answer { border-color: var(--accent); }
+#ap-answer .big { font: 700 34px/1.1 var(--font-num); color: var(--num); }
+#ap-answer p { margin: 0; font-size: 14px; }
+#ap-answer .error { color: var(--bad); font-weight: 700; }
+.ap-card .small { font-size: 12px; color: var(--muted); }
+.ap-card label.ap-check { display: flex; align-items: center; gap: 8px; }
+.ap-card .ap-check input { width: auto; }
+
 /* How it works */
 #view-how { max-width: 760px; }
 #view-how h2 { font: 600 30px/1.2 var(--font-title); margin: 8px 0 4px; }
@@ -216,6 +282,8 @@ b.t { font-family: var(--font-num); }
   <h1 class="logo">Boss<b>Timer</b></h1>
   <nav class="tabs" role="tablist" aria-label="Pages">
     <button id="tab-timer" type="button" role="tab" aria-controls="view-timer" aria-selected="true">Timer</button>
+    <button id="tab-builds" type="button" role="tab" aria-controls="view-builds" aria-selected="false">Builds</button>
+    <button id="tab-appraiser" type="button" role="tab" aria-controls="view-appraiser" aria-selected="false">Appraiser</button>
     <button id="tab-how" type="button" role="tab" aria-controls="view-how" aria-selected="false">How it works</button>
   </nav>
   <span class="auth">
@@ -253,6 +321,12 @@ b.t { font-family: var(--font-num); }
   <section id="hiddenlist" hidden></section>
   <p class="small">Times are game chat time, your local time is beside them in grey. Windows learn from players who camp a kill until the next spawn.</p>
 </main>
+<main id="view-builds" role="tabpanel" aria-labelledby="tab-builds" hidden>
+  <div id="builds-root"><p class="empty">Loading the calculator...</p></div>
+</main>
+<main id="view-appraiser" role="tabpanel" aria-labelledby="tab-appraiser" hidden>
+  <div id="appraiser-root"><p class="empty">Loading the appraiser...</p></div>
+</main>
 <main id="view-how" role="tabpanel" aria-labelledby="tab-how" hidden>
   <h2>How it works</h2>
 
@@ -282,6 +356,16 @@ b.t { font-family: var(--font-num); }
 
   <h3>How the window learns</h3>
   <p>The game files say 60 minutes for Mushmom, but real camps run longer. Only a kill followed by a spawn that the same person watched counts as a camp, and their Still waiting posts help too. Until a boss has 5 camps the window is a wide guess, from the game timer to twice that. Heard posts show dashed and never count.</p>
+
+  <h3>Builds</h3>
+  <p>The Builds tab turns your stat window into a leveling guide: where to train, where your skill and ability points go, and what to wear and scroll. Monster, skill and item numbers come from the game's own files, and the damage math is meowdb's Classic formulas. Where to train is ranked by EXP per cast, from a few thousand simulated kills with your damage range, crits, monster defense and hit chance.</p>
+  <p>A class only gets a guide once its math matches a real stat window, so far Cleric and Assassin. Every class can still save and browse builds. Want yours checked? Send Rimmah a screenshot of your stat window and skills.</p>
+  <p>Saving needs Discord, and a build shows the character name you type, never your Discord name. Screenshots are shown as they are and the numbers are what each player typed, so take other people's builds as their word.</p>
+
+  <h3>Appraiser</h3>
+  <p>The Appraiser tab answers one question: what would this item cost, on average, to make yourself? Type the + number, slots left and the bonus from its tooltip, and it works out how it was likely scrolled, then counts the clean bases and scrolls it takes to get one that good. Crafted items are priced by how many crafts it takes to roll that well. Slots, clean stats, scroll odds and recipes come from the game's own files.</p>
+  <p>Prices are what you type. The Check on Cozy button copies the item name and opens Cozy Market, where you paste it into the search. How far a dropped or catalyst crafted stat can swing isn't in the game files, so that part is a guess the page says out loud, and you can type the real odds over it.</p>
+  <p>The answer is a ceiling, not what a buyer pays. When lots of the same item are already for sale, it often sells for much less, so check Cozy's listings with the same stats too.</p>
 
   <h3>Fair play</h3>
   <p>One post every 15 seconds. Your Discord name shows on everything you post. False posts get hidden and the account blocked.</p>
@@ -499,9 +583,11 @@ function makeSupabaseApi(cfg) {
   const down = () => Promise.reject(new Error('The timer database is not set up yet.'));
   if (!cfg.supabaseUrl || !window.supabase) {
     return { getSession: async () => null, onAuth() {}, signIn: down, signOut: down, list: down, subscribe: () => () => {},
-      post: down, remove: down, hide: down, unhide: down, block: down, isAdmin: async () => false };
+      post: down, remove: down, hide: down, unhide: down, block: down, isAdmin: async () => false,
+      listBuilds: down, saveBuild: down, deleteBuild: down, uploadShot: down, removeShot: down, shotUrl: () => '', hideBuild: down };
   }
   const COLUMNS = 'id,boss_id,channel,kind,at,posted_at,user_id,user_name,hidden';
+  const BUILD_COLUMNS = 'id,user_id,ign,class,level,stats,trains_at,note,shot_path,hidden,updated_at';
   const sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
   const who = s => {
     if (!s || !s.user) return null;
@@ -539,6 +625,36 @@ function makeSupabaseApi(cfg) {
     async unhide(id) { check(await sb.from('sightings').update({ hidden: false }).eq('id', id)); },
     async block(userId) { check(await sb.from('blocked_users').insert({ user_id: userId })); },
     async isAdmin() { const { data } = await sb.rpc('is_admin'); return data === true; },
+
+    // Builds tab. The database stamps user_id, hidden and the times itself (supabase/builds.sql).
+    async listBuilds({ cls, minLv, maxLv, sort } = {}) {
+      let q = sb.from('builds').select(BUILD_COLUMNS);
+      if (cls) q = q.eq('class', cls);
+      if (minLv) q = q.gte('level', minLv);
+      if (maxLv) q = q.lte('level', maxLv);
+      q = sort === 'new' ? q.order('updated_at', { ascending: false }) : q.order('level', { ascending: false }).order('updated_at', { ascending: false });
+      const { data, error } = await q.limit(60);
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    async saveBuild({ id, ...fields }) {
+      const q = id ? sb.from('builds').update(fields).eq('id', id) : sb.from('builds').insert(fields);
+      const { data, error } = await q.select(BUILD_COLUMNS).single();
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    async deleteBuild(id) { check(await sb.from('builds').delete().eq('id', id)); },
+    // Pictures go in a folder named after your id, which is the only folder the bucket lets you write.
+    async uploadShot(blob) {
+      const { data } = await sb.auth.getSession();
+      if (!data.session) throw new Error('Sign in first.');
+      const path = data.session.user.id + '/' + crypto.randomUUID() + (blob.type === 'image/webp' ? '.webp' : '.jpg');
+      check(await sb.storage.from('build-shots').upload(path, blob, { contentType: blob.type, upsert: false }));
+      return path;
+    },
+    async removeShot(path) { check(await sb.storage.from('build-shots').remove([path])); },
+    shotUrl(path) { return sb.storage.from('build-shots').getPublicUrl(path).data.publicUrl; },
+    async hideBuild(id) { check(await sb.from('builds').update({ hidden: true }).eq('id', id)); },
   };
 }
 
@@ -767,6 +883,7 @@ async function setSession(s) {
   state.admin = s ? await api.isAdmin().catch(() => false) : false;
   renderAuth();
   render();
+  if (window.Builds && window.Builds.refresh) window.Builds.refresh();
 }
 
 async function send(channel, kind, at) {
@@ -792,17 +909,53 @@ for (const [id, kind] of [['btn-spawned', 'spawn'], ['btn-killed', 'kill'], ['bt
 $('signin').addEventListener('click', () => api.signIn().catch(err => hint(err.message)));
 $('signout').addEventListener('click', () => api.signOut().catch(() => {}).then(() => setSession(null)));
 
-// The How it works tab is #how, so it can be linked; back and forward switch views too.
+// The Builds tab is #builds, the Appraiser #appraiser and How it works #how, so each can be linked; back and forward switch views too.
 function showView() {
-  const how = location.hash === '#how';
-  $('view-how').hidden = !how;
-  $('view-timer').hidden = how;
-  $('tab-how').setAttribute('aria-selected', String(how));
-  $('tab-timer').setAttribute('aria-selected', String(!how));
+  const view = { '#how': 'how', '#builds': 'builds', '#appraiser': 'appraiser' }[location.hash] || 'timer';
+  for (const v of ['timer', 'builds', 'appraiser', 'how']) {
+    $('view-' + v).hidden = v !== view;
+    $('tab-' + v).setAttribute('aria-selected', String(v === view));
+  }
+  if (view === 'builds') loadBuilds();
+  if (view === 'appraiser') loadAppraiser();
   // The stage has no size while hidden, so the sprite is sized again when it shows.
-  if (!how && sprite.lay) { placeSprite(); walk(); }
+  if (view === 'timer' && sprite.lay) { placeSprite(); walk(); }
 }
+// builds.js and its game data only load the first time someone opens the Builds tab, so the timer stays quick.
+let buildsLoading = null;
+function loadBuilds() {
+  if (buildsLoading) return buildsLoading;
+  const script = new Promise((resolve, reject) => {
+    document.head.append(el('script', { src: 'builds.js', onload: resolve, onerror: () => reject(new Error('builds.js')) }));
+  });
+  const data = fetch('data/builds.json').then(r => { if (!r.ok) throw new Error('builds.json'); return r.json(); });
+  buildsLoading = Promise.all([script, data]).then(([, d]) => {
+    window.Builds.mount($('builds-root'), { api, store, el, data: d, session: () => state.session, admin: () => state.admin, signIn: () => api.signIn() });
+  }).catch(() => {
+    buildsLoading = null;
+    $('builds-root').replaceChildren(el('p', { class: 'empty' }, "The calculator didn't load. Try reloading the page."));
+  });
+  return buildsLoading;
+}
+// Same for appraiser.js and its data.
+let appraiserLoading = null;
+function loadAppraiser() {
+  if (appraiserLoading) return appraiserLoading;
+  const script = new Promise((resolve, reject) => {
+    document.head.append(el('script', { src: 'appraiser.js', onload: resolve, onerror: () => reject(new Error('appraiser.js')) }));
+  });
+  const data = fetch('data/appraiser.json').then(r => { if (!r.ok) throw new Error('appraiser.json'); return r.json(); });
+  appraiserLoading = Promise.all([script, data]).then(([, d]) => {
+    window.Appraiser.mount($('appraiser-root'), { el, data: d });
+  }).catch(() => {
+    appraiserLoading = null;
+    $('appraiser-root').replaceChildren(el('p', { class: 'empty' }, "The appraiser didn't load. Try reloading the page."));
+  });
+  return appraiserLoading;
+}
+$('tab-appraiser').addEventListener('click', () => { if (location.hash !== '#appraiser') location.hash = '#appraiser'; });
 $('tab-how').addEventListener('click', () => { if (location.hash !== '#how') location.hash = '#how'; });
+$('tab-builds').addEventListener('click', () => { if (location.hash !== '#builds') location.hash = '#builds'; });
 $('tab-timer').addEventListener('click', () => { if (location.hash) history.pushState(null, '', location.pathname + location.search); showView(); });
 addEventListener('hashchange', showView);
 addEventListener('popstate', showView);
