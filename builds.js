@@ -324,7 +324,8 @@ const INPUTS = { level: [['level', 'Level']], str: [['str', 'STR']], dex: [['dex
   crit: [['critRate', 'Crit rate %'], ['critDmg', 'Crit damage %']] };
 const OPEN_FIELDS = ['level', 'str', 'dex', 'int', 'luk', 'atk', 'magic', 'acc'];
 const ASSUMED_LABEL = { ...LABEL, atkMin: 'attack range', atkMax: 'attack range', skills: 'attack skill level' };
-const ui = { deps: null, data: null, root: null, form: { cls: 'cleric', v: {}, s: {} }, timer: 0 };
+// read: boxes the screen reader filled ('v:luk', 's:4100000'), marked until the player edits them
+const ui = { deps: null, data: null, root: null, form: { cls: 'cleric', v: {}, s: {} }, timer: 0, read: new Set() };
 const E = (...a) => ui.deps.el(...a);
 const fieldsOf = cls => (cls.checked ? cls.fields : OPEN_FIELDS).flatMap(f => INPUTS[f]);
 const fmt = n => Math.round(n).toLocaleString('en-US');
@@ -340,15 +341,16 @@ const rawStats = () => ({ ...ui.form.v, skills: { ...ui.form.s } });
 
 function buildForm() {
   const cls = CLASSES[ui.form.cls], box = ui.root.querySelector('.b-form');
-  const input = (id, label, value, on) => E('label', {}, label, E('input', { id, inputmode: 'numeric', autocomplete: 'off', value: value == null ? '' : String(value), oninput: on }));
+  const input = (id, label, value, on, key) => E('label', {}, label, E('input', { id, inputmode: 'numeric', autocomplete: 'off', value: value == null ? '' : String(value),
+    ...(ui.read.has(key) ? { class: 'b-read' } : {}), oninput: e => { ui.read.delete(key); e.target.classList.remove('b-read'); on(e); typedIn(key); } }));
   const kids = [E('label', { class: 'wide' }, 'Class', E('select', { id: 'b-class', onchange: e => { ui.form.cls = e.target.value; saveForm(); buildForm(); renderGuide(); } },
     Object.values(CLASSES).map(c => { const o = E('option', { value: c.id }, c.name + (c.checked ? '' : ' (no guide yet)')); if (c.id === ui.form.cls) o.selected = true; return o; })))];
-  for (const [k, label] of fieldsOf(cls)) kids.push(input('b-f-' + k, label, ui.form.v[k], e => { ui.form.v[k] = e.target.value; changed(); }));
+  for (const [k, label] of fieldsOf(cls)) kids.push(input('b-f-' + k, label, ui.form.v[k], e => { ui.form.v[k] = e.target.value; changed(); }, 'v:' + k));
   if (cls.checked) {
     kids.push(E('p', { class: 'b-sub' }, 'Skill levels'));
     for (const id of cls.skills) {
       const row = ui.data.skills[id];
-      if (row) kids.push(input('b-s-' + id, row.name, ui.form.s[id], e => { ui.form.s[id] = e.target.value; changed(); }));
+      if (row) kids.push(input('b-s-' + id, row.name, ui.form.s[id], e => { ui.form.s[id] = e.target.value; changed(); }, 's:' + id));
     }
   }
   box.replaceChildren(...kids);
@@ -391,7 +393,7 @@ function renderGuide() {
     g.ap.map(a => [a.from === a.to ? String(a.from) : a.from + ' to ' + a.to, a.put, a.why])));
   out.querySelector('#worth').replaceChildren(table(['Gain', 'Damage'], g.worth.map(w => [w.what, '+' + w.pct + '%']), [1]));
   out.querySelector('#gear').replaceChildren(table(['Slot', 'By level'], g.gear.map(s => [s.slot,
-    E('span', {}, s.rows.map((r, i) => [i ? E('br') : null, E('b', {}, r.name), ' (' + r.level + (incText(r.inc) ? ', ' + incText(r.inc) : '') + ') ', r.craft ? E('span', { class: 'b-craft' }, 'craft') : null]))])));
+    E('span', {}, s.rows.flatMap((r, i) => [i ? E('br') : null, E('b', {}, r.name), ' (' + r.level + (incText(r.inc) ? ', ' + incText(r.inc) : '') + ') ', r.craft ? E('span', { class: 'b-craft' }, 'craft') : null]))])));
   out.querySelector('#scrolls').replaceChildren(table(['Order', 'Item', 'Scroll', 'All slots with Lesser', 'Damage'],
     g.scrolls.map(s => [String(s.order), s.slot, s.family, s.gainAllLesser, '+' + s.pct + '%']), [0, 4]));
   return g;
@@ -401,9 +403,183 @@ function renderGuide() {
 function fill(raw, clsId) {
   const { skills, ...v } = raw || {};
   ui.form = { cls: CLASSES[clsId] ? clsId : ui.form.cls, v: {}, s: {} };
+  ui.read.clear();
   for (const [k, x] of Object.entries(v)) if (x != null) ui.form.v[k] = String(x);
   for (const [k, x] of Object.entries(skills || {})) if (x != null) ui.form.s[k] = String(x);
   saveForm(); buildForm(); renderGuide();
+}
+
+/* ---------- Read from game ---------- */
+
+const BASE_KEYS = ['level', 'str', 'dex', 'int', 'luk'], DETAIL_KEYS = ['atkMin', 'atkMax', 'magic', 'acc', 'critRate', 'critDmg'];
+const formKeys = cls => fieldsOf(cls).map(([k]) => k);
+const inputLabel = k => (Object.values(INPUTS).flat().find(([x]) => x === k) || [k, k])[1];
+const jobOf = id => Math.floor(Number(id) / 10000);
+const tierOf = job => job > 0 ? (job % 100 === 0 ? 1 : 2) : 0;
+
+// The class a read belongs to: the job line when it names one, else the class whose skills were read.
+function classOf(job, skills) {
+  if (job && CLASSES[job]) return job;
+  const jobs = new Set(Object.keys(skills || {}).map(jobOf));
+  const c = Object.values(CLASSES).find(c => c.skillOrder && c.skillOrder.some(([id]) => jobs.has(jobOf(id))));
+  return c ? c.id : undefined;
+}
+// Whether validateStats takes these read values on their own (any class that has the box, at a typical level).
+function readOk(keys, vals) {
+  const raw = { level: keys.includes('level') ? vals.level : 50 };
+  for (const k of keys) raw[k] = vals[k];
+  return !validateStats(raw, keys.some(k => /^(atk|crit)/.test(k)) ? 'assassin' : 'cleric').errors.length;
+}
+
+// Puts what the screen reader read into the form without clearing anything else. A value validateStats rejects or a
+// skill level above its max is skipped, and only boxes the form shows get filled. Filled boxes are marked.
+function take({ cls, values = {}, skills = {} } = {}) {
+  const filled = [], skipped = [];
+  if (CLASSES[cls] && cls !== ui.form.cls) ui.form.cls = cls;
+  const c = CLASSES[ui.form.cls], shown = formKeys(c), vals = {};
+  for (const [k, x] of Object.entries(values)) if (LABEL[k] && !blank(x)) vals[k] = x;
+  if ('atkMin' in vals || 'atkMax' in vals) {
+    const pair = { atkMin: 'atkMin' in vals ? vals.atkMin : vals.atkMax, atkMax: 'atkMax' in vals ? vals.atkMax : vals.atkMin };
+    if (!readOk(['atkMin', 'atkMax'], pair)) for (const k of ['atkMin', 'atkMax']) if (k in vals) { skipped.push(k); delete vals[k]; }
+  }
+  for (const k of Object.keys(vals)) if (!/^atk/.test(k) && !readOk([k], vals)) { skipped.push(k); delete vals[k]; }
+  for (const [k, x] of Object.entries(vals)) if (shown.includes(k)) { ui.form.v[k] = String(x); ui.read.add('v:' + k); filled.push(k); }
+  for (const [id, x] of Object.entries(skills)) {
+    const row = ui.data.skills[id], n = Number(x);
+    if (!row || !Number.isInteger(n) || n < 0 || n > row.max) { skipped.push(String(id)); continue; }
+    if (c.checked && c.skills.includes(Number(id))) { ui.form.s[id] = String(n); ui.read.add('s:' + id); filled.push(String(id)); }
+  }
+  clearTimeout(ui.timer);
+  saveForm(); buildForm(); renderGuide();
+  return { filled, skipped };
+}
+
+// reader.js and the skill icons load the first time someone opens Read from game.
+let readerLoading = null;
+function loadReader() {
+  if (readerLoading) return readerLoading;
+  const script = window.Reader ? Promise.resolve() : new Promise((resolve, reject) => {
+    document.head.append(E('script', { src: 'reader.js', onload: resolve, onerror: () => reject(new Error('reader.js')) }));
+  });
+  const json = fetch('data/skill-icons.json').then(r => { if (!r.ok) throw new Error('skill-icons.json'); return r.json(); });
+  const png = new Promise((resolve, reject) => { const im = new Image(); im.onload = () => resolve(im); im.onerror = () => reject(new Error('skill-icons.png')); im.src = 'data/skill-icons.png'; });
+  readerLoading = Promise.all([script, json, png]).then(([, j, im]) => window.Reader.setIcons(j, im));
+  readerLoading.catch(() => { readerLoading = null; });
+  return readerLoading;
+}
+
+const CHECK = [['stat', 'Stats'], ['detail', 'Detail'], ['t1', '1st job skills'], ['t2', '2nd job skills']];
+// A reading session (one share, or pastes until the next share). Keys are 'luk' or 's4100000'.
+// got: read and filled; bad: the last read of a key, when the form turned it down (key to value); asked: keys on the
+// "please type" line; typed: asked keys the player then typed in; tiers: the job and row count each skill tab showed last.
+const newSession = () => ({ got: new Set(), bad: new Map(), asked: new Set(), typed: new Set(), stat: false, detail: false, tiers: {}, last: null, status: '' });
+let rd = newSession();
+const formValue = k => /^s\d+$/.test(k) ? ui.form.s[k.slice(1)] : ui.form.v[k];
+// read, or typed in by the player after the panel asked for it (and not left empty)
+const have = k => rd.got.has(k) || (rd.typed.has(k) && !blank(formValue(k)));
+function typedIn(inputKey) {
+  const k = inputKey.startsWith('s:') ? 's' + inputKey.slice(2) : inputKey.slice(2);
+  if (rd.asked.has(k)) { rd.typed.add(k); renderReader(); }
+}
+
+// Whether the form has a box for a key ('luk', or 's4100000' for a skill), so the player could type it.
+function inForm(k) {
+  const c = CLASSES[ui.form.cls];
+  return /^s\d+$/.test(k) ? !!c.checked && c.skills.includes(Number(k.slice(1))) : formKeys(c).includes(k);
+}
+// Where each checklist item stands: 'done', 'part' (some read) or '' (nothing yet), with a count for skill tabs.
+// A skill tab only needs the skills the form has a box for (a Cleric's form has none for the 1st job tab), and a
+// character under level 30 has no 2nd job tab yet, so that item is skipped.
+function checklist() {
+  const need = keys => keys.filter(inForm);
+  const of = (seen, keys) => !seen ? '' : keys.every(have) ? 'done' : 'part';
+  const out = { stat: { state: of(rd.stat, need(BASE_KEYS)) }, detail: { state: of(rd.detail, need(DETAIL_KEYS)) } };
+  const lv = Number(ui.form.v.level), firstJob = have('level') && lv >= 1 && lv < ADVANCE;
+  for (const t of [1, 2]) {
+    if (t === 2 && firstJob) { out.t2 = { state: 'done', skip: true }; continue; }
+    const tab = rd.tiers[t];
+    if (!tab) { out['t' + t] = { state: '' }; continue; }
+    // every skill of the tab's job (to tell a cut off tab), and the ones the form asks for
+    const all = Object.keys(ui.data.skills).filter(id => jobOf(id) === tab.job && ui.data.skills[id].name);
+    const ids = all.filter(id => inForm('s' + id)), missing = ids.filter(id => !have('s' + id));
+    out['t' + t] = { state: missing.length ? 'part' : 'done', have: ids.length - missing.length, of: ids.length, missing, cut: tab.rows < all.length };
+  }
+  return out;
+}
+const allDone = () => Object.values(checklist()).every(x => x.state === 'done');
+
+function renderReader() {
+  const box = ui.root.querySelector('#r-check');
+  if (!box) return;
+  const ck = checklist(), lines = [], ask = [], scroll = [];
+  box.replaceChildren(...CHECK.map(([k, name]) => E('li', ck[k].state ? { class: ck[k].state } : {},
+    name + (ck[k].skip ? ' (none until level ' + ADVANCE + ')' : ck[k].state === 'part' && ck[k].of ? ' (' + ck[k].have + ' of ' + ck[k].of + ')' : ''))));
+  const skill = id => ui.data.skills[id] ? ui.data.skills[id].name : id;
+  // only boxes the form has are asked for: anything else can't be typed
+  if (rd.stat) for (const k of BASE_KEYS) if (inForm(k) && !have(k)) ask.push(k);
+  if (rd.detail) for (const k of DETAIL_KEYS) if (inForm(k) && !have(k)) ask.push(k);
+  for (const k of rd.bad.keys()) if (inForm(k) && !have(k)) ask.push(k);
+  for (const t of ['t1', 't2']) if (ck[t].missing) (ck[t].cut ? scroll : ask).push(...ck[t].missing.map(id => 's' + id));
+  rd.asked = new Set([...rd.asked, ...ask]);
+  const name = k => /^s\d+$/.test(k) ? skill(k.slice(1)) : inputLabel(k), last = rd.last;
+  if (ask.length) lines.push("Couldn't read, please type: " + [...new Set(ask.map(name))].join(', '));
+  if (scroll.length) lines.push('Scroll down to show ' + [...new Set(scroll.map(name))].join(', '));
+  if (rd.stat && !rd.detail) lines.push('Open DETAIL too, for attack and accuracy');
+  // a share can't be pasted again, so a share is told to fix the game's size instead
+  if (last && last.error === 'scale') lines.push(last.from === 'share' ? "Your game window looks an unusual size, so it can't be read. Try the game at its normal size." : 'Please paste a plain unscaled screenshot');
+  else if (last && last.error && last.from === 'paste') lines.push("Couldn't find a stat or skill window in that picture.");
+  else if (last && last.unreadTab) lines.push("Couldn't read that skill tab. Move the mouse off it and try again.");
+  ui.root.querySelector('#r-msg').replaceChildren(...lines.map(t => E('p', {}, t)));
+  ui.root.querySelector('#r-status').textContent = rd.status;
+}
+
+// One picture or shared frame: read it, put what's new into the form, and tick the checklist.
+function onImage(img, { from }) {
+  const r = window.Reader.readAll(img), share = from === 'share';
+  // While sharing, the same frame comes in twice a second: leave out what was read, typed, or turned down at this value,
+  // so the form is only rebuilt when something new turns up.
+  const fresh = (k, x) => !share || !(have(k) || rd.typed.has(k) || rd.bad.get(k) === String(x));
+  const values = {}, skills = {};
+  for (const [k, x] of Object.entries(r.values)) if (k !== 'job' && fresh(k, x)) values[k] = x;
+  for (const [id, x] of Object.entries(r.skills)) if (fresh('s' + id, x)) skills[id] = x;
+  const cls = classOf(r.values.job, r.skills);
+  let skipped = [];
+  if (Object.keys(values).length || Object.keys(skills).length || (CLASSES[cls] && cls !== ui.form.cls)) skipped = take({ cls, values, skills }).skipped;
+  // a turned down read takes the key off got, so the panel asks for it again
+  const keep = (k, key, x) => { if (skipped.includes(k)) { rd.bad.set(key, String(x)); rd.got.delete(key); } else { rd.got.add(key); rd.bad.delete(key); } };
+  for (const [k, x] of Object.entries(values)) keep(k, k, x);
+  for (const [id, x] of Object.entries(skills)) keep(id, 's' + id, x);
+  if (Object.keys(r.values).length || r.missing.length) rd.stat = true;
+  if (r.detail) rd.detail = true;
+  const ids = Object.keys(r.skills);
+  for (const job of new Set(ids.map(jobOf))) {
+    const t = tierOf(job);
+    if (t) rd.tiers[t] = { job, rows: ids.filter(id => jobOf(id) === job).length + r.unknownRows };
+  }
+  rd.last = { from, error: r.error, unreadTab: !ids.length && r.unknownRows > 0 };
+  const done = allDone();
+  if (done && !share) rd.status = 'All read. Check the marked boxes, then save.';
+  renderReader();
+  return { done };
+}
+
+function openReader() {
+  const panel = ui.root.querySelector('#b-reader'), btn = panel.querySelector('#b-readbtn'), note = panel.querySelector('#b-readnote');
+  btn.disabled = true; note.textContent = 'Loading the reader...';
+  loadReader().then(() => {
+    btn.hidden = true; note.textContent = "Open your Character Stat window with DETAIL, then your Skill window, and click through your 1st and 2nd job tabs. Every box it fills is marked so you can check it. Reading happens on your computer. The reader never sends your game pictures anywhere.";
+    const area = E('div', { class: 'r-area' });
+    panel.append(area, E('ul', { id: 'r-check' }), E('p', { id: 'r-status' }), E('div', { id: 'r-msg' }));
+    ui.capture = window.Reader.capture(area, { el: E, onImage,
+      say: t => { rd.status = t; renderReader(); },
+      onState: (state, why) => {
+        if (state === 'sharing') { rd = newSession(); rd.status = 'Watching your game window. It stops by itself once everything is read.'; }
+        else rd.status = { done: 'All read. Check the marked boxes, then save.', time: 'Stopped sharing after 2 minutes. Press Share the game window to try again.',
+          stop: 'Stopped sharing.', ended: 'Stopped sharing.', hidden: 'Stopped sharing because you left the Builds tab.' }[why] || '';
+        renderReader();
+      } });
+    renderReader();
+  }, () => { btn.disabled = false; note.textContent = "The reader didn't load. Try again."; });
 }
 
 /* ---------- Saving and browsing ---------- */
@@ -566,6 +742,9 @@ function mount(root, deps) {
     E('section', { class: 'b-calc' },
       E('h2', {}, 'Your build'),
       E('p', { class: 'lead' }, 'Type in your stat window and get a leveling guide for your character: where to train, where your points go, and what to wear and scroll.'),
+      E('div', { id: 'b-reader', class: 'b-reader' },
+        E('button', { id: 'b-readbtn', type: 'button', onclick: openReader }, 'Read from game'),
+        E('p', { id: 'b-readnote', class: 'small' }, 'Or let the page read your stat and skill windows, from a shared game window or a screenshot.')),
       E('div', { class: 'b-form' }),
       E('p', { id: 'b-msg' })),
     E('section', { id: 'b-guide', hidden: '' },
@@ -583,5 +762,5 @@ function mount(root, deps) {
 }
 
 window.Builds = { CLASSES, mastery, physRange, spellRange, weaponAttackFromMax, levelScale, hitChance, defend, elemMult, makeRng, castsToKill,
-  validateStats, rankMobs, buildGuide, mount, fill, refresh, shrinkImage };
+  validateStats, rankMobs, buildGuide, mount, fill, refresh, shrinkImage, take, classOf };
 })();

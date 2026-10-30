@@ -130,6 +130,25 @@ select { background: var(--surface); border: 1.5px solid var(--btn-line); border
 .b-card img { width: 100%; border-radius: 8px; border: 1px solid var(--line); }
 .b-card .b-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .b-card .b-actions button { padding: 3px 10px; font-size: 12px; }
+/* Read from game (reader.js draws .r-bar and .r-drop) */
+.b-reader { margin: 14px 0 0; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; display: grid; gap: 8px; }
+.b-reader p { margin: 0; }
+.b-reader .small { font-size: 13px; color: var(--muted); }
+.r-area { display: grid; gap: 8px; }
+.r-bar { display: flex; flex-wrap: wrap; gap: 8px; }
+.r-bar:not(:has(button:not([hidden]))) { display: none; }
+.r-drop { padding: 14px; border: 2px dashed var(--btn-line); border-radius: 12px; text-align: center; font-size: 13px; font-weight: 700; color: var(--muted); }
+.r-drop:focus { outline: 2px solid var(--focus); outline-offset: 2px; }
+.r-drop.over { border-color: var(--focus); color: var(--ink); }
+#r-check { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; font-weight: 700; color: var(--muted); }
+#r-check li::before { content: '\25CB'; margin-right: 5px; }
+#r-check li.part::before { content: '\25D0'; color: var(--watch-fg); }
+#r-check li.done { color: var(--ink); }
+#r-check li.done::before { content: '\2714'; color: var(--up-fg); }
+#r-status { font-size: 13px; font-weight: 700; }
+#r-status:empty, #r-msg:empty { display: none; }
+#r-msg { display: grid; gap: 2px; font-size: 13px; font-weight: 700; color: var(--bad); }
+.b-form input.b-read { background: var(--up-bg); border-color: var(--up-dot); }
 
 /* Appraiser */
 #view-appraiser { max-width: 1000px; }
@@ -156,8 +175,6 @@ button.cozy { padding: 2px 9px; font-size: 11px; border-radius: 999px; }
 #ap-answer p { margin: 0; font-size: 14px; }
 #ap-answer .error { color: var(--bad); font-weight: 700; }
 .ap-card .small { font-size: 12px; color: var(--muted); }
-.ap-card label.ap-check { display: flex; align-items: center; gap: 8px; }
-.ap-card .ap-check input { width: auto; }
 
 /* How it works */
 #view-how { max-width: 760px; }
@@ -359,12 +376,13 @@ b.t { font-family: var(--font-num); }
 
   <h3>Builds</h3>
   <p>The Builds tab turns your stat window into a leveling guide: where to train, where your skill and ability points go, and what to wear and scroll. Monster, skill and item numbers come from the game's own files, and the damage math is meowdb's Classic formulas. Where to train is ranked by EXP per cast, from a few thousand simulated kills with your damage range, crits, monster defense and hit chance.</p>
+  <p>Tired of typing your stats? The Read from game button on the Builds tab reads them off your screen. Press it, share your game window or paste a screenshot, then open your Character Stat window with DETAIL and your Skill window and click through your 1st and 2nd job tabs. It fills in your level, stats, attack or magic, accuracy, crits and skill levels, marks every box it filled so you can check it, and stops by itself once it has everything. If it isn't sure about a number it leaves the box empty and tells you which one to type. The reader never sends your game pictures anywhere, because the reading happens on your computer. Saving a build is separate. It stores the numbers in the form and the name and note you type, and uploads only the equip screenshot you pick yourself.</p>
   <p>A class only gets a guide once its math matches a real stat window, so far Cleric and Assassin. Every class can still save and browse builds. Want yours checked? Send Rimmah a screenshot of your stat window and skills.</p>
   <p>Saving needs Discord, and a build shows the character name you type, never your Discord name. Screenshots are shown as they are and the numbers are what each player typed, so take other people's builds as their word.</p>
 
   <h3>Appraiser</h3>
-  <p>The Appraiser tab answers one question: what would this item cost, on average, to make yourself? Type the + number, slots left and the bonus from its tooltip, and it works out how it was likely scrolled, then counts the clean bases and scrolls it takes to get one that good. Crafted items are priced by how many crafts it takes to roll that well. Slots, clean stats, scroll odds and recipes come from the game's own files.</p>
-  <p>Prices are what you type. The Check on Cozy button copies the item name and opens Cozy Market, where you paste it into the search. How far a dropped or catalyst crafted stat can swing isn't in the game files, so that part is a guess the page says out loud, and you can type the real odds over it.</p>
+  <p>The Appraiser tab answers one question: what would this item cost, on average, to make yourself? Type the + number, slots left and the bonus from its tooltip, and it works out how it was likely scrolled, then counts the clean bases and scrolls it takes to get one that good. Slots, clean stats and scroll odds come from the game's own files.</p>
+  <p>Prices are what you type. The Check on Cozy button copies the item name and opens Cozy Market, where you paste it into the search. How far a dropped item's stats can swing isn't in the game files, so when a scroll story leaves a point or two over, the page calls it the drop roll.</p>
   <p>The answer is a ceiling, not what a buyer pays. When lots of the same item are already for sale, it often sells for much less, so check Cozy's listings with the same stats too.</p>
 
   <h3>Fair play</h3>

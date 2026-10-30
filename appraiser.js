@@ -1,6 +1,6 @@
 // Appraiser tab: what an item would cost, on average, to make yourself, plus the tab's UI.
 // The scroll run math is the Meso Appraiser artifact's (item-appraiser/index.html), and every slot, stat,
-// scroll odd and recipe comes from data/appraiser.json, written from the game's own files.
+// and scroll odd comes from data/appraiser.json, written from the game's own files.
 (function () {
 'use strict';
 
@@ -29,17 +29,9 @@ const oneIn = x => x < 10 ? String(Math.round(x * 10) / 10) : fmt(Math.round(x))
 
 /* ---------- Rolls ---------- */
 
-// How far a clean stat can land from the client's value. The real rule lives on the server; this matches the
-// ±1s on Rimmah's Blue Arten, and ±2 for bigger stats is a guess the page says out loud.
+// How far a clean stat can land from the client's value: the leftover a scroll story may leave for the drop roll.
+// The real rule lives on the server; this matches the ±1s on Rimmah's Blue Arten, and ±2 for bigger stats is a guess.
 const swingFor = clean => clean <= 10 ? 1 : 2;
-
-// Chance a stat lands at least `typed`, landing evenly on whole numbers within ±swing of clean (never below 0).
-function rollChance(clean, typed, swing) {
-  const lo = Math.max(0, clean - swing), hi = clean + swing;
-  if (typed <= lo) return 1;
-  if (typed > hi) return 0;
-  return (hi - typed + 1) / (hi - lo + 1);
-}
 
 /* ---------- Scroll runs ---------- */
 
@@ -126,39 +118,6 @@ function appraiseScrolled({ equip, family, slotsLeft, passes, bonus, pick = 0, p
   return out;
 }
 
-/* ---------- Crafting ---------- */
-
-const ONE_HANDED = ['One-Handed Sword', 'One-Handed Axe', 'One-Handed Blunt Weapon', 'Dagger', 'Wand', 'Staff', 'Claw'];
-const TWO_HANDED = ['Two-handed Sword', 'Two-handed Axe', 'Two-handed Blunt Weapon', 'Spear', 'Polearm', 'Bow', 'Crossbow'];
-const catalystFor = (equip, data) => data.catalysts[ONE_HANDED.includes(equip.slot) ? 'one-handed' : TWO_HANDED.includes(equip.slot) ? 'two-handed' : 'armor'];
-
-// A craft without a catalyst always comes out clean. A better roll needs a catalyst on every try.
-function appraiseCrafted({ equip, typed = {}, oddsOverride, quickCost, salvage = 0, prices = {} }) {
-  if (!equip.recipe) return { error: `${equip.name} can't be crafted.` };
-  const stats = Object.keys(typed).filter(s => Number.isInteger(typed[s]));
-  const rolled = stats.some(s => typed[s] > (equip.inc[s] || 0));
-  let chance = 1;
-  if (oddsOverride !== undefined && !(oddsOverride > 0 && oddsOverride <= 1)) return { rolled, error: 'Odds should be a percent between 0 and 100, like 5.' };
-  if (rolled) {
-    chance = oddsOverride > 0 && oddsOverride <= 1 ? oddsOverride
-      : stats.reduce((c, s) => c * rollChance(equip.inc[s] || 0, typed[s], swingFor(equip.inc[s] || 0)), 1);
-    if (!(chance > 0)) return { rolled, chance: 0, error: "Under our guess at how far stats swing, that roll can't happen. If you know the odds, type them in." };
-  }
-  let craft;
-  if (quickCost !== undefined && quickCost !== null) {
-    if (!priceOk(quickCost)) return { rolled, chance, waitingFor: 'quick' };
-    craft = quickCost;
-  } else {
-    const ing = prices.ingredients || {};
-    const gap = equip.recipe.ingredients.find(i => !priceOk(ing[i.name]));
-    if (gap) return { rolled, chance, waitingFor: gap.name };
-    craft = equip.recipe.meso + equip.recipe.ingredients.reduce((sum, i) => sum + i.count * ing[i.name], 0);
-  }
-  if (rolled && !priceOk(prices.catalyst)) return { rolled, chance, craft, waitingFor: 'catalyst' };
-  const perTry = craft + (rolled ? prices.catalyst : 0) - (1 - chance) * (salvage > 0 ? salvage : 0);
-  if (!(perTry > 0)) return { rolled, chance, craft, error: 'The misses sell for more than a try costs, so there is nothing to price. Lower the resale price.' };
-  return { rolled, chance, craft, perTry, price: perTry / chance };
-}
 
 function compareOffer(offer, price) {
   const ratio = offer / price;
@@ -184,7 +143,7 @@ const $ = id => ui.root.querySelector('#' + id);
 
 function mount(root, deps) {
   ui.root = root; ui.data = deps.data; E = deps.el;
-  Object.assign(ui, { equip: null, manualMode: null, pick: 0, prices: {}, rolls: {}, priceKeys: '', storyKeys: '' });
+  Object.assign(ui, { equip: null, pick: 0, prices: {}, priceKeys: '', storyKeys: '' });
   const field = (label, input, hint) => E('label', {}, label, input, hint ? E('span', { class: 'small' }, hint) : null);
   const num = (id, extra = {}) => E('input', { id, inputmode: 'numeric', autocomplete: 'off', ...extra });
   const names = [...new Set(ui.data.equips.map(e => e.name))].sort();
@@ -196,8 +155,6 @@ function mount(root, deps) {
         field('Item', E('input', { id: 'ap-item', list: 'ap-items', autocomplete: 'off', spellcheck: 'false', placeholder: 'Start typing a name' })),
         E('datalist', { id: 'ap-items' }, names.map(n => E('option', { value: n }))),
         E('p', { id: 'ap-facts' }),
-        E('label', { id: 'ap-modewrap', hidden: '' }, 'Price it as',
-          E('select', { id: 'ap-mode' }, E('option', { value: 'scrolled' }, 'Scrolled'), E('option', { value: 'crafted' }, 'Crafted'))),
         E('div', { id: 'ap-scrolled', class: 'ap-card-part' },
           E('div', { class: 'ap-row' },
             field('+ in the name', num('ap-passes')),
@@ -205,12 +162,6 @@ function mount(root, deps) {
             field('Stat', E('select', { id: 'ap-stat' })),
             field('Bonus', num('ap-bonus'), 'After the plus, like the 7 in (75 +7)')),
           E('div', { id: 'ap-stories' })),
-        E('div', { id: 'ap-crafted', hidden: '' },
-          E('div', { id: 'ap-rolls', class: 'ap-row' }),
-          field('Odds of this roll, if you know them (%)', E('input', { id: 'ap-odds', inputmode: 'decimal', autocomplete: 'off' })),
-          E('label', { class: 'ap-check' }, E('input', { id: 'ap-quick', type: 'checkbox' }), 'Just type the craft cost'),
-          E('label', { id: 'ap-quickwrap', hidden: '' }, 'Craft cost', E('input', { id: 'ap-quickcost', autocomplete: 'off' })),
-          field('Sell the misses for (optional)', E('input', { id: 'ap-salvage', autocomplete: 'off' }))),
         E('div', { id: 'ap-prices', class: 'ap-card-part' }),
         E('p', { id: 'ap-note', 'aria-live': 'polite' })),
       E('section', { id: 'ap-answer', class: 'ap-card', 'aria-live': 'polite' },
@@ -222,11 +173,9 @@ function mount(root, deps) {
         E('p', { class: 'small' }, "This is a ceiling. Check Cozy's listings with the same stats too, since that's what one actually sells for."))));
 
   $('ap-item').addEventListener('input', () => setItem($('ap-item').value));
-  $('ap-mode').addEventListener('change', () => { ui.manualMode = $('ap-mode').value; renderMode(); update(); });
   for (const id of ['ap-passes', 'ap-left', 'ap-bonus']) $(id).addEventListener('input', () => { ui.pick = 0; update(); });
   $('ap-stat').addEventListener('change', () => { ui.pick = 0; renderFacts(); update(); });
-  $('ap-quick').addEventListener('change', () => { $('ap-quickwrap').hidden = !$('ap-quick').checked; update(); });
-  for (const id of ['ap-odds', 'ap-quickcost', 'ap-salvage', 'ap-offer']) $(id).addEventListener('input', update);
+  $('ap-offer').addEventListener('input', update);
   update();
 }
 
@@ -234,31 +183,14 @@ function setItem(text) {
   const t = text.trim().toLowerCase();
   const equip = ui.data.equips.find(e => e.name.toLowerCase() === t) || null;
   if (equip === ui.equip) return;
-  Object.assign(ui, { equip, manualMode: null, pick: 0, rolls: {} });
+  Object.assign(ui, { equip, pick: 0 });
   const fams = equip ? ui.data.families.filter(f => f.slot === equip.slot) : [];
   fams.sort((a, b) => (STAT_ORDER.indexOf(a.stat) + 1 || 99) - (STAT_ORDER.indexOf(b.stat) + 1 || 99));
   $('ap-stat').replaceChildren(...fams.map(f => E('option', { value: f.stat }, STAT_NAME[f.stat] || f.stat)));
-  $('ap-modewrap').hidden = !(equip && equip.recipe);
-  $('ap-rolls').replaceChildren(...(equip ? Object.entries(equip.inc) : []).map(([s, v]) => {
-    const input = E('input', { id: 'ap-roll-' + s, inputmode: 'numeric', autocomplete: 'off', placeholder: String(v) });
-    input.addEventListener('input', () => { ui.rolls[s] = input.value; update(); });
-    return E('label', {}, `${STAT_NAME[s] || s} (clean ${v})`, input);
-  }));
-  renderFacts(); renderMode(); update();
+  renderFacts(); update();
 }
 
 const family = () => ui.equip && ui.data.families.find(f => f.slot === ui.equip.slot && f.stat === $('ap-stat').value);
-function mode() {
-  if (!ui.equip || !ui.equip.recipe) return 'scrolled';
-  if (ui.manualMode) return ui.manualMode;
-  return whole($('ap-left').value) === ui.equip.slots ? 'crafted' : 'scrolled';
-}
-function renderMode() {
-  const m = mode();
-  $('ap-mode').value = m;
-  $('ap-scrolled').hidden = m !== 'scrolled';
-  $('ap-crafted').hidden = m !== 'crafted';
-}
 
 function renderFacts() {
   const e = ui.equip;
@@ -267,7 +199,7 @@ function renderFacts() {
   const stats = Object.entries(e.inc).map(([s, v]) => `${v} ${(STAT_NAME[s] || s).toLowerCase()}`).join(', ');
   const f = family();
   const odds = f ? ' · scrolls ' + f.tiers.map(t => `+${t.gain} ${t.rate}%${t.chaos ? ' chaos' : ''}`).join(', ') : '';
-  $('ap-facts').textContent = `${e.slot} · Lv ${e.level} · ${jobs} · clean ${stats || 'no stats'} · ${e.slots} slots${odds}${e.recipe ? ' · craftable' : ''}`;
+  $('ap-facts').textContent = `${e.slot} · Lv ${e.level} · ${jobs} · clean ${stats || 'no stats'} · ${e.slots} slots${odds}`;
 }
 
 function priceOf(name) { const v = parseMesos(ui.prices[name]); return v === null ? null : v; }
@@ -314,7 +246,7 @@ function renderStories(stories) {
   }));
 }
 
-const waitingLabel = (w, e) => w === 'base' ? e.name : w === 'catalyst' ? catalystFor(e, ui.data).name : w === 'quick' ? 'the craft cost' : w;
+const waitingLabel = (w, e) => w === 'base' ? e.name : w;
 
 function scrolledView(e) {
   const f = family();
@@ -342,29 +274,9 @@ function scrolledView(e) {
   return { r, rows, why, stories: r.stories || [] };
 }
 
-function craftedView(e) {
-  const typed = {};
-  for (const [s, v] of Object.entries(ui.rolls)) { const n = whole(v); if (Number.isInteger(n)) typed[s] = n; }
-  const oddsText = $('ap-odds').value.trim();
-  const quick = $('ap-quick').checked;
-  const r = appraiseCrafted({ equip: e, typed, oddsOverride: oddsText ? Number(oddsText.replace('%', '')) / 100 : undefined,
-    quickCost: quick ? (parseMesos($('ap-quickcost').value) ?? NaN) : undefined, salvage: parseMesos($('ap-salvage').value) || 0,
-    prices: { ingredients: Object.fromEntries(e.recipe.ingredients.map(i => [i.name, priceOf(i.name)])), catalyst: priceOf(catalystFor(e, ui.data).name) } });
-  const rows = quick ? [] : e.recipe.ingredients.map(i => ({ name: i.name, label: `${i.count} × ${i.name}` }));
-  if (r.rolled) rows.push({ name: catalystFor(e, ui.data).name, label: catalystFor(e, ui.data).name + ' (one per try)' });
-  const why = [];
-  if (!r.rolled) why.push(`Crafting without a catalyst always comes out clean, so this is one craft (${fmt(e.recipe.meso)} mesos plus the ingredients).`);
-  else if (r.chance > 0) {
-    why.push(`About 1 in ${oneIn(1 / r.chance)} catalyst crafts roll this well.`);
-    if (!oddsText) why.push("That's our guess: we assume each stat lands up to 1 away from clean, or 2 for stats above 10. If you know the odds, type them.");
-  }
-  return { r, rows, why, stories: [] };
-}
-
 function update() {
-  renderMode();
   const e = ui.equip;
-  const view = !e ? null : mode() === 'crafted' ? craftedView(e) : scrolledView(e);
+  const view = e ? scrolledView(e) : null;
   renderPrices(view ? view.rows : []);
   renderStories(view ? view.stories : []);
   const lines = [];
@@ -386,5 +298,5 @@ function update() {
   $('ap-offerline').textContent = price > 0 && offer > 0 ? compareOffer(offer, price) : '';
 }
 
-window.Appraiser = { parseMesos, fmt, oneIn, swingFor, rollChance, scrollRun, findStories, appraiseScrolled, catalystFor, appraiseCrafted, compareOffer, mount };
+window.Appraiser = { parseMesos, fmt, oneIn, swingFor, scrollRun, findStories, appraiseScrolled, compareOffer, mount };
 })();
