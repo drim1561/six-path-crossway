@@ -356,7 +356,7 @@ function planSkills(s, cls) {
     for (const [rid, rlv] of Object.entries(row.req || {})) if (plan[rid] !== undefined) raise(Number(rid), rlv);
     const add = Math.min(Math.max(0, target - plan[id]), left);
     if (!add) return;
-    steps.push({ from: atLevel(used), to: atLevel(used + add - 1), id, text: row.name + ' to ' + (plan[id] + add) + ' (' + add + (add === 1 ? ' point)' : ' points)') });
+    steps.push({ from: atLevel(used), to: atLevel(used + add - 1), id, target: plan[id] + add, text: row.name + ' to ' + (plan[id] + add) + ' (' + add + (add === 1 ? ' point)' : ' points)') });
     plan[id] += add; left -= add; used += add;
   }
   for (const [id, target] of order) if (plan[id] !== undefined) raise(id, Math.min(target, DATA.skills[id].max));
@@ -387,6 +387,7 @@ function planAP(s, cls) {
       const take = Math.min(5 - per[lv].req, need);
       if (take <= 0) continue;
       per[lv].req += take; need -= take; per[lv].why = 'So you can wear a ' + tiers[T].name + ' at ' + T + ' (it needs ' + tiers[T].need + ' ' + STAT_NAME[cls.reqStat] + ').';
+      per[lv].wear = { name: tiers[T].name, level: T, need: tiers[T].need };
     }
   }
   const rows = [];
@@ -396,7 +397,7 @@ function planAP(s, cls) {
     const why = p.why || 'Your main stat, it adds the most damage.';
     const last = rows[rows.length - 1];
     if (last && last.put === put && last.why === why && last.to === lv - 1) last.to = lv;
-    else rows.push({ from: lv, to: lv, put, why });
+    else rows.push({ from: lv, to: lv, put, why, ...(p.wear ? { wear: p.wear } : {}) });
   }
   return rows;
 }
@@ -441,11 +442,12 @@ function planNext(s, cls, P, skills, W) {
     .sort((a, b) => a.level - b.level || (b.inc[key] || 0) - (a.inc[key] || 0))[0];
   if (up) {
     const needs = ['str', 'dex', 'int', 'luk'].filter(k => up.req[k]).map(k => up.req[k] + ' ' + STAT_NAME[k]).join(' and ');
-    out.push({ level: up.level, text: up.name + ' (' + (up.inc[key] || 0) + ' ' + STAT_NAME[key] + ')' + (needs ? ', it needs ' + needs : '') + '.' });
+    out.push({ kind: 'gear', level: up.level, name: up.name, gain: Math.round((up.inc[key] || 0) - (W || 0)), stat: STAT_NAME[key], needs,
+      text: up.name + ' (' + (up.inc[key] || 0) + ' ' + STAT_NAME[key] + ')' + (needs ? ', it needs ' + needs : '') + '.' });
   }
-  if (P.phase === 1) out.push({ level: ADVANCE, text: '2nd job advancement: talk to ' + P.branch.npc + ' and become a ' + cls.name + '.' });
+  if (P.phase === 1) out.push({ kind: 'job', level: ADVANCE, text: '2nd job advancement: talk to ' + P.branch.npc + ' and become a ' + cls.name + '.' });
   const step = skills.steps[0];
-  if (step) out.push({ level: step.from, text: 'Start ' + step.text + '.' });
+  if (step) out.push({ kind: 'skill', level: step.from, text: 'Start ' + step.text + '.' });
   return out.sort((a, b) => a.level - b.level);
 }
 
@@ -472,6 +474,21 @@ function buildGuide(raw, clsId, data) {
     scrolls: planScrolls(s, cls, gear), worth: worth.map(([what, d]) => ({ what, pct: gainPct(s, cls, d) })) };
 }
 
+// The ability points, skill points and upgrades ahead as one list by level, split at the next milestone (the next level a
+// weapon needs the second stat, the next weapon, or the job advancement), and at least 5 levels ahead.
+function pointsPlan(g) {
+  const lv = g.stats.level, order = { up: 0, job: 1, ap: 2, sp: 3 };
+  const events = [
+    ...g.ap.map(a => ({ kind: 'ap', from: a.from, to: a.to, text: a.put, note: a.wear ? 'so you can wear a ' + a.wear.name + ' at ' + a.wear.level + ' (needs ' + a.wear.need + ')' : 'your main stat' })),
+    ...g.skills.steps.map(st => ({ kind: 'sp', from: st.from, to: st.to, text: st.text })),
+    ...g.next.filter(n => n.kind !== 'skill').map(n => ({ kind: n.kind === 'gear' ? 'up' : 'job', from: n.level, to: n.level, text: n.kind === 'gear' ? 'Equip ' + n.name : n.text })),
+  ].sort((a, b) => a.from - b.from || order[a.kind] - order[b.kind]);
+  const marks = [...g.ap.filter(a => a.wear).map(a => a.wear.level), ...g.next.filter(n => n.kind !== 'skill').map(n => n.level)].filter(x => x > lv);
+  const horizon = Math.max(lv + 5, marks.length ? Math.min(...marks) : 0);
+  return { horizon, until: events.length ? Math.max(...events.map(e => e.to)) : lv,
+    shown: events.filter(e => e.from <= horizon), rest: events.filter(e => e.from > horizon) };
+}
+
 /* ---------- UI ---------- */
 
 const INPUTS = { level: [['level', 'Level']], str: [['str', 'STR']], dex: [['dex', 'DEX']], int: [['int', 'INT']], luk: [['luk', 'LUK']],
@@ -496,13 +513,19 @@ function loadForm() {
 const saveForm = () => ui.deps.store.set('bt.calc', JSON.stringify(ui.form));
 const rawStats = () => ({ ...ui.form.v, skills: { ...ui.form.s } });
 
+// The drawer's boxes (everything but the level, which sits on the character card) and the card's name and level.
 function buildForm() {
   const cls = CLASSES[ui.form.cls], box = ui.root.querySelector('.b-form');
   const input = (id, label, value, on, key) => E('label', {}, label, E('input', { id, inputmode: 'numeric', autocomplete: 'off', value: value == null ? '' : String(value),
     ...(ui.read.has(key) ? { class: 'b-read' } : {}), oninput: e => { ui.read.delete(key); e.target.classList.remove('b-read'); on(e); typedIn(key); } }));
-  const kids = [E('label', { class: 'wide' }, 'Class', E('select', { id: 'b-class', onchange: e => pickClass(e.target.value) },
-    Object.values(CLASSES).map(c => { const o = E('option', { value: c.id }, c.name); if (c.id === ui.form.cls) o.selected = true; return o; })))];
+  const kids = [];
+  ui.root.querySelector('#b-name').textContent = cls.name;
+  ui.root.querySelector('#b-avatar').textContent = cls.name[0];
+  const lvBox = ui.root.querySelector('#b-f-level'), lv = ui.form.v.level == null ? '' : String(ui.form.v.level);
+  if (lvBox.value !== lv) lvBox.value = lv;
+  lvBox.classList.toggle('b-read', ui.read.has('v:level'));
   for (const [k, label] of fieldsOf(cls)) {
+    if (k === 'level') continue;
     if (k === 'weapon') {
       const w = formWeapon(cls);
       kids.push(E('label', { class: 'wide' }, label, E('select', { id: 'b-f-weapon', onchange: e => {
@@ -517,7 +540,7 @@ function buildForm() {
     } else if (k === 'wat') {
       const w = formWeapon(cls), shown = blank(ui.form.v.wat) ? (w ? w.inc.wat || 0 : '') : ui.form.v.wat;
       kids.push(input('b-f-wat', label, shown, e => { ui.form.v.wat = e.target.value; changed(); }, 'v:wat'));
-    } else kids.push(input('b-f-' + k, label, ui.form.v[k], e => { ui.form.v[k] = e.target.value; k === 'level' ? levelChanged() : changed(); }, 'v:' + k));
+    } else kids.push(input('b-f-' + k, label, ui.form.v[k], e => { ui.form.v[k] = e.target.value; changed(); }, 'v:' + k));
   }
   ui.formPhase = phaseOf(cls, formLevel()).phase;
   const ids = skillsFor(cls, formLevel()).filter(id => ui.data.skills[id]);
@@ -527,18 +550,32 @@ function buildForm() {
   // every way the class changes (tiles, the select, a loaded card, Read from game) redraws the form, so the tiles follow here
   renderTiles();
 }
-// A level that crosses 30 swaps the skill boxes (1st job or 2nd job) and the weapon list, so the form is redrawn
-// with the cursor kept in the level box.
+// A level that crosses 30 swaps the skill boxes (1st job or 2nd job) and the weapon list, so the drawer is redrawn.
+// The level box itself is on the card and is never redrawn, so the cursor stays put.
 function levelChanged() {
   const cls = CLASSES[ui.form.cls];
-  if (phaseOf(cls, formLevel()).phase !== ui.formPhase || cls.family === 'phys') {
-    const el = ui.root.querySelector('#b-f-level'), at = el ? el.selectionStart : null;
-    buildForm();
-    const again = ui.root.querySelector('#b-f-level');
-    if (again && document.activeElement !== again) { again.focus(); if (at !== null) again.setSelectionRange(at, at); }
-  }
+  if (phaseOf(cls, formLevel()).phase !== ui.formPhase || cls.family === 'phys') buildForm();
   changed();
 }
+function typeLevel(e) {
+  ui.read.delete('v:level'); e.target.classList.remove('b-read');
+  ui.form.v.level = e.target.value; levelChanged(); typedIn('v:level');
+}
+// The minus and plus buttons next to the level.
+function stepLevel(d) {
+  const n = Math.min(200, Math.max(1, (parseInt(ui.form.v.level, 10) || ADVANCE) + d)), box = ui.root.querySelector('#b-f-level');
+  ui.form.v.level = box.value = String(n);
+  ui.read.delete('v:level'); box.classList.remove('b-read');
+  levelChanged(); typedIn('v:level');
+}
+// The drawer of stat and skill boxes, and the save and community panels: open or shut, remembered on this device.
+function setOpen(id, open, key) {
+  const box = ui.root.querySelector('#' + id), btn = ui.root.querySelector('[aria-controls="' + id + '"]');
+  box.hidden = !open;
+  if (btn) btn.setAttribute('aria-expanded', String(open));
+  if (key) ui.deps.store.set(key, open ? '1' : '');
+}
+const toggle = (id, key) => setOpen(id, ui.root.querySelector('#' + id).hidden, key);
 // Switching class keeps the numbers but drops a weapon the new class can't hold.
 function pickClass(id) {
   if (!CLASSES[id]) return;
@@ -575,12 +612,106 @@ async function renderMine() {
 }
 function changed() { saveForm(); clearTimeout(ui.timer); ui.timer = setTimeout(renderGuide, 150); }
 
-function table(head, rows, numeric) {
-  return E('div', { class: 'b-wrap' }, E('table', { class: 'b-table' },
-    E('thead', {}, E('tr', {}, head.map((h, i) => E('th', numeric && numeric.includes(i) ? { class: 'n' } : {}, h)))),
-    E('tbody', {}, rows.map(r => E('tr', {}, r.map((c, i) => E('td', numeric && numeric.includes(i) ? { class: 'n' } : {}, c)))))));
-}
 const incText = inc => Object.entries(inc).filter(([k]) => STAT_NAME[k]).map(([k, v]) => STAT_NAME[k] + ' +' + v).join(', ');
+const range = (a, b) => a === b ? String(a) : a + ' to ' + b;
+const bar = pct => E('div', { class: 'b-bar' }, E('i', { style: 'width:' + Math.max(2, Math.min(100, pct)) + '%' }));
+// A row that waits behind "show more": hidden until the panel's button opens it.
+const extra = (node, i, keep) => { if (i >= keep) { node.classList.add('b-extra'); node.hidden = true; } return node; };
+// The panel's "show more" button, or nothing when every row already shows.
+function moreButton(box, label) {
+  if (!box.querySelector('.b-extra')) return;
+  box.append(E('button', { type: 'button', class: 'b-more', onclick: e => {
+    const rows = [...box.querySelectorAll('.b-extra')], show = rows.some(x => x.hidden);
+    rows.forEach(x => { x.hidden = !show; });
+    e.target.textContent = show ? 'Show less' : label;
+  } }, label));
+}
+const castsText = m => m.casts.toFixed(1) === '1.0' ? '1 cast a kill' : m.casts.toFixed(1) + ' casts a kill';
+const tile = (k, label, v, s) => E('div', { class: 'b-nowt', 'data-k': k }, E('div', { class: 'k' }, label), E('div', { class: 'v' }, v), E('div', { class: 's' }, s || ''));
+
+// The card's big numbers: the two stats this class cares about, magic or weapon attack, the attack per hit, and what a point is worth.
+function renderBig(g, cls) {
+  const guess = k => g.assumed.includes(k);
+  const big = (k, v, sub, guessed) => E('div', { class: 'b-bigone' }, E('div', { class: 'k' }, k), E('div', { class: 'v' + (guessed ? ' guess' : '') }, v),
+    guessed || sub ? E('div', { class: 's' }, guessed ? 'guessed' : sub) : null);
+  const atk = ui.data.skills[g.phase === 1 ? cls.attack1 : cls.attack].name;
+  const worth = g.worth.find(w => w.what === '+1 ' + STAT_NAME[cls.mainStat]) || g.worth[0];
+  ui.root.querySelector('#b-big').replaceChildren(
+    big(STAT_NAME[cls.mainStat], fmt(g.stats[cls.mainStat]), '', guess(cls.mainStat)),
+    big(STAT_NAME[cls.reqStat], fmt(g.stats[cls.reqStat]), '', guess(cls.reqStat)),
+    physical(cls) ? big('Weapon attack', fmt(g.weapon.W), '', ['wat', 'weapon', 'atkMin', 'atkMax'].some(guess)) : big('Magic', fmt(g.stats.magic), '', guess('magic')),
+    big(atk, fmt(g.attack.min) + ' to ' + fmt(g.attack.max), 'per hit'),
+    worth ? big(worth.what, '+' + worth.pct + '%', 'damage') : null);
+}
+
+// The four "right now" answers: where to train, the next ability and skill points, and the next upgrade.
+function renderNow(g, cls) {
+  const m = g.train[0];
+  const a = g.ap[0], wear = g.ap.find(r => r.wear);
+  const apSub = !a ? 'each level' : a.wear ? 'for a ' + a.wear.name + ' at ' + a.wear.level : wear ? wear.put.split(',')[0] + ' at ' + wear.from + ', for a ' + wear.wear.name : 'your main stat';
+  const st = g.skills.steps[0], sk = g.skills;
+  const up = g.next.find(n => n.kind === 'gear') || g.next.find(n => n.kind === 'job');
+  const upSub = !up ? '' : up.kind === 'job' ? up.text : [up.gain > 0 ? '+' + up.gain + ' ' + up.stat : '', up.needs ? 'needs ' + up.needs : ''].filter(Boolean).join(', ');
+  ui.root.querySelector('#b-now').replaceChildren(
+    tile('train', 'Train', m ? m.name : 'No map yet', m ? m.map + ', ' + castsText(m) : ''),
+    tile('ap', 'Next AP', a ? a.put : '5 ' + STAT_NAME[cls.mainStat], apSub),
+    st ? tile('sp', 'Next SP', ui.data.skills[st.id].name, 'from ' + st.from + ', up to ' + st.target)
+      : tile('sp', 'Next SP', sk.spare ? sk.spare + ' spare' : 'All planned', sk.spare ? 'points left by level ' + sk.until : ''),
+    tile('up', 'Next upgrade', !up ? 'Nothing soon' : up.kind === 'job' ? '2nd job at ' + up.level : up.name + ' at ' + up.level, upSub));
+}
+
+function renderPanels(g) {
+  const lv = g.stats.level, top = g.train.length ? g.train[0].expPerCast : 1;
+  const train = ui.root.querySelector('#train');
+  train.replaceChildren(...g.train.map((m, i) => extra(E('div', { class: 'b-mob' },
+    E('div', {}, E('div', {}, E('b', { class: 'b-name' }, m.name), ' ', E('span', { class: 'small' }, 'lv ' + m.level)),
+      E('div', { class: 'small' }, m.map + ', ' + castsText(m) + ', ' + m.hit + '% hit, ' + fmt(m.hp) + ' HP'),
+      bar(m.expPerCast / top * 100)),
+    E('div', { class: 'num' }, m.expPerCast.toFixed(0) + ' EXP a cast')), i, 3)),
+    E('p', { class: 'small b-foot' }, 'Ranked by EXP per cast at your level, over a few thousand simulated kills with your damage range, crits, monster defense and hit chance. Walking time is not counted.'));
+  moreButton(train, 'Show all ' + g.train.length + ' maps');
+  train.append(train.querySelector('.b-foot'));
+
+  const pts = pointsPlan(g), chip = { ap: 'AP', sp: 'SP', up: 'upgrade', job: 'job' };
+  const row = e => E('li', { class: 'b-ev', 'data-from': String(e.from) }, E('span', { class: 'num' }, range(e.from, e.to)),
+    E('span', {}, E('b', {}, e.text), e.note ? E('span', { class: 'small' }, ' ' + e.note) : null, ' ', E('span', { class: 'b-chip ' + e.kind }, chip[e.kind])));
+  const now = Object.keys(g.skills.now).map(id => ui.data.skills[id].name + ' ' + g.skills.now[id]).join(', ');
+  const points = ui.root.querySelector('#points');
+  points.replaceChildren(E('ul', { class: 'b-time' }, pts.shown.map(row), pts.rest.map(e => extra(row(e), 1, 0))),
+    E('p', { class: 'small b-foot' }, 'Skills now: ' + now + '.' + (g.skills.spare ? ' ' + g.skills.spare + ' SP left over by level ' + g.skills.until + '.' : '')));
+  moreButton(points, 'Show the plan to ' + pts.until);
+  points.append(points.querySelector('.b-foot'));
+
+  const gear = ui.root.querySelector('#gear');
+  gear.replaceChildren(E('div', { class: 'b-gear' }, g.gear.map(s => {
+    const cur = s.rows.filter(r => r.level <= lv).pop(), nxt = s.rows.find(r => r.level > lv);
+    const item = r => [E('b', {}, r.name), ' (' + r.level + (incText(r.inc) ? ', ' + incText(r.inc) : '') + ') ', r.craft ? E('span', { class: 'b-craft' }, 'craft') : null];
+    return E('div', { class: 'b-gcard' }, E('div', { class: 'k' }, s.slot),
+      E('div', { class: 'b-item' }, cur ? item(cur) : E('span', { class: 'small' }, 'Nothing for your level yet')),
+      nxt ? E('div', { class: 'small' }, 'Next: ', E('b', {}, nxt.name), ' at ' + nxt.level) : null,
+      extra(E('ul', { class: 'b-ladder' }, s.rows.map(r => E('li', {}, item(r)))), 1, 0));
+  })), E('p', { class: 'small b-foot' }, 'Gear and scrolls come from the game files. They have no drop tables, so check in game where the items drop.'));
+  moreButton(gear, 'Show every item by level');
+  gear.append(gear.querySelector('.b-foot'));
+
+  const scrolls = ui.root.querySelector('#scrolls'), best = g.scrolls.length ? g.scrolls[0].pct : 1;
+  scrolls.replaceChildren(...g.scrolls.map((s, i) => extra(E('div', { class: 'b-mob' },
+    E('div', {}, E('b', {}, s.family), E('div', { class: 'small' }, s.slot + ': ' + s.gainAllLesser + ' with Lessers'), bar(s.pct / best * 100)),
+    E('div', { class: 'num' }, '+' + s.pct + '%')), i, 3)),
+    E('p', { class: 'small b-foot' }, 'What a point is worth: ' + g.worth.map(w => w.what + ' adds ' + w.pct + '% damage').join(', ') + '.'));
+  moreButton(scrolls, 'Show more');
+  scrolls.append(scrolls.querySelector('.b-foot'));
+}
+
+const TABS = [['train', 'Train'], ['points', 'Points'], ['gear', 'Gear'], ['scrolls', 'Scrolls']];
+function showTab(t) {
+  if (!TABS.some(([id]) => id === t)) t = 'train';
+  for (const [id] of TABS) {
+    ui.root.querySelector('#' + id).hidden = id !== t;
+    ui.root.querySelector('[data-tab="' + id + '"]').setAttribute('aria-selected', String(id === t));
+  }
+  ui.deps.store.set('bt.btab', t);
+}
 
 function renderGuide() {
   const cls = CLASSES[ui.form.cls], msg = ui.root.querySelector('#b-msg'), out = ui.root.querySelector('#b-guide');
@@ -588,34 +719,21 @@ function renderGuide() {
   msg.className = '';
   if (!g.ok) {
     out.hidden = true;
-    out.querySelectorAll('tbody').forEach(t => t.replaceChildren());
+    ui.root.querySelector('#b-big').replaceChildren();
+    for (const id of ['b-now', 'train', 'points', 'gear', 'scrolls']) ui.root.querySelector('#' + id).replaceChildren();
     if (g.beginner) { msg.className = 'note'; msg.textContent = 'Your 1st job starts at level ' + g.advance + '. Talk to ' + g.npc + ' then come back for a guide.'; }
     else { msg.className = 'error'; msg.textContent = g.errors.join(' '); }
     return g;
   }
   out.hidden = false;
   const guessed = [...new Set(g.assumed.map(k => ASSUMED_LABEL[k]))];
-  if (guessed.length) { msg.className = 'note'; msg.textContent = 'Guessed from your level because these boxes are empty: ' + guessed.join(', ') + '. Fill them in for a sharper guide.'; }
-  else msg.textContent = '';
-  const atk = ui.data.skills[g.phase === 1 ? cls.attack1 : cls.attack].name;
+  if (guessed.length) {
+    msg.className = 'note';
+    msg.replaceChildren('Guessed from your level: ' + guessed.join(', ') + '. ',
+      E('button', { type: 'button', class: 'linkish', onclick: () => setOpen('b-drawer', true, 'bt.bedit') }, 'Add them'), ' for a sharper guide.');
+  } else msg.replaceChildren();
   out.querySelector('#b-estimated').hidden = !g.estimated;
-  out.querySelector('#b-attack').textContent = 'One ' + atk + ' does ' + fmt(g.attack.min) + ' to ' + fmt(g.attack.max) + ' a hit, about ' + fmt(g.attack.avg) + ' a cast before monster defense.';
-  out.querySelector('#train').replaceChildren(table(['Monster', 'Map', 'HP', 'Def', 'EXP', 'Casts', 'EXP a cast', 'Hit'],
-    g.train.map(m => [m.name + ' (' + m.level + ')', m.map + ' (' + m.count + ')', fmt(m.hp), String(m.def), fmt(m.exp), m.casts.toFixed(1), m.expPerCast.toFixed(0), m.hit + '%']), [2, 3, 4, 5, 6, 7]));
-  const sk = g.skills;
-  const nowText = Object.keys(sk.now).map(id => ui.data.skills[id].name + ' ' + sk.now[id]).join(', ');
-  out.querySelector('#skills').replaceChildren(E('ul', { class: 'b-steps' },
-    E('li', {}, E('b', {}, 'Now (' + g.stats.level + ')'), E('span', {}, nowText)),
-    sk.steps.map(st => E('li', {}, E('b', {}, st.from === st.to ? 'Lv ' + st.from : 'Lv ' + st.from + ' to ' + st.to), E('span', {}, st.text))),
-    sk.spare ? E('li', {}, E('b', {}, 'Spare'), E('span', {}, sk.spare + ' points left over by level ' + sk.until + '.')) : null));
-  out.querySelector('#ap').replaceChildren(table(['Levels', 'Put AP in', 'Why'],
-    g.ap.map(a => [a.from === a.to ? String(a.from) : a.from + ' to ' + a.to, a.put, a.why])));
-  out.querySelector('#worth').replaceChildren(table(['Gain', 'Damage'], g.worth.map(w => [w.what, '+' + w.pct + '%']), [1]));
-  out.querySelector('#gear').replaceChildren(table(['Slot', 'By level'], g.gear.map(s => [s.slot,
-    E('span', {}, s.rows.flatMap((r, i) => [i ? E('br') : null, E('b', {}, r.name), ' (' + r.level + (incText(r.inc) ? ', ' + incText(r.inc) : '') + ') ', r.craft ? E('span', { class: 'b-craft' }, 'craft') : null]))])));
-  out.querySelector('#next').replaceChildren(E('ul', { class: 'b-steps' }, g.next.map(n => E('li', {}, E('b', {}, 'Lv ' + n.level), E('span', {}, n.text)))));
-  out.querySelector('#scrolls').replaceChildren(table(['Order', 'Item', 'Scroll', 'All slots with Lesser', 'Damage'],
-    g.scrolls.map(s => [String(s.order), s.slot, s.family, s.gainAllLesser, '+' + s.pct + '%']), [0, 4]));
+  renderBig(g, cls); renderNow(g, cls); renderPanels(g);
   return g;
 }
 
@@ -784,8 +902,10 @@ function onImage(img, { from }) {
   return { done };
 }
 
+// The reader panel opens under the card, with the drawer, so the boxes it fills (marked) and the ones it asks for show.
 function openReader() {
-  const panel = ui.root.querySelector('#b-reader'), btn = panel.querySelector('#b-readbtn'), note = panel.querySelector('#b-readnote');
+  const panel = ui.root.querySelector('#b-reader'), btn = ui.root.querySelector('#b-readbtn'), note = panel.querySelector('#b-readnote');
+  panel.hidden = false; setOpen('b-drawer', true);
   btn.disabled = true; note.textContent = 'Loading the reader...';
   loadReader().then(() => {
     btn.hidden = true; note.textContent = "Open your Character Stat window with DETAIL, then your Skill window, and click through your 1st and 2nd job tabs. Every box it fills is marked so you can check it. Reading happens on your computer. The reader never sends your game pictures anywhere.";
@@ -917,7 +1037,7 @@ function card(b) {
         if (ui.editing && ui.editing.id !== b.id) { ui.editing = null; renderSave(); }
         fill(b.stats, b.class); ui.root.scrollIntoView({ behavior: 'smooth' });
       } }, 'Load into calculator'),
-      mine ? E('button', { type: 'button', onclick: () => { ui.editing = b; fill(b.stats, b.class); renderSave(); ui.root.querySelector('#b-save').scrollIntoView({ behavior: 'smooth' }); } }, 'Edit') : null,
+      mine ? E('button', { type: 'button', onclick: () => { ui.editing = b; fill(b.stats, b.class); renderSave(); setOpen('b-save', true); ui.root.querySelector('#b-save').scrollIntoView({ behavior: 'smooth' }); } }, 'Edit') : null,
       mine ? E('button', { type: 'button', onclick: () => remove(b) }, 'Delete') : null,
       admin && !mine ? E('button', { type: 'button', onclick: () => ui.deps.api.hideBuild(b.id).then(loadList, e => alert(e.message)) }, 'Hide') : null));
 }
@@ -958,28 +1078,44 @@ function mount(root, deps) {
   ui.root = root; ui.deps = deps; ui.data = deps.data; DATA = deps.data;
   ui.editing = null; ui.lastIgn = ''; ui.listGen = 0; ui.who = null; ui.filter = { cls: '', minLv: '', maxLv: '', sort: 'level' };
   loadForm();
-  const sec = (title, id, extra) => [E('h3', {}, title), extra || null, E('div', { id })];
+  const editOpen = !!ui.deps.store.get('bt.bedit');
+  const shut = open => open ? {} : { hidden: '' };
   root.replaceChildren(
     E('section', { class: 'b-calc' },
       E('div', { id: 'b-mine', class: 'b-mine' }),
-      E('h2', {}, 'Your build'),
-      E('p', { class: 'lead' }, 'Type in your stat window and get a leveling guide for your character: where to train, where your points go, and what to wear and scroll.'),
-      E('div', { id: 'b-tiles', class: 'b-tiles' }), E('div', { id: 'b-paths', class: 'b-paths' }),
-      E('div', { id: 'b-reader', class: 'b-reader' },
-        E('button', { id: 'b-readbtn', type: 'button', onclick: openReader }, 'Read from game'),
-        E('p', { id: 'b-readnote', class: 'small' }, 'Or let the page read your stat and skill windows, from a shared game window or a screenshot.')),
-      E('div', { class: 'b-form' }),
-      E('p', { id: 'b-msg' })),
+      E('div', { class: 'b-picker' }, E('div', { id: 'b-tiles', class: 'b-tiles' }), E('div', { id: 'b-paths', class: 'b-paths' })),
+      E('div', { id: 'b-hero', class: 'b-hero' },
+        E('div', { id: 'b-avatar', class: 'b-avatar', 'aria-hidden': 'true' }),
+        E('div', { class: 'b-who' }, E('h2', { id: 'b-name' }),
+          E('div', { class: 'b-lv' },
+            E('button', { id: 'b-lvdown', type: 'button', class: 'b-step', 'aria-label': 'Level down', onclick: () => stepLevel(-1) }, '−'),
+            E('input', { id: 'b-f-level', inputmode: 'numeric', autocomplete: 'off', 'aria-label': 'Level', oninput: typeLevel }),
+            E('button', { id: 'b-lvup', type: 'button', class: 'b-step', 'aria-label': 'Level up', onclick: () => stepLevel(1) }, '+'),
+            E('span', { class: 'small' }, 'level'))),
+        E('div', { class: 'b-act' },
+          E('button', { id: 'b-readbtn', type: 'button', class: 'b-primary', onclick: openReader }, 'Read from game'),
+          E('button', { id: 'b-edit', type: 'button', class: 'linkish', 'aria-controls': 'b-drawer', 'aria-expanded': String(editOpen), onclick: () => toggle('b-drawer', 'bt.bedit') }, 'Edit stats and skills')),
+        E('div', { id: 'b-big', class: 'b-big' }),
+        E('p', { id: 'b-msg' })),
+      E('div', { id: 'b-reader', class: 'b-reader', hidden: '' },
+        E('p', { id: 'b-readnote', class: 'small' }, 'Reads your stat and skill windows, from a shared game window or a screenshot.')),
+      E('div', { id: 'b-drawer', class: 'b-drawer', ...shut(editOpen) }, E('div', { class: 'b-form' }))),
     E('section', { id: 'b-guide', hidden: '' },
       estimatedNote(),
-      sec('Where to train', 'train', E('p', { class: 'small', id: 'b-attack' })),
-      E('p', { class: 'small' }, 'Ranked by EXP per cast at your level, over a few thousand simulated kills with your damage range, crits, monster defense and hit chance. Walking time is not counted.'),
-      sec('Skill points', 'skills'), sec('Ability points', 'ap'), sec('What each stat is worth', 'worth'), sec('Gear', 'gear'), sec('Coming up', 'next'), sec('Scrolls', 'scrolls'),
-      E('p', { class: 'small' }, 'Gear and scrolls come from the game files. They have no drop tables, so check in game where the items drop.')),
-    E('section', { id: 'b-save', class: 'b-panel' }),
-    E('section', { id: 'b-browse' }, E('h2', {}, 'Builds'),
+      E('div', { id: 'b-now', class: 'b-now' }),
+      E('div', { class: 'b-dtabs', role: 'tablist' }, TABS.map(([id, name]) =>
+        E('button', { type: 'button', role: 'tab', 'data-tab': id, 'aria-controls': id, onclick: () => showTab(id) }, name))),
+      TABS.map(([id]) => E('section', { id, class: 'b-dpanel', role: 'tabpanel' }))),
+    E('section', { class: 'b-strip' },
+      E('div', {}, E('b', {}, 'Keep this character'), ' ', E('span', { class: 'small' }, "Save it, or see other players' builds.")),
+      E('div', { class: 'b-strip-btns' },
+        E('button', { id: 'b-savetoggle', type: 'button', 'aria-controls': 'b-save', 'aria-expanded': 'false', onclick: () => toggle('b-save') }, 'Save build'),
+        E('button', { id: 'b-browsetoggle', type: 'button', 'aria-controls': 'b-browse', 'aria-expanded': 'false', onclick: () => toggle('b-browse') }, 'Community builds'))),
+    E('section', { id: 'b-save', class: 'b-panel', hidden: '' }),
+    E('section', { id: 'b-browse', hidden: '' }, E('h2', {}, 'Builds'),
       E('p', { class: 'lead' }, "Other players' characters, their stats and where they train. Load one into the calculator to see its guide."),
       renderFilters(), E('div', { id: 'b-list' })));
+  showTab(ui.deps.store.get('bt.btab'));
   buildForm();
   renderGuide();
   refresh();
@@ -987,5 +1123,5 @@ function mount(root, deps) {
 const estimatedNote = () => E('p', { id: 'b-estimated', class: 'b-badge', hidden: '' }, E('b', {}, 'Estimated. '), "Damage for this weapon comes from meowdb's table and hasn't been checked against a real stat window yet.");
 
 window.Builds = { CLASSES, BRANCHES, branchOf, weaponsFor, mastery, physRange, spellRange, weaponAttackFromMax, WEAPONS, CHECKED_WEAPONS, windowRange, levelScale, hitChance, defend, elemMult, makeRng, castsToKill,
-  validateStats, rankMobs, buildGuide, mount, fill, refresh, shrinkImage, take, classOf };
+  validateStats, rankMobs, buildGuide, pointsPlan, mount, fill, refresh, shrinkImage, take, classOf };
 })();

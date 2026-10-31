@@ -600,6 +600,9 @@ var SEEDS = {"glyphs":{"0":[{"g":[21,83,153,177,177,164,115,22,90,154,206,222,22
   // browser's own stop button ends the track, when the area is hidden or taken off the page, when another panel starts
   // a share, or when the prompt is turned down. opts.onState(state, why) hears 'sharing' and 'idle' (why: 'done' | 'time' |
   // 'stop' | 'ended' | 'hidden' | 'denied' | 'failed'); opts.say(text) gets the area's own notes.
+  // For a long share (the Grind tab), all off by default: raw hands onImage(src, { from, w, h }) the live frame itself
+  // instead of a copy; limit 0 means no time limit; keepWhenHidden keeps sharing while the area is hidden; full asks the
+  // browser for the window at full size; drop false leaves out the paste and drop area.
   var CAPTURE_COPY = { share: 'Share the game window', stop: 'Stop', drop: 'Or paste a screenshot here (Win+Shift+S, then Ctrl+V)',
     notPicture: "That file isn't a picture.", failed: "Couldn't start sharing the game window. Try again, or paste a screenshot instead." };
   var activeShare = null; // the one capture that is sharing right now
@@ -609,9 +612,10 @@ var SEEDS = {"glyphs":{"0":[{"g":[21,83,153,177,177,164,115,22,90,154,206,222,22
     var md = navigator.mediaDevices, canShare = !!(md && md.getDisplayMedia);
     var share = E('button', { id: id('share'), type: 'button', onclick: function () { start(); } }, copy.share);
     var stopBtn = E('button', { id: id('stop'), type: 'button', hidden: '', onclick: function () { stop('stop'); } }, copy.stop);
-    var drop = E('div', { id: id('drop'), class: 'r-drop', tabindex: '0' }, copy.drop);
+    var drop = o.drop === false ? null : E('div', { id: id('drop'), class: 'r-drop', tabindex: '0' }, copy.drop);
     if (!canShare) share.hidden = true;
-    root.append(E('div', { class: 'r-bar' }, share, stopBtn), drop);
+    root.append(E('div', { class: 'r-bar' }, share, stopBtn));
+    if (drop) root.append(drop);
     var s = null;     // the share: {starting} while the browser's prompt is open, then {stream, track, frames, latest, video, worker, interval, limit, t0, busy}
     var dead = false; // destroyed: a prompt that answers late is turned down
     var me = { stop: function () { stop('stop'); } };
@@ -620,7 +624,8 @@ var SEEDS = {"glyphs":{"0":[{"g":[21,83,153,177,177,164,115,22,90,154,206,222,22
       if (s || !canShare || dead) return;
       var pending = s = { starting: true }, got = null, cur = null;
       share.disabled = true;
-      navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 5 }, audio: false }).then(function (stream) {
+      var video = o.full ? { frameRate: 5, width: { ideal: 7680 }, height: { ideal: 4320 } } : { frameRate: 5 };
+      navigator.mediaDevices.getDisplayMedia({ video: video, audio: false }).then(function (stream) {
         got = stream;
         if (dead || s !== pending) { stream.getTracks().forEach(function (t) { t.stop(); }); return; }
         var track = stream.getVideoTracks()[0];
@@ -651,7 +656,7 @@ var SEEDS = {"glyphs":{"0":[{"g":[21,83,153,177,177,164,115,22,90,154,206,222,22
           cur.worker = new Worker(url); URL.revokeObjectURL(url);
           cur.worker.onmessage = tick;
         } catch (e) { cur.interval = setInterval(tick, o.every); }
-        cur.limit = setTimeout(function () { if (s === cur) stop('time'); }, o.limit);
+        if (o.limit) cur.limit = setTimeout(function () { if (s === cur) stop('time'); }, o.limit);
         share.hidden = true; share.disabled = false; stopBtn.hidden = false;
         o.onState('sharing');
       }).catch(function (e) {
@@ -697,10 +702,10 @@ var SEEDS = {"glyphs":{"0":[{"g":[21,83,153,177,177,164,115,22,90,154,206,222,22
     function tick() {
       var cur = s;
       if (!cur || cur.busy) return;
-      if (Date.now() - cur.t0 >= o.limit) return stop('time');
+      if (o.limit && Date.now() - cur.t0 >= o.limit) return stop('time');
       if (cur.track.readyState === 'ended') return stop('ended');
       // the panel was taken off the page or its tab was left
-      if (!root.isConnected || !root.getClientRects().length) return stop('hidden');
+      if (!root.isConnected || (!o.keepWhenHidden && !root.getClientRects().length)) return stop('hidden');
       var src = cur.frames ? cur.latest : cur.video;
       if (!src || (cur.video && cur.video.readyState < 2)) return;
       cur.busy = true;
@@ -708,7 +713,10 @@ var SEEDS = {"glyphs":{"0":[{"g":[21,83,153,177,177,164,115,22,90,154,206,222,22
     }
     // one picture to the consumer; resolves true when it says it has everything
     function give(src, from) {
-      return Promise.resolve().then(function () { return o.onImage(imageOf(src), { from: from }); })
+      return Promise.resolve().then(function () {
+        if (!o.raw) return o.onImage(imageOf(src), { from: from });
+        return o.onImage(src, { from: from, w: src.displayWidth || src.videoWidth || src.width, h: src.displayHeight || src.videoHeight || src.height });
+      })
         .then(function (r) { return !!(r && r.done); }, function (e) { stop('stop'); setTimeout(function () { throw e; }); return false; });
     }
     function pictures(list) {
@@ -731,15 +739,17 @@ var SEEDS = {"glyphs":{"0":[{"g":[21,83,153,177,177,164,115,22,90,154,206,222,22
       e.preventDefault();
       pictures(files);
     }
-    document.addEventListener('paste', onPaste, true);
-    drop.addEventListener('dragover', function (e) { e.preventDefault(); drop.classList.add('over'); });
-    drop.addEventListener('dragleave', function () { drop.classList.remove('over'); });
-    drop.addEventListener('drop', function (e) {
-      e.preventDefault(); drop.classList.remove('over');
-      var files = (e.dataTransfer && e.dataTransfer.files) || [];
-      if (files.length && !Array.prototype.some.call(files, function (f) { return /^image\//.test(f.type); })) o.say(copy.notPicture);
-      else pictures(files);
-    });
+    if (drop) {
+      document.addEventListener('paste', onPaste, true);
+      drop.addEventListener('dragover', function (e) { e.preventDefault(); drop.classList.add('over'); });
+      drop.addEventListener('dragleave', function () { drop.classList.remove('over'); });
+      drop.addEventListener('drop', function (e) {
+        e.preventDefault(); drop.classList.remove('over');
+        var files = (e.dataTransfer && e.dataTransfer.files) || [];
+        if (files.length && !Array.prototype.some.call(files, function (f) { return /^image\//.test(f.type); })) o.say(copy.notPicture);
+        else pictures(files);
+      });
+    }
     return { stop: function () { stop('stop'); }, sharing: function () { return !!s && !s.starting; }, read: pictures,
       destroy: function () {
         dead = true; stop('stop');

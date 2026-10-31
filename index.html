@@ -136,17 +136,195 @@ select { background: var(--surface); border: 1.5px solid var(--btn-line); border
 .b-mine-list { display: flex; flex-wrap: wrap; gap: 8px; }
 .b-mine-card { padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); font: inherit; font-size: 14px; cursor: pointer; }
 .b-mine-card:hover, .b-mine-card:focus-visible { border-color: var(--focus); }
-.b-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 12px 0 8px; }
-@media (max-width: 560px) { .b-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.b-tile { padding: 14px 8px; border: 2px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--ink); font: inherit; font-weight: 800; font-size: 15px; cursor: pointer; }
-.b-tile[aria-pressed="true"] { border-color: var(--focus); background: var(--up-bg); }
-.b-paths { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0 0 4px; }
-.b-paths-label { font-size: 13px; font-weight: 700; color: var(--muted); margin-right: 4px; }
-.b-paths button { padding: 6px 12px; border: 1px solid var(--btn-line); border-radius: 999px; background: transparent; color: var(--ink); font: inherit; font-size: 14px; cursor: pointer; }
-.b-paths button[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+#view-builds [hidden] { display: none !important; }
+.b-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 6px 0 14px; }
+.b-tiles { display: flex; flex-wrap: wrap; gap: 8px; }
+.b-tile { padding: 6px 14px; border: 1px solid var(--btn-line); border-radius: 999px; background: var(--btn); color: var(--ink); font: inherit; font-weight: 800; font-size: 14px; cursor: pointer; }
+.b-tile[aria-pressed="true"] { background: var(--btn-k); color: var(--btn-k-ink); border-color: var(--btn-k); }
+.b-paths { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding-left: 12px; border-left: 1px solid var(--line); }
+.b-paths-label { font-size: 13px; font-weight: 700; color: var(--muted); margin-right: 2px; }
+.b-paths button { padding: 4px 11px; border: 1px solid var(--btn-line); border-radius: 999px; background: transparent; color: var(--ink); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.b-paths button[aria-pressed="true"] { background: var(--btn-k); color: var(--btn-k-ink); border-color: var(--btn-k); }
+@media (max-width: 560px) { .b-paths { padding-left: 0; border-left: 0; } }
+/* character card */
+.b-hero { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 18px; display: grid; grid-template-columns: auto 1fr auto; gap: 14px 18px; align-items: center; }
+.b-avatar { width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, #b98cf0, #7cb7f0); display: grid; place-items: center; font: 700 26px var(--font-title); color: #fff; }
+#view-builds .b-who h2 { margin: 0; font-size: 26px; line-height: 1.1; }
+.b-lv { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.b-step { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--btn-line); background: var(--btn); color: var(--ink); font: 800 16px var(--font-body); cursor: pointer; padding: 0; }
+#b-f-level { width: 4.2em; text-align: center; font: 700 18px var(--font-num); color: var(--num); border: 1px solid var(--line); border-radius: 8px; padding: 3px 4px; background: var(--surface); }
+#b-f-level.b-read { background: var(--up-bg); border-color: var(--up-dot); }
+.b-hero .small { font-size: 13px; color: var(--muted); }
+.b-act { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+.b-primary { background: var(--btn-k); color: var(--btn-k-ink); border: 0; border-radius: 12px; padding: 10px 16px; font: 800 15px var(--font-body); cursor: pointer; }
+.b-act .linkish { color: var(--muted); font-size: 13px; font-weight: 700; text-align: center; }
+.b-big { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 10px 24px; }
+.b-big:empty { display: none; }
+.b-bigone .k, .b-nowt .k, .b-gcard .k { font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.b-bigone .v { font: 700 24px var(--font-num); color: var(--num); line-height: 1.2; }
+.b-bigone .v.guess { color: var(--muted); }
+.b-bigone .s { font-size: 12px; color: var(--muted); }
+.b-hero #b-msg { grid-column: 1 / -1; margin: 0; padding-top: 10px; border-top: 1px solid var(--row-line); font-size: 13px; font-weight: 600; }
+.b-drawer { margin-top: 10px; padding: 4px 14px 10px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; }
+@media (max-width: 760px) {
+  .b-hero { grid-template-columns: auto 1fr; }
+  .b-act { grid-column: 1 / -1; flex-direction: row; align-items: center; justify-content: space-between; }
+}
+/* right now tiles */
+.b-now { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 16px 0; }
+@media (max-width: 760px) { .b-now { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.b-nowt { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px 14px; position: relative; overflow: hidden; }
+.b-nowt::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 4px; background: var(--c, var(--accent)); }
+.b-nowt[data-k="ap"] { --c: #b98cf0; }
+.b-nowt[data-k="sp"] { --c: var(--soon-bar); }
+.b-nowt[data-k="up"] { --c: var(--up-dot); }
+.b-nowt .v { font: 700 19px var(--font-title); margin: 4px 0 2px; line-height: 1.2; overflow-wrap: anywhere; }
+.b-nowt .s { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+/* detail tabs */
+.b-dtabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.b-dtabs button { background: none; border: 0; padding: 9px 14px; font: 800 15px var(--font-body); color: var(--muted); border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; }
+.b-dtabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.b-dpanel { background: var(--surface); border: 1px solid var(--line); border-top: 0; border-radius: 0 0 14px 14px; padding: 4px 16px 14px; }
+.b-dpanel .small { font-size: 13px; color: var(--muted); }
+.b-mob { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--row-line); }
+.b-mob .num { font: 700 14px var(--font-num); color: var(--num); white-space: nowrap; }
+.b-bar { height: 6px; border-radius: 99px; background: var(--track); margin-top: 6px; overflow: hidden; }
+.b-bar i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+.b-more { display: block; background: none; border: 0; padding: 10px 0 0; color: var(--muted); font: 800 13px var(--font-body); text-decoration: underline; cursor: pointer; }
+.b-foot { margin: 10px 0 0; }
+.b-time { list-style: none; margin: 6px 0 0; padding: 0; }
+.b-ev { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--row-line); }
+.b-ev .num { font: 700 13px var(--font-num); color: var(--num); }
+.b-chip { display: inline-block; font-size: 11px; font-weight: 800; border-radius: 99px; padding: 0 7px; background: var(--band); color: var(--muted); }
+.b-chip.sp { background: var(--soon-bg); color: var(--soon-fg); }
+.b-chip.up, .b-chip.job { background: var(--up-bg); color: var(--up-fg); }
+.b-gear { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; padding-top: 10px; }
+.b-gcard { border: 1px solid var(--row-line); background: var(--surface-2); border-radius: 12px; padding: 10px 12px; }
+.b-item { margin: 2px 0 4px; }
+.b-ladder { margin: 8px 0 0; padding: 8px 0 0 16px; border-top: 1px solid var(--row-line); font-size: 13px; display: grid; gap: 3px; }
+/* save and community */
+.b-strip { margin-top: 22px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+.b-strip .small { font-size: 13px; color: var(--muted); }
+.b-strip-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.b-strip-btns button[aria-expanded="true"] { border-color: var(--focus); }
 .b-badge { margin: 0 0 8px; padding: 8px 12px; border-radius: 10px; background: var(--watch-bg, var(--surface)); border: 1px solid var(--line); font-size: 13px; }
 .b-badge[hidden] { display: none; }
 .linkish { background: none; border: 0; padding: 0; color: var(--focus); font: inherit; text-decoration: underline; cursor: pointer; }
+
+/* Grind tab (grind.js) */
+#view-grind { max-width: 1000px; }
+/* the tester link (?only=grind): just the Grind tab */
+body.only-grind #tab-timer, body.only-grind #tab-builds, body.only-grind #tab-appraiser { display: none; }
+#view-grind h2 { font: 600 30px/1.2 var(--font-title); margin: 8px 0 4px; }
+#view-grind h3 { font: 600 20px var(--font-title); margin: 26px 0 8px; }
+#view-grind [hidden] { display: none !important; }
+.g-lead { color: var(--muted); margin: 0 0 12px; }
+.g-status { min-height: 1.4em; margin: 8px 0 0; font-size: 14px; color: var(--muted); }
+.g-top { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 16px; margin-top: 14px; align-items: start; }
+@media (max-width: 820px) { .g-top { grid-template-columns: minmax(0, 1fr); } }
+.g-card { background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 18px; padding: 16px; }
+.g-lbl { font: 800 11px var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.g-big { font: 700 34px/1.1 var(--font-num); color: var(--num); }
+.g-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+#g-mesokpi .g-big { color: var(--up-fg); }
+#g-mesokpi .g-sub { font-size: 12px; }
+.g-sub { color: var(--muted); font-size: 14px; }
+.g-row { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.g-row b, .g-row span:last-child { font-family: var(--font-num); text-align: right; }
+.g-cd { display: flex; gap: 12px; align-items: center; margin: 12px 0 10px; padding: 10px 12px; border-radius: 14px; background: var(--surface-2); border: 1px solid var(--line); }
+.g-cd img { width: 44px; height: 44px; image-rendering: pixelated; flex: none; }
+.g-clock { font: 700 34px/1.05 var(--font-num); font-variant-numeric: tabular-nums; color: var(--ink); }
+.g-verdict { margin: 0 0 6px; padding: 6px 10px; border-radius: 10px; font: 800 16px var(--font-body); }
+.g-verdict.up { background: var(--up-bg); color: var(--up-fg); }
+.g-verdict.down { background: var(--over-bg); color: var(--over-fg); }
+.g-low { display: inline-flex; gap: 6px; align-items: center; margin-top: 6px; padding: 2px 8px; border-radius: 8px; background: var(--over-bg); color: var(--over-fg); font-size: 13px; font-weight: 800; }
+.g-check { list-style: none; margin: 0; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; display: grid; gap: 6px; font-size: 14px; }
+.g-check li { display: grid; grid-template-columns: 22px 92px minmax(0, 1fr); gap: 6px; align-items: baseline; }
+.g-check li::before { content: '…'; color: var(--muted); font-weight: 800; }
+.g-check li.done::before { content: '✓'; color: var(--up-fg); }
+.g-check li.fix::before { content: '!'; color: var(--over-fg); }
+.g-check li b { font-weight: 800; }
+.g-check li span { color: var(--muted); overflow-wrap: anywhere; }
+.g-check li.done span { color: var(--ink); }
+.g-ready { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; padding: 10px 14px; background: var(--up-bg); color: var(--up-fg); border-radius: 14px; font-weight: 800; font-size: 14px; margin-bottom: 8px; }
+.g-scroll { overflow-x: auto; }
+#g-map { width: 100%; max-width: 520px; }
+.g-price { background: none; border: 0; padding: 0; font: inherit; font-family: var(--font-num); color: var(--focus); text-decoration: underline dotted; cursor: pointer; }
+.g-ico { width: 22px; height: 22px; image-rendering: pixelated; vertical-align: middle; margin-right: 6px; }
+#g-pots input { width: 6em; padding: 3px 6px; font: inherit; font-family: var(--font-num); }
+.g-chip { display: inline-block; font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 99px; background: var(--soon-bg); color: var(--soon-fg); }
+.g-note { font-size: 13px; color: var(--muted); margin: 8px 0 0; }
+.g-viewing { margin-top: 12px; padding: 8px 12px; border-radius: 12px; background: var(--soon-bg); color: var(--soon-fg); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.g-sess { display: grid; gap: 6px; }
+.g-sess button { text-align: left; display: flex; flex-wrap: wrap; gap: 4px 14px; justify-content: space-between; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; font: inherit; font-size: 14px; font-weight: 600; }
+.g-sess button:hover, .g-sess button:focus-visible { border-color: var(--focus); }
+.g-sess .n { font-family: var(--font-num); color: var(--muted); }
+/* Grind charts: EXP is categorical slot 1 (blue), potions take slots 2 to 4 (orange, aqua, yellow), the heatmap one blue ramp */
+#view-grind { --g-exp: #2a78d6; --g-p1: #eb6834; --g-p2: #1baf7a; --g-p3: #eda100; --g-other: #8b8a85;
+  --g-h0: #cde2fb; --g-h1: #9ec5f4; --g-h2: #6da7ec; --g-h3: #3987e5; --g-h4: #256abf; --g-h5: #184f95; }
+:root[data-theme="dark"] #view-grind { --g-exp: #3987e5; --g-p1: #d95926; --g-p2: #199e70; --g-p3: #c98500; --g-other: #8d93ad;
+  --g-h0: #104281; --g-h1: #184f95; --g-h2: #256abf; --g-h3: #2a78d6; --g-h4: #5598e7; --g-h5: #86b6ef; }
+.g-charts { position: relative; }
+.g-chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.g-grid { stroke: var(--line); stroke-width: 1; }
+.g-axis { fill: var(--muted); font: 600 11px var(--font-body); }
+.g-bar { fill: var(--g-exp); }
+.g-avg { stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.g-avgl { fill: var(--ink); font: 700 11px var(--font-body); }
+.g-band { fill: var(--ink); opacity: .05; }
+.g-hit { fill: transparent; cursor: crosshair; }
+.g-hit:hover { fill: var(--ink); opacity: .06; }
+.g-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 6px; font-size: 13px; }
+.g-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; }
+.g-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.g-tile { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
+.g-tv { font: 700 22px/1.2 var(--font-num); color: var(--num); margin: 2px 0; }
+.g-tip { position: absolute; z-index: 5; max-width: 220px; padding: 6px 9px; border-radius: 10px; background: var(--nav); color: #fff; font-size: 12px; font-weight: 700; pointer-events: none; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+/* is it reading everything: a sign and a colour per check, and the one thing to do */
+.g-health { display: flex; flex-wrap: wrap; gap: 5px; margin: 12px 0 6px; }
+.g-hc { font-size: 12px; font-weight: 800; padding: 2px 8px; border-radius: 99px; white-space: nowrap; background: var(--surface-2); color: var(--muted); }
+.g-hc.ok, .g-nudge.ok { background: var(--up-bg); color: var(--up-fg); }
+.g-hc.wait, .g-nudge.wait { background: var(--watch-bg); color: var(--watch-fg); }
+.g-hc.bad, .g-nudge.bad { background: var(--over-bg); color: var(--over-fg); }
+.g-nudge { font-size: 13px; font-weight: 700; padding: 6px 10px; border-radius: 10px; margin: 0 0 8px; background: var(--surface-2); color: var(--muted); }
+#g-refind.hi { border-color: var(--focus); color: var(--focus); font-weight: 800; }
+.g-markl { stroke: var(--focus); stroke-width: 1.5; stroke-dasharray: 3 3; }
+.g-died { fill: var(--over-fg); font: 800 11px var(--font-body); }
+.g-tradebox { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 6px; font-size: 13px; }
+.g-tradebox input { width: 7em; padding: 3px 6px; font: inherit; font-family: var(--font-num); }
+#g-trade button { font-size: 12px; }
+/* the pop out strip: always the quiet dark slate, whatever the site's theme, so it sits softly over the game */
+/* no scroll bars in the pop out: the text fits the window instead */
+html:has(body.g-pip), body.g-pip { overflow: hidden; scrollbar-width: none; }
+body.g-pip { margin: 0; padding: 0; background: #1b2030; }
+body.g-pip::-webkit-scrollbar { display: none; }
+body.g-pip #view-grind { max-width: none; }
+/* sizes are in em off one base that follows the window's width and height, so dragging the pop out bigger makes it all
+   bigger, and a short window shrinks the text rather than scrolling */
+.g-strip { font-family: var(--font-body); font-size: 16px; color: #eef1f7; background: #1b2030; padding: .5em .7em .55em; }
+body.g-pip .g-strip { font-size: clamp(11px, min(2.5vw, 10.5vh), 30px); }
+.g-l1 { display: flex; align-items: center; gap: .45em; white-space: nowrap; }
+.g-l1 b { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-size: 1.05em; }
+.g-l1 img { width: 1.6em; height: 1.6em; image-rendering: pixelated; }
+.g-clocks, .g-clk { display: inline-flex; align-items: center; gap: .35em; }
+.g-strip small { color: #8d96a8; font-size: .7em; }
+.g-strip .up { color: #4cc38a; } .g-strip .down { color: #f39a90; }
+.g-sep { color: #4b5368; }
+.g-dots { display: flex; gap: .5em; margin-left: auto; align-items: center; }
+.g-dw { display: inline-flex; align-items: center; gap: .2em; }
+.g-dot { width: .5em; height: .5em; border-radius: 50%; background: #4b5368; }
+.g-dw.ok .g-dot { background: #4cc38a; } .g-dw.wait .g-dot { background: #f5b942; } .g-dw.bad .g-dot { background: #f06a5d; }
+.g-dw.wait small { color: #f5c96a; } .g-dw.bad small { color: #f39a90; }
+.g-lp, .g-l2, .g-l3 { margin-top: .35em; padding-top: .35em; border-top: 1px solid #2a3145; font-size: .8em; color: #a7afc0; display: flex; gap: .25em .9em; align-items: center; }
+/* each line stays on one row and the text is sized to fit (fitStrip); only the one thing to do wraps */
+.g-lp, .g-l2 { white-space: nowrap; }
+.g-l3 { flex-wrap: wrap; }
+.g-l2 b { color: #dfe4ee; font-family: var(--font-num); }
+.g-l2 img { width: 1.25em; height: 1.25em; image-rendering: pixelated; vertical-align: -.25em; margin-right: .2em; }
+.g-l3.wait { color: #f5c96a; } .g-l3.bad { color: #f39a90; } .g-l3.idle { color: #a7afc0; }
+.g-lp b { color: #dfe4ee; font-family: var(--font-num); }
+.g-l3 .g-keep { margin-left: 0; }
+.g-lp button, .g-l3 button { margin-left: auto; font: inherit; color: #cfe0ff; border: 1px solid #3c5a8f; border-radius: 6px; padding: .05em .55em; background: #22304d; cursor: pointer; }
 
 /* Read from game (reader.js draws .r-bar and .r-drop) */
 .b-reader { margin: 14px 0 0; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; display: grid; gap: 8px; }
@@ -319,6 +497,7 @@ b.t { font-family: var(--font-num); }
     <button id="tab-timer" type="button" role="tab" aria-controls="view-timer" aria-selected="true">Timer</button>
     <button id="tab-builds" type="button" role="tab" aria-controls="view-builds" aria-selected="false">Builds</button>
     <button id="tab-appraiser" type="button" role="tab" aria-controls="view-appraiser" aria-selected="false">Appraiser</button>
+    <button id="tab-grind" type="button" role="tab" aria-controls="view-grind" aria-selected="false">Grind</button>
     <button id="tab-how" type="button" role="tab" aria-controls="view-how" aria-selected="false">How it works</button>
   </nav>
   <span class="auth">
@@ -361,6 +540,9 @@ b.t { font-family: var(--font-num); }
 </main>
 <main id="view-appraiser" role="tabpanel" aria-labelledby="tab-appraiser" hidden>
   <div id="appraiser-root"><p class="empty">Loading the appraiser...</p></div>
+</main>
+<main id="view-grind" hidden>
+  <div id="grind-root"><p class="empty">Loading the grind tracker...</p></div>
 </main>
 <main id="view-how" role="tabpanel" aria-labelledby="tab-how" hidden>
   <h2>How it works</h2>
@@ -620,9 +802,11 @@ function makeSupabaseApi(cfg) {
   if (!cfg.supabaseUrl || !window.supabase) {
     return { getSession: async () => null, onAuth() {}, signIn: down, signOut: down, list: down, subscribe: () => () => {},
       post: down, remove: down, hide: down, unhide: down, block: down, isAdmin: async () => false,
-      listBuilds: down, saveBuild: down, deleteBuild: down, uploadShot: down, removeShot: down, shotUrl: () => '', hideBuild: down };
+      listBuilds: down, saveBuild: down, deleteBuild: down, uploadShot: down, removeShot: down, shotUrl: () => '', hideBuild: down,
+      listGrind: down, getGrind: down, saveGrind: down, deleteGrind: down };
   }
   const COLUMNS = 'id,boss_id,channel,kind,at,posted_at,user_id,user_name,hidden';
+  const GRIND_LIST = 'id,map_id,started_at,ended_at,level_start,level_end,exp,pct,active_min,deaths,mesos_earned,meso_min,etc_value,etc_min,potions';
   const BUILD_COLUMNS = 'id,user_id,ign,class,level,stats,trains_at,note,shot_path,hidden,updated_at';
   const sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
   const who = s => {
@@ -692,6 +876,20 @@ function makeSupabaseApi(cfg) {
     async removeShot(path) { check(await sb.storage.from('build-shots').remove([path])); },
     shotUrl(path) { return sb.storage.from('build-shots').getPublicUrl(path).data.publicUrl; },
     async hideBuild(id) { check(await sb.from('builds').update({ hidden: true }).eq('id', id)); },
+
+    // Grind tab. Sessions are private (supabase/grind.sql); the running one updates its own row, so save is an upsert.
+    async listGrind() {
+      const { data, error } = await sb.from('grind_sessions').select(GRIND_LIST).order('started_at', { ascending: false }).limit(100);
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    async getGrind(id) {
+      const { data, error } = await sb.from('grind_sessions').select('*').eq('id', id).single();
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    async saveGrind(row) { check(await sb.from('grind_sessions').upsert(row, { onConflict: 'id' })); },
+    async deleteGrind(id) { check(await sb.from('grind_sessions').delete().eq('id', id)); },
   };
 }
 
@@ -915,9 +1113,24 @@ function renderAuth() {
   hint(defaultHint());
 }
 
+// Sign in leaves for Discord and comes back to the front page (the tokens come back in the # part, so the tab can't ride
+// along there). The tab is kept in this browser tab for ten minutes and opened again once the page sees the session.
+const BACK = 'bt.back';
+function signIn() {
+  try { if (location.hash) sessionStorage.setItem(BACK, JSON.stringify({ hash: location.hash, t: Date.now() })); } catch { /* storage blocked: the front page it is */ }
+  return api.signIn();
+}
+function comeBack() {
+  if (/access_token|error/.test(location.hash)) return;   // the sign in's own # part, not cleared yet
+  let back = null;
+  try { back = JSON.parse(sessionStorage.getItem(BACK)); sessionStorage.removeItem(BACK); } catch { /* nothing kept */ }
+  if (back && Date.now() - back.t < 10 * 60000 && !location.hash) location.hash = back.hash;
+}
+
 async function setSession(s) {
   state.session = s;
   state.admin = s ? await api.isAdmin().catch(() => false) : false;
+  if (s) comeBack();
   renderAuth();
   render();
   if (window.Builds && window.Builds.refresh) window.Builds.refresh();
@@ -943,18 +1156,31 @@ $('entry').addEventListener('keydown', async e => {
 for (const [id, kind] of [['btn-spawned', 'spawn'], ['btn-killed', 'kill'], ['btn-waiting', 'waiting']]) {
   $(id).addEventListener('click', () => send(state.channel, kind, null).catch(err => hint(err.message)));
 }
-$('signin').addEventListener('click', () => api.signIn().catch(err => hint(err.message)));
+$('signin').addEventListener('click', () => signIn().catch(err => hint(err.message)));
 $('signout').addEventListener('click', () => api.signOut().catch(() => {}).then(() => setSession(null)));
 
-// The Builds tab is #builds, the Appraiser #appraiser and How it works #how, so each can be linked; back and forward switch views too.
+// The Builds tab is #builds, the Appraiser #appraiser, Grind #grind and How it works #how, so each can be linked; back and
+// forward switch views too.
+// The tester link: ?only=grind shows just the Grind tab in this browser while the Timer, Builds and Appraiser are worked
+// on; ?only=all brings them back. Kept on the device, since Discord sends a sign in back to the plain address; the
+// address is tidied straight away so sign in isn't sent back to the link itself.
+const ONLY = 'bt.only';
+{
+  const q = new URLSearchParams(location.search).get('only');
+  if (q === 'grind' || q === 'all') { store.set(ONLY, q === 'grind' ? 'grind' : ''); history.replaceState(null, '', location.pathname + location.hash); }
+}
+const onlyGrind = () => store.get(ONLY) === 'grind';
+document.body.classList.toggle('only-grind', onlyGrind());
 function showView() {
-  const view = { '#how': 'how', '#builds': 'builds', '#appraiser': 'appraiser' }[location.hash] || 'timer';
-  for (const v of ['timer', 'builds', 'appraiser', 'how']) {
+  let view = { '#how': 'how', '#builds': 'builds', '#appraiser': 'appraiser', '#grind': 'grind' }[location.hash] || 'timer';
+  if (onlyGrind() && view !== 'how') view = 'grind';
+  for (const v of ['timer', 'builds', 'appraiser', 'grind', 'how']) {
     $('view-' + v).hidden = v !== view;
-    $('tab-' + v).setAttribute('aria-selected', String(v === view));
+    if ($('tab-' + v)) $('tab-' + v).setAttribute('aria-selected', String(v === view));
   }
   if (view === 'builds') loadBuilds();
   if (view === 'appraiser') loadAppraiser();
+  if (view === 'grind') loadGrind();
   // The stage has no size while hidden, so the sprite is sized again when it shows.
   if (view === 'timer' && sprite.lay) { placeSprite(); walk(); }
 }
@@ -967,7 +1193,7 @@ function loadBuilds() {
   });
   const data = fetch('data/builds.json').then(r => { if (!r.ok) throw new Error('builds.json'); return r.json(); });
   buildsLoading = Promise.all([script, data]).then(([, d]) => {
-    window.Builds.mount($('builds-root'), { api, store, el, data: d, session: () => state.session, admin: () => state.admin, signIn: () => api.signIn() });
+    window.Builds.mount($('builds-root'), { api, store, el, data: d, session: () => state.session, admin: () => state.admin, signIn: () => signIn() });
   }).catch(() => {
     buildsLoading = null;
     $('builds-root').replaceChildren(el('p', { class: 'empty' }, "The calculator didn't load. Try reloading the page."));
@@ -990,7 +1216,26 @@ function loadAppraiser() {
   });
   return appraiserLoading;
 }
+// The Grind tab needs the share loop (reader.js, which Builds may have loaded already), the HUD readers, the session
+// engine and its game data and client pictures.
+let grindLoading = null;
+function loadGrind() {
+  if (grindLoading) return grindLoading;
+  const script = src => new Promise((resolve, reject) => {
+    document.head.append(el('script', { src, onload: resolve, onerror: () => reject(new Error(src)) }));
+  });
+  const json = f => fetch('data/' + f).then(r => { if (!r.ok) throw new Error(f); return r.json(); });
+  const scripts = (window.Reader ? Promise.resolve() : script('reader.js')).then(() => Promise.all([script('screen.js'), script('grind-session.js')])).then(() => script('grind.js'));
+  grindLoading = Promise.all([scripts, json('grind.json'), json('grind-pictures.json')]).then(([, data, pictures]) => {
+    window.Grind.mount($('grind-root'), { api, store, el, data, pictures, session: () => state.session, signIn: () => signIn() });
+  }).catch(() => {
+    grindLoading = null;
+    $('grind-root').replaceChildren(el('p', { class: 'empty' }, "The grind tracker didn't load. Try reloading the page."));
+  });
+  return grindLoading;
+}
 $('tab-appraiser').addEventListener('click', () => { if (location.hash !== '#appraiser') location.hash = '#appraiser'; });
+$('tab-grind').addEventListener('click', () => { if (location.hash !== '#grind') location.hash = '#grind'; });
 $('tab-how').addEventListener('click', () => { if (location.hash !== '#how') location.hash = '#how'; });
 $('tab-builds').addEventListener('click', () => { if (location.hash !== '#builds') location.hash = '#builds'; });
 $('tab-timer').addEventListener('click', () => { if (location.hash) history.pushState(null, '', location.pathname + location.search); showView(); });
