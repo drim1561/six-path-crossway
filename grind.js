@@ -8,7 +8,7 @@
 
 const MS = () => window.MapleScreen, GS = () => window.GrindSession;
 const KEY_OPEN = 'grind.open', KEY_LOCAL = 'grind.local', KEY_PRICES = 'grind.prices', KEY_MAP = 'grind.map';
-const RESUME_MS = 30 * 60000, SAVE_MS = 60000, LEVEL_EVERY = 40, PARTY_EVERY = 2, ICON_EVERY = 40, RECHECK_EVERY = 40, HUD_CHANGE = 0.06;
+const RESUME_MS = 30 * 60000, SAVE_MS = 60000, LEVEL_EVERY = 20, PARTY_EVERY = 2, ICON_EVERY = 40;
 
 /* ---------- formatting ---------- */
 
@@ -159,7 +159,18 @@ function mount(root, deps) {
     SP.lp = el('div', { class: 'g-lp' }),
     SP.l2 = el('div', { class: 'g-l2' }),
     SP.l3 = el('div', { class: 'g-l3', hidden: '' }));
-  const viewBar = el('div', { class: 'g-viewing', hidden: '' }, V.viewing = el('span', {}), el('button', { type: 'button', onclick: () => { viewing = null; render(); } }, 'Back to live'));
+  const viewBar = el('div', { class: 'g-viewing', hidden: '' }, V.viewing = el('span', {}), el('button', { type: 'button', onclick: () => { viewing = null; render(); } }, 'Back to live'),
+    V.del = el('span', {}));
+  // a saved session with bad numbers can go: Delete, then Yes (from the account, and from this device)
+  const delButton = () => el('button', { type: 'button', id: 'g-del', onclick: () => V.del.replaceChildren('Delete this session for good? ',
+    el('button', { type: 'button', id: 'g-delyes', onclick: () => deleteViewed() }, 'Yes, delete'), ' ', el('button', { type: 'button', onclick: () => V.del.replaceChildren(delButton()) }, 'No')) }, 'Delete');
+  V.del.append(delButton());
+  function deleteViewed() {
+    const id = viewing && viewing.id;
+    if (!id) return;
+    const gone = () => { jset(KEY_LOCAL, jget(KEY_LOCAL, []).filter(r => r.id !== id)); viewing = null; V.del.replaceChildren(delButton()); render(); listSessions(); setStatus('Deleted that session.'); };
+    (signedIn() ? api.deleteGrind(id) : Promise.resolve()).then(gone, e => setStatus("Couldn't delete it (" + e.message + ').'));
+  }
   const pots = el('table', { class: 'b-table', id: 'g-pots' },
     el('thead', {}, el('tr', {}, ['Key', 'Potion', 'Left', 'Used', 'Price', 'Cost'].map((h, i) => el('th', i > 1 ? { class: 'n' } : {}, h)))), el('tbody', {}));
   const mapSel = el('select', { id: 'g-map', 'aria-label': 'Map', onchange: () => { mapId = +mapSel.value; store.set(KEY_MAP, String(mapId)); if (session) session.mapId = mapId; showMap(); render(); } },
@@ -257,13 +268,10 @@ function mount(root, deps) {
       // frame stops here (reading the quickslots without a bar threw, which stopped the share)
       if (++st.expMiss >= 20) { st.line = null; st.m = null; st.expMiss = 0; updateReady(); render(); return; }
     }
-    // once a minute, check the HUD is still the size measured: UI Size in the game's options changes it without changing
-    // the window, and reading at the old size invents counts and potions (more than 6% off; measuring wobbles about 3%)
-    if (st.m && st.ticks >= st.recheckAt) {
-      st.recheckAt = st.ticks + RECHECK_EVERY;
-      const m = S.measure(src, st.line, h);
-      if (m.score < 0.8 || Math.abs(m.s / st.m.s - 1) > HUD_CHANGE) st.m = null;
-    }
+    // the level box not where it was on two reads running (every 30 seconds, a few milliseconds each): UI Size in the
+    // game's options changed the HUD without changing the window, and reading at the old size invents counts, so measure
+    // again (here, before anything below reads with the old measurement)
+    if (st.m && st.levelMiss >= 2) { st.m = null; st.levelMiss = 0; }
     if (!st.m && st.ticks >= st.measureAt) {
       const m = S.measure(src, st.line, h);
       mark('size', m.score >= 0.8);
@@ -272,7 +280,7 @@ function mount(root, deps) {
         // and its potion is named again, so the switch isn't read as potions drunk
         if (st.measured && session) { GS().rebase(session); setStatus('Measured your game again. Potion counts carry on from here, nothing was counted for the switch.'); }
         st.measured = true; st.slots = {};
-        st.m = m; st.levelAt = st.ticks; st.recheckAt = st.ticks + RECHECK_EVERY; setCheck('size', 'done', 'Stretched ' + m.s.toFixed(2) + ' times');
+        st.m = m; st.levelAt = st.ticks; st.levelMiss = 0; setCheck('size', 'done', 'Stretched ' + m.s.toFixed(2) + ' times');
       }
       else { st.measureAt = st.ticks + 10; setCheck('size', 'fix', "Couldn't measure the game size (best match " + m.score.toFixed(2) + ' on a ' + w + '×' + h + ' share)'); }
     }
@@ -282,17 +290,20 @@ function mount(root, deps) {
         st.levelAt = st.ticks + LEVEL_EVERY;
         const lv = S.readLevel(src, st.line, st.m);
         mark('level', lv.ok);
-        if (lv.ok) { st.level = lv.level; reading.level = lv.level; setCheck('level', 'done', 'Level ' + lv.level); }
-        else if (!st.level) setCheck('level', 'fix', "Can't read your level yet");
+        if (lv.ok) { st.levelMiss = 0; st.level = lv.level; reading.level = lv.level; setCheck('level', 'done', 'Level ' + lv.level); }
+        else { st.levelMiss = (st.levelMiss || 0) + 1; if (!st.level) setCheck('level', 'fix', "Can't read your level yet"); }
       }
       mark('counts', st.m.countScore >= 0.8);
       if (st.m.countScore < 0.8) setCheck('potions', 'fix', "Can't read the quickslot numbers at this share size (match " + st.m.countScore.toFixed(2) + ')');
       else {
+        let nth = 0;
         for (const c of S.readCounts(src, st.line, st.m)) {
           let known = st.slots[c.key];
-          if (!known || st.ticks >= known.at) {   // which potion: once per slot, then now and then in case it was swapped
+          nth++;
+          // which potion: once per slot, then now and then in case it was swapped (spread over ticks, ~35 ms each)
+          if (!known || st.ticks >= known.at) {
             const ic = S.readIcon(src, c, st.m);
-            known = st.slots[c.key] = { id: ic.diff < 75 && data.potions[ic.id] ? +ic.id : null, at: st.ticks + ICON_EVERY };
+            known = st.slots[c.key] = { id: ic.diff < 75 && data.potions[ic.id] ? +ic.id : null, at: st.ticks + ICON_EVERY + nth * 3 };
           }
           const pot = known.id ? data.potions[known.id] : null;
           reading.counts.push({ key: c.key, id: known.id, name: pot ? pot[0] : 'Unknown item', price: known.id && prices[known.id] != null ? prices[known.id] : (pot ? pot[1] : 0), value: c.value });

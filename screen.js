@@ -233,16 +233,28 @@ function measure(src, line, frameH) {
     for (let s = g0 * 0.92; s <= g0 * 1.08; s += 0.0125) {
       const fine = setAt('level', s), f0 = fine['0'], near = region(src, cx - 8, cy - 8, f0.w + 16, f0.h + 16);
       const b = best(near, fine, DIGITS, 0, near.w - f0.w, 0, near.h - f0.h);
-      if (b.score > top.score) top = { s: Math.round(s * 1000) / 1000, score: b.score };
+      if (b.score > top.score) top = { s: Math.round(s * 1000) / 1000, score: b.score, x: near.x + b.x, y: near.y + b.y };
     }
     if (top.score >= 0.85) break;
   }
-  const out = { s: top.s, sc: top.s, score: Math.max(0, top.score), countScore: 0 };
+  // lx, ly: where a level digit was found, so readLevel looks there first instead of the whole area
+  const out = { s: top.s, sc: top.s, score: Math.max(0, top.score), countScore: 0, lx: top.x, ly: top.y };
   if (out.score >= LEVEL) { const c = fineCounts(src, line, out.s); out.sc = c.sc; out.countScore = c.score; }
   return out;
 }
+// The level box never moves, so it reads around the digit found last time (a few digits either side, ~5 ms) and only
+// searches the whole area (~700 ms on a 2560x1440 share) when that spot no longer matches.
 function readLevel(src, line, m) {
-  const a = levelArea(line, m.s), img = region(src, a.x, a.y, a.w, a.h), set = setAt('level', m.s), t0 = set['0'];
+  const set = setAt('level', m.s), t0 = set['0'];
+  if (m.lx != null) {
+    const img = region(src, m.lx - 2 * t0.w - 4, m.ly - 4, 5 * t0.w + 8, t0.h + 8), r = levelIn(img, set, t0);
+    if (r.ok) { m.lx = img.x + r.x; m.ly = img.y + r.y; return r; }
+  }
+  const a = levelArea(line, m.s), img = region(src, a.x, a.y, a.w, a.h), r = levelIn(img, set, t0);
+  if (r.ok) { m.lx = img.x + r.x; m.ly = img.y + r.y; }
+  return r;
+}
+function levelIn(img, set, t0) {
   const first = best(img, set, DIGITS, 0, img.w - t0.w, 0, img.h - t0.h);
   if (first.score < LEVEL) return { ok: false, score: first.score };
   const ds = [first];
@@ -250,7 +262,7 @@ function readLevel(src, line, m) {
   const l = best(img, set, DIGITS, first.x - t0.w - 3, first.x - t0.w + 2, first.y - 1, first.y + 1);
   if (r.score >= LEVEL) ds.push(r);
   if (l.score >= LEVEL) ds.unshift(l);
-  return { ok: true, level: parseInt(ds.map(q => q.d).join(''), 10), score: Math.min(...ds.map(q => q.score)) };
+  return { ok: true, level: parseInt(ds.map(q => q.d).join(''), 10), score: Math.min(...ds.map(q => q.score)), x: first.x, y: first.y };
 }
 
 /* ---------- quickslot counts ---------- */
@@ -311,6 +323,28 @@ function readCounts(src, line, m) {
     const x = img.x + n[0].x, y = img.y + n[0].y, bx = (x - line.x) / m.s, by = (y - line.y) / m.s;
     return { key: keyOf(bx, by), bx, by, x, y, value: parseInt(n.map(q => q.d[0]).join(''), 10), score: Math.min(...n.map(q => q.score)) };
   };
+  // the number whose first digit sits near screen pixel (ax, ay), for the slot named key, or null
+  const atSpot = (key, ax, ay, padX, padY) => {
+    const ex = Math.round(ax - img.x), ey = Math.round(ay - img.y);
+    const x0 = Math.max(0, ex - padX), x1 = Math.min(img.w - t0.w, ex + padX), y0 = Math.max(0, ey - padY), y1 = Math.min(img.h - t0.h, ey + padY);
+    if (x0 > x1 || y0 > y1) return null;
+    const b = best(img, set, COUNT_KEYS, x0, x1, y0, y1);
+    if (b.score < NEXT) return null;
+    const n = grow(b);
+    return n ? Object.assign(out(n), { key }) : null;
+  };
+  // Every tick after the first: the slots never move, so check just where each count starts (~10 ms instead of ~200 ms
+  // for the whole area). A potion dropped into an empty slot shows up there too. Nothing at any spot means the HUD
+  // moved, so it forgets the grid and searches everywhere.
+  if (m.grid) {
+    const found = [];
+    for (let r = 0; r < KEYS.length; r++) for (let c = 0; c < KEYS[r].length; c++) {
+      const n = atSpot(KEYS[r][c], m.grid.x + c * m.grid.px, m.grid.y + r * m.grid.py, 3, 2);
+      if (n) found.push(n);
+    }
+    if (found.length) return found;
+    m.grid = null;
+  }
   // first pass: spots that look like an 8 or a 1, each checked 4 pixels either way for the real digit (the 8 picture best
   // fits the 4 of "477" 4 pixels to its right)
   const seeds = [];
@@ -340,14 +374,11 @@ function readCounts(src, line, m) {
     for (let r = 0; r < KEYS.length; r++) for (let c = 0; c < KEYS[r].length; c++) {
       const key = KEYS[r][c];
       if (found.some(f => f.key === key)) continue;
-      const ex = Math.round(at.f.x + (c - at.c) * px - img.x), ey = Math.round(at.f.y + (r - at.r) * py - img.y);
-      const x0 = Math.max(0, ex - 6), x1 = Math.min(img.w - t0.w, ex + 6), y0 = Math.max(0, ey - 3), y1 = Math.min(img.h - t0.h, ey + 3);
-      if (x0 > x1 || y0 > y1) continue;
-      const b = best(img, set, COUNT_KEYS, x0, x1, y0, y1);
-      if (b.score < NEXT) continue;
-      const n = grow(b); if (!n) continue;
-      found.push(Object.assign(out(n), { key }));
+      const n = atSpot(key, at.f.x + (c - at.c) * px, at.f.y + (r - at.r) * py, 6, 3);
+      if (n) found.push(n);
     }
+    // the grid as screen pixels, for the next ticks: where the count of the top left slot starts, and slot to slot
+    m.grid = { x: at.f.x - at.c * px, y: at.f.y - at.r * py, px, py };
   }
   return found;
 }
