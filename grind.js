@@ -8,7 +8,7 @@
 
 const MS = () => window.MapleScreen, GS = () => window.GrindSession;
 const KEY_OPEN = 'grind.open', KEY_LOCAL = 'grind.local', KEY_PRICES = 'grind.prices', KEY_MAP = 'grind.map';
-const RESUME_MS = 30 * 60000, SAVE_MS = 60000, LEVEL_EVERY = 40, PARTY_EVERY = 2, ICON_EVERY = 40;
+const RESUME_MS = 30 * 60000, SAVE_MS = 60000, LEVEL_EVERY = 40, PARTY_EVERY = 2, ICON_EVERY = 40, RECHECK_EVERY = 40, HUD_CHANGE = 0.06;
 
 /* ---------- formatting ---------- */
 
@@ -257,10 +257,23 @@ function mount(root, deps) {
       // frame stops here (reading the quickslots without a bar threw, which stopped the share)
       if (++st.expMiss >= 20) { st.line = null; st.m = null; st.expMiss = 0; updateReady(); render(); return; }
     }
+    // once a minute, check the HUD is still the size measured: UI Size in the game's options changes it without changing
+    // the window, and reading at the old size invents counts and potions (more than 6% off; measuring wobbles about 3%)
+    if (st.m && st.ticks >= st.recheckAt) {
+      st.recheckAt = st.ticks + RECHECK_EVERY;
+      const m = S.measure(src, st.line, h);
+      if (m.score < 0.8 || Math.abs(m.s / st.m.s - 1) > HUD_CHANGE) st.m = null;
+    }
     if (!st.m && st.ticks >= st.measureAt) {
       const m = S.measure(src, st.line, h);
       mark('size', m.score >= 0.8);
-      if (m.score >= 0.8) { st.m = m; st.levelAt = st.ticks; setCheck('size', 'done', 'Stretched ' + m.s.toFixed(2) + ' times'); }
+      if (m.score >= 0.8) {
+        // measured again (the HUD changed size, or the game was found again): every slot starts over from what it shows
+        // and its potion is named again, so the switch isn't read as potions drunk
+        if (st.measured && session) { GS().rebase(session); setStatus('Measured your game again. Potion counts carry on from here, nothing was counted for the switch.'); }
+        st.measured = true; st.slots = {};
+        st.m = m; st.levelAt = st.ticks; st.recheckAt = st.ticks + RECHECK_EVERY; setCheck('size', 'done', 'Stretched ' + m.s.toFixed(2) + ' times');
+      }
       else { st.measureAt = st.ticks + 10; setCheck('size', 'fix', "Couldn't measure the game size (best match " + m.score.toFixed(2) + ' on a ' + w + '×' + h + ' share)'); }
     }
     const reading = { t: Date.now(), exp: exp.ok ? exp.exp : null, pct: exp.ok ? exp.pct : null, level: null, counts: [], party: null };

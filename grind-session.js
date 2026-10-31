@@ -72,6 +72,9 @@ function takeExp(s, t, exp, pct) {
 
 /* ---------- potions ---------- */
 
+const BIG_DROP = 30, HOLD_MS = 15000;
+// every slot starts over from its next read (grind.js calls this when the HUD changed size)
+function rebase(s) { for (const sl of Object.values(s.slots)) { sl.rebase = true; sl.pend = null; sl.big = null; } }
 function takeCounts(s, t, counts) {
   const seen = {};
   for (const c of counts || []) {
@@ -87,10 +90,21 @@ function takeCounts(s, t, counts) {
       continue;
     }
     sl.missing = 0;
-    if (c.value === sl.count) { sl.pend = null; continue; }
+    // after the HUD changed size: start over from what the slot shows, counting nothing for the switch
+    if (sl.rebase) { sl.count = c.value; sl.rebase = false; sl.pend = null; sl.big = null; continue; }
+    if (c.value === sl.count) { sl.pend = null; sl.big = null; continue; }
+    const d = c.value - sl.count;
+    // a drop no one could drink between two reads (684 read as 84 for a moment) is a misread until it holds for 15
+    // seconds; otherwise it reads as hundreds drunk and then a refill when the right number comes back
+    if (d < -BIG_DROP) {
+      if (!sl.big || sl.big.v !== c.value) { sl.big = { v: c.value, t }; continue; }
+      if (t - sl.big.t < HOLD_MS) continue;
+      sl.big = null; sl.pend = null; change(s, sl, t, d); continue;
+    }
+    sl.big = null;
     if (sl.pend !== c.value) { sl.pend = c.value; continue; }   // wait for a second read
     sl.pend = null;
-    change(s, sl, t, c.value - sl.count);
+    change(s, sl, t, d);
   }
   // a slot not read: covered (a tooltip, the cursor) keeps its count; one that showed 3 or less and stays gone ran out
   for (const sl of Object.values(s.slots)) {
@@ -294,9 +308,10 @@ function stats(s, t, avgExpPerKill) {
   const e = etcOf(s);
   o.etcLooks = s.etcs ? s.etcs.looks : 0; o.etcValue = e.value; o.etcHr = e.value != null && e.min >= RATE_MIN ? e.value / (e.min / 60) : null;
   // profit: mesos earned + etc picked up (at NPC prices) - potions drunk
-  o.profitHr = o.mesosHr != null || o.etcHr != null ? (o.mesosHr || 0) + (o.etcHr || 0) - (o.costHr || 0) : null;
+  // profit needs the mesos counted: etc minus potions alone reads as a big loss that is really just income not counted yet
+  o.profitHr = o.mesosHr != null ? o.mesosHr + (o.etcHr || 0) - (o.costHr || 0) : null;
   o.netHr = o.profitHr;
-  o.profit = o.mesosEarned != null || o.etcValue != null ? (o.mesosEarned || 0) + (o.etcValue || 0) - o.potCost : null;
+  o.profit = o.mesosEarned != null ? o.mesosEarned + (o.etcValue || 0) - o.potCost : null;
   // pace: the last 5 and 10 minutes once the session reaches back that far, and since Reset average
   const at = snap(s, t);
   o.pace = {};
@@ -377,5 +392,5 @@ function fromRow(row) {
   return s;
 }
 
-window.GrindSession = { CFG, create, add, stats, countdown, countdowns, minuteOf, toRow, fromRow, mark, trade, keepMesos };
+window.GrindSession = { CFG, create, add, stats, countdown, countdowns, minuteOf, toRow, fromRow, mark, trade, keepMesos, rebase };
 })();
