@@ -1,5 +1,6 @@
 // Grind tab (#grind): one click EXP and potion tracker. Share the game window and everything reads itself (screen.js):
-// the EXP line, the game's stretch, the level, every quickslot potion and the party. grind-session.js turns the readings
+// the EXP line, the game's stretch, the level, every quickslot potion and the mesos when the inventory opens (the party
+// and etc items are left out for now, until they read right). grind-session.js turns the readings
 // into minutes and numbers; this file draws the setup checklist, the card with the potion countdown, the potions list,
 // the map panel and the saved sessions, and saves to the player's private grind_sessions rows or this device.
 // Design: docs/superpowers/specs/2026-10-31-grind-tab-design.md
@@ -7,8 +8,8 @@
 'use strict';
 
 const MS = () => window.MapleScreen, GS = () => window.GrindSession;
-const KEY_OPEN = 'grind.open', KEY_LOCAL = 'grind.local', KEY_PRICES = 'grind.prices', KEY_MAP = 'grind.map';
-const RESUME_MS = 30 * 60000, SAVE_MS = 60000, LEVEL_EVERY = 20, PARTY_EVERY = 2, ICON_EVERY = 40;
+const KEY_OPEN = 'grind.open', KEY_LOCAL = 'grind.local', KEY_PRICES = 'grind.prices', KEY_MAP = 'grind.map', KEY_HOME = 'grind.mesoHome';
+const RESUME_MS = 30 * 60000, SAVE_MS = 60000, LEVEL_EVERY = 20, ICON_EVERY = 40, MESO_SEARCH_EVERY = 40;
 
 /* ---------- formatting ---------- */
 
@@ -47,9 +48,9 @@ const plural = name => /s$/.test(name) ? name : name + 's';
 /* ---------- is it reading everything ---------- */
 
 // f: what the readers have seen. exp, level, size and counts are { ok, fail }: when the reader last worked, and when its
-// current run of misses began (null while it works). meso: { at, unclear }, etc: { at }: the last inventory looks.
-// Returns six checks (ok green, wait amber, bad red), the one thing to do (most important first) and stuck, which lights
-// up Find my game again. Red is kept for what breaks the core numbers; mesos and etc only ever ask.
+// current run of misses began (null while it works). meso: { at, unclear }: the last inventory look.
+// Returns four checks (ok green, wait amber, bad red), the one thing to do (most important first) and stuck, which lights
+// up Find my game again. Red is kept for what breaks the core numbers; mesos only ever ask.
 const STUCK_MS = 30000, STALE_MS = 15 * 60000;
 function health(f) {
   const t = f.t, ago = at => { const m = Math.floor((t - at) / 60000); return m < 1 ? 'just now' : m + ' min ago'; };
@@ -60,11 +61,8 @@ function health(f) {
   C.level = f.level.ok != null ? { state: 'ok', text: f.levelNow ? String(f.levelNow) : 'read' } : stuckOn(f.level) ? { state: 'bad', text: "can't read it" } : { state: 'wait', text: 'looking' };
   C.potions = stuckOn(f.size) ? { state: 'bad', text: "can't measure the game" } : stuckOn(f.counts) ? { state: 'bad', text: "can't read the numbers" }
     : f.counts.ok == null ? { state: 'wait', text: 'looking' } : f.potNone ? { state: 'wait', text: 'none on quickslots' } : { state: 'ok', text: f.potCount ? String(f.potCount) : 'reading' };
-  C.party = f.party ? { state: 'ok', text: f.party === 1 ? 'solo' : String(f.party) } : { state: 'wait', text: 'looking' };
   const mesoStale = f.meso.at != null && t - f.meso.at > STALE_MS;
   C.mesos = f.meso.unclear ? { state: 'wait', text: "can't read clearly" } : f.meso.at == null ? { state: 'wait', text: 'open inventory' } : { state: mesoStale ? 'wait' : 'ok', text: ago(f.meso.at) };
-  const afterTown = f.etc.at != null && f.refillAt != null && f.refillAt > f.etc.at;
-  C.etc = f.etc.at == null ? { state: 'wait', text: 'not seen' } : afterTown ? { state: 'wait', text: 'look again' } : { state: 'ok', text: ago(f.etc.at) };
 
   const stuck = ['exp', 'potions', 'level'].some(k => C[k].state === 'bad');
   const say = (state, text) => ({ checks: C, nudge: { state, text }, stuck });
@@ -75,12 +73,9 @@ function health(f) {
   if (C.level.state === 'bad') return say('bad', "Can't read your level. Try Find my game again");
   if (f.exp.ok == null || f.size.ok == null) return say('wait', 'Looking for your game…');
   if (f.potNone) return say('wait', 'Put the potions you drink on your quickslots so they count');
-  if (afterTown) return say('wait', "Back from town? Open your Etc tab for a moment so what you sold doesn't count twice");
   if (f.meso.unclear) return say('wait', "Can't read your meso total clearly yet. Move the mouse off it");
-  if ((f.meso.at == null || mesoStale) && f.etc.at == null) return say('wait', 'Open your inventory on the Etc tab for a moment, so mesos and etc items count');
   if (f.meso.at == null) return say('wait', 'Open your inventory for a moment so mesos count');
   if (mesoStale) return say('wait', 'Mesos last seen ' + ago(f.meso.at) + '. Open your inventory for a moment');
-  if (f.etc.at == null) return say('wait', 'Open the Etc tab in your inventory once, so etc items count');
   return say('ok', 'Reading everything');
 }
 
@@ -119,10 +114,10 @@ function mount(root, deps) {
   const refindBtn = el('button', { type: 'button', id: 'g-refind', onclick: () => refind() }, 'Find my game again');
   // a fresh average from now on, to try another way of grinding; the session average keeps going
   const markBtn = el('button', { type: 'button', id: 'g-mark', onclick: () => resetAverage() }, 'Reset average');
-  const HEALTH = [['exp', 'EXP'], ['level', 'Level'], ['potions', 'Potions'], ['party', 'Party'], ['mesos', 'Mesos'], ['etc', 'Etc']];
+  const HEALTH = [['exp', 'EXP'], ['level', 'Level'], ['potions', 'Potions'], ['mesos', 'Mesos']];
   const SIGN = { ok: '✓', wait: '!', bad: '✕', idle: '·' };
-  const CHECKS = [['exp', 'EXP line'], ['size', 'Game size'], ['level', 'Level'], ['potions', 'Potions'], ['party', 'Party'], ['mesos', 'Mesos']];
-  const NEEDED = ['exp', 'size', 'level', 'potions', 'party'];   // mesos only come when the inventory opens
+  const CHECKS = [['exp', 'EXP line'], ['size', 'Game size'], ['level', 'Level'], ['potions', 'Potions'], ['mesos', 'Mesos']];
+  const NEEDED = ['exp', 'size', 'level', 'potions'];   // mesos only come when the inventory opens
   const check = el('ul', { class: 'g-check', id: 'g-check' }, CHECKS.map(([k, label]) => el('li', { 'data-k': k }, el('b', {}, label), el('span', {}, 'Looking…'))));
   const V = {};
   const row = (k, label, strong) => el('div', { class: 'g-row' }, strong ? el('b', {}, label) : el('span', {}, label), V[k] = el(strong ? 'b' : 'span', {}, '·'));
@@ -130,7 +125,7 @@ function mount(root, deps) {
     el('div', { class: 'g-kpis' },
       el('div', {}, el('div', { class: 'g-lbl' }, 'EXP per hour'), V.expHr = el('div', { class: 'g-big', id: 'g-exphr' }, '·')),
       el('div', { id: 'g-mesokpi' }, el('div', { class: 'g-lbl' }, 'Mesos earned'), V.mesoBig = el('div', { class: 'g-big' }, '·'),
-        V.mesoSub = el('div', { class: 'g-sub' }, 'Open your inventory on the Etc tab now and then to start counting'))),
+        V.mesoSub = el('div', { class: 'g-sub' }, 'Open your inventory now and then to start counting'))),
     V.health = el('div', { class: 'g-health', id: 'g-health' }, HEALTH.map(([k]) => el('span', { class: 'g-hc wait', 'data-k': k }))),
     V.nudge = el('div', { class: 'g-nudge idle', id: 'g-nudge' }, 'Share the game window to start'),
     V.sub = el('div', { class: 'g-sub' }, 'Share the game window to start'), V.pace = el('div', { class: 'g-sub', id: 'g-pace' }), V.next = el('div', { class: 'g-sub' }),
@@ -146,7 +141,7 @@ function mount(root, deps) {
     row('gain', 'EXP gained'), row('time', 'Time'), row('kpm', 'Kills a minute'), row('pots', 'Potions used'),
     row('costHr', 'Potions an hour', true), row('per1', 'Cost per 1%', true),
     el('div', { class: 'g-row' }, V.perPotL = el('span', {}, 'Potions per 1%'), V.perPot = el('span', {}, '·')),
-    V.perPot2Row = el('div', { class: 'g-row', hidden: '' }, V.perPot2L = el('span', {}), V.perPot2 = el('span', {}, '·')), row('party', 'Party'), row('level', 'Level'));
+    V.perPot2Row = el('div', { class: 'g-row', hidden: '' }, V.perPot2L = el('span', {}), V.perPot2 = el('span', {}, '·')), row('level', 'Level'));
   // the pop out over the game: one slim dark strip, built here and moved into the pop out window. Line 1 the big numbers
   // and a dot per check (a dot that isn't green says its name), line 2 the rest, line 3 only when it needs you.
   const SP = {};
@@ -155,7 +150,7 @@ function mount(root, deps) {
     el('div', { class: 'g-l1' }, SP.clocks = el('span', { class: 'g-clocks' }, el('b', {}, '··:··')),
       sep(), SP.exp = el('b', {}, '·'), el('small', {}, 'exp/hr'), sep(), SP.pct = el('b', {}, '·'), el('small', {}, '/hr'),
       sep(), SP.meso = el('b', {}, '·'), el('small', {}, 'mesos'), sep(), SP.profit = el('b', {}, '·'), el('small', {}, 'profit'),
-      SP.dots = el('span', { class: 'g-dots' }, ['exp', 'level', 'potions', 'mesos', 'etc'].map(k => el('span', { class: 'g-dw', 'data-k': k }, el('i', { class: 'g-dot' }), el('small', {}))))),
+      SP.dots = el('span', { class: 'g-dots' }, ['exp', 'level', 'potions', 'mesos'].map(k => el('span', { class: 'g-dw', 'data-k': k }, el('i', { class: 'g-dot' }), el('small', {}))))),
     SP.lp = el('div', { class: 'g-lp' }),
     SP.l2 = el('div', { class: 'g-l2' }),
     SP.l3 = el('div', { class: 'g-l3', hidden: '' }));
@@ -202,11 +197,11 @@ function mount(root, deps) {
   function updateReady() {
     const all = NEEDED.every(k => check.querySelector('[data-k="' + k + '"]').classList.contains('done'));
     ready.hidden = !all; check.hidden = all && !checkOpen;
-    readyText.textContent = '✓ Reading your game · Level ' + st.level + ' · ' + namedCount + ' potion' + (namedCount === 1 ? '' : 's') + ' · ' + (st.party === 1 ? 'Solo' : 'party of ' + st.party) + ' · ' + (st.mesos != null ? fmt(st.mesos) + ' mesos' : st.mesoUnclear ? 'mesos unclear' : 'open your inventory for mesos');
+    readyText.textContent = '✓ Reading your game · Level ' + st.level + ' · ' + namedCount + ' potion' + (namedCount === 1 ? '' : 's') + ' · ' + (st.mesos != null ? fmt(st.mesos) + ' mesos' : st.mesoUnclear ? 'mesos unclear' : 'open your inventory for mesos');
   }
   root.replaceChildren(
     el('h2', {}, 'Grind'),
-    el('p', { class: 'g-lead' }, 'Share the game window and grind. Your EXP, level, potions and party read themselves, nothing to type.'),
+    el('p', { class: 'g-lead' }, 'Share the game window and grind. Your EXP, level and potions read themselves, nothing to type. Open your inventory now and then and your mesos count too.'),
     shareArea, status,
     el('div', { class: 'g-top' }, el('div', {}, card, el('div', { class: 'r-bar', style: 'margin-top:10px' }, popBtn, markBtn, refindBtn, newBtn, snapBtn)), el('div', {}, ready, check, viewBar)),
     charts,
@@ -230,31 +225,25 @@ function mount(root, deps) {
     if (st.wantSnap) { st.wantSnap = false; saveFrame(src, info); }
     st.ticks++; st.sharing = true;
     const S = MS(), w = info.w, h = info.h;
-    if (w !== st.fw || h !== st.fh) { st.fw = w; st.fh = h; st.line = null; }   // the window changed size
-    // the inventory's meso box: every tick while it's open, every third tick while looking for it (a full look takes a moment)
-    let mesos = null, etc = null;
-    if (st.mesoOpen || st.ticks % 3 === 1) {
-      const mr = S.readMesos(src);
+    if (w !== st.fw || h !== st.fh) { st.fw = w; st.fh = h; st.line = null; S.mesoHome(null); st.homeTried = false; }   // the window changed size
+    // the inventory's meso box: checked every tick where it last opened (a few ms, kept on this device for next time);
+    // the whole frame is searched every third tick until it's been seen, then once a minute in case it moved (a search
+    // takes a quarter second on a big window)
+    if (!st.homeTried) { st.homeTried = true; const hm = jget(KEY_HOME, null); if (hm && hm.w === w && hm.h === h && hm.box && !S.mesoHome()) S.mesoHome(hm.box); }
+    let mesos = null;
+    const home = S.mesoHome(), search = st.ticks % (home ? MESO_SEARCH_EVERY : 3) === 1;
+    if (home || search) {
+      const mr = S.readMesos(src, { search });
       st.mesoOpen = mr.reason !== 'no inventory';
-      st.mesoUnclear = !mr.ok && mr.reason !== 'no inventory';
-      // the open tab and, on the Etc tab, every etc item and its count (every other tick: it's the slowest read)
-      if (mr.reason !== 'no inventory' && (st.ticks % 2 === 0 || !st.tab)) {
-        const inv = S.readInventory(src);
-        if (inv.ok) {
-          st.tab = inv.tab;
-          if (inv.tab === 'Etc') {
-            const known = inv.slots.filter(q => q.id && data.etc[q.id]);
-            etc = known.map(q => ({ id: q.id, name: data.etc[q.id][0], price: data.etc[q.id][1], count: q.value }));
-            st.etcKinds = new Set(known.map(q => q.id)).size;
-          }
-        }
+      st.mesoUnclear = !mr.ok && st.mesoOpen;
+      if (mr.ok) {
+        mesos = mr.value; st.mesos = mr.value; setCheck('mesos', 'done', fmt(mr.value) + ' at ' + timeOfDay(Date.now()));
+        if (!home || Math.abs(home.x - mr.box.x) > 3 || Math.abs(home.y - mr.box.y) > 3) jset(KEY_HOME, { w, h, box: mr.box });
       }
-      const etcPart = st.tab === 'Etc' ? ' · ' + st.etcKinds + ' etc kinds' : ' · open the Etc tab to count etc items';
-      if (mr.ok) { mesos = mr.value; st.mesos = mr.value; setCheck('mesos', 'done', fmt(mr.value) + ' at ' + timeOfDay(Date.now()) + etcPart); }
-      else if (mr.reason !== 'no inventory') setCheck('mesos', 'fix', "Can't read your mesos clearly (a tooltip over them, or a digit it hasn't learned yet)");
+      else if (st.mesoOpen) setCheck('mesos', 'fix', "Can't read your mesos clearly (a tooltip over them, or a digit it hasn't learned yet)");
       else if (st.mesos == null) setCheck('mesos', '', 'Open your inventory now and then');
     }
-    if ((mesos != null || etc) && session) GS().add(session, Object.assign({ t: Date.now() }, mesos != null ? { mesos } : {}, etc ? { etc } : {}));
+    if (mesos != null && session) GS().add(session, { t: Date.now(), mesos });
     if (!st.line) {
       st.line = S.findExpLine(src, w, h); st.m = null; st.measureAt = 0;
       if (!st.line) { mark('exp', false); setCheck('exp', 'fix', 'Make sure the bar at the bottom of the game is showing'); updateReady(); render(); return; }
@@ -313,18 +302,11 @@ function mount(root, deps) {
         if (named.length) setCheck('potions', 'done', named.length + ' potion' + (named.length > 1 ? 's' : '') + ': ' + named.map(c => c.name).join(', '));
         else setCheck('potions', '', 'No potions in your quickslots yet');
       }
-      // the engine changes the party size only when two of these reads agree
-      if (st.ticks % PARTY_EVERY === 0 || !session || !session.partyNow) {
-        const pr = S.readParty(src, st.line, st.m);
-        if (pr.sure) reading.party = pr.n;
-      }
     }
     if (reading.exp != null || reading.counts.length) {
       if (!session) session = GS().create({ mapId, t: reading.t, prices });
       GS().add(session, reading); st.reads++;
     }
-    st.party = session && session.partyNow ? session.partyNow : null;
-    if (st.party) setCheck('party', 'done', st.party === 1 ? 'Solo' : 'party of ' + st.party);
     updateReady();
     render(); save(false);
   }
@@ -360,7 +342,8 @@ function mount(root, deps) {
   // the quick reset: forget where the game was (bars, size, which potion sits on each key, the inventory) and look again;
   // the session and every number in it stay
   function refind() {
-    Object.assign(st, { line: null, m: null, measureAt: 0, levelAt: 0, expMiss: 0, slots: {}, tab: null, mesoOpen: false, h: fresh() });
+    Object.assign(st, { line: null, m: null, measureAt: 0, levelAt: 0, expMiss: 0, slots: {}, mesoOpen: false, homeTried: true, h: fresh() });
+    MS().mesoHome(null); store.set(KEY_HOME, '');
     setStatus('Looking for your game again. Your session and its numbers are kept.');
     render();
   }
@@ -434,8 +417,6 @@ function mount(root, deps) {
     V.pots.textContent = o.potUsed ? fmt(o.potUsed) + ' · ' + fmtK(o.potCost) : '·';
     V.costHr.textContent = o.costHr != null ? fmtK(o.costHr) : '·';
     V.per1.textContent = o.per1 != null ? fmtK(o.per1) : '·';
-    const lastParty = viewing ? (s.minutes.length ? s.minutes[s.minutes.length - 1].party : null) : st.party;
-    V.party.textContent = lastParty == null ? '·' : lastParty === 1 ? 'Solo' : lastParty + ' of you';
     V.level.textContent = s.level ? s.level + (s.last ? ' · ' + s.last.pct.toFixed(2) + '%' : '') : '·';
     renderCountdown(s, t);
     const mains = mainPotions(s, o), main = mains[0] || null, second = mains[1] || null;
@@ -480,9 +461,8 @@ function mount(root, deps) {
   function renderHealth() {
     const s = session;
     const h = lastHealth = health({ t: Date.now(), sharing: st.sharing, hasSession: !!s, exp: st.h.exp, level: st.h.level, levelNow: st.level,
-      size: st.h.size, counts: st.h.counts, potNone: st.potNone, potCount: st.potCount, party: st.party,
-      meso: { at: s && s.meso && s.meso.last ? s.meso.last.t : null, unclear: !!(st.mesoOpen && st.mesoUnclear) },
-      etc: { at: s && s.etcs && s.etcs.last ? s.etcs.last.t : null }, refillAt: s && s.lastRefill || null });
+      size: st.h.size, counts: st.h.counts, potNone: st.potNone, potCount: st.potCount,
+      meso: { at: s && s.meso && s.meso.last ? s.meso.last.t : null, unclear: !!(st.mesoOpen && st.mesoUnclear) } });
     // a saved session being looked at isn't live, so its card has no checks
     V.health.hidden = V.nudge.hidden = !!viewing;
     for (const [k, label] of HEALTH) {
@@ -518,7 +498,7 @@ function mount(root, deps) {
       el('small', {}, fmt(c.left) + ' left'))) : [el('b', {}, '··:··')]));
     SP.exp.textContent = o.expHr != null ? fmtK(o.expHr) : '·';
     SP.pct.textContent = o.pctHr != null ? o.pctHr.toFixed(2) + '%' : '·';
-    SP.meso.textContent = o.mesosEarned != null ? (o.mesosEarned >= 0 ? '+' : '−') + fmtK(Math.abs(o.mesosEarned)) : o.mesoLooks >= 1 ? '+0' : '·';
+    SP.meso.textContent = o.mesosEarned != null ? (o.mesosEarned >= 0 ? '+' : '−') + fmtK(Math.abs(o.mesosEarned)) : '·';
     SP.profit.textContent = o.profitHr != null ? (o.profitHr >= 0 ? '▲ +' : '▼ −') + fmtK(Math.abs(o.profitHr)) + '/hr' : '·';
     SP.profit.className = o.profitHr == null ? '' : o.profitHr >= 0 ? 'up' : 'down';
     // the pace line, live only, with Reset average right there so it can be pressed without leaving the game
@@ -717,9 +697,9 @@ function mount(root, deps) {
     else if (o.mesoLooks >= 1) V.mesos.textContent = 'Counting mesos from ' + fmt(s.meso.first.v) + '. Open your inventory again in a few minutes to see what you earned';
     else V.mesos.textContent = 'Mesos: open your inventory now and then to count them';
     if (o.mesosEarned != null) { V.mesoBig.textContent = (o.mesosEarned >= 0 ? '+' : '−') + fmt(Math.abs(o.mesosEarned)); V.mesoSub.textContent = o.mesosHr != null ? fmtK(o.mesosHr) + ' an hour' : 'this session'; }
-    // one look is only where the count starts: earnings show once a later look is a minute or more after it
-    else if (o.mesoLooks >= 1) { V.mesoBig.textContent = '+0'; V.mesoSub.textContent = 'Counting from ' + fmt(s.meso.first.v) + '. Open your inventory again in a few minutes'; }
-    else { V.mesoBig.textContent = '·'; V.mesoSub.textContent = st.mesoUnclear ? "Can't read your mesos clearly yet" : 'Open your inventory on the Etc tab now and then to start counting'; }
+    // one look is only where the count starts, not +0 earned: earnings show once a later look is a minute or more after it
+    else if (o.mesoLooks >= 1) { V.mesoBig.textContent = '·'; V.mesoSub.textContent = 'Counting from ' + fmt(s.meso.first.v) + '. Open your inventory again in a few minutes'; }
+    else { V.mesoBig.textContent = '·'; V.mesoSub.textContent = st.mesoUnclear ? "Can't read your mesos clearly yet" : 'Open your inventory now and then to start counting'; }
     // profit: mesos earned + etc picked up - potions drunk
     V.verdict.hidden = o.profit == null;
     if (o.profit != null) {
@@ -807,7 +787,7 @@ function mount(root, deps) {
 
   showMap(); render(); listSessions();
   if (session) setStatus('Carrying on your session from ' + timeOfDay(session.t0) + '. Share the game window to keep going.');
-  window.Grind.debug = { session: () => session, state: () => ({ reads: st.reads, ticks: st.ticks, line: st.line, m: st.m, party: st.party, level: st.level }),
+  window.Grind.debug = { session: () => session, state: () => ({ reads: st.reads, ticks: st.ticks, line: st.line, m: st.m, level: st.level }),
     save: () => save(true), load: row => { viewing = GS().fromRow(row); render(); }, capture: () => capture, mesoLine };
 }
 

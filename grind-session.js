@@ -72,7 +72,9 @@ function takeExp(s, t, exp, pct) {
 
 /* ---------- potions ---------- */
 
-const BIG_DROP = 30, HOLD_MS = 15000;
+// BIG: a change of more than this between two reads holds HOLD_MS before it counts. PICKUP: a rise this small is a
+// potion picked up off the ground, not bought (a mob drops one at a time; a shop trip buys dozens)
+const BIG = 30, HOLD_MS = 15000, PICKUP = 5;
 // every slot starts over from its next read (grind.js calls this when the HUD changed size)
 function rebase(s) { for (const sl of Object.values(s.slots)) { sl.rebase = true; sl.pend = null; sl.big = null; } }
 function takeCounts(s, t, counts) {
@@ -94,9 +96,9 @@ function takeCounts(s, t, counts) {
     if (sl.rebase) { sl.count = c.value; sl.rebase = false; sl.pend = null; sl.big = null; continue; }
     if (c.value === sl.count) { sl.pend = null; sl.big = null; continue; }
     const d = c.value - sl.count;
-    // a drop no one could drink between two reads (684 read as 84 for a moment) is a misread until it holds for 15
-    // seconds; otherwise it reads as hundreds drunk and then a refill when the right number comes back
-    if (d < -BIG_DROP) {
+    // a drop no one could drink between two reads (684 read as 84 for a moment), or a rise as big (84 read as 684), is a
+    // misread until it holds for 15 seconds; otherwise it reads as hundreds drunk, or hundreds bought
+    if (Math.abs(d) > BIG) {
       if (!sl.big || sl.big.v !== c.value) { sl.big = { v: c.value, t }; continue; }
       if (t - sl.big.t < HOLD_MS) continue;
       sl.big = null; sl.pend = null; change(s, sl, t, d); continue;
@@ -120,7 +122,8 @@ function change(s, sl, t, d) {
     sl.uses.push([t, -d]);
     while (sl.uses.length && sl.uses[0][0] < t - CFG.rateWindow) sl.uses.shift();
     const b = bucket(s, t); b.used[sl.id] = (b.used[sl.id] || 0) + -d;
-  } else { sl.bought += d; s.boughtCost = (s.boughtCost || 0) + d * (sl.price || 0); s.lastRefill = t; }   // a refill: back from town
+  } else if (d <= PICKUP) sl.found = (sl.found || 0) + d;   // picked up: stock that cost nothing
+  else { sl.bought += d; s.boughtCost = (s.boughtCost || 0) + d * (sl.price || 0); s.lastRefill = t; }   // a refill: back from town
   sl.count += d;
 }
 

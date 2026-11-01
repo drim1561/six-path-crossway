@@ -537,7 +537,8 @@ function labelAt(s) {
   const mean = sm / idx.length, t = { w, h, L: TL, idx, mean, v: ss / idx.length - mean * mean };
   cache.set(key, t); return t;
 }
-// the meso box on screen: { x, y, w, h, s } or null
+// the meso box on screen: { x, y, w, h, s } or null. lastBox is where it was last seen, kept while the inventory is
+// closed (it opens at the same spot): checking there costs a few ms, searching the whole frame a quarter second
 let lastBox = null;
 function confirmBox(src, x0, yRow, len) {
   const G = invGeometry(), s = (len + 1) / G.fw, t = labelAt(s);
@@ -548,13 +549,20 @@ function confirmBox(src, x0, yRow, len) {
   if (b.score < 0.5) return null;
   return { x: x0, y: img.y + b.y, w: Math.round(G.fw * s), h: Math.round(G.fh * s), s, score: b.score };
 }
+const atHome = src => lastBox && invGeometry() ? confirmBox(src, lastBox.x, lastBox.y + Math.round(lastBox.h / 2), lastBox.w - 1) : null;
 function findMesoBox(src) {
+  const c = atHome(src);   // the window seldom moves: check where it was first
+  if (c) return (lastBox = c);
+  const f = scanBoxes(src, b => b);
+  if (f) lastBox = f;
+  return f;
+}
+// where the inventory was last seen: mesoHome() reads it, mesoHome(box) sets it (kept from an earlier session), null forgets
+function mesoHome(box) { if (arguments.length) lastBox = box || null; return lastBox; }
+// every box shape on the frame, top to bottom, handed to take until it returns something
+function scanBoxes(src, take) {
   const G = invGeometry(); if (!G) return null;
   const { w: W, h: H } = sizeOf(src);
-  if (lastBox) {   // the window seldom moves: check where it was first
-    const c = confirmBox(src, lastBox.x, lastBox.y + Math.round(lastBox.h / 2), lastBox.w - 1);
-    if (c) return (lastBox = c);
-  }
   const g = ctx2d(W, H); g.drawImage(src, 0, 0);
   const d = g.getImageData(0, 0, W, H).data, white = i => Math.min(d[i * 4], d[i * 4 + 1], d[i * 4 + 2]) >= 236, tried = [];
   for (let y = 2; y < H - 2; y += 2) {
@@ -566,13 +574,12 @@ function findMesoBox(src) {
       const len = x - st, s = len / G.fw;
       if (s >= 0.7 && s <= 3.4 && !tried.some(q => Math.abs(q[0] - st) < 4 && Math.abs(q[1] - len) < 4 && Math.abs(q[2] - y) < 40)) {
         tried.push([st, len, y]);
-        const c = confirmBox(src, st, y, len);
-        if (c) return (lastBox = c);
+        const c = confirmBox(src, st, y, len), r = c && take(c);
+        if (r) return r;
       }
       st = -1;
     }
   }
-  lastBox = null;
   return null;
 }
 // the dark marks inside the box, cut apart by empty columns: [{ x0, x1, y0, y1, g, a, comma }]
@@ -608,10 +615,18 @@ function classifyMeso(q) {
   const r = Object.entries(per).sort((a, b) => a[1] - b[1]);
   return r.length ? { d: r[0][0], dist: r[0][1], second: r[1] ? r[1][1] : 9 } : { d: null, dist: 9, second: 9 };
 }
-// { ok, value, box } or { ok: false, reason }: 'no inventory', 'unsure' (a digit not clearly one), 'bad commas'
-function readMesos(src) {
-  const box = findMesoBox(src);
-  if (!box) return { ok: false, reason: 'no inventory' };
+// { ok, value, box } or { ok: false, reason }: 'no inventory', 'unsure' (a digit not clearly one), 'bad commas'.
+// opts.search false: only where the inventory was last seen. A box found by searching counts only if its total reads,
+// so something shaped like it (a sign beside a cloud) is never asked about
+function readMesos(src, opts) {
+  const home = atHome(src);
+  if (home) { const r = mesoTotal(src, home); if (r.ok) lastBox = home; return r; }
+  if (opts && opts.search === false) return { ok: false, reason: 'no inventory' };
+  const r = scanBoxes(src, b => { const r = mesoTotal(src, b); return r.ok ? r : null; });
+  if (r) { lastBox = r.box; return r; }
+  return { ok: false, reason: 'no inventory' };
+}
+function mesoTotal(src, box) {
   const gs = mesoGlyphs(src, box).filter(q => q.h >= 0.25 * q.tall);
   if (!gs.length) return { ok: false, reason: 'unsure', box };
   let text = '';
@@ -732,5 +747,5 @@ function readInventory(src) {
 }
 
 window.MapleScreen = { load, sizeOf, findExpLine, readExp, expGlyphs, measure, readLevel, readCounts, readIcon, readParty, levelArea, slotArea, partyArea,
-  findMesoBox, mesoGlyphs, readMesos, invGeometry, readInventory };
+  findMesoBox, mesoHome, mesoGlyphs, readMesos, invGeometry, readInventory };
 })();
