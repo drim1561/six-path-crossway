@@ -1,15 +1,18 @@
 // Grind tab (#grind): one click EXP and potion tracker. Share the game window and everything reads itself (screen.js):
 // the EXP line, the game's stretch, the level, every quickslot potion and the mesos when the inventory opens (the party
 // and etc items are left out for now, until they read right). grind-session.js turns the readings
-// into minutes and numbers; this file draws the setup checklist, the card with the potion countdown, the potions list,
-// the map panel and the saved sessions, and saves to the player's private grind_sessions rows or this device.
+// into minutes and numbers; this file draws the page (big buttons and the reading checks down the left, this session in
+// one slim line with its card, potions and charts folded away, and all time from every saved session), the pop out over
+// the game, and saves to the player's private grind_sessions rows or this device.
 // Design: docs/superpowers/specs/2026-10-31-grind-tab-design.md
 (function () {
 'use strict';
 
 const MS = () => window.MapleScreen, GS = () => window.GrindSession;
 const KEY_OPEN = 'grind.open', KEY_LOCAL = 'grind.local', KEY_PRICES = 'grind.prices', KEY_MAP = 'grind.map', KEY_HOME = 'grind.mesoHome';
-const KEY_LAYOUT = 'grind.layout', KEY_SIZES = 'grind.layoutSizes';
+const KEY_LAYOUT = 'grind.layout', KEY_SIZES = 'grind.layoutSizes', KEY_DETAIL = 'grind.detail';
+// sessions kept on this device for all time: up to 200, the newest 20 with their minutes (the charts), older ones without
+const LOCAL_MAX = 200, LOCAL_MINUTES = 20;
 const RESUME_MS = 30 * 60000, SAVE_MS = 60000, LEVEL_EVERY = 20, ICON_EVERY = 40, MESO_SEARCH_EVERY = 40;
 
 /* ---------- formatting ---------- */
@@ -91,6 +94,53 @@ function lemonTile(c, t) {
     juice: Math.round(100 * Math.min(1, c.left / (c.full || c.left || 1))), low: !!c.low };
 }
 
+// all time on the page, from every saved session (rows as GrindSession.toRow writes them): totals, Lemons and Meat (o.lemon
+// and o.meat: the client ids with those names, since two items are named Lemon), the most trained maps, personal bests
+// and the last 30 days. Only what was tracked counts, so it's "since you started tracking", never the whole game
+const BEST_MIN = 10;   // a session shorter than this can't be a best (3 lucky minutes aren't an EXP an hour)
+const dayKey = ms => { const d = new Date(ms); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+function lifetime(rows, o) {
+  const L = { sessions: rows.length, mins: 0, exp: 0, deaths: 0, levelFrom: null, levelTo: null, mesos: null, profit: null,
+    lemon: { used: 0, cost: 0, pct: 0 }, meat: { used: 0, cost: 0, pct: 0 }, other: { used: 0, cost: 0 }, maps: [],
+    best: { expHr: null, longest: null, lemons: null, cheap1: null }, days: 0, streak: 0, daysList: [] };
+  const maps = {}, byDay = {}, top = (k, v, row, low) => { const b = L.best[k]; if (!b || (low ? v < b.v : v > b.v)) L.best[k] = { v, row }; };
+  for (const r of rows) {
+    const mins = r.active_min || 0, exp = r.exp || 0, pct = r.pct || 0;
+    L.mins += mins; L.exp += exp; L.deaths += r.deaths || 0;
+    if (r.level_start != null) L.levelFrom = L.levelFrom == null ? r.level_start : Math.min(L.levelFrom, r.level_start);
+    if (r.level_end != null) L.levelTo = L.levelTo == null ? r.level_end : Math.max(L.levelTo, r.level_end);
+    let cost = 0, lemons = 0, meat = 0;
+    for (const p of r.potions || []) {
+      const c = p.used * (p.price || 0), g = o.lemon.includes(p.id) ? L.lemon : o.meat.includes(p.id) ? L.meat : L.other;
+      g.used += p.used; g.cost += c; cost += c;
+      if (g === L.lemon) lemons += p.used; else if (g === L.meat) meat += p.used;
+    }
+    // per 1% only over the sessions that drank them, so a session on other potions doesn't thin it out
+    if (lemons && pct > 0) L.lemon.pct += pct;
+    if (meat && pct > 0) L.meat.pct += pct;
+    if (r.mesos_earned != null) { L.mesos = (L.mesos || 0) + r.mesos_earned; L.profit = (L.profit || 0) + r.mesos_earned - cost; }
+    const m = maps[r.map_id] || (maps[r.map_id] = { id: r.map_id, mins: 0, exp: 0 });
+    m.mins += mins; m.exp += exp;
+    if (mins >= BEST_MIN) top('expHr', exp / (mins / 60), r);
+    if (mins > 0) top('longest', mins, r);
+    if (lemons) top('lemons', lemons, r);
+    if (pct >= 0.3 && cost > 0) top('cheap1', cost / pct, r, true);   // the same 0.3% floor as the sessions list
+    const k = dayKey(Date.parse(r.started_at));
+    byDay[k] = (byDay[k] || 0) + mins;
+  }
+  for (const g of [L.lemon, L.meat]) { g.per1 = g.pct ? g.used / g.pct : null; delete g.pct; }
+  L.maps = Object.values(maps).map(m => Object.assign(m, { expHr: m.mins ? m.exp / (m.mins / 60) : null })).sort((a, b) => b.mins - a.mins);
+  const keys = Object.keys(byDay).sort();
+  L.days = keys.length;
+  for (let i = 0, run = 0; i < keys.length; i++) {
+    const prev = i && dayKey(Date.parse(keys[i] + 'T12:00:00') - 864e5) === keys[i - 1];
+    run = prev ? run + 1 : 1; L.streak = Math.max(L.streak, run);
+  }
+  const noon = new Date(o.now); noon.setHours(12, 0, 0, 0);
+  for (let i = 29; i >= 0; i--) { const k = dayKey(noon.getTime() - i * 864e5); L.daysList.push({ date: k, mins: byDay[k] || 0 }); }
+  return L;
+}
+
 /* ---------- the tab ---------- */
 
 function mount(root, deps) {
@@ -100,7 +150,7 @@ function mount(root, deps) {
   const prices = jget(KEY_PRICES, {});
   let mapId = +store.get(KEY_MAP) || 10004134;
   let session = null, viewing = null, editing = false, picturesReady = false;
-  let cd = null, lastHealth = null;   // the potion countdown and the checks, as last drawn
+  let lastHealth = null, lastRows = [], lifeAt = 0;   // the checks as last drawn, the saved sessions as last listed, when all time was drawn
   const open = jget(KEY_OPEN, null);
   if (open && open.tLast && Date.now() - open.tLast < RESUME_MS) session = open;   // carry on after a reload or a dropped share
   // per share: where the EXP line is, the measured stretch, and what each reader last saw
@@ -116,16 +166,20 @@ function mount(root, deps) {
   const avgExp = id => { let n = 0, e = 0; for (const m of mobsOf(id)) { n += m.count; e += m.count * m.exp; } return n ? e / n : null; };
   const mapName = id => (data.maps[id] && data.maps[id].n) || 'Unknown map';
 
-  /* ----- layout ----- */
+  /* ----- layout: big buttons down the left with what reads the game and the map under them; on the right this session
+     in one slim line (its card, potions and charts fold away under Session details, since the pop out is the live view)
+     and all time, every saved session added up, filling the rest ----- */
   const status = el('p', { class: 'g-status', id: 'g-status' });
   const shareArea = el('div', { id: 'g-sharearea' });
-  const newBtn = el('button', { type: 'button', id: 'g-new', onclick: () => newSession() }, 'New session');
-  // the next frame from the share comes down as a picture, to send when something reads wrong
-  const snapBtn = el('button', { type: 'button', id: 'g-snap', onclick: () => { st.wantSnap = true; setStatus('Saving the next frame from your game…'); } }, 'Save a frame');
-  // the quick reset: look for the bars, measure and name the potions again, keeping the session
-  const refindBtn = el('button', { type: 'button', id: 'g-refind', onclick: () => refind() }, 'Find my game again');
+  const btn = (id, icon, label, onclick) => el('button', { type: 'button', id, class: 'g-btn', onclick }, el('i', { 'aria-hidden': 'true' }, icon), label);
+  const popBtn = btn('g-pop', '⧉', 'Pop out over the game', () => popOut());
   // a fresh average from now on, to try another way of grinding; the session average keeps going
-  const markBtn = el('button', { type: 'button', id: 'g-mark', onclick: () => resetAverage() }, 'Reset average');
+  const markBtn = btn('g-mark', '↺', 'Reset average', () => resetAverage());
+  // the quick reset: look for the bars, measure and name the potions again, keeping the session
+  const refindBtn = btn('g-refind', '⌖', 'Find my game again', () => refind());
+  const newBtn = btn('g-new', '＋', 'New session', () => newSession());
+  // the next frame from the share comes down as a picture, to send when something reads wrong
+  const snapBtn = btn('g-snap', '◉', 'Save a frame', () => { st.wantSnap = true; setStatus('Saving the next frame from your game…'); });
   const HEALTH = [['exp', 'EXP'], ['level', 'Level'], ['potions', 'Potions'], ['mesos', 'Mesos']];
   const SIGN = { ok: '✓', wait: '!', bad: '✕', idle: '·' };
   const CHECKS = [['exp', 'EXP line'], ['size', 'Game size'], ['level', 'Level'], ['potions', 'Potions'], ['mesos', 'Mesos']];
@@ -133,22 +187,22 @@ function mount(root, deps) {
   const check = el('ul', { class: 'g-check', id: 'g-check' }, CHECKS.map(([k, label]) => el('li', { 'data-k': k }, el('b', {}, label), el('span', {}, 'Looking…'))));
   const V = {};
   const row = (k, label, strong) => el('div', { class: 'g-row' }, strong ? el('b', {}, label) : el('span', {}, label), V[k] = el(strong ? 'b' : 'span', {}, '·'));
+  V.pill = el('div', { class: 'g-pill idle', id: 'g-pill' }, el('i', { class: 'g-pdot' }), V.pillText = el('span', {}, 'Not sharing yet'));
+  const steps = el('ol', { class: 'g-steps' }, ['Pick the MapleStory window', 'Grind, nothing to type', 'Open your inventory now and then for mesos'].map(t => el('li', {}, t)));
+  V.health = el('div', { class: 'g-health', id: 'g-health' }, HEALTH.map(([k]) => el('span', { class: 'g-hc wait', 'data-k': k })));
+  // the one thing to do, only when something needs you
+  V.nudge = el('div', { class: 'g-nudge idle', id: 'g-nudge', hidden: '' }, 'Share the game window to start');
+  // a big jump between peeks: a trade or a big buy isn't grinding, so it asks
+  V.trade = el('div', { class: 'g-nudge wait', id: 'g-trade', hidden: '' }, V.tradeQ = el('span', {}), ' ',
+    el('button', { type: 'button', id: 'g-tradeyes', onclick: () => answerJump(true) }, 'Leave it out'), ' ',
+    el('button', { type: 'button', id: 'g-tradeno', onclick: () => answerJump(false) }, 'Keep it'));
   const card = el('div', { class: 'g-card', id: 'g-card' },
     el('div', { class: 'g-kpis' },
       el('div', {}, el('div', { class: 'g-lbl' }, 'EXP per hour'), V.expHr = el('div', { class: 'g-big', id: 'g-exphr' }, '·')),
       el('div', { id: 'g-mesokpi' }, el('div', { class: 'g-lbl' }, 'Mesos earned'), V.mesoBig = el('div', { class: 'g-big' }, '·'),
         V.mesoSub = el('div', { class: 'g-sub' }, 'Open your inventory now and then to start counting'))),
-    V.health = el('div', { class: 'g-health', id: 'g-health' }, HEALTH.map(([k]) => el('span', { class: 'g-hc wait', 'data-k': k }))),
-    V.nudge = el('div', { class: 'g-nudge idle', id: 'g-nudge' }, 'Share the game window to start'),
     V.sub = el('div', { class: 'g-sub' }, 'Share the game window to start'), V.pace = el('div', { class: 'g-sub', id: 'g-pace' }), V.next = el('div', { class: 'g-sub' }),
-    el('div', { class: 'g-cd', id: 'g-cd' }, V.cdIcon = el('img', { alt: '', hidden: '' }),
-      el('div', {}, V.cdLabel = el('div', { class: 'g-lbl' }, 'Potions out in'), V.clock = el('div', { class: 'g-clock' }, '··:··'),
-        V.cdSub = el('div', { class: 'g-sub' }, 'Starts once you drink a few potions'), V.low = el('div', { class: 'g-low', hidden: '' }))),
     V.verdict = el('div', { class: 'g-verdict', id: 'g-verdict', hidden: '' }), V.mesos = el('div', { class: 'g-sub', id: 'g-mesos' }, 'Mesos: open your inventory now and then to count them'),
-    // a big jump between peeks: a trade or a big buy isn't grinding, so it asks
-    V.trade = el('div', { class: 'g-nudge wait', id: 'g-trade', hidden: '' }, V.tradeQ = el('span', {}), ' ',
-      el('button', { type: 'button', id: 'g-tradeyes', onclick: () => answerJump(true) }, 'Leave it out'), ' ',
-      el('button', { type: 'button', id: 'g-tradeno', onclick: () => answerJump(false) }, 'Keep it')),
     V.tradeBox = el('div', { class: 'g-tradebox', id: 'g-tradebox' }, el('button', { type: 'button', class: 'linkish', id: 'g-tradebtn', onclick: () => openTrade() }, 'Leave out a trade')),
     row('gain', 'EXP gained'), row('time', 'Time'), row('kpm', 'Kills a minute'), row('pots', 'Potions used'),
     row('costHr', 'Potions an hour', true), row('per1', 'Cost per 1%', true),
@@ -190,10 +244,9 @@ function mount(root, deps) {
   const mapSel = el('select', { id: 'g-map', 'aria-label': 'Map', onchange: () => { mapId = +mapSel.value; store.set(KEY_MAP, String(mapId)); if (session) session.mapId = mapId; showMap(); render(); } },
     Object.keys(data.maps).sort((a, b) => mapName(a).localeCompare(mapName(b))).map(id => el('option', { value: id }, mapName(id))));
   mapSel.value = String(mapId);
-  const mobs = el('tbody', {}), mapNote = el('p', { class: 'g-note' });
+  const mobs = el('ul', { class: 'g-mobs' }), mapNote = el('p', { class: 'g-note' });
+  card.append(mapNote);   // it explains Kills a minute, a row on the card
   const sessions = el('div', { class: 'g-sess', id: 'g-sessions' });
-  const popBtn = el('button', { type: 'button', id: 'g-pop', onclick: () => popOut() }, 'Pop out over the game');
-  const tiles = el('div', { class: 'g-tiles', id: 'g-tiles' });
   const chartA = el('div', { id: 'g-chart-a', class: 'g-chart' }), chartB = el('div', { id: 'g-chart-b', class: 'g-chart' }), heat = el('div', { id: 'g-heat', class: 'g-chart' });
   const tip = el('div', { id: 'g-tip', class: 'g-tip', hidden: '' });
   const table = el('table', { class: 'b-table', id: 'g-table', hidden: '' },
@@ -201,7 +254,6 @@ function mount(root, deps) {
   const tableBtn = el('button', { type: 'button', id: 'g-showtable', class: 'linkish', onclick: () => { table.hidden = !table.hidden; tableBtn.textContent = table.hidden ? 'Show as table' : 'Hide the table'; render(); } }, 'Show as table');
   const partyCompare = el('p', { class: 'g-note', id: 'g-party-compare' });
   const charts = el('div', { class: 'g-charts', id: 'g-charts' },
-    el('h3', {}, 'Right now'), tiles,
     el('h3', {}, 'EXP every minute'), chartA,
     el('h3', {}, 'Potions every minute'), chartB,
     el('h3', {}, 'The whole session'), heat, tableBtn, el('div', { class: 'g-scroll' }, table), partyCompare, tip);
@@ -218,17 +270,52 @@ function mount(root, deps) {
     ready.hidden = !all; check.hidden = all && !checkOpen;
     readyText.textContent = '✓ Reading your game · Level ' + st.level + ' · ' + namedCount + ' potion' + (namedCount === 1 ? '' : 's') + ' · ' + (st.mesos != null ? fmt(st.mesos) + ' mesos' : st.mesoUnclear ? 'mesos unclear' : 'open your inventory for mesos');
   }
+  // this session: one slim line, and its details (the card, the potions with their prices, the charts) folded away until
+  // asked for (kept on the device); a saved session opened from the list always shows them
+  V.now = el('div', { class: 'g-nowv' });
+  let detailOpen = store.get(KEY_DETAIL) === '1';
+  const moreBtn = el('button', { type: 'button', id: 'g-more', class: 'g-more', 'aria-controls': 'g-detail', onclick: () => { detailOpen = !detailOpen; store.set(KEY_DETAIL, detailOpen ? '1' : ''); showDetail(); } }, 'Session details');
+  const detail = el('div', { class: 'g-detail', id: 'g-detail', hidden: '' }, viewBar,
+    el('div', { class: 'g-dgrid' }, card, el('div', { class: 'g-dpots' }, el('h3', {}, 'Potions'), el('div', { class: 'g-scroll' }, pots),
+      el('p', { class: 'g-note' }, 'Keep every potion you drink on a quickslot (the hotkey grid at the bottom right): a count going down is a potion drunk, a count jumping up is a refill. Each one is matched to the game\'s own potion picture. Prices start at 10 times what the NPC pays (a Lemon is 150); tap a price to set what you really paid, and refills you already made follow it.'))),
+    charts);
+  function showDetail() {
+    const open = detailOpen || !!viewing;
+    detail.hidden = !open;
+    moreBtn.setAttribute('aria-expanded', String(open)); moreBtn.textContent = open ? 'Hide details' : 'Session details';
+  }
+  // all time: Lemons and Meat first (by the client's own pictures), then the totals, the maps, personal bests and the days
+  const LEMON_IDS = Object.keys(data.potions).filter(id => data.potions[id][0] === 'Lemon').map(Number);
+  const MEAT_IDS = Object.keys(data.potions).filter(id => data.potions[id][0] === 'Meat').map(Number);
+  const picOf = ids => pictures.Icons[ids.find(id => pictures.Icons[id])];
+  const LF = {};
+  const trophy = (k, label, ids) => {
+    const t = { pic: picOf(ids) };
+    t.el = el('div', { class: 'g-trophy g-t-' + k }, t.pic ? el('img', { class: 'g-tico', src: t.pic, alt: '' }) : null,
+      el('div', { class: 'g-tbody' }, el('div', { class: 'g-tl' }, label), t.n = el('div', { class: 'g-tn' }, '0'), t.sub = el('div', { class: 'g-ts' }), t.row = el('div', { class: 'g-trow' })));
+    return t;
+  };
+  LF.lemon = trophy('lemon', 'Lemons eaten', LEMON_IDS); LF.meat = trophy('meat', 'Meat eaten', MEAT_IDS);
+  const life = el('section', { class: 'g-life', id: 'g-life' },
+    el('div', { class: 'g-lhead' }, el('h3', {}, 'All time'), LF.since = el('span', {})),
+    el('div', { class: 'g-trophies' }, LF.lemon.el, LF.meat.el),
+    LF.other = el('p', { class: 'g-note' }),
+    LF.tots = el('div', { class: 'g-tots' }),
+    el('div', { class: 'g-lgrid' },
+      el('div', { class: 'g-lcard' }, el('h4', {}, 'Most trained maps'), LF.maps = el('div', { id: 'g-maps' })),
+      el('div', { class: 'g-lcard' }, el('h4', {}, 'Personal bests'), LF.bests = el('div', { class: 'g-bests', id: 'g-bests' }))),
+    el('div', { class: 'g-lgrid g-lgrid2' },
+      el('div', { class: 'g-lcard' }, el('h4', {}, 'Days you grinded'), LF.days = el('div', { class: 'g-days', id: 'g-days' }), LF.daysNote = el('p', { class: 'g-note' })),
+      el('div', { class: 'g-lcard' }, el('h4', {}, 'Your sessions'), sessions)));
   root.replaceChildren(
     el('h2', {}, 'Grind'),
-    el('p', { class: 'g-lead' }, 'Share the game window and grind. Your EXP, level and potions read themselves, nothing to type. Open your inventory now and then and your mesos count too.'),
-    shareArea, status,
-    el('div', { class: 'g-top' }, el('div', {}, card, el('div', { class: 'r-bar', style: 'margin-top:10px' }, popBtn, markBtn, refindBtn, newBtn, snapBtn)), el('div', {}, ready, check, viewBar)),
-    charts,
-    el('h3', {}, 'Potions'), el('div', { class: 'g-scroll' }, pots),
-    el('p', { class: 'g-note' }, 'Keep every potion you drink on a quickslot (the hotkey grid at the bottom right): a count going down is a potion drunk, a count jumping up is a refill. Each one is matched to the game\'s own potion picture. Prices start at 10 times what the NPC pays (a Lemon is 150); tap a price to set what you really paid, and refills you already made follow it.'),
-    el('h3', {}, 'This map'), mapSel, el('div', { class: 'g-scroll', style: 'margin-top:10px' },
-      el('table', { class: 'b-table' }, el('thead', {}, el('tr', {}, ['Monster', 'Lv', 'EXP', 'HP', 'On map', ''].map((h, i) => el('th', i && i < 5 ? { class: 'n' } : {}, h)))), mobs)), mapNote,
-    el('h3', {}, 'Your sessions'), sessions,
+    el('p', { class: 'g-lead' }, 'Share the game window and grind: your EXP, level and potions read themselves, nothing to type. Pop it out over the game for the live numbers; this page keeps your record.'),
+    el('div', { class: 'g-page' },
+      el('aside', { class: 'g-rail', id: 'g-rail' }, el('div', { class: 'g-railin' },
+        el('div', { class: 'g-box g-acts' }, V.pill, shareArea, steps, popBtn, markBtn, refindBtn, newBtn, snapBtn),
+        el('div', { class: 'g-box' }, el('div', { class: 'g-boxh' }, 'Reading'), V.health, ready, check),
+        el('div', { class: 'g-box' }, el('div', { class: 'g-boxh' }, 'This map'), mapSel, mobs))),
+      el('div', { class: 'g-main' }, status, V.nudge, V.trade, el('div', { class: 'g-now', id: 'g-now' }, V.now, moreBtn), detail, life)),
     el('p', { class: 'g-note' }, 'Item and UI pictures are from MapleStory, which belongs to Nexon.'), strip);
 
   const setStatus = msg => { status.textContent = msg; };
@@ -341,6 +428,8 @@ function mount(root, deps) {
 
   /* ----- saving ----- */
   const signedIn = () => !!(deps.session && deps.session());
+  const keepLocal = r => jset(KEY_LOCAL, [r].concat(jget(KEY_LOCAL, []).filter(x => x.id !== r.id)).slice(0, LOCAL_MAX)
+    .map((x, i) => i < LOCAL_MINUTES || !x.minutes ? x : Object.assign({}, x, { minutes: undefined })));
   function save(force) {
     if (!session) return Promise.resolve();
     const now = Date.now();
@@ -349,12 +438,11 @@ function mount(root, deps) {
     jset(KEY_OPEN, session);
     const row = GS().toRow(session);
     if (!signedIn()) {
-      jset(KEY_LOCAL, [row].concat(jget(KEY_LOCAL, []).filter(r => r.id !== row.id)).slice(0, 50));
+      keepLocal(row);
       listSessions();
       return Promise.resolve();
     }
     // a row the account didn't take is kept on the device too, so starting a new session can't lose it
-    const keepLocal = r => jset(KEY_LOCAL, [r].concat(jget(KEY_LOCAL, []).filter(x => x.id !== r.id)).slice(0, 50));
     return api.saveGrind(row).then(() => { jset(KEY_LOCAL, jget(KEY_LOCAL, []).filter(x => x.id !== row.id)); listSessions(); },
       e => { keepLocal(row); listSessions(); setStatus('Saved on this device only, your account didn\'t take it (' + e.message + '). It tries again in a minute.'); });
   }
@@ -406,7 +494,7 @@ function mount(root, deps) {
 
   /* ----- the share ----- */
   const capture = window.Reader.capture(shareArea, { el, prefix: 'g-', raw: true, limit: 0, keepWhenHidden: true, full: true, drop: false, every: 1500,
-    copy: { share: 'Share game window' },
+    copy: { share: 'Share game window', stop: 'Stop sharing' },
     onImage: frame, say: setStatus,
     onState: (state, why) => {
       st.sharing = state === 'sharing'; render();
@@ -414,6 +502,10 @@ function mount(root, deps) {
       setStatus(why === 'denied' ? 'Sharing was turned down. Press Share game window to try again.' : 'Stopped. This session is kept, share again to carry on.');
       save(true);
     } });
+  // before sharing, Share game window is the one to press; Stop sits at the bottom of the buttons
+  for (const b of shareArea.querySelectorAll('button')) b.classList.add('g-btn');
+  const shareBtn = shareArea.querySelector('#g-share');
+  if (shareBtn) shareBtn.classList.add('go');
 
   /* ----- drawing ----- */
   function render() {
@@ -422,8 +514,11 @@ function mount(root, deps) {
     if (viewing) V.viewing.textContent = 'Looking at ' + mapName(viewing.mapId) + ', ' + dateOf(viewing.t0);
     if (!editing) renderPots(s);
     renderHealth();
+    showDetail();
+    // while sharing, Pop out is the one to press, and the three steps under Share game window go
+    popBtn.classList.toggle('go', st.sharing); steps.hidden = st.sharing;
     charts.hidden = !s;
-    if (!s) { fitStrip(); return; }
+    if (!s) { renderNow(null); fitStrip(); return; }
     const t = viewing ? s.tLast : Date.now(), o = GS().stats(s, t, avgExp(s.mapId || mapId));
     V.expHr.textContent = o.expHr != null ? fmtK(o.expHr) : '·';
     V.sub.textContent = o.expMin != null ? fmt(o.expMin) + ' a minute · ' + o.pctHr.toFixed(2) + '% an hour' : 'Needs 2 minutes of EXP first';
@@ -438,13 +533,15 @@ function mount(root, deps) {
     V.costHr.textContent = o.costHr != null ? fmtK(o.costHr) : '·';
     V.per1.textContent = o.per1 != null ? fmtK(o.per1) : '·';
     V.level.textContent = s.level ? s.level + (s.last ? ' · ' + s.last.pct.toFixed(2) + '%' : '') : '·';
-    renderCountdown(s, t);
     const mains = mainPotions(s, o), main = mains[0] || null, second = mains[1] || null;
     V.perPotL.textContent = (main ? plural(main.name) : 'Potions') + ' per 1%';
     V.perPot.textContent = main && o.perPct[main.id] != null ? perFmt(o.perPct[main.id]) : '·';
     V.perPot2Row.hidden = !second;
     if (second) { V.perPot2L.textContent = plural(second.name) + ' per 1%'; V.perPot2.textContent = o.perPct[second.id] != null ? perFmt(o.perPct[second.id]) : '·'; }
     renderMesos(s, o);
+    renderNow(s, o, mains);
+    // all time follows the running session, so its Lemons never trail this session's line by a minute of saves
+    if (!viewing && Date.now() - lifeAt > 5000) renderLife();
     renderStrip(s, o, mains);
     fitStrip();
     renderCharts(s, t, o);
@@ -477,14 +574,21 @@ function mount(root, deps) {
     });
   }
 
-  /* ----- is it reading everything: checks on the card, the one thing to do, and the strip's dots ----- */
+  /* ----- is it reading everything: the pill and checks down the left, the one thing to do, and the strip's dots ----- */
   function renderHealth() {
     const s = session;
     const h = lastHealth = health({ t: Date.now(), sharing: st.sharing, hasSession: !!s, exp: st.h.exp, level: st.h.level, levelNow: st.level,
       size: st.h.size, counts: st.h.counts, potNone: st.potNone, potCount: st.potCount,
       meso: { at: s && s.meso && s.meso.last ? s.meso.last.t : null, unclear: !!(st.mesoOpen && st.mesoUnclear) } });
-    // a saved session being looked at isn't live, so its card has no checks
-    V.health.hidden = V.nudge.hidden = !!viewing;
+    // the pill over the buttons goes by what the core numbers need (mesos only ever ask)
+    const core = ['exp', 'level', 'potions'].map(k => h.checks[k].state);
+    const ps = !st.sharing ? 'idle' : core.includes('bad') ? 'bad' : core.every(x => x === 'ok') ? 'ok' : 'wait';
+    V.pill.className = 'g-pill ' + ps;
+    // the chips only mean something once the game is shared; before that the pill says so
+    V.health.hidden = !st.sharing;
+    V.pillText.textContent = ps === 'idle' ? (s ? 'Share stopped' : 'Not sharing yet') : ps === 'bad' ? "Can't read your game" : ps === 'ok' ? 'Reading · Lv ' + (st.level || '·') : 'Looking for your game…';
+    // the one thing to do, only when there is one (a saved session being looked at isn't live)
+    V.nudge.hidden = !!viewing || h.nudge.state === 'ok' || (h.nudge.state === 'idle' && !s);
     for (const [k, label] of HEALTH) {
       const c = h.checks[k], e = V.health.querySelector('[data-k="' + k + '"]');
       e.className = 'g-hc ' + c.state; e.textContent = SIGN[c.state] + ' ' + label + ' ' + c.text;
@@ -572,7 +676,7 @@ function mount(root, deps) {
     if (tall > w.innerHeight) strip.style.fontSize = Math.max(8, f * w.innerHeight / tall) + 'px';
   }
 
-  /* ----- charts: A EXP every minute, B potions every minute, C runway tiles, D the minute heatmap ----- */
+  /* ----- charts: A EXP every minute, B potions every minute, D the minute heatmap ----- */
   const NS = 'http://www.w3.org/2000/svg', W = 640, X0 = 44, X1 = 632;
   function svg(tag, attrs, ...kids) {
     const e = document.createElementNS(NS, tag);
@@ -654,21 +758,6 @@ function mount(root, deps) {
     for (const m of ms) b.append(svg('rect', { x: X0 + m.m * bw, y: 0, width: bw, height: HB - 20, class: 'g-hit', 'data-m': m.m }));
     const legend = series.length >= 2 ? el('div', { class: 'g-legend' }, series.map(se => el('span', {}, el('i', { style: 'background:' + se.color }), se.name))) : null;
     chartB.replaceChildren(b, legend || el('p', { class: 'g-note' }, series.length ? series[0].name : 'No potions drunk yet.'));
-    // C
-    const live = !viewing, cdNow = live ? GS().countdown(s, t) : null, last = ms.length > 1 ? ms[ms.length - 2] : null;
-    const tile = (label, value, sub) => el('div', { class: 'g-tile' }, el('div', { class: 'g-lbl' }, label), el('div', { class: 'g-tv' }, value), el('div', { class: 'g-sub' }, sub));
-    const thisMin = last && avg ? Math.round((last.exp / avg - 1) * 100) : null;
-    const pm = n => (n >= 0 ? '+' : '−') + fmt(Math.abs(n));
-    tiles.replaceChildren(
-      // the big numbers live here too, so the page keeps them while the card is popped out over the game
-      tile('EXP per hour', o.expHr != null ? fmtK(o.expHr) : '·', o.expMin != null ? fmt(o.expMin) + ' a minute' : 'needs 2 minutes'),
-      tile('Mesos earned', o.mesosEarned != null ? pm(o.mesosEarned) : '·', o.mesosHr != null ? fmtK(o.mesosHr) + ' an hour' : 'open your inventory now and then'),
-      tile('Profit', o.profit != null ? pm(o.profit) : '·', o.profitHr != null ? (o.profitHr >= 0 ? '▲ ' : '▼ ') + fmtK(Math.abs(o.profitHr)) + ' an hour' : 'mesos + etc − potions'),
-      tile('Potions an hour', o.costHr != null ? fmtK(o.costHr) : '·', o.potUsed ? fmt(o.potUsed) + ' drunk · ' + fmtK(o.potCost) : 'none yet'),
-      tile(cdNow && !cdNow.measuring ? plural(cdNow.name) + ' out in' : 'Potions out in', cdNow && !cdNow.measuring ? clock((cdNow.doneAt - Date.now()) / 1000) : '·', cdNow && !cdNow.measuring ? fmt(cdNow.left) + ' left' : cdNow ? 'measuring' : 'once you drink'),
-      tile('Next level at', o.hrsToLevel != null ? timeOfDay(t + o.hrsToLevel * 3600000) : '·', o.hrsToLevel != null ? fmtDur(o.hrsToLevel * 60) + ' at this pace' : 'needs 2 minutes'),
-      tile('Last minute', last ? fmt(last.exp) + ' EXP' : '·', thisMin == null ? '·' : Math.abs(thisMin) < 1 ? 'right on your average' : Math.abs(thisMin) + '% ' + (thisMin > 0 ? 'above' : 'below') + ' your average'),
-      tile('Party', st.party && live ? (st.party === 1 ? 'Solo' : st.party + ' of you') : ms.length && ms[ms.length - 1].party ? (ms[ms.length - 1].party === 1 ? 'Solo' : ms[ms.length - 1].party + ' of you') : '·', 'counted from the party list'));
     // D
     const CELL = 22, GAP = 3, rows = Math.max(1, Math.ceil(ms.length / 10)), maxD = Math.max(1, ...ms.map(m => m.exp));
     const d = svg('svg', { viewBox: `0 0 ${76 + 10 * (CELL + GAP)} ${rows * (CELL + GAP) + 4}`, role: 'img', 'aria-label': 'EXP by minute', style: 'max-width:340px' });
@@ -757,21 +846,9 @@ function mount(root, deps) {
       V.verdict.textContent = (up ? '▲ Profit +' : '▼ Loss −') + fmt(Math.abs(o.profit)) + (o.profitHr != null ? ' · ' + fmtK(Math.abs(o.profitHr)) + ' an hour' : '');
     }
   }
-  function renderCountdown(s, t) {
-    cd = viewing ? null : GS().countdown(s, t);
-    const real = cd && !cd.measuring;
-    V.cdIcon.hidden = !real;
-    if (real && pictures.Icons[cd.id]) V.cdIcon.src = pictures.Icons[cd.id];
-    V.cdLabel.textContent = real ? plural(cd.name) + ' out in' : 'Potions out in';
-    V.clock.textContent = real ? clock((cd.doneAt - Date.now()) / 1000) : cd && cd.measuring ? 'Measuring…' : '··:··';
-    V.cdSub.textContent = real ? fmt(cd.left) + ' left · done around ' + timeOfDay(cd.doneAt) : cd && cd.measuring ? 'Give it 2 minutes of drinking' : 'Starts once you drink a few potions';
-    V.low.hidden = !(real && cd.low);
-    V.low.textContent = real ? '⚠ ' + plural(cd.name) + ' almost out' : '';
-  }
-  // the clock ticks every second between frames
+  // the pop out's clocks tick every second between frames
   const ticker = setInterval(() => {
     if (!root.isConnected) { clearInterval(ticker); return; }
-    if (cd && !cd.measuring) V.clock.textContent = clock((cd.doneAt - Date.now()) / 1000);
     if (!strip.hidden) {
       renderLemon(Date.now());
       const b2 = SP.mini.querySelector('.g-c2 b'), c2 = (SP.ticks || [])[1];
@@ -809,18 +886,39 @@ function mount(root, deps) {
   }
 
   function showMap() {
-    mobs.replaceChildren(...mobsOf(mapId).map(m => el('tr', {}, el('td', {}, m.name), el('td', { class: 'n' }, String(m.level)), el('td', { class: 'n' }, fmt(m.exp)),
-      el('td', { class: 'n' }, fmt(m.hp)), el('td', { class: 'n' }, String(m.count)), el('td', {}, m.undead ? el('span', { class: 'g-chip' }, 'undead · Heal hits it') : null))));
+    mobs.replaceChildren(...mobsOf(mapId).map(m => el('li', {}, el('b', {}, m.name), ' Lv ' + m.level + ' · ' + fmt(m.exp) + ' EXP · ' + fmt(m.hp) + ' HP · ' + m.count + ' here',
+      m.undead ? el('span', { class: 'g-chip' }, 'undead · Heal hits it') : null)));
     const a = avgExp(mapId);
     mapNote.textContent = a ? 'From the game\'s own data. Kills a minute is your EXP a minute ÷ ' + Math.round(a) + ', the average EXP a kill here, so it reads low while a party member shares your EXP.' : '';
   }
 
-  /* ----- saved sessions ----- */
+  /* ----- this session in one slim line: EXP an hour, EXP gained, the main potion drunk, mesos and the time ----- */
+  const iconOf = (id, name) => pictures.Icons[id] ? el('img', { src: pictures.Icons[id], alt: name }) : null;
+  const usedOf = (s, id) => Object.values(s.slots).concat(s.retired || []).filter(x => String(x.id) === String(id)).reduce((a, x) => a + x.used, 0);
+  const shortMap = id => mapName(id).replace(/^.*? : /, '');
+  function renderNow(s, o, mains) {
+    const k = (cls, v, label) => el('span', { class: 'g-nk ' + cls }, el('b', {}, v), label ? ' ' + label : '');
+    if (!s) {
+      V.now.replaceChildren(el('span', { class: 'g-nl' }, 'This session'), el('span', { class: 'g-nm' }, st.sharing ? 'It starts with your next EXP' : 'Share the game window to start one'));
+      moreBtn.hidden = true; return;
+    }
+    const main = mains[0];
+    V.now.replaceChildren(...[el('span', { class: 'g-nl' }, viewing ? 'Looking at ' + shortMap(viewing.mapId) + ', ' + dateOf(viewing.t0) : 'This session'),
+      k('y', o.expHr != null ? fmtK(o.expHr) : '·', 'EXP an hour'), k('b', fmt(o.exp), 'EXP'),
+      main ? el('span', { class: 'g-nk l' }, iconOf(main.id, main.name), el('b', {}, fmt(usedOf(s, main.id))), ' ' + plural(main.name)) : null,
+      o.mesosEarned != null ? k('g', (o.mesosEarned >= 0 ? '+' : '−') + fmtK(Math.abs(o.mesosEarned)), 'mesos') : null,
+      k('t', fmtDur(o.mins))].filter(Boolean));
+    moreBtn.hidden = !!viewing;
+  }
+
+  /* ----- saved sessions, and all time from them ----- */
   function listSessions() {
     // signed in: the account's sessions plus any the account didn't take yet, which are kept on this device
     const local = jget(KEY_LOCAL, []);
     const got = signedIn() ? api.listGrind().catch(() => []).then(rows => rows.concat(local.filter(l => !rows.some(r => r.id === l.id)))) : Promise.resolve(local);
     return got.then(rows => {
+      lastRows = rows;
+      renderLife();
       if (!rows.length) { sessions.replaceChildren(el('p', { class: 'g-note' }, signedIn() ? 'No saved sessions yet.' : 'No sessions yet. Signed out, they stay on this device.')); return; }
       const byMap = {};
       for (const r of rows) (byMap[r.map_id] = byMap[r.map_id] || []).push(r);
@@ -834,8 +932,52 @@ function mount(root, deps) {
     });
   }
   function openSession(r) {
-    const full = r.minutes ? Promise.resolve(r) : api.getGrind(r.id);
-    return full.then(row => { viewing = GS().fromRow(row); render(); }, e => setStatus("Couldn't open that session (" + e.message + ').'));
+    // older sessions kept on this device have no minutes any more: they open without charts
+    const full = r.minutes || jget(KEY_LOCAL, []).some(x => x.id === r.id) ? Promise.resolve(r) : api.getGrind(r.id);
+    return full.then(row => { viewing = GS().fromRow(row); render(); detail.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, e => setStatus("Couldn't open that session (" + e.message + ').'));
+  }
+  // all time: the listed sessions with the running one as it is now (its last save swapped for the live numbers)
+  function renderLife() {
+    lifeAt = Date.now();
+    let rows = lastRows;
+    if (session) {
+      try { const r = GS().toRow(session); rows = rows.filter(x => x.id !== r.id).concat(r.active_min > 0 ? [r] : []); } catch (e) { /* not started yet */ }
+    }
+    const L = lifetime(rows, { now: Date.now(), lemon: LEMON_IDS, meat: MEAT_IDS });
+    LF.since.textContent = 'since you started tracking' + (signedIn() ? '' : ', on this device') + ' · ' + L.sessions + ' session' + (L.sessions === 1 ? '' : 's');
+    const fill = (t, g, name, glass) => {
+      t.n.textContent = fmt(g.used);
+      t.sub.textContent = g.used ? fmtK(g.cost) + ' mesos of ' + glass + (g.per1 != null ? ' · about ' + perFmt(g.per1) + ' for every 1%' : '') : 'None yet. Every one you drink counts here';
+      // a little picture for every 1,000, the way the game would stack them
+      const k = Math.floor(g.used / 1000);
+      t.row.replaceChildren(...(k && t.pic ? Array.from({ length: Math.min(k, 20) }, () => el('img', { src: t.pic, alt: '' })) : []),
+        k ? (k > 20 ? ' +' + (k - 20) + ' · ' : ' ') + 'one for every 1,000' : fmt(1000 - g.used) + ' more to your first 1,000');
+    };
+    fill(LF.lemon, L.lemon, 'Lemon', 'lemonade'); fill(LF.meat, L.meat, 'Meat', 'Meat');
+    LF.other.textContent = L.other.used ? 'Plus ' + fmt(L.other.used) + ' other potions, ' + fmtK(L.other.cost) + ' mesos of them.' : '';
+    const tot = (label, v, sub, cls) => el('div', { class: 'g-tot' }, el('div', { class: 'g-lbl' }, label), el('div', { class: 'g-tv ' + (cls || '') }, v), el('div', { class: 'g-tsub' }, sub));
+    const hrs = L.mins / 60, levels = L.levelFrom != null && L.levelTo != null;
+    LF.tots.replaceChildren(
+      tot('Hours grinded', fmtDur(L.mins), L.days ? 'over ' + L.days + ' day' + (L.days === 1 ? '' : 's') : 'none yet'),
+      tot('EXP gained', fmtK(L.exp), hrs ? fmtK(L.exp / hrs) + ' an hour on average' : '·', 'b'),
+      tot('Levels gained', levels ? String(L.levelTo - L.levelFrom) : '·', levels ? L.levelFrom + ' → ' + L.levelTo : '·', 'y'),
+      tot('Mesos earned', L.mesos != null ? (L.mesos >= 0 ? '+' : '−') + fmtK(Math.abs(L.mesos)) : '·',
+        L.profit != null ? (L.profit >= 0 ? '+' : '−') + fmtK(Math.abs(L.profit)) + ' after potions' : 'open your inventory while you grind', 'g'),
+      tot('Deaths', String(L.deaths), L.deaths ? 'one every ' + fmtDur(L.mins / L.deaths) : L.sessions ? 'none yet' : '·'));
+    const top = L.maps.slice(0, 5), most = top.length ? top[0].mins || 1 : 1;
+    LF.maps.replaceChildren(...(top.length ? top.map((m, i) => el('div', { class: 'g-mrow' }, el('span', { class: 'g-rk' }, String(i + 1)),
+      el('div', {}, el('b', {}, shortMap(m.id)), el('div', { class: 'g-barw' }, el('i', { style: 'width:' + Math.max(2, Math.round(100 * m.mins / most)) + '%' }))),
+      el('div', { class: 'g-mr' }, fmtDur(m.mins), el('small', {}, m.expHr != null ? fmtK(m.expHr) + ' an hour' : '·'))))
+      : [el('p', { class: 'g-note' }, 'Your maps show up after your first session. They go by the map picked under This map.')]));
+    const when = r => shortMap(r.map_id) + ' · ' + new Date(Date.parse(r.started_at)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const best = (label, b, v) => b ? el('div', { class: 'g-bi' }, el('span', {}, label, el('small', {}, when(b.row))), el('b', {}, v(b.v))) : null;
+    const bests = [best('Best EXP an hour', L.best.expHr, fmtK), best('Longest session', L.best.longest, fmtDur),
+      best('Most Lemons in one go', L.best.lemons, fmt), best('Cheapest 1%', L.best.cheap1, fmtK)].filter(Boolean);
+    LF.bests.replaceChildren(...(bests.length ? bests : [el('p', { class: 'g-note' }, 'Your bests show up after a session of 10 minutes or more.')]));
+    const shade = m => !m ? 0 : m < 60 ? 1 : m < 150 ? 2 : 3;
+    LF.days.replaceChildren(...L.daysList.map(d => el('i', { class: 'g-d' + shade(d.mins), 'data-day': d.date,
+      title: new Date(d.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + (d.mins ? ' · ' + fmtDur(d.mins) : ' · no grinding') })));
+    LF.daysNote.textContent = 'The last 30 days, darker is more time.' + (L.streak > 1 ? ' Best streak: ' + L.streak + ' days in a row.' : '');
   }
 
   showMap(); render(); listSessions();
@@ -844,5 +986,5 @@ function mount(root, deps) {
     save: () => save(true), load: row => { viewing = GS().fromRow(row); render(); }, capture: () => capture, mesoLine };
 }
 
-window.Grind = { mount, fmtK, clock, health, lemonTile };
+window.Grind = { mount, fmtK, clock, health, lemonTile, lifetime };
 })();
