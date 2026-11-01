@@ -412,7 +412,8 @@ function mount(root, deps) {
     V.pace.textContent = paceParts(o, true).map(p => p.label + ' ' + p.value + (p.vs ? ' ' + p.vs : '') + (p.extra ? ' · ' + p.extra : '')).join(' · ');
     V.next.textContent = o.hrsToLevel != null ? 'Level ' + ((s.level || 0) + 1) + ' at ' + timeOfDay(t + o.hrsToLevel * 3600000) + ', in ' + fmtDur(o.hrsToLevel * 60) : '';
     V.gain.textContent = fmt(o.exp) + ' · ' + o.pct.toFixed(2) + '%' + (o.deaths ? ' · ' + deathText(o) : '');
-    V.time.textContent = fmtDur(o.mins);
+    // the clock runs only while the EXP bar is read; time left out for a pause says so, to square with a stopwatch
+    V.time.textContent = fmtDur(o.mins) + (o.pausedMins >= 1 ? ' · ' + fmtDur(o.pausedMins) + ' paused, not counted' : '');
     V.kpm.textContent = o.kpm != null ? 'about ' + o.kpm.toFixed(1) : '·';
     V.pots.textContent = o.potUsed ? fmt(o.potUsed) + ' · ' + fmtK(o.potCost) : '·';
     V.costHr.textContent = o.costHr != null ? fmtK(o.costHr) : '·';

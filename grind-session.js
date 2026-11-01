@@ -94,6 +94,8 @@ function takeCounts(s, t, counts) {
     sl.missing = 0;
     // after the HUD changed size: start over from what the slot shows, counting nothing for the switch
     if (sl.rebase) { sl.count = c.value; sl.rebase = false; sl.pend = null; sl.big = null; continue; }
+    // after a pause: what was drunk while the clock was off isn't counted; a refill bought meanwhile still is
+    if (sl.paused) { sl.paused = false; if (c.value < sl.count) { sl.count = c.value; sl.pend = null; sl.big = null; continue; } }
     if (c.value === sl.count) { sl.pend = null; sl.big = null; continue; }
     const d = c.value - sl.count;
     // a drop no one could drink between two reads (684 read as 84 for a moment), or a rise as big (84 read as 684), is a
@@ -240,6 +242,13 @@ function add(s, r) {
   if (s.levelStart == null && s.level) s.levelStart = s.level;
   const b = bucket(s, t);
   if (r.exp != null && r.pct != null) {
+    // over 30 seconds since the last EXP read (the share stopped, the page reloaded, the bar out of sight) is a pause:
+    // its time isn't counted, so the EXP gained and potions drunk across it aren't either (counting one without the
+    // other inflates the rates)
+    if (s.last && s.lastValidT != null && t - s.lastValidT > CFG.maxGapMs) {
+      s.last = null; s.pend = null; s.pausedMs = (s.pausedMs || 0) + (t - s.lastValidT);
+      for (const sl of Object.values(s.slots)) sl.paused = true;
+    }
     const e = takeExp(s, t, r.exp, r.pct);
     if (e.ok) {
       if (s.lastValidT != null) { const dt = t - s.lastValidT; if (dt > 0 && dt <= CFG.maxGapMs) s.activeMs += dt; }
@@ -269,7 +278,7 @@ function add(s, r) {
 
 // avgExpPerKill: the map's average EXP a kill, for kills a minute (an estimate; a party shares EXP)
 function stats(s, t, avgExpPerKill) {
-  const mins = s.activeMs / 60000, hrs = mins / 60, o = { exp: s.gainExp, pct: s.gainPct, mins, deaths: s.deaths, levels: s.levels };
+  const mins = s.activeMs / 60000, hrs = mins / 60, o = { exp: s.gainExp, pct: s.gainPct, mins, pausedMins: (s.pausedMs || 0) / 60000, deaths: s.deaths, levels: s.levels };
   const rated = mins >= 2;
   o.expHr = rated ? s.gainExp / hrs : null;
   o.expMin = rated ? s.gainExp / mins : null;
