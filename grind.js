@@ -9,6 +9,7 @@
 
 const MS = () => window.MapleScreen, GS = () => window.GrindSession;
 const KEY_OPEN = 'grind.open', KEY_LOCAL = 'grind.local', KEY_PRICES = 'grind.prices', KEY_MAP = 'grind.map', KEY_HOME = 'grind.mesoHome';
+const KEY_LAYOUT = 'grind.layout', KEY_SIZES = 'grind.layoutSizes';
 const RESUME_MS = 30 * 60000, SAVE_MS = 60000, LEVEL_EVERY = 20, ICON_EVERY = 40, MESO_SEARCH_EVERY = 40;
 
 /* ---------- formatting ---------- */
@@ -79,6 +80,17 @@ function health(f) {
   return say('ok', 'Reading everything');
 }
 
+// the pop-out's Lemon tile from the clock of the potion running out first (GrindSession.countdowns): the clock, what's
+// left and when, a caption (Lemons get the lemonade jokes), how full the glass is (0 to 100, against how full the slot
+// was since the last refill) and low under 5 minutes
+function lemonTile(c, t) {
+  if (!c) return { clock: '··:··', left: '', cap: 'starts once you drink', juice: 0, low: false };
+  const lemon = /lemon/i.test(c.name || '');
+  return { clock: clock((c.doneAt - t) / 1000), left: fmt(c.left) + ' left · ' + timeOfDay(c.doneAt),
+    cap: c.low ? (lemon ? 'Squeeze time! Refill soon' : 'Almost out! Refill soon') : (lemon ? 'till the juice runs out' : 'till they run out'),
+    juice: Math.round(100 * Math.min(1, c.left / (c.full || c.left || 1))), low: !!c.low };
+}
+
 /* ---------- the tab ---------- */
 
 function mount(root, deps) {
@@ -142,17 +154,24 @@ function mount(root, deps) {
     row('costHr', 'Potions an hour', true), row('per1', 'Cost per 1%', true),
     el('div', { class: 'g-row' }, V.perPotL = el('span', {}, 'Potions per 1%'), V.perPot = el('span', {}, '·')),
     V.perPot2Row = el('div', { class: 'g-row', hidden: '' }, V.perPot2L = el('span', {}), V.perPot2 = el('span', {}, '·')), row('level', 'Level'));
-  // the pop out over the game: one slim dark strip, built here and moved into the pop out window. Line 1 the big numbers
-  // and a dot per check (a dot that isn't green says its name), line 2 the rest, line 3 only when it needs you.
+  // the pop out over the game: one dark panel built here and moved into the pop out window, in one of four layouts that
+  // ⇆ Layout flips (kept on the device, each at its own window size): Hero (the Lemon tile beside three big numbers, the
+  // rest in one small line), Bar (one slim row), Column (stacked down the side) and Corner (two by two). A dot per check
+  // (one that isn't green says its name), and the one thing to do on its own line, only when it needs you
   const SP = {};
-  const sep = () => el('span', { class: 'g-sep' }, '|');
-  const strip = el('div', { class: 'g-strip', id: 'g-strip', hidden: '' },
-    el('div', { class: 'g-l1' }, SP.clocks = el('span', { class: 'g-clocks' }, el('b', {}, '··:··')),
-      sep(), SP.exp = el('b', {}, '·'), el('small', {}, 'exp/hr'), sep(), SP.pct = el('b', {}, '·'), el('small', {}, '/hr'),
-      sep(), SP.meso = el('b', {}, '·'), el('small', {}, 'mesos'), sep(), SP.profit = el('b', {}, '·'), el('small', {}, 'profit'),
-      SP.dots = el('span', { class: 'g-dots' }, ['exp', 'level', 'potions', 'mesos'].map(k => el('span', { class: 'g-dw', 'data-k': k }, el('i', { class: 'g-dot' }), el('small', {}))))),
-    SP.lp = el('div', { class: 'g-lp' }),
-    SP.l2 = el('div', { class: 'g-l2' }),
+  const LAYOUTS = { hero: [660, 236], bar: [800, 92], column: [250, 640], corner: [430, 330] }, ORDER = Object.keys(LAYOUTS);
+  let layout = ORDER.includes(store.get(KEY_LAYOUT)) ? store.get(KEY_LAYOUT) : 'hero', pipWin = null, sizeTimer = null;
+  const kTile = (k, label) => el('div', { class: 'g-k g-k-' + k }, el('div', { class: 'g-kl' }, label), SP[k] = el('div', { class: 'g-kn' }, '·'), SP[k + 'Sub'] = el('div', { class: 'g-ks' }));
+  const strip = el('div', { class: 'g-strip', id: 'g-strip', 'data-layout': layout, hidden: '' },
+    el('div', { class: 'g-grid' },
+      SP.lemon = el('div', { class: 'g-lemon' }, SP.juice = el('div', { class: 'g-juice' }), SP.lIcon = el('img', { alt: '', hidden: '' }),
+        SP.lClock = el('div', { class: 'g-lclock' }, '··:··'), SP.lCap = el('div', { class: 'g-lcap' }), SP.lLeft = el('div', { class: 'g-lleft' })),
+      kTile('exp', 'EXP an hour'), kTile('meso', 'Mesos earned'), kTile('gain', 'EXP gained'),
+      SP.mini = el('div', { class: 'g-mini' })),
+    el('div', { class: 'g-foot' },
+      SP.dots = el('span', { class: 'g-dots' }, ['exp', 'level', 'potions', 'mesos'].map(k => el('span', { class: 'g-dw', 'data-k': k }, el('i', { class: 'g-dot' }), el('small', {})))),
+      el('button', { type: 'button', class: 'g-lay', title: 'Layout', onclick: () => nextLayout() }, '⇆', el('span', { class: 'g-bl' }, ' Layout')),
+      el('button', { type: 'button', class: 'g-reset', title: 'Reset average', onclick: () => resetAverage() }, '↺', el('span', { class: 'g-bl' }, ' Reset average'))),
     SP.l3 = el('div', { class: 'g-l3', hidden: '' }));
   const viewBar = el('div', { class: 'g-viewing', hidden: '' }, V.viewing = el('span', {}), el('button', { type: 'button', onclick: () => { viewing = null; render(); } }, 'Back to live'),
     V.del = el('span', {}));
@@ -490,42 +509,64 @@ function mount(root, deps) {
     SP.l3.replaceChildren(SIGN[h.nudge.state] + ' ' + h.nudge.text, h.stuck ? el('button', { type: 'button', onclick: () => refind() }, '↻ Find my game again') : '');
   }
 
-  /* ----- the strip: the clock, EXP an hour, mesos and the dots; a second line with the rest, or the one thing to do ----- */
+  /* ----- the pop out panel: the Lemon tile, three big numbers, one small line, the dots ----- */
   function renderStrip(s, o, mains) {
-    // a clock for each of the two potions running out first (Lemons and Meat), the first one leading
-    SP.ticks = viewing ? [] : GS().countdowns(s, Date.now()).slice(0, 2);
-    SP.clocks.replaceChildren(...(SP.ticks.length ? SP.ticks.map((c, i) => el('span', { class: 'g-clk' }, i ? el('span', { class: 'g-sep' }, '|') : '',
-      pictures.Icons[c.id] ? el('img', { src: pictures.Icons[c.id], alt: c.name }) : el('small', {}, c.name), el('b', {}, clock((c.doneAt - Date.now()) / 1000)),
-      el('small', {}, fmt(c.left) + ' left'))) : [el('b', {}, '··:··')]));
+    const now = Date.now(), cds = viewing ? [] : GS().countdowns(s, now);
+    SP.ticks = cds.slice(0, 2);   // the two potions running out first (Lemons, then Meat)
+    SP.mainIcon = mains[0] ? pictures.Icons[mains[0].id] : null;
+    renderLemon(now);
     SP.exp.textContent = o.expHr != null ? fmtK(o.expHr) : '·';
-    SP.pct.textContent = o.pctHr != null ? o.pctHr.toFixed(2) + '%' : '·';
+    SP.expSub.textContent = o.pctHr != null ? o.pctHr.toFixed(2) + '% an hour' : 'after 2 minutes';
     SP.meso.textContent = o.mesosEarned != null ? (o.mesosEarned >= 0 ? '+' : '−') + fmtK(Math.abs(o.mesosEarned)) : '·';
-    SP.profit.textContent = o.profitHr != null ? (o.profitHr >= 0 ? '▲ +' : '▼ −') + fmtK(Math.abs(o.profitHr)) + '/hr' : '·';
-    SP.profit.className = o.profitHr == null ? '' : o.profitHr >= 0 ? 'up' : 'down';
-    // the pace line, live only, with Reset average right there so it can be pressed without leaving the game
-    SP.lp.hidden = !!viewing;
-    SP.lp.replaceChildren(...paceParts(o, false).map(p => el('span', {}, el('small', {}, p.label + ' '), el('b', {}, p.value),
-      p.vs ? el('span', { class: p.up ? 'up' : 'down' }, ' ' + p.vs) : '', p.extra ? el('small', {}, ' · ' + p.extra) : '')),
-      el('button', { type: 'button', onclick: () => resetAverage() }, '↺ Reset average'));
-    const bits = [];
-    if (o.hrsToLevel != null) bits.push(el('span', {}, 'Lv ' + ((s.level || 0) + 1) + ' in ', el('b', {}, fmtDur(o.hrsToLevel * 60))));
-    for (const p of mains) if (o.perPct[p.id] != null) bits.push(el('span', {}, pictures.Icons[p.id] ? el('img', { src: pictures.Icons[p.id], alt: p.name }) : p.name + ' ', el('b', {}, perFmt(o.perPct[p.id])), ' per 1%'));
+    SP.mesoSub.textContent = o.mesosHr != null ? fmtK(o.mesosHr) + ' an hour' : o.mesosEarned != null ? 'this session' : o.mesoLooks ? 'peek again later' : 'no peek yet';
+    SP.gain.textContent = fmtK(o.exp);
+    SP.gainSub.textContent = (o.pct >= 0 ? '+' : '−') + Math.abs(o.pct).toFixed(2) + '% · ' + fmtDur(o.mins) + (o.deaths ? ' · ' + deathText(o) : '');
+    // the small line: the second clock (Meat), the next level, Lemons per 1%, what 1% costs, the pace and profit
+    const bits = [], c2 = SP.ticks[1], main = mains[0], icon = (id, name) => pictures.Icons[id] ? el('img', { src: pictures.Icons[id], alt: name }) : name + ' ';
+    if (c2) bits.push(el('span', { class: 'g-c2' }, icon(c2.id, c2.name), el('b', {}, clock((c2.doneAt - now) / 1000))));
+    if (o.hrsToLevel != null) bits.push(el('span', { class: 'g-eta' }, 'Lv ' + ((s.level || 0) + 1) + ' in ', el('b', {}, fmtDur(o.hrsToLevel * 60))));
+    if (main && o.perPct[main.id] != null) bits.push(el('span', {}, icon(main.id, main.name), el('b', {}, perFmt(o.perPct[main.id])), ' per 1%'));
     if (o.per1 != null) bits.push(el('span', {}, '1% costs ', el('b', {}, fmtK(o.per1))));
-    if (o.costHr != null) bits.push(el('span', {}, 'pots ', el('b', {}, fmtK(o.costHr)), '/hr'));
-    bits.push(el('span', {}, el('b', {}, '+' + o.pct.toFixed(2) + '%'), ' gained'));
-    if (o.deaths) bits.push(el('span', { class: 'down' }, deathText(o)));
-    bits.push(el('b', {}, fmtDur(o.mins)));
-    SP.l2.replaceChildren(...bits);
+    const pace = viewing ? null : paceParts(o, false)[o.markT ? 2 : 0];
+    if (pace && pace.value !== '·') bits.push(el('span', {}, pace.label + ' ', el('b', {}, pace.value), pace.vs ? el('span', { class: pace.up ? 'up' : 'down' }, ' ' + pace.vs) : ''));
+    if (o.profitHr != null) bits.push(el('span', { class: o.profitHr >= 0 ? 'up' : 'down' }, 'profit ', el('b', {}, (o.profitHr >= 0 ? '+' : '−') + fmtK(Math.abs(o.profitHr))), '/hr'));
+    SP.mini.replaceChildren(...bits);
+    SP.mini.hidden = !bits.length;
   }
-  // the strip fits its pop out window: the text as big as the widest line and all the lines allow (each stays on one
-  // row; the one thing to do may wrap, so the height is checked again at the new size)
+  // the Lemon tile, every frame and every second between: the potion running out first as a glass that drains
+  function renderLemon(now) {
+    const c = (SP.ticks || [])[0], x = lemonTile(c, now), icon = c ? pictures.Icons[c.id] : SP.mainIcon;
+    SP.lemon.classList.toggle('low', x.low);
+    SP.juice.style.height = x.juice + '%';
+    if (icon && SP.lIcon.getAttribute('src') !== icon) SP.lIcon.src = icon;
+    SP.lIcon.hidden = !icon; SP.lIcon.alt = c ? c.name : '';
+    SP.lClock.textContent = x.clock; SP.lCap.textContent = viewing ? 'a saved session' : x.cap; SP.lLeft.textContent = x.left;
+  }
+  // ⇆ Layout: the next layout, at its own window size (a click lets the pop out resize itself; the frame around the page
+  // is added on), kept for next time
+  function nextLayout() {
+    layout = ORDER[(ORDER.indexOf(layout) + 1) % ORDER.length];
+    strip.dataset.layout = layout; store.set(KEY_LAYOUT, layout);
+    if (pipWin) {
+      const [w, h] = layoutSize(layout), fw = Math.max(0, Math.min(40, pipWin.outerWidth - pipWin.innerWidth)), fh = Math.max(0, Math.min(80, pipWin.outerHeight - pipWin.innerHeight));
+      try { pipWin.resizeTo(w + fw, h + fh); } catch (e) { /* this browser won't: it can be dragged to size */ }
+    }
+    fitStrip();
+  }
+  // each layout's window size: where it was last dragged to, or its own
+  function layoutSize(l) {
+    const s = jget(KEY_SIZES, {})[l];
+    return s && s[0] >= 120 && s[1] >= 50 ? s : LAYOUTS[l];
+  }
+  // the panel fits its pop out window: as big as its natural size (each tile's text on one line) allows across and
+  // down; the one thing to do may wrap, so the height is checked again at the new size
   function fitStrip() {
     const w = strip.ownerDocument.defaultView;
     if (strip.hidden || !w || w === window) return;
     strip.style.fontSize = '16px'; strip.style.width = 'max-content'; SP.l3.style.display = 'none';
     const nat = strip.getBoundingClientRect();
     strip.style.width = ''; SP.l3.style.display = '';
-    let f = Math.max(8, Math.min(40, 16 * Math.min(w.innerWidth / nat.width, w.innerHeight / nat.height)));
+    let f = Math.max(8, Math.min(48, 16 * Math.min(w.innerWidth / nat.width, w.innerHeight / nat.height)));
     strip.style.fontSize = f + 'px';
     const tall = strip.scrollHeight;
     if (tall > w.innerHeight) strip.style.fontSize = Math.max(8, f * w.innerHeight / tall) + 'px';
@@ -674,7 +715,9 @@ function mount(root, deps) {
   /* ----- the pop out over the game: the slim strip moves into a small window that stays on top; the card stays here ----- */
   function popOut() {
     if (!window.documentPictureInPicture) { setStatus("Your browser can't pop out a window. Use Edge or Chrome on a computer."); return; }
-    documentPictureInPicture.requestWindow({ width: 640, height: 156 }).then(pip => {
+    const [w0, h0] = layoutSize(layout);
+    documentPictureInPicture.requestWindow({ width: w0, height: h0 }).then(pip => {
+      pipWin = pip;
       const d = pip.document;
       for (const ss of document.styleSheets) {
         try { const s = d.createElement('style'); s.textContent = Array.from(ss.cssRules).map(r => r.cssText).join('\n'); d.head.append(s); } catch (e) { /* a stylesheet from another site */ }
@@ -684,8 +727,13 @@ function mount(root, deps) {
       d.body.className = 'g-pip';
       strip.hidden = false;
       const wrap = d.createElement('div'); wrap.id = 'view-grind'; wrap.append(strip); d.body.append(wrap);
-      pip.addEventListener('pagehide', () => { strip.hidden = true; strip.style.fontSize = ''; root.append(strip); });
-      pip.addEventListener('resize', fitStrip);
+      pip.addEventListener('pagehide', () => { pipWin = null; strip.hidden = true; strip.style.fontSize = ''; root.append(strip); });
+      // dragged to a new size: fit to it, and keep it as this layout's size
+      pip.addEventListener('resize', () => {
+        fitStrip();
+        clearTimeout(sizeTimer);
+        sizeTimer = setTimeout(() => { if (pipWin === pip) { const all = jget(KEY_SIZES, {}); all[layout] = [pip.innerWidth, pip.innerHeight]; jset(KEY_SIZES, all); } }, 400);
+      });
       fitStrip();
     }).catch(e => setStatus("Couldn't pop out: " + e.message));
   }
@@ -724,7 +772,11 @@ function mount(root, deps) {
   const ticker = setInterval(() => {
     if (!root.isConnected) { clearInterval(ticker); return; }
     if (cd && !cd.measuring) V.clock.textContent = clock((cd.doneAt - Date.now()) / 1000);
-    SP.clocks.querySelectorAll('.g-clk b').forEach((b, i) => { const c = (SP.ticks || [])[i]; if (c) b.textContent = clock((c.doneAt - Date.now()) / 1000); });
+    if (!strip.hidden) {
+      renderLemon(Date.now());
+      const b2 = SP.mini.querySelector('.g-c2 b'), c2 = (SP.ticks || [])[1];
+      if (b2 && c2) b2.textContent = clock((c2.doneAt - Date.now()) / 1000);
+    }
   }, 1000);
 
   function renderPots(s) {
@@ -792,5 +844,5 @@ function mount(root, deps) {
     save: () => save(true), load: row => { viewing = GS().fromRow(row); render(); }, capture: () => capture, mesoLine };
 }
 
-window.Grind = { mount, fmtK, clock, health };
+window.Grind = { mount, fmtK, clock, health, lemonTile };
 })();

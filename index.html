@@ -296,35 +296,75 @@ body.only-grind #tab-timer, body.only-grind #tab-builds, body.only-grind #tab-ap
 /* the pop out strip: always the quiet dark slate, whatever the site's theme, so it sits softly over the game */
 /* no scroll bars in the pop out: the text fits the window instead */
 html:has(body.g-pip), body.g-pip { overflow: hidden; scrollbar-width: none; }
-body.g-pip { margin: 0; padding: 0; background: #1b2030; }
+body.g-pip { margin: 0; padding: 0; background: #10141f; }
 body.g-pip::-webkit-scrollbar { display: none; }
 body.g-pip #view-grind { max-width: none; }
-/* sizes are in em off one base that follows the window's width and height, so dragging the pop out bigger makes it all
-   bigger, and a short window shrinks the text rather than scrolling */
-.g-strip { font-family: var(--font-body); font-size: 16px; color: #eef1f7; background: #1b2030; padding: .5em .7em .55em; }
-body.g-pip .g-strip { font-size: clamp(11px, min(2.5vw, 10.5vh), 30px); }
-.g-l1 { display: flex; align-items: center; gap: .45em; white-space: nowrap; }
-.g-l1 b { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-size: 1.05em; }
-.g-l1 img { width: 1.6em; height: 1.6em; image-rendering: pixelated; }
-.g-clocks, .g-clk { display: inline-flex; align-items: center; gap: .35em; }
-.g-strip small { color: #8d96a8; font-size: .7em; }
-.g-strip .up { color: #4cc38a; } .g-strip .down { color: #f39a90; }
-.g-sep { color: #4b5368; }
-.g-dots { display: flex; gap: .5em; margin-left: auto; align-items: center; }
+/* every size is in em off the panel's font size, which fitStrip sets so the layout fills its window: dragging the pop
+   out bigger makes it all bigger, and a small window shrinks it rather than scrolling */
+.g-strip { font-family: var(--font-body); font-size: 16px; color: #eef1f7; background: #10141f; padding: .55em; }
+.g-grid { display: grid; gap: .5em; }
+.g-lemon, .g-k, .g-mini { position: relative; overflow: hidden; min-width: 0; background: rgba(255,255,255,.055); border: 1px solid rgba(255,255,255,.08); border-radius: .75em; padding: .55em .75em; }
+.g-kl { font-size: .62em; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: #93a0bd; white-space: nowrap; }
+.g-kn { font: 700 1.9em/1.05 var(--font-num); font-variant-numeric: tabular-nums; margin-top: .18em; white-space: nowrap; }
+.g-ks { font-size: .72em; color: #a8b2c7; margin-top: .3em; white-space: nowrap; }
+.g-k-exp .g-kn { color: #ffd66b; } .g-k-meso .g-kn { color: #5fe0a0; } .g-k-gain .g-kn { color: #8fc8ff; }
+/* the Lemon tile: a glass of lemonade that drains as the potion runs down, orange and shaking under 5 minutes */
+.g-lemon { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; background: rgba(255,214,64,.07); border-color: rgba(255,214,64,.28); }
+.g-lemon > :not(.g-juice) { position: relative; }
+.g-juice { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: linear-gradient(to top, rgba(255,206,48,.38), rgba(255,206,48,.12)); border-top: 2px solid rgba(255,226,120,.55); transition: height 1s ease; }
+.g-juice::before, .g-juice::after { content: ""; position: absolute; top: -.5em; width: .4em; height: .4em; border-radius: 50%; background: rgba(255,236,160,.6); animation: g-fizz 3.2s linear infinite; }
+.g-juice::before { left: 14%; } .g-juice::after { left: 70%; animation-duration: 2.4s; animation-delay: .8s; }
+.g-lemon img { width: 3em; height: 3em; image-rendering: pixelated; animation: g-bob 2.6s ease-in-out infinite; }
+.g-lclock { font: 800 2.4em/1 var(--font-num); font-variant-numeric: tabular-nums; color: #fff1a8; margin-top: .12em; text-shadow: 0 2px 0 rgba(0,0,0,.35); white-space: nowrap; }
+.g-lcap { font-size: .7em; color: #f3e3a0; margin-top: .35em; white-space: nowrap; }
+.g-lleft { font-size: .72em; color: #d8cfa6; margin-top: .1em; white-space: nowrap; }
+.g-lemon.low { background: rgba(255,120,60,.1); border-color: #ff9f43; animation: g-glow 1.4s ease-in-out infinite; }
+.g-lemon.low .g-juice { background: linear-gradient(to top, rgba(255,150,60,.42), rgba(255,150,60,.12)); border-top-color: rgba(255,190,120,.7); }
+.g-lemon.low img { animation: g-shake .5s ease-in-out infinite; }
+.g-lemon.low .g-lclock { color: #ffb27a; } .g-lemon.low .g-lcap { color: #ffc79e; font-weight: 700; }
+@keyframes g-bob { 0%, 100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-.25em) rotate(4deg); } }
+@keyframes g-shake { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-12deg); } 75% { transform: rotate(12deg); } }
+@keyframes g-glow { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,159,67,0); } 50% { box-shadow: 0 0 0 .25em rgba(255,159,67,.35); } }
+@keyframes g-fizz { 0% { transform: translateY(0); opacity: 0; } 15% { opacity: 1; } 100% { transform: translateY(-2.8em); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .g-lemon img, .g-juice::before, .g-juice::after, .g-lemon.low { animation: none; } }
+.g-mini { display: flex; gap: .3em 1.1em; align-items: center; font-size: .78em; color: #c3cbdb; white-space: nowrap; }
+.g-mini b { color: #fff; font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.g-mini img { width: 1.35em; height: 1.35em; image-rendering: pixelated; vertical-align: -.35em; margin-right: .2em; }
+.g-strip .up { color: #5fe0a0; } .g-strip .down { color: #f39a90; }
+.g-foot { display: flex; align-items: center; gap: .5em; margin-top: .5em; font-size: .72em; color: #9aa3b5; white-space: nowrap; }
+.g-dots { display: flex; gap: .5em; align-items: center; }
 .g-dw { display: inline-flex; align-items: center; gap: .2em; }
-.g-dot { width: .5em; height: .5em; border-radius: 50%; background: #4b5368; }
+.g-dot { width: .6em; height: .6em; border-radius: 50%; background: #4b5368; }
 .g-dw.ok .g-dot { background: #4cc38a; } .g-dw.wait .g-dot { background: #f5b942; } .g-dw.bad .g-dot { background: #f06a5d; }
 .g-dw.wait small { color: #f5c96a; } .g-dw.bad small { color: #f39a90; }
-.g-lp, .g-l2, .g-l3 { margin-top: .35em; padding-top: .35em; border-top: 1px solid #2a3145; font-size: .8em; color: #a7afc0; display: flex; gap: .25em .9em; align-items: center; }
-/* each line stays on one row and the text is sized to fit (fitStrip); only the one thing to do wraps */
-.g-lp, .g-l2 { white-space: nowrap; }
-.g-l3 { flex-wrap: wrap; }
-.g-l2 b { color: #dfe4ee; font-family: var(--font-num); }
-.g-l2 img { width: 1.25em; height: 1.25em; image-rendering: pixelated; vertical-align: -.25em; margin-right: .2em; }
+.g-foot button, .g-l3 button { font: inherit; color: #cfe0ff; border: 1px solid #3c5a8f; border-radius: .5em; padding: .15em .7em; background: #22304d; cursor: pointer; }
+.g-lay { margin-left: auto; }
+.g-l3 { margin-top: .45em; padding-top: .4em; border-top: 1px solid #2a3145; font-size: .78em; color: #a7afc0; display: flex; flex-wrap: wrap; gap: .25em .9em; align-items: center; }
 .g-l3.wait { color: #f5c96a; } .g-l3.bad { color: #f39a90; } .g-l3.idle { color: #a7afc0; }
-.g-lp b { color: #dfe4ee; font-family: var(--font-num); }
-.g-l3 .g-keep { margin-left: 0; }
-.g-lp button, .g-l3 button { margin-left: auto; font: inherit; color: #cfe0ff; border: 1px solid #3c5a8f; border-radius: 6px; padding: .05em .55em; background: #22304d; cursor: pointer; }
+.g-l3 button { margin-left: auto; } .g-l3 .g-keep { margin-left: 0; }
+/* the four layouts. Hero: the Lemon tile beside three big numbers, the rest in one line under them */
+.g-strip[data-layout="hero"] .g-grid { grid-template-columns: 10.5em repeat(3, minmax(0, 1fr)); }
+.g-strip[data-layout="hero"] .g-lemon { grid-row: 1 / span 2; }
+.g-strip[data-layout="hero"] .g-mini { grid-column: 2 / span 3; }
+/* Corner: two by two, the small line under */
+.g-strip[data-layout="corner"] .g-grid { grid-template-columns: 1fr 1fr; }
+.g-strip[data-layout="corner"] .g-mini { grid-column: 1 / span 2; }
+.g-strip[data-layout="corner"] .g-lcap { display: none; }
+/* Column: stacked down the side, the small line as a list, the buttons as icons */
+.g-strip[data-layout="column"] .g-grid { grid-template-columns: 1fr; }
+.g-strip[data-layout="column"] .g-mini { flex-direction: column; align-items: flex-start; gap: .35em; }
+.g-strip[data-layout="column"] .g-bl { display: none; }
+/* Bar: one slim row, the clock, the three numbers and the next level */
+.g-strip[data-layout="bar"] { display: flex; flex-wrap: wrap; align-items: center; column-gap: .9em; }
+.g-strip[data-layout="bar"] .g-grid { display: flex; align-items: center; gap: 1.1em; }
+.g-strip[data-layout="bar"] .g-lemon, .g-strip[data-layout="bar"] .g-k, .g-strip[data-layout="bar"] .g-mini { background: none; border: 0; padding: 0; overflow: visible; animation: none; }
+.g-strip[data-layout="bar"] .g-lemon { flex-direction: row; gap: .45em; }
+.g-strip[data-layout="bar"] .g-lemon img { width: 2em; height: 2em; }
+.g-strip[data-layout="bar"] .g-lclock { margin: 0; font-size: 1.9em; }
+.g-strip[data-layout="bar"] .g-kn { font-size: 1.6em; }
+.g-strip[data-layout="bar"] :is(.g-juice, .g-lcap, .g-lleft, .g-ks, .g-mini > :not(.g-eta), .g-bl) { display: none; }
+.g-strip[data-layout="bar"] .g-foot { margin: 0 0 0 auto; }
+.g-strip[data-layout="bar"] .g-l3 { flex-basis: 100%; }
 
 /* Read from game (reader.js draws .r-bar and .r-drop) */
 .b-reader { margin: 14px 0 0; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; display: grid; gap: 8px; }

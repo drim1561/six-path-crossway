@@ -88,7 +88,7 @@ function takeCounts(s, t, counts) {
       // what was already drunk from a slot whose potion changed still counts
       if (sl && (sl.used || sl.bought)) (s.retired = s.retired || []).push(sl);
       s.slots[c.key] = { key: c.key, id: c.id || null, name: c.name || 'Unknown item', price: s.prices[c.id] != null ? s.prices[c.id] : (c.price || 0),
-        count: c.value, pend: null, used: 0, bought: 0, missing: 0, uses: [], firstUse: null };
+        count: c.value, full: c.value, pend: null, used: 0, bought: 0, missing: 0, uses: [], firstUse: null };
       continue;
     }
     sl.missing = 0;
@@ -127,6 +127,8 @@ function change(s, sl, t, d) {
   } else if (d <= PICKUP) sl.found = (sl.found || 0) + d;   // picked up: stock that cost nothing
   else { sl.bought += d; s.boughtCost = (s.boughtCost || 0) + d * (sl.price || 0); s.lastRefill = t; }   // a refill: back from town
   sl.count += d;
+  // how full the slot was since the last refill (the pop-out drains a glass from it): a refill fills it, a pickup tops it up
+  sl.full = d > PICKUP ? sl.count : Math.max(sl.full || 0, sl.count);
 }
 
 /* ---------- mesos: totals read off the inventory window now and then ---------- */
@@ -354,7 +356,7 @@ function clocks(s, t) {
     const perMin = used / ((t - from) / 60000);
     if (!perMin) continue;
     const secs = Math.round(sl.count / perMin * 60);
-    list.push({ id: sl.id, name: sl.name, key: sl.key, left: sl.count, perMin, secs, doneAt: t + secs * 1000, low: secs < CFG.low });
+    list.push({ id: sl.id, name: sl.name, key: sl.key, left: sl.count, full: Math.max(sl.full || 0, sl.count), perMin, secs, doneAt: t + secs * 1000, low: secs < CFG.low });
   }
   return { list: list.sort((a, b) => a.secs - b.secs), measuring };
 }
