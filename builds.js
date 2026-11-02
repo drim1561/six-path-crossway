@@ -328,8 +328,9 @@ function attackModel(s, cls, Wover, skillId) {
 const KILL_GAP = 2;
 // Each monster is fought with whichever skill the character has points in gives the best pace: the attack, or a
 // multi-target skill that kills a group (every monster in reach takes the same casts) for one walk.
-function rankWith(s, cls, data, n) {
-  const P = phaseOf(cls, s.level), seed = hash(JSON.stringify(s)), out = [];
+function rankWith(s, cls, data, n, seed) {
+  const P = phaseOf(cls, s.level), out = [];
+  if (seed === undefined) seed = hash(JSON.stringify(s));
   const models = [attackModel(s, cls)].concat(MULTI.filter(id => id !== P.attack && s.skills[id] >= 1 && DATA.skills[id]).map(id => attackModel(s, cls, undefined, id)));
   for (const mob of data.mobs) {
     let best = null;
@@ -487,19 +488,91 @@ function planGear(s, cls) {
   return out;
 }
 
-// Scroll families that raise this class's damage, by what filling a typical item's slots with Lessers adds.
-function planScrolls(s, cls, gear) {
+/* ---------- Scrolls ---------- */
+
+// Stats with a few gains applied (d), the way avgCast applies them: magic attack and INT/2 into a mage's magic,
+// weapon attack into the physical W override.
+function withGain(s, cls, d) {
+  const s2 = { ...s, skills: s.skills };
+  for (const k of ['str', 'dex', 'int', 'luk']) s2[k] = s[k] + (d[k] || 0);
+  if (physical(cls)) { s2.critRate = s.critRate + (d.crt || 0); s2.W = attackModel(s, cls).W + (d.wat || 0); }
+  else s2.magic = s.magic + (d.mad || 0) + (d.int || 0) / 2;
+  return s2;
+}
+
+// How a gain plays at your spot: the Train tab's simulation rerun on the few monsters that matter, with the dice
+// pinned to your stats as they are now, so the only thing that changes is the gain.
+function spotModel(s, cls, rank) {
+  const ids = new Set(rank.slice(0, 6).map(m => m.id)), mobs = DATA.mobs.filter(m => ids.has(m.id)), seed = hash(JSON.stringify(s));
+  const memo = {}, at = d => memo[JSON.stringify(d)] || (memo[JSON.stringify(d)] = rankWith(withGain(s, cls, d), cls, { ...DATA, mobs }, 150, seed));
+  // Your spot is the Train tab's pick; the gains are measured on it, so both tabs name the same monster.
+  const base = at({}), here = rank[0] && base.find(m => m.id === rank[0].id);
+  const pct = rows => { const m = here && rows.find(x => x.id === here.id); return m ? Math.round((m.pace / here.pace - 1) * 1000) / 10 : 0; };
+  return { here, base, at, pct, gain: d => here ? pct(at(d)) : 0 };
+}
+
+// Where you stand: how much more magic or weapon attack keeps raising EXP an hour at your spot, where it stops
+// helping (stops), when it only starts helping past +5 (starts), and when nothing to +40 moves your spot (flat), how much
+// it takes for one cast fewer.
+function standing(s, cls, spot) {
+  const { here, at, pct } = spot;
+  if (!here) return null;
+  const stat = physical(cls) ? 'wat' : 'mad', castsAt = add => (at({ [stat]: add }).find(m => m.id === here.id) || here).casts;
+  const steps = [5, 10, 15, 20, 25, 30, 35, 40].map(add => { const rows = at({ [stat]: add }); return { add, pct: pct(rows), mob: rows[0].name }; });
+  const top = steps[steps.length - 1].pct, flat = top < 1, first = steps.find(x => x.pct >= 1);
+  let stops = null;
+  if (top >= 1) {
+    const i = steps.findIndex(x => top - x.pct < 1);
+    let lo = i ? steps[i - 1].add : 0, hi = steps[i].add;
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; top - pct(at({ [stat]: mid })) < 1 ? hi = mid : lo = mid; }
+    stops = hi;
+  }
+  let fewer = null;
+  if (flat) {
+    const goal = here.casts - 1 + 0.05;
+    let hi = null, lo = 0;
+    for (let add = 10; add <= 80; add += 10) { if (castsAt(add) <= goal) { hi = add; break; } lo = add; }
+    if (hi !== null) { while (hi - lo > 1) { const mid = (lo + hi) >> 1; castsAt(mid) <= goal ? hi = mid : lo = mid; } fewer = hi; }
+  }
+  const far = at({ [stat]: 40 });
+  const moved = far.find(m => m.id !== here.id && (spot.base.find(b => b.id === m.id) || m).casts - m.casts >= 0.3);
+  return { mob: here.name, skill: here.skill, casts: here.casts, stat, steps, starts: first && first.add > 5 ? first.add : null, stops: flat ? null : stops, flat, fewer, next: moved ? moved.name : null };
+}
+
+// Scroll families that raise this class's damage, one card per slot you have an item in: Lesser, Intermediate and
+// Greater side by side with what filling the item's slots should get you (odds x gain), its damage and EXP an hour at
+// your spot, and with a Cozy price, the cost and the cost of each 1% of damage.
+function planScrolls(s, cls, gear, spot) {
   const atk = physical(cls) ? 'wat' : 'mad';
   const useful = physical(cls) ? [atk, cls.mainStat, 'crt'] : [atk, cls.mainStat];
   const out = [];
   for (const f of DATA.scrolls) {
-    if (!useful.includes(f.stat)) continue;
-    const slot = gear.find(x => x.slot === f.slot);
-    if (!slot) continue;
-    const slots = slot.rows[0].slots || 5, gain = f.gains[0] * slots;
-    out.push({ slot: f.slot, family: f.family, gainAllLesser: slots + ' slots, +' + gain + ' ' + STAT_NAME[f.stat], pct: gainPct(s, cls, { [f.stat]: gain }) });
+    if (!useful.includes(f.stat) || !f.tiers) continue;
+    const g = gear.find(x => x.slot === f.slot), cur = g && g.rows.filter(r => r.level <= s.level).pop();
+    if (!cur || !cur.slots) continue;
+    const tiers = f.tiers.map(t => {
+      const expect = Math.round(cur.slots * t.rate / 100 * t.gain * 10) / 10, dmg = gainPct(s, cls, { [f.stat]: expect });
+      const cost = t.price ? cur.slots * t.price : null;
+      return { tier: t.tier, rate: t.rate, cozy: t.cozy, price: t.price, sales: t.sales, expect, dmg, exp: spot.gain({ [f.stat]: expect }),
+        cost, per1: cost && dmg > 0 ? Math.round(cost / dmg) : null };
+    });
+    const priced = tiers.filter(t => t.per1 !== null);
+    out.push({ slot: f.slot, family: f.family, stat: f.stat, slots: cur.slots, item: cur.name, tiers,
+      best: priced.length ? Math.min(...priced.map(t => t.per1)) : null, top: Math.max(...tiers.map(t => t.dmg)) });
   }
-  return out.sort((a, b) => b.pct - a.pct).slice(0, 5).map((x, i) => ({ order: i + 1, ...x }));
+  return out.sort((a, b) => (a.best === null) - (b.best === null) || (a.best - b.best) || b.top - a.top);
+}
+
+// What +1, +5 and +10 of each stat is worth to you in damage, and +10 in EXP an hour at your spot.
+function worthTable(s, cls, spot) {
+  const atk = physical(cls) ? 'wat' : 'mad';
+  const keys = [atk, cls.mainStat, ...['str', 'dex', 'int', 'luk'].filter(k => k !== cls.mainStat), ...(physical(cls) ? ['crt'] : [])];
+  const cap = k => STAT_NAME[k].length > 3 ? STAT_NAME[k][0].toUpperCase() + STAT_NAME[k].slice(1) : STAT_NAME[k];
+  const rows = keys.map(k => {
+    const d = [1, 5, 10].map(n => gainPct(s, cls, { [k]: n }));
+    return { what: cap(k), stat: k, d, exp10: d[2] > 0 ? spot.gain({ [k]: 10 }) : null };
+  });
+  return rows.slice(0, 2).concat(rows.slice(2).sort((a, b) => b.d[2] - a.d[2]));
 }
 
 // What's ahead: the next weapon worth buying, the job advancement, and the next skill in the plan.
@@ -527,19 +600,14 @@ function buildGuide(raw, clsId, data) {
   const v = validateStats(raw, clsId);
   if (v.errors.length) return { ok: false, errors: v.errors };
   const s = v.stats, P = phaseOf(cls, s.level), am = attackModel(s, cls), sum = am.range[0] + am.range[1];
-  const worth = physical(cls)
-    ? [[cls.family === 'claw' ? '+1 weapon attack (claw, gloves or stars)' : '+1 weapon attack (weapon or gloves)', { wat: 1 }], ['+1% crit rate', { crt: 1 }],
-      ...(cls.family === 'claw' ? [['+1 LUK', { luk: 1 }], ['+1 DEX or STR', { str: 1 }]]
-        : [['+1 ' + STAT_NAME[cls.mainStat], { [cls.mainStat]: 1 }], ['+1 ' + STAT_NAME[cls.reqStat], { [cls.reqStat]: 1 }]])]
-    : [['+1 magic attack', { mad: 1 }], ['+1 INT', { int: 1 }]];
-  const gear = planGear(s, cls), skills = planSkills(s, cls), slot = slotOf(s, cls), rank = rankWith(s, cls, data), ap = planAP(s, cls);
+  const gear = planGear(s, cls), skills = planSkills(s, cls), slot = slotOf(s, cls), rank = rankWith(s, cls, data), ap = planAP(s, cls), spot = spotModel(s, cls, rank);
   const held = cls.family === 'phys' && DATA.gear.find(x => x.id === s.weapon);
   const weapon = physical(cls) ? { id: held ? held.id : null, slot, name: held ? held.name : null, wat: held ? held.inc.wat || 0 : null, W: am.W } : null;
   return { ok: true, phase: P.phase, estimated: cls.family === 'phys' && !CHECKED_WEAPONS.has(slot), weapon, assumed: v.assumed, stats: s,
     attack: { min: Math.round(am.range[0]), max: Math.round(am.range[1]), avg: Math.round(sum / 2 * am.hits) },
     train: rank.slice(0, 10), here: rank[0] || null, tryNext: worthTry(rank, s.level, rank[0] && rank[0].id), stages: forecast(s, cls, ap),
     skills, ap, gear, next: planNext(s, cls, P, skills, physical(cls) ? am.W : bestWeapon(slot, s.level, 'mad')),
-    scrolls: planScrolls(s, cls, gear), worth: worth.map(([what, d]) => ({ what, pct: gainPct(s, cls, d) })) };
+    scrolls: planScrolls(s, cls, gear, spot), standing: standing(s, cls, spot), worth: worthTable(s, cls, spot), prices: data.prices || null };
 }
 
 /* ---------- The road ahead ---------- */
@@ -656,7 +724,11 @@ const INPUTS = { level: [['level', 'Level']], str: [['str', 'STR']], dex: [['dex
   crit: [['critRate', 'Crit rate %'], ['critDmg', 'Crit damage %']], weapon: [['weapon', 'Weapon'], ['wat', 'Weapon attack']] };
 const ASSUMED_LABEL = { ...LABEL, atkMin: 'attack range', atkMax: 'attack range', skills: 'attack skill level' };
 // read: boxes the screen reader filled ('v:luk', 's:4100000'), marked until the player edits them
-const ui = { deps: null, data: null, root: null, form: { cls: 'cleric', v: {}, s: {} }, timer: 0, read: new Set() };
+// form.from: where the numbers came from, for a Something off? report ('mine' or 'community' for a loaded build, 'read'
+// for Read from game, none when typed by hand), and form.edited once the player changed something after that
+// lastPic: the picture Read from game read last ({ img, at }), kept for a report until the next one or a reload
+const ui = { deps: null, data: null, root: null, form: { cls: 'cleric', v: {}, s: {} }, timer: 0, read: new Set(), lastPic: null };
+const FROM = ['mine', 'community', 'read'];
 const E = (...a) => ui.deps.el(...a);
 const fieldsOf = cls => cls.fields.flatMap(f => INPUTS[f]);
 const formLevel = () => Number(ui.form.v.level) || ADVANCE;
@@ -667,9 +739,11 @@ const fmt = n => Math.round(n).toLocaleString('en-US');
 function loadForm() {
   try {
     const f = JSON.parse(ui.deps.store.get('bt.calc'));
-    if (f && CLASSES[f.cls]) ui.form = { cls: f.cls, v: f.v || {}, s: f.s || {} };
+    if (f && CLASSES[f.cls]) ui.form = { cls: f.cls, v: f.v || {}, s: f.s || {}, ...(FROM.includes(f.from) ? { from: f.from } : {}), ...(f.edited === true ? { edited: true } : {}) };
   } catch { /* nothing saved yet */ }
 }
+// The player changed the form by hand after it was loaded or read.
+const edited = () => { if (ui.form.from) ui.form.edited = true; };
 const saveForm = () => ui.deps.store.set('bt.calc', JSON.stringify(ui.form));
 const rawStats = () => ({ ...ui.form.v, skills: { ...ui.form.s } });
 
@@ -742,7 +816,7 @@ function pickClass(id) {
   ui.form.cls = id;
   const w = ui.form.v.weapon && ui.data.gear.find(x => x.id === Number(ui.form.v.weapon));
   if (w && !(CLASSES[id].weapons || []).includes(w.slot)) { delete ui.form.v.weapon; delete ui.form.v.wat; }
-  saveForm(); buildForm(); renderGuide();
+  edited(); saveForm(); buildForm(); renderGuide();
 }
 // The four 1st job tiles and, under them, the picked tile's 2nd job paths.
 function renderTiles() {
@@ -765,12 +839,12 @@ async function renderMine() {
     if (gen !== ui.mineGen) return;
     const mine = rows.filter(b => b.user_id === s.user_id);
     box.replaceChildren(E('h3', {}, 'My builds'), mine.length
-      ? E('div', { class: 'b-mine-list' }, mine.map(b => E('button', { type: 'button', class: 'b-mine-card', onclick: () => fill(b.stats, b.class) },
+      ? E('div', { class: 'b-mine-list' }, mine.map(b => E('button', { type: 'button', class: 'b-mine-card', onclick: () => fill(b.stats, b.class, 'mine') },
         E('b', {}, b.ign), ' Lv ' + b.level + ' ' + (CLASSES[b.class] ? CLASSES[b.class].name : b.class))))
       : E('p', { class: 'small' }, 'Builds you save show up here.'));
   } catch (e) { if (gen === ui.mineGen) box.replaceChildren(E('p', { class: 'small' }, "Couldn't load your builds: " + e.message)); }
 }
-function changed() { saveForm(); clearTimeout(ui.timer); ui.timer = setTimeout(renderGuide, 150); }
+function changed() { edited(); saveForm(); clearTimeout(ui.timer); ui.timer = setTimeout(renderGuide, 150); }
 
 const incText = inc => Object.entries(inc).filter(([k]) => STAT_NAME[k]).map(([k, v]) => STAT_NAME[k] + ' +' + v).join(', ');
 const range = (a, b) => a === b ? String(a) : a + ' to ' + b;
@@ -795,13 +869,13 @@ function renderBig(g, cls) {
   const big = (k, v, sub, guessed) => E('div', { class: 'b-bigone' }, E('div', { class: 'k' }, k), E('div', { class: 'v' + (guessed ? ' guess' : '') }, v),
     guessed || sub ? E('div', { class: 's' }, guessed ? 'guessed' : sub) : null);
   const atk = ui.data.skills[g.phase === 1 ? cls.attack1 : cls.attack].name;
-  const worth = g.worth.find(w => w.what === '+1 ' + STAT_NAME[cls.mainStat]) || g.worth[0];
+  const worth = g.worth.find(w => w.stat === cls.mainStat);
   ui.root.querySelector('#b-big').replaceChildren(
     big(STAT_NAME[cls.mainStat], fmt(g.stats[cls.mainStat]), '', guess(cls.mainStat)),
     big(STAT_NAME[cls.reqStat], fmt(g.stats[cls.reqStat]), '', guess(cls.reqStat)),
     physical(cls) ? big('Weapon attack', fmt(g.weapon.W), '', ['wat', 'weapon', 'atkMin', 'atkMax'].some(guess)) : big('Magic', fmt(g.stats.magic), '', guess('magic')),
     big(atk, fmt(g.attack.min) + ' to ' + fmt(g.attack.max), 'per hit'),
-    worth ? big(worth.what, '+' + worth.pct + '%', 'damage') : null);
+    worth ? big('+1 ' + STAT_NAME[cls.mainStat], '+' + worth.d[0] + '%', 'damage') : null);
 }
 
 // The four "right now" answers: where to train, the next ability and skill points, and the next upgrade.
@@ -873,13 +947,67 @@ function renderPanels(g) {
   moreButton(gear, 'Show every item by level');
   gear.append(gear.querySelector('.b-foot'));
 
-  const scrolls = ui.root.querySelector('#scrolls'), best = g.scrolls.length ? g.scrolls[0].pct : 1;
-  scrolls.replaceChildren(...g.scrolls.map((s, i) => extra(E('div', { class: 'b-mob' },
-    E('div', {}, E('b', {}, s.family), E('div', { class: 'small' }, s.slot + ': ' + s.gainAllLesser + ' with Lessers'), bar(s.pct / best * 100)),
-    E('div', { class: 'num' }, '+' + s.pct + '%')), i, 3)),
-    E('p', { class: 'small b-foot' }, 'What a point is worth: ' + g.worth.map(w => w.what + ' adds ' + w.pct + '% damage').join(', ') + '.'));
-  moreButton(scrolls, 'Show more');
-  scrolls.append(scrolls.querySelector('.b-foot'));
+  renderScrolls(g);
+}
+
+// Mesos the short way: 179k, 1.25m.
+const meso = n => n >= 1e6 ? +(n / 1e6).toFixed(2) + 'm' : n >= 1e3 ? Math.round(n / 1e3) + 'k' : String(n);
+const SHORT = { mad: 'MA', wat: 'ATT' };
+const plural = n => /y$/.test(n) ? n.slice(0, -1) + 'ies' : /s$/.test(n) ? n : n + 's';
+
+// The Where you stand sentences: where more attack starts helping, where it tops out, or that nothing moves this spot.
+function standingText(st) {
+  const att = STAT_NAME[st.stat], mobs = plural(st.mob), top = st.steps[st.steps.length - 1];
+  if (st.flat) return ["More " + att + " won't speed this spot up yet: even +40 kills " + mobs + ' no faster.',
+    st.fewer ? ' One cast fewer takes about +' + st.fewer + ' ' + att + '.' : ''];
+  const start = !st.starts ? 'Every bit of ' + att + ' helps here. '
+    : st.starts <= 10 ? '+5 ' + att + ' changes nothing here. It starts helping at about +' + st.starts + '. '
+    : '+5 and +10 ' + att + ' change nothing here. It starts helping at about +' + st.starts + '. ';
+  return [start, st.stops && st.stops < 40
+    ? 'At about +' + st.stops + ' it tops out at ' + top.pct + '% more EXP an hour' + (st.next ? ', and past that only ' + plural(st.next) + ' get faster.' : '; past that nothing changes here.')
+    : '+40 is about ' + top.pct + '% more EXP an hour, and it keeps helping past that.'];
+}
+
+// Scrolls tab: where you stand, a card per slot with the three tiers priced from Cozy, and what a stat is worth.
+function renderScrolls(g) {
+  const box = ui.root.querySelector('#scrolls'), st = g.standing;
+  const mobs = st ? plural(st.mob) : '', expAt = x => x > 0 ? '+' + x + '%' : 'no change';
+  const say = st ? E('div', { class: 'b-here' }, 'You train best at ', E('b', {}, mobs), ': ' + (ui.data.skills[st.skill] ? ui.data.skills[st.skill].name : 'your attack') + ' takes about ',
+    E('b', { class: 'num' }, st.casts.toFixed(1)), ' casts each.', E('div', { class: 'small', style: 'margin-top:6px' }, ...standingText(st))) : null;
+  const cheapest = Math.min(...g.scrolls.flatMap(c => c.tiers.map(t => t.per1).filter(x => x !== null)));
+  const most = Math.max(...g.scrolls.map(c => c.top));
+  const cards = g.scrolls.map((c, i) => {
+    const mid = c.tiers[1], name = STAT_NAME[c.stat];
+    const pill = i === 0 && c.best !== null ? E('span', { class: 'b-pill' }, 'best per meso') : c.top === most ? E('span', { class: 'b-pill warm' }, 'most damage') : null;
+    const row = t => E('tr', { class: t.per1 !== null && t.per1 === cheapest ? 'best' : '' },
+      E('td', {}, t.cozy ? E('a', { href: 'https://cozy.markets/items/' + t.cozy, target: '_blank', rel: 'noopener' }, t.tier) : t.tier),
+      E('td', { class: 'n' }, t.rate + '%'),
+      E('td', { class: 'n', title: t.sales + ' sales on Cozy' }, t.price ? meso(t.price) + (t.sales < 5 ? ' few sales' : '') : 'no sales'),
+      E('td', { class: 'n' }, '+' + t.expect + ' ' + (SHORT[c.stat] || name) + ' · ' + t.dmg + '%'),
+      E('td', { class: 'n' }, expAt(t.exp)),
+      E('td', { class: 'n' }, t.cost ? meso(t.cost) : ''),
+      E('td', { class: 'n' }, t.per1 !== null ? meso(t.per1) : ''));
+    return extra(E('div', { class: 'b-scard' },
+      E('div', { class: 'top' }, E('b', {}, c.family), pill),
+      E('div', { class: 'small' }, c.slots + ' slots on your ' + c.item + '. Intermediates (60%) should add +' + mid.expect + ' ' + name +
+        (st ? ', about ' + (mid.exp > 0 ? mid.exp + '% more EXP an hour at ' + mobs : 'no change at ' + mobs) : '') + '.'),
+      E('table', { class: 'b-table' }, E('thead', {}, E('tr', {}, ...['Scroll', 'Odds', 'Each', "You'd expect", 'EXP an hour', 'Cost', 'Per 1%']
+        .map((h, j) => E('th', { class: j ? 'n' : '' }, h)))), E('tbody', {}, c.tiers.map(row)))), i, 2);
+  });
+  const when = g.prices && new Date(g.prices.date + 'T00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const foot = E('p', { class: 'small b-foot' }, "You'd expect is the average for filling every slot. A 60% scroll fails about 4 in 10 and a 10% about 9 in 10, so if you want a clean item, plan on rebuying it.",
+    when ? ' Prices from Cozy Market, ' + when + ': the usual Free Market price. Each scroll links to its page on ' : ' Each scroll links to its page on ',
+    E('a', { href: 'https://cozy.markets', target: '_blank', rel: 'noopener' }, 'Cozy Market'), ', which also shows who drops it.');
+  const used = g.worth.filter(w => w.d[2] > 0), idle = g.worth.filter(w => w.d[2] === 0);
+  const worth = E('table', { class: 'b-table b-worth' },
+    E('thead', {}, E('tr', {}, E('th', {}, ''), E('th', { class: 'n' }, '+1'), E('th', { class: 'n' }, '+5'), E('th', { class: 'n' }, '+10'),
+      E('th', { class: 'n' }, st ? 'EXP an hour at ' + mobs + ', +10' : 'EXP an hour, +10'))),
+    E('tbody', {}, used.map(w => E('tr', {}, E('td', {}, w.what), ...w.d.map(x => E('td', { class: 'n' }, x + '%')), E('td', { class: 'n' }, w.exp10 === null ? '' : expAt(w.exp10)))),
+      idle.length ? E('tr', {}, E('td', {}, idle.map(w => w.what).join(', ')), E('td', { class: 'n' }, '0%'), E('td', { class: 'n' }, '0%'), E('td', { class: 'n' }, '0%'), E('td', { class: 'n' }, 'only for gear')) : null));
+  box.replaceChildren(E('h4', { class: 'b-sec' }, 'Where you stand'), say || E('p', { class: 'small' }, 'Nothing to train on yet.'),
+    E('h4', { class: 'b-sec' }, 'Start here: cheapest first'), ...(cards.length ? cards : [E('p', { class: 'small' }, 'No damage scrolls for your gear yet.')]));
+  moreButton(box, 'Show every slot');
+  box.append(foot, E('h4', { class: 'b-sec' }, 'What a stat is worth to you'), worth);
 }
 
 const TABS = [['train', 'Train'], ['points', 'Points'], ['gear', 'Gear'], ['scrolls', 'Scrolls']];
@@ -916,10 +1044,10 @@ function renderGuide() {
   return g;
 }
 
-// Puts a build's stats into the calculator (from a saved card).
-function fill(raw, clsId) {
+// Puts a build's stats into the calculator (from a saved card: from is 'mine' or 'community').
+function fill(raw, clsId, from) {
   const { skills, ...v } = raw || {};
-  ui.form = { cls: CLASSES[clsId] ? clsId : ui.form.cls, v: {}, s: {} };
+  ui.form = { cls: CLASSES[clsId] ? clsId : ui.form.cls, v: {}, s: {}, ...(FROM.includes(from) ? { from } : {}) };
   ui.read.clear();
   for (const [k, x] of Object.entries(v)) if (x != null) ui.form.v[k] = String(x);
   for (const [k, x] of Object.entries(skills || {})) if (x != null) ui.form.s[k] = String(x);
@@ -967,6 +1095,8 @@ function take({ cls, values = {}, skills = {} } = {}) {
     if (!row || !Number.isInteger(n) || n < 0 || n > row.max) { skipped.push(String(id)); continue; }
     if (skillsFor(c, formLevel()).includes(Number(id))) { ui.form.s[id] = String(n); ui.read.add('s:' + id); filled.push(String(id)); }
   }
+  // the first box a read fills makes the form the reader's; a fix typed after that stays marked edited
+  if ((Object.keys(vals).length || filled.length) && ui.form.from !== 'read') { ui.form.from = 'read'; delete ui.form.edited; }
   clearTimeout(ui.timer);
   saveForm(); buildForm(); renderGuide();
   return { filled, skipped };
@@ -1053,6 +1183,8 @@ function renderReader() {
 
 // One picture or shared frame: read it, put what's new into the form, and tick the checklist.
 function onImage(img, { from }) {
+  // the pixels the reader is handed are already its own copy, so keeping the last one costs no extra copying
+  ui.lastPic = { img, at: Date.now() };
   const r = window.Reader.readAll(img), share = from === 'share';
   // While sharing, the same frame comes in twice a second: leave out what was read, typed, or turned down at this value,
   // so the form is only rebuilt when something new turns up.
@@ -1087,7 +1219,7 @@ function openReader() {
   panel.hidden = false; setOpen('b-drawer', true);
   btn.disabled = true; note.textContent = 'Loading the reader...';
   loadReader().then(() => {
-    btn.hidden = true; note.textContent = "Open your Character Stat window with DETAIL, then your Skill window, and click through your 1st and 2nd job tabs. Every box it fills is marked so you can check it. Reading happens on your computer. The reader never sends your game pictures anywhere.";
+    btn.hidden = true; note.textContent = "Open your Character Stat window with DETAIL, then your Skill window, and click through your 1st and 2nd job tabs. Every box it fills is marked so you can check it. Reading happens on your computer, and your game pictures stay there unless you send one with a Something off? report.";
     const area = E('div', { class: 'r-area' });
     panel.append(area, E('ul', { id: 'r-check' }), E('p', { id: 'r-status' }), E('div', { id: 'r-msg' }));
     ui.capture = window.Reader.capture(area, { el: E, onImage,
@@ -1214,9 +1346,9 @@ function card(b) {
     E('div', { class: 'b-actions' },
       E('button', { type: 'button', onclick: () => {
         if (ui.editing && ui.editing.id !== b.id) { ui.editing = null; renderSave(); }
-        fill(b.stats, b.class); ui.root.scrollIntoView({ behavior: 'smooth' });
+        fill(b.stats, b.class, mine ? 'mine' : 'community'); ui.root.scrollIntoView({ behavior: 'smooth' });
       } }, 'Load into calculator'),
-      mine ? E('button', { type: 'button', onclick: () => { ui.editing = b; fill(b.stats, b.class); renderSave(); setOpen('b-save', true); ui.root.querySelector('#b-save').scrollIntoView({ behavior: 'smooth' }); } }, 'Edit') : null,
+      mine ? E('button', { type: 'button', onclick: () => { ui.editing = b; fill(b.stats, b.class, 'mine'); renderSave(); setOpen('b-save', true); ui.root.querySelector('#b-save').scrollIntoView({ behavior: 'smooth' }); } }, 'Edit') : null,
       mine ? E('button', { type: 'button', onclick: () => remove(b) }, 'Delete') : null,
       admin && !mine ? E('button', { type: 'button', onclick: () => ui.deps.api.hideBuild(b.id).then(loadList, e => alert(e.message)) }, 'Hide') : null));
 }
@@ -1301,10 +1433,19 @@ function mount(root, deps) {
   // what a Something off? report carries from this tab (index.html keeps it)
   // (what Read from game filled, what it asked to be typed, and what the form turned down)
   return { report: () => ({ tab: ui.deps.store.get('bt.btab') || 'train', form: ui.form, read: rd.last, filled: [...ui.read],
-    asked: [...rd.asked], bad: Object.fromEntries(rd.bad) }) };
+    asked: [...rd.asked], bad: Object.fromEntries(rd.bad) }),
+    // the last picture Read from game read, on a canvas of its own, once the share has stopped (while it runs, the
+    // live frame goes instead); null when nothing was read since the page loaded
+    frame: () => {
+      if (!ui.lastPic || (ui.capture && ui.capture.sharing())) return null;
+      const { img, at } = ui.lastPic, c = document.createElement('canvas');
+      c.width = img.w; c.height = img.h;
+      c.getContext('2d').putImageData(new ImageData(img.data, img.w, img.h), 0, 0);
+      return { canvas: c, at };
+    } };
 }
 const estimatedNote = () => E('p', { id: 'b-estimated', class: 'b-badge', hidden: '' }, E('b', {}, 'Estimated. '), "Damage for this weapon comes from meowdb's table and hasn't been checked against a real stat window yet.");
 
-window.Builds = { KILL_GAP, CLASSES, BRANCHES, branchOf, weaponsFor, mastery, physRange, spellRange, weaponAttackFromMax, WEAPONS, CHECKED_WEAPONS, windowRange, levelScale, hitChance, defend, elemMult, makeRng, castsToKill,
+window.Builds = { standingText, KILL_GAP, CLASSES, BRANCHES, branchOf, weaponsFor, mastery, physRange, spellRange, weaponAttackFromMax, WEAPONS, CHECKED_WEAPONS, windowRange, levelScale, hitChance, defend, elemMult, makeRng, castsToKill,
   validateStats, rankMobs, buildGuide, pointsPlan, mount, fill, refresh, shrinkImage, take, classOf };
 })();

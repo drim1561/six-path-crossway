@@ -216,6 +216,17 @@ select { background: var(--surface); border: 1.5px solid var(--btn-line); border
 .b-here .b-name { font: 700 19px var(--font-title); }
 .b-try { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
 .b-tryone { padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; }
+.b-scard { margin: 8px 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.b-scard .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.b-scard .top b { font: 600 16px var(--font-title); }
+.b-scard .b-table { margin-top: 6px; border: 0; border-radius: 0; font-size: 13px; }
+.b-scard .b-table th, .b-scard .b-table td, .b-worth th, .b-worth td { padding: 5px 8px; }
+.b-scard tr.best td { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.b-scard a, .b-foot a { color: var(--focus); text-decoration: underline dotted; }
+.b-pill { font-size: 11px; font-weight: 800; padding: 1px 8px; border-radius: 99px; background: var(--up-bg); color: var(--up-fg); white-space: nowrap; }
+.b-pill.warm { background: var(--watch-bg); color: var(--watch-fg); }
+.b-worth { margin-top: 6px; }
+@media (max-width: 640px) { .b-scard .b-table { display: block; overflow-x: auto; } }
 .b-time { list-style: none; margin: 6px 0 0; padding: 0; }
 .b-ev { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--row-line); }
 .b-ev .num { font: 700 13px var(--font-num); color: var(--num); }
@@ -804,7 +815,7 @@ const CONFIG = {
   reportUrl: 'https://sixpathcrossway.pages.dev/api/report',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-02a',
+  version: '2026-11-02b',
 };
 
 /* BOSSES:START */
