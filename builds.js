@@ -152,9 +152,9 @@ function castsToKill({ hp, range, hits, crit, hit, mult }, rng, n = 2000) {
 
 /* ---------- Inputs ---------- */
 
-const LABEL = { level: 'level', str: 'STR', dex: 'DEX', int: 'INT', luk: 'LUK', magic: 'Magic', acc: 'accuracy', wat: 'weapon attack',
+const LABEL = { apLeft: 'AP left', level: 'level', str: 'STR', dex: 'DEX', int: 'INT', luk: 'LUK', magic: 'Magic', acc: 'accuracy', wat: 'weapon attack',
   atkMin: 'attack', atkMax: 'attack', critRate: 'crit rate', critDmg: 'crit damage' };
-const LIMIT = { str: 999, dex: 999, int: 999, luk: 999, magic: 9999, acc: 999, wat: 999, atkMin: 99999, atkMax: 99999, critRate: 100, critDmg: 500 };
+const LIMIT = { apLeft: 999, str: 999, dex: 999, int: 999, luk: 999, magic: 9999, acc: 999, wat: 999, atkMin: 99999, atkMax: 99999, critRate: 100, critDmg: 500 };
 const blank = v => v === undefined || v === null || String(v).trim() === '';
 // A skill's numbers at level n, or undefined at level 0 (no points, no bonus).
 const level = (row, n) => row && n >= 1 ? row.lv[Math.min(n, row.lv.length) - 1] : undefined;
@@ -213,6 +213,8 @@ function validateStats(raw, clsId) {
     else if (n > LIMIT[k]) errors.push('That ' + LABEL[k] + ' looks too high.');
     stats[k] = n;
   };
+  // AP left: points from the stat window not spent yet. Blank means all spent, not a guess.
+  if (!blank(raw.apLeft)) { const n = Number(raw.apLeft); if (!Number.isInteger(n) || n < 0 || n > LIMIT.apLeft) errors.push("That AP left doesn't look like a number."); else stats.apLeft = n; }
   const main = cls && cls.mainStat, req = cls && cls.reqStat;
   // The second stat meets what the held weapon asks for (a Zard at 40 needs 40 DEX), paid for out of the main stat.
   const held = cls && cls.family === 'phys' && DATA ? weaponOf(cls, lv, raw.weapon) : null;
@@ -444,28 +446,29 @@ function weaponTiers(s, cls, slot, until) {
 function planAP(s, cls) {
   // AP doesn't change at a job advancement, so the plan runs to 70 in either job.
   const until = NEXT_ADVANCE, tiers = weaponTiers(s, cls, slotOf(s, cls), until);
-  const per = {};
-  for (let lv = s.level + 1; lv < until; lv++) per[lv] = { req: 0, why: '' };
+  // Points not spent yet (AP left) are a row of their own at your level, before the next level up.
+  const per = {}, left = s.apLeft || 0, first = left ? s.level : s.level + 1, cap = lv => lv === s.level ? left : 5;
+  for (let lv = first; lv < until; lv++) per[lv] = { req: 0, why: '' };
   let have = s[cls.reqStat];
   for (const T of Object.keys(tiers).map(Number).sort((a, b) => a - b)) {
     let need = tiers[T].need - have;
     if (need <= 0) continue;
     have += need;
-    for (let lv = T - 1; lv > s.level && need > 0; lv--) {
-      const take = Math.min(5 - per[lv].req, need);
+    for (let lv = T - 1; lv >= first && need > 0; lv--) {
+      const take = Math.min(cap(lv) - per[lv].req, need);
       if (take <= 0) continue;
       per[lv].req += take; need -= take; per[lv].why = 'So you can wear a ' + tiers[T].name + ' at ' + T + ' (it needs ' + tiers[T].need + ' ' + STAT_NAME[cls.reqStat] + ').';
       per[lv].wear = { name: tiers[T].name, level: T, need: tiers[T].need };
     }
   }
   const rows = [];
-  for (let lv = s.level + 1; lv < until; lv++) {
-    const p = per[lv], main = 5 - p.req;
-    const put = p.req ? p.req + ' ' + STAT_NAME[cls.reqStat] + (main ? ', ' + main + ' ' + STAT_NAME[cls.mainStat] : '') : '5 ' + STAT_NAME[cls.mainStat];
+  for (let lv = first; lv < until; lv++) {
+    const p = per[lv], main = cap(lv) - p.req, now = lv === s.level;
+    const put = p.req ? p.req + ' ' + STAT_NAME[cls.reqStat] + (main ? ', ' + main + ' ' + STAT_NAME[cls.mainStat] : '') : cap(lv) + ' ' + STAT_NAME[cls.mainStat];
     const why = p.why || 'Your main stat, it adds the most damage.';
     const last = rows[rows.length - 1];
-    if (last && last.put === put && last.why === why && last.to === lv - 1) last.to = lv;
-    else rows.push({ from: lv, to: lv, put, why, req: p.req, ...(p.wear ? { wear: p.wear } : {}) });
+    if (last && !last.now && !now && last.put === put && last.why === why && last.to === lv - 1) last.to = lv;
+    else rows.push({ from: lv, to: lv, put, why, req: p.req, ...(now ? { now: true } : {}), ...(p.wear ? { wear: p.wear } : {}) });
   }
   return rows;
 }
@@ -707,7 +710,7 @@ function whyStage(a, b, cls, slot, pick, was, from) {
 function pointsPlan(g) {
   const lv = g.stats.level, order = { up: 0, job: 1, ap: 2, sp: 3 };
   const events = [
-    ...g.ap.map(a => ({ kind: 'ap', from: a.from, to: a.to, text: a.put, note: a.wear ? 'so you can wear a ' + a.wear.name + ' at ' + a.wear.level + ' (needs ' + a.wear.need + ')' : 'your main stat' })),
+    ...g.ap.map(a => ({ kind: 'ap', from: a.from, to: a.to, now: a.now, text: a.put, note: a.wear ? 'so you can wear a ' + a.wear.name + ' at ' + a.wear.level + ' (needs ' + a.wear.need + ')' : 'your main stat' })),
     ...g.skills.steps.map(st => ({ kind: 'sp', from: st.from, to: st.to, text: st.text })),
     ...g.next.filter(n => n.kind !== 'skill').map(n => ({ kind: n.kind === 'gear' ? 'up' : 'job', from: n.level, to: n.level, text: n.kind === 'gear' ? 'Equip ' + n.name : n.text })),
   ].sort((a, b) => a.from - b.from || order[a.kind] - order[b.kind]);
@@ -730,7 +733,7 @@ const ASSUMED_LABEL = { ...LABEL, atkMin: 'attack range', atkMax: 'attack range'
 const ui = { deps: null, data: null, root: null, form: { cls: 'cleric', v: {}, s: {} }, timer: 0, read: new Set(), lastPic: null };
 const FROM = ['mine', 'community', 'read'];
 const E = (...a) => ui.deps.el(...a);
-const fieldsOf = cls => cls.fields.flatMap(f => INPUTS[f]);
+const fieldsOf = cls => cls.fields.flatMap(f => INPUTS[f]).concat([['apLeft', 'AP left']]);
 const formLevel = () => Number(ui.form.v.level) || ADVANCE;
 // The weapon the form shows: the picked one when this class can hold it, else the best for the level.
 const formWeapon = cls => weaponOf(cls, formLevel(), ui.form.v.weapon);
@@ -926,7 +929,7 @@ function renderPanels(g) {
   train.append(train.querySelector('.b-foot'));
 
   const pts = pointsPlan(g), chip = { ap: 'AP', sp: 'SP', up: 'upgrade', job: 'job' };
-  const row = e => E('li', { class: 'b-ev', 'data-from': String(e.from) }, E('span', { class: 'num' }, range(e.from, e.to)),
+  const row = e => E('li', { class: 'b-ev', 'data-from': String(e.from) }, E('span', { class: 'num' }, e.now ? 'Now' : range(e.from, e.to)),
     E('span', {}, E('b', {}, e.text), e.note ? E('span', { class: 'small' }, ' ' + e.note) : null, ' ', E('span', { class: 'b-chip ' + e.kind }, chip[e.kind])));
   const now = Object.keys(g.skills.now).map(id => ui.data.skills[id].name + ' ' + g.skills.now[id]).join(', ');
   const points = ui.root.querySelector('#points');
@@ -1042,6 +1045,13 @@ function renderGuide() {
   out.querySelector('#b-estimated').hidden = !g.estimated;
   renderBig(g, cls); renderNow(g, cls); renderPanels(g);
   return g;
+}
+
+// New build: a blank form in the same class for another character. Saved builds stay as they are, and Save makes a new one.
+function newBuild() {
+  ui.form = { cls: ui.form.cls, v: {}, s: {} };
+  ui.read.clear(); ui.editing = null; ui.lastIgn = '';
+  saveForm(); buildForm(); renderGuide(); renderSave();
 }
 
 // Puts a build's stats into the calculator (from a saved card: from is 'mine' or 'community').
@@ -1405,6 +1415,7 @@ function mount(root, deps) {
             E('span', { class: 'small' }, 'level'))),
         E('div', { class: 'b-act' },
           E('button', { id: 'b-readbtn', type: 'button', class: 'b-primary', onclick: openReader }, 'Read from game'),
+          E('button', { id: 'b-new', type: 'button', class: 'linkish', onclick: newBuild }, 'New build'),
           E('button', { id: 'b-edit', type: 'button', class: 'linkish', 'aria-controls': 'b-drawer', 'aria-expanded': String(editOpen), onclick: () => toggle('b-drawer', 'bt.bedit') }, 'Edit stats and skills')),
         E('div', { id: 'b-big', class: 'b-big' }),
         E('p', { id: 'b-msg' })),
