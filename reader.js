@@ -638,7 +638,10 @@ var SEEDS = {"glyphs":{"0":[{"g":[21,83,153,177,177,164,115,22,90,154,206,222,22
       var pending = s = { starting: true }, got = null, cur = null;
       share.disabled = true;
       var video = o.full ? { frameRate: 5, width: { ideal: 7680 }, height: { ideal: 4320 } } : { frameRate: 5 };
-      navigator.mediaDevices.getDisplayMedia({ video: video, audio: false }).then(function (stream) {
+      // the picker opens on its Window list, where the game is, and leaves this tab out (a page can't pick the window
+      // itself: the browser makes the player choose). Entire screen stays, as some games only share that way in full screen
+      video.displaySurface = 'window';
+      navigator.mediaDevices.getDisplayMedia({ video: video, audio: false, selfBrowserSurface: 'exclude' }).then(function (stream) {
         got = stream;
         if (dead || s !== pending) { stream.getTracks().forEach(function (t) { t.stop(); }); return; }
         var track = stream.getVideoTracks()[0];

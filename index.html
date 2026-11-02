@@ -250,6 +250,8 @@ select { background: var(--surface); border: 1.5px solid var(--btn-line); border
 #view-grind { max-width: 1180px; }
 /* the tester link (?only=grind): just the Grind tab */
 body.only-grind #tab-timer, body.only-grind #tab-builds, body.only-grind #tab-appraiser { display: none; }
+/* the Timer is off for now (window.BT_TIMER turns it on): its tab and its parts of How it works go */
+body.timer-off #tab-timer, body.timer-off .timer-only { display: none; }
 #view-grind h2 { font: 600 30px/1.2 var(--font-title); margin: 8px 0 4px; }
 #view-grind h3 { font: 600 20px var(--font-title); margin: 26px 0 8px; }
 #view-grind [hidden] { display: none !important; }
@@ -272,6 +274,58 @@ body.only-grind #tab-timer, body.only-grind #tab-builds, body.only-grind #tab-ap
 .g-check li::before { content: '…'; color: var(--muted); font-weight: 800; }
 .g-check li.done::before { content: '✓'; color: var(--up-fg); }
 .g-check li.fix::before { content: '!'; color: var(--over-fg); }
+/* Count my loot: the switch and the bag's tabs under the reading checks, and the result card at the top of Session
+   details (four even tiles, the session's Lemons and Meat, what was picked up). Every tile in a row is the same size */
+.g-loot { display: block; width: 100%; margin-top: 10px; padding: 10px 14px; border-radius: 12px; border: 1.5px solid var(--btn-line); background: var(--btn); color: var(--ink); font: 800 15px var(--font-body); text-align: left; cursor: pointer; }
+.g-loot::before { content: '○ '; color: var(--muted); }
+.g-loot[aria-pressed="true"] { background: var(--up-bg); color: var(--up-fg); border-color: transparent; }
+.g-loot[aria-pressed="true"]::before { content: '● '; color: var(--up-fg); }
+.g-bagcheck { margin-top: 8px; }
+.g-bagcheck li { grid-template-columns: 22px 52px minmax(0, 1fr); }
+.g-res { background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 18px; padding: 18px 20px; margin: 0 0 14px; line-height: 1.45; }
+.g-res-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.g-res-hr { font: 700 36px/1.1 var(--font-num); color: var(--num); font-variant-numeric: tabular-nums; }
+.g-res .pos, .g-res-hr.pos { color: var(--up-fg); }
+.g-res .neg, .g-res-hr.neg { color: var(--over-fg); }
+.g-res-pill { padding: 3px 10px; border-radius: 999px; font: 700 13px var(--font-body); background: var(--line); color: var(--muted); }
+.g-res-pill.up { background: var(--up-bg); color: var(--up-fg); }
+.g-res-pill.down { background: var(--over-bg); color: var(--over-fg); }
+.g-res-sub { color: var(--muted); font-size: 14px; margin-top: 2px; }
+.g-res-win { display: block; }
+.g-res-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 16px 0; }
+.g-res-tile { display: flex; flex-direction: column; gap: 2px; min-width: 0; min-height: 84px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--page); }
+.g-res-tv { font: 700 20px var(--font-num); font-variant-numeric: tabular-nums; }
+.g-res-tile.off .g-res-tv { font: 600 14px var(--font-body); color: var(--muted); }
+.g-res-ts { font-size: 12px; color: var(--muted); }
+.g-res-eats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.g-res-eat { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 12px; align-items: start; padding: 12px 14px; border-radius: 12px; min-width: 0; }
+.g-res-eat:nth-child(1) { background: linear-gradient(135deg, #fff6c9, #ffe27a); border: 1px solid #f3d36a; --t-n: #7a4f00; --t-s: #6a5520; }
+.g-res-eat:nth-child(2) { background: linear-gradient(135deg, #ffe3d6, #ffc2a3); border: 1px solid #f2a987; --t-n: #8a2f10; --t-s: #7a3a1c; }
+:root[data-theme="dark"] .g-res-eat:nth-child(1) { background: linear-gradient(135deg, #2f2a14, #463a12); border-color: #6a5a1e; --t-n: #ffe58a; --t-s: #d8c890; }
+:root[data-theme="dark"] .g-res-eat:nth-child(2) { background: linear-gradient(135deg, #33201a, #4a2618); border-color: #74402a; --t-n: #ffb08a; --t-s: #e0b8a0; }
+.g-res-eat img { width: 40px; height: 40px; image-rendering: pixelated; }
+.g-res-en { font: 700 22px/1.1 var(--font-num); color: var(--t-n); margin-bottom: 6px; }
+.g-res-en span { font: 600 14px var(--font-body); color: var(--t-s); }
+.g-res-eat p { margin: 0 0 3px; font-size: 13px; color: var(--t-s); }
+.g-res-h { margin: 18px 0 8px; }
+.g-res-loot { display: grid; gap: 6px; }
+.g-res-li { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 44px; padding: 6px 8px; border-radius: 8px; background: var(--page); font-size: 14px; }
+.g-res-li b { font: 700 15px var(--font-num); font-variant-numeric: tabular-nums; }
+.g-res-li small { display: block; font-size: 12px; color: var(--up-fg); }
+.g-res-li.best { outline: 1.5px solid #e7c46a; background: color-mix(in srgb, #e7c46a 16%, var(--page)); }
+.g-res-li.best small { color: #a07a10; }
+:root[data-theme="dark"] .g-res-li.best small { color: #e7c46a; }
+.g-res-li.sum { background: none; border-top: 1px solid var(--line); border-radius: 0; min-height: 36px; }
+.g-res-ic { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 6px; background: var(--surface); }
+.g-res-ic img { max-width: 32px; max-height: 32px; image-rendering: pixelated; }
+.g-res-lines { display: grid; gap: 4px; margin-top: 14px; font-size: 14px; }
+.g-res-lines:empty { display: none; }
+.g-res-nudge { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-top: 14px; padding: 12px 14px; border: 1px dashed var(--line); border-radius: 12px; font-size: 14px; }
+.g-res-nudge .g-btn { width: auto; min-height: 40px; }
+.g-nk.v { padding: 2px 9px; border-radius: 999px; font: 700 13px var(--font-body); }
+.g-nk.v.up { background: #1d4a2f; color: #7be29c; }
+.g-nk.v.down { background: #4a1d24; color: #ff9aa2; }
+@media (max-width: 640px) { .g-res-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .g-res-eats { grid-template-columns: minmax(0, 1fr); } }
 .g-check li b { font-weight: 800; }
 .g-check li span { color: var(--muted); overflow-wrap: anywhere; }
 .g-check li.done span { color: var(--ink); }
@@ -776,11 +830,11 @@ b.t { font-family: var(--font-num); }
 <header class="topbar"><div class="in">
   <h1 class="logo">Six Path <b>Crossway</b></h1>
   <nav class="tabs" role="tablist" aria-label="Pages">
-    <button id="tab-timer" type="button" role="tab" aria-controls="view-timer" aria-selected="true">Timer</button>
+    <button id="tab-how" type="button" role="tab" aria-controls="view-how" aria-selected="true">How it works</button>
+    <button id="tab-grind" type="button" role="tab" aria-controls="view-grind" aria-selected="false">Grind</button>
     <button id="tab-builds" type="button" role="tab" aria-controls="view-builds" aria-selected="false">Builds</button>
     <button id="tab-appraiser" type="button" role="tab" aria-controls="view-appraiser" aria-selected="false">Appraiser</button>
-    <button id="tab-grind" type="button" role="tab" aria-controls="view-grind" aria-selected="false">Grind</button>
-    <button id="tab-how" type="button" role="tab" aria-controls="view-how" aria-selected="false">How it works</button>
+    <button id="tab-timer" type="button" role="tab" aria-controls="view-timer" aria-selected="false">Timer</button>
   </nav>
   <span class="auth">
     <span id="who" hidden></span>
@@ -792,7 +846,7 @@ b.t { font-family: var(--font-num); }
     <svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="currentColor"/><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg>
   </button>
 </div></header>
-<main id="view-timer" role="tabpanel" aria-labelledby="tab-timer">
+<main id="view-timer" role="tabpanel" aria-labelledby="tab-timer" hidden>
   <section id="stage" aria-label="Selected boss">
     <div class="stars"></div>
     <div class="ground"></div>
@@ -826,9 +880,15 @@ b.t { font-family: var(--font-num); }
 <main id="view-grind" hidden>
   <div id="grind-root"><p class="empty">Loading the grind tracker...</p></div>
 </main>
-<main id="view-how" role="tabpanel" aria-labelledby="tab-how" hidden>
+<main id="view-how" role="tabpanel" aria-labelledby="tab-how">
   <h2>How it works</h2>
 
+  <h3>Grind</h3>
+  <p class="lead">The Grind tab keeps score while you train. Press Share game window, pick MapleStory and go. There's nothing to type: it reads your EXP bar, your level and the potions on your quickslots straight off the screen, so every potion you drink needs a quickslot.</p>
+  <p>EXP an hour runs from your first kill to your latest, so the walk out of town and the wait at the end don't drag it down, while a repot trip in the middle still counts. The Lemon glass drains as you drink and says Squeeze time! when you're down to 5 minutes. Pop out over the game floats the live numbers in a small window over MapleStory, and this page keeps your record: Lemons and Meat eaten, hours, levels and your best sessions.</p>
+  <p>Open your inventory now and then and it counts your mesos too. Want to know if a session made or lost mesos? Turn on Count my loot and flip through your Equip, Use and Etc tabs at the start and again at the end. It counts the mesos you picked up and sold for, adds what your bags gained or lost (priced at what an NPC pays), takes off the potions you drank, and calls the session Profitable or Losing. The reading happens on your computer, and your game pictures stay there unless you send one with a Something off? report. Signed in, your sessions save to your account and nobody else can see them. Signed out, they stay on this device.</p>
+
+  <div class="timer-only">
   <h3>Why post</h3>
   <p class="lead">Boss camping comes down to patience and luck, and whoever does the most damage takes the loot. A timer won't change that. What it does change is how long everyone waits. Every kill or spawn you share makes the window sharper for the next person, and for you next time.</p>
 
@@ -855,6 +915,7 @@ b.t { font-family: var(--font-num); }
 
   <h3>How the window learns</h3>
   <p>The game files say 60 minutes for Mushmom, but real camps run longer. Only a kill followed by a spawn that the same person watched counts as a camp, and their Still waiting posts help too. Until a boss has 5 camps the window is a wide guess, from the game timer to twice that. Heard posts show dashed and never count.</p>
+  </div>
 
   <h3>Builds</h3>
   <p>The Builds tab turns your stat window into a leveling guide: where to train, where your skill and ability points go, and what to wear and scroll. Monster, skill and item numbers come from the game's own files, and the damage math is meowdb's Classic formulas. Where to train is ranked by EXP per cast, from a few thousand simulated kills with your damage range, crits, monster defense and hit chance.</p>
@@ -870,10 +931,12 @@ b.t { font-family: var(--font-num); }
   <h3>Discord</h3>
   <p>Something look off, or have an idea? Press Something off? in the corner of any page and it comes straight to Rimmah, with a picture of what you saw. Fixes and news go up in our Discord. <a id="how-discord" href="https://discord.gg/sHupB2U7tD" target="_blank" rel="noopener">Join our Discord</a></p>
 
+  <div class="timer-only">
   <h3>Fair play</h3>
   <p>One post every 15 seconds. Your Discord name shows on everything you post. False posts get hidden and the account blocked.</p>
+  </div>
 
-  <p class="small smallprint">Fan made, not affiliated with Nexon. Boss art comes from the MapleStory client and belongs to Nexon.</p>
+  <p class="small smallprint">Fan made, not affiliated with Nexon. Game art comes from the MapleStory client and belongs to Nexon.</p>
 </main>
 <button id="flag" class="flag" type="button" aria-label="Report something off">⚑ Something off?</button>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
@@ -885,7 +948,7 @@ const CONFIG = {
   reportUrl: 'https://sixpathcrossway.pages.dev/api/report',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-02e',
+  version: '2026-11-02f',
 };
 
 /* BOSSES:START */
@@ -1098,7 +1161,7 @@ function makeSupabaseApi(cfg) {
       listPriceReports: down, addPriceReport: down, deletePriceReport: down, listPriceHistory: down, savePriceHistory: down };
   }
   const COLUMNS = 'id,boss_id,channel,kind,at,posted_at,user_id,user_name,hidden';
-  const GRIND_LIST = 'id,map_id,started_at,ended_at,level_start,level_end,exp,pct,active_min,deaths,mesos_earned,meso_min,etc_value,etc_min,potions';
+  const GRIND_LIST = 'id,map_id,started_at,ended_at,level_start,level_end,exp,pct,active_min,deaths,mesos_earned,meso_min,etc_value,etc_min,potions,loot_mode,result,result_min,exp_min';
   const BUILD_COLUMNS = 'id,user_id,ign,class,level,stats,trains_at,note,shot_path,hidden,updated_at';
   // the Appraiser's tables never hand out who wrote a row (appraiser.sql grants no select on user_id)
   const REPORT_COLUMNS = 'id,item_id,bonus,slots_left,price,kind,reporter,created_at';
@@ -1216,6 +1279,9 @@ function makeSupabaseApi(cfg) {
 /* ---------- UI ---------- */
 
 const api = window.BT_API || makeSupabaseApi(CONFIG);
+// The Timer is off for now (Rimmah, 2026-11-02): no tab, no view, and none of it runs (no posts fetched, nothing kept
+// live). window.BT_TIMER = true turns it back on, as the tests do; bringing the tab back is making this true
+const TIMER_ON = window.BT_TIMER === true;
 const $ = id => document.getElementById(id);
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
@@ -1281,9 +1347,10 @@ function walk() {
 }
 
 function startWalk() { placeSprite(); sprite.start = Date.now(); walk(); }
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') clearTimeout(sprite.timer); else walk(); });
+// (no boss walks until the stage has been laid out, and never with the Timer off)
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') clearTimeout(sprite.timer); else if (sprite.lay) walk(); });
 let resizeTimer = null;
-addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { placeSprite(); walk(); }, 150); });
+addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (sprite.lay) { placeSprite(); walk(); } }, 150); });
 
 // Boss buttons show frame 0 of the same strip, scaled to a small chip. Built once, so a switch keeps keyboard focus.
 function markBosses() {
@@ -1452,7 +1519,7 @@ async function setSession(s) {
   state.admin = s ? await api.isAdmin().catch(() => false) : false;
   if (s) comeBack();
   renderAuth();
-  render();
+  if (TIMER_ON) render();
   if (window.Builds && window.Builds.refresh) window.Builds.refresh();
   if (window.Appraiser && window.Appraiser.refresh) window.Appraiser.refresh();
 }
@@ -1492,9 +1559,11 @@ const ONLY = 'bt.only';
 }
 const onlyGrind = () => store.get(ONLY) === 'grind';
 document.body.classList.toggle('only-grind', onlyGrind());
+document.body.classList.toggle('timer-off', !TIMER_ON);
+// the front page is How it works while the Timer is off; the tester link opens Grind wherever it lands, How it works aside
 function viewNow() {
-  const view = { '#how': 'how', '#builds': 'builds', '#appraiser': 'appraiser', '#grind': 'grind' }[location.hash] || 'timer';
-  return onlyGrind() && view !== 'how' ? 'grind' : view;
+  const view = { '#how': 'how', '#builds': 'builds', '#appraiser': 'appraiser', '#grind': 'grind' }[location.hash] || (TIMER_ON ? 'timer' : 'how');
+  return onlyGrind() && location.hash !== '#how' ? 'grind' : view;
 }
 function showView() {
   const view = viewNow();
@@ -1612,17 +1681,19 @@ function chooseBoss(id) {
   state.full = []; state.recent = []; state.open = null; state.gen++;
   markBosses(); startWalk(); render(); subscribeBoss(); fetchFull();
 }
-renderBosses();
-startWalk();
 renderAuth();
-render();
-fetchFull();
-subscribeBoss();
+if (TIMER_ON) {
+  renderBosses();
+  startWalk();
+  render();
+  fetchFull();
+  subscribeBoss();
+  setInterval(() => { if (!state.live) fetchRecent(); }, 60 * 1000);
+  setInterval(fetchFull, 15 * 60 * 1000);
+  setInterval(render, 30 * 1000);
+}
 api.getSession().then(setSession, () => setSession(null));
 try { api.onAuth(s => setSession(s)); } catch { /* sign in still works after a reload */ }
-setInterval(() => { if (!state.live) fetchRecent(); }, 60 * 1000);
-setInterval(fetchFull, 15 * 60 * 1000);
-setInterval(render, 30 * 1000);
 </script>
 </body>
 </html>

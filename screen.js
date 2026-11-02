@@ -164,8 +164,9 @@ function load(pics) {
     for (const [k, u] of Object.entries(pics[set] || {})) jobs.push(img(u).then(i => { if (i) raw[key][k] = i; }));
   }
   if (pics.InvBg) jobs.push(img(pics.InvBg).then(i => { raw.inv = i; }));
-  raw.etcIcon = {};
+  raw.etcIcon = {}; raw.cursor = {};
   for (const [k, u] of Object.entries(pics.EtcIcons || {})) jobs.push(img(u).then(i => { if (i) raw.etcIcon[k] = i; }));
+  for (const [k, u] of Object.entries(pics.Cursor || {})) jobs.push(img(u).then(i => { if (i) raw.cursor[k] = i; }));
   raw.mesoDigits = pics.MesoDigits || {};
   return Promise.all(jobs).then(() => { cache.clear(); icons = null; inv = null; etcIcons = null; slotSc = { s: 0, sc: 0 }; });
 }
@@ -565,6 +566,8 @@ function scanBoxes(src, take) {
   const { w: W, h: H } = sizeOf(src);
   const g = ctx2d(W, H); g.drawImage(src, 0, 0);
   const d = g.getImageData(0, 0, W, H).data, white = i => Math.min(d[i * 4], d[i * 4 + 1], d[i * 4 + 2]) >= 236, tried = [];
+  // how many rows of white, up and down from row y, at column x
+  const whiteRun = (x, y) => { let a = y, z = y; while (a > 0 && white((a - 1) * W + x)) a--; while (z < H - 1 && white((z + 1) * W + x)) z++; return z - a + 1; };
   for (let y = 2; y < H - 2; y += 2) {
     let st = -1;
     for (let x = 0; x <= W; x++) {
@@ -572,7 +575,11 @@ function scanBoxes(src, take) {
       if (on && st < 0) st = x;
       if (on || st < 0) continue;
       const len = x - st, s = len / G.fw;
-      if (s >= 0.7 && s <= 3.4 && !tried.some(q => Math.abs(q[0] - st) < 4 && Math.abs(q[1] - len) < 4 && Math.abs(q[2] - y) < 40)) {
+      // the box's field is white straight up and down at its left edge for its height (as invGeometry measures it in the
+      // client's picture): a white line, text or the sky isn't, and skipping them before the label match keeps the
+      // hunt light (every white streak of the width got the match: 205 ms a hunt)
+      const tall = s >= 0.7 && s <= 3.4 ? whiteRun(st + Math.max(2, Math.round(2 * s)), y) : 0;
+      if (tall >= 0.6 * G.fh * s && tall <= 1.4 * G.fh * s && !tried.some(q => Math.abs(q[0] - st) < 4 && Math.abs(q[1] - len) < 4 && Math.abs(q[2] - y) < 40)) {
         tried.push([st, len, y]);
         const c = confirmBox(src, st, y, len), r = c && take(c);
         if (r) return r;
@@ -650,13 +657,15 @@ function windowOf(box) {
   const G = invGeometry();
   return { x: box.x - G.fx0 * box.s, y: box.y - G.fy0 * box.s, s: box.s };
 }
-// the open tab is the pink one in the tab bar
+// the open tab is the pink one in the tab bar (Item.img Tab enabled, 224,96,128). After something new lands in a tab it
+// blinks: Item.img New/Tab lays white over it at up to 73%, so the open one goes as pale as 236,201,210, still redder
+// than it is green or blue, where the grey tabs and the white names never are
 function readTab(src, win) {
   const s = win.s, img = region(src, win.x + 4 * s, win.y + 21 * s, 201 * s, 16 * s), d = img.data;
   let sum = 0, n = 0;
   for (let y = 0; y < img.h; y++) for (let x = 0; x < img.w; x++) {
     const k = (y * img.w + x) * 4;
-    if (d[k] > 170 && d[k + 1] < 150 && d[k + 2] < 170 && d[k] - d[k + 1] > 50) { sum += x; n++; }
+    if (d[k] > 170 && d[k] - d[k + 1] > 25 && d[k] - d[k + 2] > 10) { sum += x; n++; }
   }
   if (n < 20 * s) return null;
   return TABS[Math.max(0, Math.min(5, Math.floor((sum / n / s + 4 - 5) / 33.5)))];
@@ -666,12 +675,18 @@ const SLOT_MORE = 0.6;
 let slotSc = { s: 0, sc: 0 }, slotCache = { key: '', slots: {} };   // the item in each slot, while its count stays
 function slotRect(win, r, c) { const s = win.s; return { x: win.x + (SLOT.x0 + c * SLOT.px) * s, y: win.y + (SLOT.y0 + r * SLOT.py) * s, w: SLOT.w * s, h: SLOT.h * s }; }
 // the number at the bottom left of a slot, or null
-function slotNumber(src, rect, sc) {
+// guardLeft (the bag reader): something digit like just left of the first digit means a faint leading 1 was missed
+// ("12" read as "2" on a small share), so none
+function slotNumber(src, rect, sc, guardLeft) {
   const set = setAt('count', sc), t0 = set['0'];
   const img = region(src, rect.x - 3, rect.y + rect.h - t0.h - 6, Math.min(rect.w, t0.w * 4) + 6, t0.h + 9);
   let first = { score: -1 };
   for (const d of SLOT_KEYS) { const b = best(img, set, [d], 0, Math.min(8, img.w - set[d].w), 0, img.h - set[d].h); if (b.score > first.score) first = b; }
   if (first.score < NEXT) return null;
+  if (guardLeft) {
+    const w1 = set['1'].w, x1 = first.x - w1 - 2, x2 = first.x - w1 + 1;
+    if (x2 >= 0 && best(img, set, ['1', '1~'], Math.max(0, x1), x2, Math.max(0, first.y - 1), Math.min(img.h - set['1'].h, first.y + 1)).score >= SLOT_MORE) return null;
+  }
   const n = [first];
   for (let k = 0; k < 4; k++) {
     const l = n[n.length - 1], r = best(img, set, SLOT_KEYS, l.x + l.t.w - 2, l.x + l.t.w + 2, l.y - 1, l.y + 1);
@@ -746,6 +761,311 @@ function readInventory(src) {
   return { ok: true, tab, box, slots };
 }
 
+/* ---------- the bag for Count my loot: every item in the open tab, and where the scrollbar is ---------- */
+
+// Every Equip, Use and Etc picture in the client (data/loot-icons.*, one cell per distinct picture), per tab. Each keeps
+// its solid pixels above the bottom 12 rows (where a count is drawn) and a colour histogram of them, so a slot is first
+// narrowed to the few pictures with the nearest colours and only those are matched pixel by pixel.
+let loot = null;
+const HBINS = 64, NEAR = 32, NEAR_COLOUR = 16;
+const bgLike = (r, g, b) => Math.abs(r - 229) + Math.abs(g - 231) + Math.abs(b - 219) < 40 || (r > 240 && g > 240 && b > 240);
+function hist(d, list) {
+  const h = new Float32Array(HBINS); let n = 0;
+  for (const k of list) { if (bgLike(d[k], d[k + 1], d[k + 2])) continue; h[(d[k] >> 6) * 16 + (d[k + 1] >> 6) * 4 + (d[k + 2] >> 6)]++; n++; }
+  if (n) for (let i = 0; i < HBINS; i++) h[i] /= n;
+  return { h, n };
+}
+function loadLoot(sheet, index) {
+  const g = ctx2d(sheet.width, sheet.height); g.drawImage(sheet, 0, 0);
+  const all = g.getImageData(0, 0, sheet.width, sheet.height).data, W = sheet.width;
+  const tabs = index.cells.map(() => new Set());
+  for (const [tab, , , k] of Object.values(index.items)) tabs[k].add(tab);
+  const sets = { Equip: [], Use: [], Etc: [] };
+  index.cells.forEach((c, k) => {
+    const x0 = (k % index.cols) * index.cell, y0 = Math.floor(k / index.cols) * index.cell, d = new Uint8ClampedArray(c.w * c.h * 4);
+    for (let y = 0; y < c.h; y++) d.set(all.subarray(((y0 + y) * W + x0) * 4, ((y0 + y) * W + x0 + c.w) * 4), y * c.w * 4);
+    const idx = [];
+    for (let i = 0; i < c.w * Math.max(1, c.h - 12); i++) if (d[i * 4 + 3] > 200) idx.push(i);
+    if (idx.length < 8) return;
+    // every 7th solid pixel for the quick first pass over all pictures, then every pixel for the few left
+    const t = { cell: k, w: c.w, h: c.h, d, idx, few: idx.filter((_, j) => j % 7 === 0), hist: hist(d, idx.map(i => i * 4)).h };
+    for (const tab of tabs[k]) sets[tab].push(t);
+  });
+  loot = { sets };
+  bagCache = { key: '', slots: {} };
+}
+// The scrollbar right of the slots, in the window's base pixels: the track runs down x 196 between the arrows and the
+// thumb is a bar of a fixed size (~25 px) in it, so it says how far down the tab is, never how long the tab is. No thumb
+// at all is a tab that fits on one page. Anything else over the track (a tooltip) leaves it unknown (null).
+// The track is read 2 px in from each arrow (at a big stretch its first row lands on the arrow's edge), as runs of
+// not-track pixels joined across small gaps (the thumb has highlight lines across it), specks dropped
+const SCR = { x: 196, y0: 65, y1: 236, min: 16, max: 34 };
+function readScroll(src, win) {
+  const s = win.s, img = region(src, win.x + SCR.x * s, win.y + SCR.y0 * s, 1, (SCR.y1 - SCR.y0) * s), d = img.data, H = img.h, runs = [];
+  for (let y = 0, st = -1, blue = false; y <= H; y++) {
+    const k = y * 4, L = y < H ? img.L[y] : 255, on = y < H && !(L > 215 && !(d[k + 2] > 200 && L < 190));
+    if (on) { if (st < 0) { st = y; blue = false; } if (d[k + 2] > 200 && L < 190) blue = true; continue; }
+    if (st < 0) continue;
+    const last = runs[runs.length - 1];
+    if (last && (st - last.b) / s <= 2.5) { last.b = y - 1; last.blue = last.blue || blue; } else runs.push({ a: st, b: y - 1, blue });
+    st = -1;
+  }
+  const real = runs.filter(r => (r.b - r.a + 1) / s >= 2);
+  if (!real.length) return { at: 0, top: true, bottom: true, none: true };
+  if (real.length > 1) return null;
+  const r = real[0], len = (r.b - r.a + 1) / s;
+  if (len < SCR.min || len > SCR.max) return null;   // a tooltip over the track is far longer than the thumb
+  const span = (SCR.y1 - SCR.y0) - len;
+  return { at: Math.max(0, Math.min(1, (r.a / s) / span)), top: r.a / s <= 2, bottom: (H - 1 - r.b) / s <= 2 };
+}
+// the count digits' own stretch on this window, fine tuned once per window size on the slots that have a number
+function countScale(src, win, box) {
+  if (Math.abs(slotSc.s - box.s) <= 0.001) return slotSc.sc;
+  let bestSc = { sc: box.s * 0.975, score: -1 };
+  for (let sc = box.s * 0.95; sc <= box.s * 1.01; sc += 0.0125) {
+    const scores = [];
+    for (let r = 0; r < 2; r++) for (let c = 0; c < SLOT.cols; c++) { const n = slotNumber(src, slotRect(win, r, c), sc); if (n) scores.push(n.score); }
+    const mean = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+    if (mean > bestSc.score) bestSc = { sc, score: mean };
+  }
+  slotSc = { s: box.s, sc: bestSc.sc };
+  return slotSc.sc;
+}
+// the item in a slot: the nearest pictures by colour, then the best pixel match among them. Named only when it's under
+// the same bar as the potions (75) and clearly ahead of the next picture, so two look alike pictures read as unsure
+const BAG_SURE = 55, BAG_GAP = 4, BAG_FLAT = 0.45;
+// is anything in the slot: the share of its inside that isn't the slot's own pale fill
+// cover: the pointer over the slot (pointerOn); its pixels don't count, and too little left showing is still filled
+function slotFilled(src, rect, s, cover) {
+  const ins = 3 * s, x0 = Math.round(rect.x + ins), y0 = Math.round(rect.y + ins), img = region(src, x0, y0, rect.w - 2 * ins, rect.h - 2 * ins), d = img.data;
+  let n = 0, seen = 0;
+  for (let i = 0; i < img.w * img.h; i++) {
+    if (cover && cover.has(x0 + (i % img.w), y0 + ((i / img.w) | 0))) continue;
+    seen++;
+    if (!bgLike(d[i * 4], d[i * 4 + 1], d[i * 4 + 2])) n++;
+  }
+  return seen < 0.3 * img.w * img.h || n / seen > 0.06;
+}
+// The mouse pointer over a slot: the client's own pointer pictures (Basic.img Cursor, the open hand over a slot)
+// stretched by s and matched by colour wherever they'd overlap the slot. { has(x, y) } for the frame pixels it covers
+// (a 2 px margin for the video's smear), or null when no pointer is there
+const POINTER_SURE = 35;
+let pointerPics = { s: 0, list: [] };
+function pointerOn(src, rect, s) {
+  if (pointerPics.s !== s) {
+    pointerPics = { s, list: Object.values(raw.cursor || {}).map(im => {
+      const w = Math.round(im.width * s), h = Math.round(im.height * s), g = ctx2d(w, h);
+      g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(im, 0, 0, w, h);
+      const d = g.getImageData(0, 0, w, h).data, few = [], cover = new Uint8Array(w * h);
+      for (let i = 0; i < w * h; i++) if (d[i * 4 + 3] > 200 && i % 3 === 0) few.push(i);
+      for (let i = 0; i < w * h; i++) if (d[i * 4 + 3] > 0) cover[i] = 1;
+      return { w, h, d, few, cover };
+    }) };
+  }
+  let best = null;
+  for (const t of pointerPics.list) {
+    const ax = Math.round(rect.x - t.w), ay = Math.round(rect.y - t.h), img = region(src, ax, ay, rect.w + 2 * t.w, rect.h + 2 * t.h), D = img.data;
+    for (let y = 1; y + t.h < img.h; y += 2) for (let x = 1; x + t.w < img.w; x += 2) {
+      const cap = (best ? best.diff : POINTER_SURE) * t.few.length * 3;
+      let sum = 0, j = 0;
+      for (; j < t.few.length && sum <= cap; j++) { const i = t.few[j], k = ((y + ((i / t.w) | 0)) * img.w + x + (i % t.w)) * 4, q = i * 4; sum += Math.abs(D[k] - t.d[q]) + Math.abs(D[k + 1] - t.d[q + 1]) + Math.abs(D[k + 2] - t.d[q + 2]); }
+      if (j === t.few.length && sum <= cap) best = { diff: sum / (t.few.length * 3), x: ax + x, y: ay + y, t };
+    }
+  }
+  if (!best) return null;
+  const { x: px, y: py, t } = best, M = 2;
+  return { diff: best.diff, has: (x, y) => {
+    for (let dy = -M; dy <= M; dy++) for (let dx = -M; dx <= M; dx++) {
+      const u = x - px + dx, v = y - py + dy;
+      if (u >= 0 && v >= 0 && u < t.w && v < t.h && t.cover[v * t.w + u]) return true;
+    }
+    return false;
+  } };
+}
+const lumStd = (d, list) => { let a = 0, b = 0; for (const k of list) { const L = lumAt(d, k); a += L; b += L * L; } const m = a / list.length; return Math.sqrt(Math.max(0, b / list.length - m * m)); };
+function bagIcon(src, rect, s, set) {
+  const W = 37, H = 37, g = ctx2d(W, H); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+  g.drawImage(src, rect.x - 3 * s, rect.y - 3 * s, W * s, H * s, 0, 0, W, H);
+  const d = g.getImageData(0, 0, W, H).data, top = [];
+  for (let y = 0; y < H - 12; y++) for (let x = 0; x < W; x++) top.push((y * W + x) * 4);
+  const hs = hist(d, top);
+  // first pass: every picture of the tab on a sample of its pixels and a 2 px grid of spots; the best NEAR go on to the
+  // full match (a colour histogram shortlist dropped the right picture for some equips and named a wrong one instead)
+  const near = set.map(t => {
+    let b = 1e9;
+    for (let y = 0; y + t.h <= H; y += 2) for (let x = 0; x + t.w <= W; x += 2) {
+      const base = y * W + x; let sum = 0;
+      for (const i of t.few) { const k = (base + ((i / t.w) | 0) * W + (i % t.w)) * 4, q = i * 4; sum += Math.abs(d[k] - t.d[q]) + Math.abs(d[k + 1] - t.d[q + 1]) + Math.abs(d[k + 2] - t.d[q + 2]); }
+      if (sum < b) b = sum;
+    }
+    return [b / (t.few.length * 3), t];
+  }).sort((a, b) => a[0] - b[0]).slice(0, NEAR);
+  // plus the nearest by colour, which catches a finely striped picture (a fence) the 2 px grid can miss
+  for (const [, t] of set.map(t => { let e = 0; for (let i = 0; i < HBINS; i++) e += Math.abs(t.hist[i] - hs.h[i]); return [e, t]; }).sort((a, b) => a[0] - b[0]).slice(0, NEAR_COLOUR))
+    if (!near.some(x => x[1] === t)) near.push([0, t]);
+  let first = { t: null, diff: 1e9 }, second = 1e9;
+  for (const [, t] of near) {
+    let bestT = 1e9, at = 0;
+    for (let y = 0; y + t.h <= H; y++) for (let x = 0; x + t.w <= W; x++) {
+      const n = t.idx.length, base = y * W + x, cap = bestT * n * 3;
+      let sum = 0, j = 0;
+      for (; j < n && sum <= cap; j++) {
+        const i = t.idx[j], k = (base + ((i / t.w) | 0) * W + (i % t.w)) * 4, q = i * 4;
+        sum += Math.abs(d[k] - t.d[q]) + Math.abs(d[k + 1] - t.d[q + 1]) + Math.abs(d[k + 2] - t.d[q + 2]);
+      }
+      if (j === n && sum / (n * 3) < bestT) { bestT = sum / (n * 3); at = base; }
+    }
+    if (bestT < first.diff) { second = first.diff; first = { t, diff: bestT, at }; } else if (bestT < second) second = bestT;
+  }
+  let sure = first.t && first.diff < BAG_SURE && second - first.diff >= BAG_GAP, why = !first.t || first.diff >= BAG_SURE ? 'none' : sure ? 'sure' : 'close';
+  // a flat patch (a tooltip's dark fill) can sit close to a dark picture's colours: the screen under the picture must
+  // have some of the picture's own light and shade
+  if (sure) {
+    const t = first.t, scr = t.idx.map(i => (first.at + ((i / t.w) | 0) * W + (i % t.w)) * 4);
+    if (lumStd(d, scr) < BAG_FLAT * lumStd(t.d, t.idx.map(i => i * 4))) { sure = false; why = 'flat'; }
+  }
+  return { cell: sure ? first.t.cell : null, diff: Math.round(first.diff), hist: hs.h, why };
+}
+let bagCache = { key: '', slots: {} };   // each slot's pixels and answer while the bag sits still
+// a slot and its margin cut from the grid picture, as whole luminance
+function pixelsOf(grid, rect, m) {
+  const x0 = Math.max(0, Math.round(rect.x - m) - grid.x), y0 = Math.max(0, Math.round(rect.y - m) - grid.y);
+  const w = Math.min(grid.w - x0, Math.round(rect.w + 2 * m)), h = Math.min(grid.h - y0, Math.round(rect.h + 2 * m)), f = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) f[y * w + x] = grid.L[(y0 + y) * grid.w + x0 + x];
+  return f;
+}
+// the same pixels, give or take a video's noise: a count going 46 to 47, the pointer or a tooltip moves dozens by far more
+function samePixels(a, b) {
+  if (!a || a.length !== b.length) return false;
+  for (let i = 0, n = 0; i < a.length; i++) if (Math.abs(a[i] - b[i]) > 40 && ++n > 6) return false;
+  return true;
+}
+const histNear = (a, b) => { let e = 0; for (let i = 0; i < HBINS; i++) e += Math.abs(a[i] - b[i]); return e < 0.12; };
+// { ok, tab, box, scroll: { at, top, bottom } | null, slots: [{ r, c, value, cell, diff, rect }] } or { ok: false, reason }.
+// r and c are the slot on the page as shown; how far down the tab that page is comes from scroll (the engine lines pages
+// up by their overlap). Equip slots carry a 1 in this client, so every counted tab reads the same way
+function readBag(src) {
+  const box = findMesoBox(src);
+  if (!box) return { ok: false, reason: 'no inventory' };
+  if (!loot) return { ok: false, reason: 'no loot pictures', box };
+  const win = windowOf(box), tab = readTab(src, win);
+  if (!tab) return { ok: false, reason: 'no tab', box };
+  const scroll = readScroll(src, win);
+  if (!loot.sets[tab]) return { ok: true, tab, box, scroll, slots: [] };   // Set-up, Cash, Deco: not counted
+  // the cache holds while the bag sits still: the same tab, spot and scroll position (a scroll moves other items into a
+  // slot, and every equip and scroll shows a 1)
+  const sc = countScale(src, win, box), set = loot.sets[tab], slots = [];
+  const key = tab + Math.round(box.x) + ',' + Math.round(box.y) + '@' + (scroll ? Math.round(scroll.at * 100) : '-');
+  if (bagCache.key !== key) bagCache = { key, slots: {} };
+  // the slot grid as one picture, with the margin the count reader and the item match look into around each slot: a slot
+  // whose pixels are as they were at the last look reuses its whole answer (the bag is read twice a second while open,
+  // and re-reading all 30 counts each time was most of the work)
+  const m = Math.ceil(3 * win.s) + 3, g0 = slotRect(win, 0, 0), g1 = slotRect(win, SLOT.rows - 1, SLOT.cols - 1);
+  const grid = region(src, g0.x - m, g0.y - m, g1.x + g1.w - g0.x + 2 * m, g1.y + g1.h - g0.y + 2 * m);
+  for (let r = 0; r < SLOT.rows; r++) for (let c = 0; c < SLOT.cols; c++) {
+    const rect = slotRect(win, r, c), rc = r + ',' + c, fp = pixelsOf(grid, rect, m), prev = bagCache.slots[rc];
+    if (prev && samePixels(prev.fp, fp)) { if (prev.out) slots.push(Object.assign({}, prev.out, { kept: true })); continue; }
+    const n = slotNumber(src, rect, sc, true);
+    const box4 = { x: Math.round(rect.x), y: Math.round(rect.y), w: Math.round(rect.w), h: Math.round(rect.h) };
+    // something there without a count it can read (covered, or too small to trust): unsure, so its row waits. Under the
+    // pointer, only what it leaves showing says whether anything's there
+    if (!n) {
+      let out = null;
+      if (slotFilled(src, rect, box.s)) { const pt = pointerOn(src, rect, box.s); if (!pt || slotFilled(src, rect, box.s, pt)) out = { r, c, value: null, cell: null, diff: null, rect: box4 }; }
+      if (out) slots.push(out);
+      bagCache.slots[rc] = { fp, out, ic: null };
+      continue;
+    }
+    const kept = prev && prev.ic;
+    let ic = null;
+    if (kept && kept.value === n.value) {
+      // the same count: still the same item only if its colours didn't change (a scroll can bring another stack of 1)
+      const fresh = bagIcon(src, rect, box.s, []);
+      if (histNear(fresh.hist, kept.hist)) ic = kept;
+    }
+    if (!ic) { ic = bagIcon(src, rect, box.s, set); ic.value = n.value; }
+    const out = { r, c, value: n.value, cell: ic.cell, diff: ic.diff, rect: box4, unknown: ic.cell == null && ic.why !== 'flat' };
+    bagCache.slots[rc] = { fp, out, ic };
+    slots.push(Object.assign({}, out, { kept: ic === kept }));
+  }
+  return { ok: true, tab, box, scroll, slots };
+}
+
+/* ---------- the NPC shop window: your meso total while you buy and sell ---------- */
+
+// The shop window (ShopBg, 465 x 379 base) has a red divider across each of its two panels at base y 117, x 4 to 230
+// and 234 to 460: two red runs of the same length side by side on one row are the shop, and their length gives the
+// stretch. The meso box is drawn over the window, not part of its picture: a white field at base (365, 65) about
+// 91 x 14 (measured on Rimmah's two shop crops, which agree to the pixel). Digits are read like the inventory's.
+const SHOP = { red: 227, gap: 230, lx: 4, ly: 117, bx: 365, by: 65.4, bw: 91, bh: 13.6 };
+let lastShop = null;
+const isRed = (d, k) => d[k] > 150 && d[k + 1] < 70 && d[k + 2] < 70;
+// red runs on a row of RGBA, small breaks (the tab buttons' edges) bridged: [[start, end]]
+function redRuns(d, y, W, x0, x1) {
+  const runs = []; let st = -1, last = -1;
+  for (let x = x0; x < x1; x++) {
+    if (!isRed(d, (y * W + x) * 4)) continue;
+    if (st >= 0 && x - last <= 6) { last = x; continue; }
+    if (st >= 0) runs.push([st, last]);
+    st = x; last = x;
+  }
+  if (st >= 0) runs.push([st, last]);
+  return runs;
+}
+// the white meso box near where the window says it is: { x, y, w, h, s } or null
+function shopBox(src, x0, y0, s) {
+  const ex = x0 + SHOP.bx * s, ey = y0 + SHOP.by * s, img = region(src, ex - 8, ey - 6, SHOP.bw * s + 16, SHOP.bh * s + 12), d = img.data, W = img.w;
+  const white = (x, y) => { const k = (y * W + x) * 4; return Math.min(d[k], d[k + 1], d[k + 2]) >= 236; };
+  // two rows 1.5 base px inside the box's top and bottom edges (the digits sit between them)
+  const midY = Math.round(img.h / 2), yA = Math.round(6 + 1.5 * s), yB = Math.round(6 + (SHOP.bh - 1.5) * s);
+  let a = -1;
+  for (let x = 0; x < 20 && x < W; x++) if (white(x, yA) && white(x, yB)) { a = x; break; }
+  if (a < 0) return null;
+  let b = a; while (b + 1 < W && white(b + 1, yA)) b++;
+  if (Math.abs((b - a + 1) / s - SHOP.bw) > 8) return null;
+  let top = yA, bot = top;
+  while (top > 0 && white(a + 2, top - 1)) top--;
+  while (bot + 1 < img.h && white(a + 2, bot + 1)) bot++;
+  if (Math.abs((bot - top + 1) / s - SHOP.bh) > 4 || midY < top || midY > bot) return null;
+  return { x: img.x + a, y: img.y + top, w: b - a + 1, h: bot - top + 1, s };
+}
+// the shop window's anchor on screen { x0, y0, s }, by its two red dividers, or null
+function findShop(src) {
+  const { w: W, h: H } = sizeOf(src), g = ctx2d(W, H); g.drawImage(src, 0, 0);
+  const d = g.getImageData(0, 0, W, H).data;
+  for (let y = 0; y < H; y += 2) {
+    const runs = redRuns(d, y, W, 0, W);
+    for (const [a, b] of runs) {
+      const L = b - a + 1, s = L / SHOP.red;
+      if (s < 0.7 || s > 3.4) continue;
+      const pair = runs.find(([c, e]) => Math.abs(c - (a + SHOP.gap * s)) <= 6 * s + 4 && Math.abs((e - c + 1) - L) <= 0.06 * L);
+      if (!pair) continue;
+      let top = y; while (top > 0 && isRed(d, ((top - 1) * W + a + 2) * 4)) top--;
+      return { x0: a - SHOP.lx * s, y0: top - SHOP.ly * s, s };
+    }
+  }
+  return null;
+}
+// where the shop was last seen: shopHome() reads it, shopHome(x) sets it, null forgets
+function shopHome(x) { if (arguments.length) lastShop = x || null; return lastShop; }
+// { ok, value, box } or { ok: false, reason }: 'no shop', 'unsure', 'bad commas'. opts.search false: only where it was
+// last seen (a red divider still there and a box to read), so a closed shop costs a few ms a tick
+function readShop(src, opts) {
+  const at = lastShop;
+  if (at) {
+    const k = region(src, at.x0 + (SHOP.lx + 20) * at.s, at.y0 + SHOP.ly * at.s, 6, Math.max(2, 2 * at.s));
+    const there = isRed(k.data, 0) || isRed(k.data, (k.w * k.h - 1) * 4);
+    const box = there ? shopBox(src, at.x0, at.y0, at.s) : null;
+    if (box) { const r = mesoTotal(src, box); return r.ok ? r : { ok: false, reason: r.reason, box }; }
+  }
+  if (opts && opts.search === false) return { ok: false, reason: 'no shop' };
+  const w = findShop(src), box = w && shopBox(src, w.x0, w.y0, w.s);
+  if (!box) return { ok: false, reason: 'no shop' };
+  const r = mesoTotal(src, box);
+  if (r.ok) lastShop = w;
+  return r.ok ? r : { ok: false, reason: r.reason, box };
+}
+
 window.MapleScreen = { load, sizeOf, findExpLine, readExp, expGlyphs, measure, readLevel, readCounts, readIcon, readParty, levelArea, slotArea, partyArea,
-  findMesoBox, mesoHome, mesoGlyphs, readMesos, invGeometry, readInventory };
+  findMesoBox, mesoHome, mesoGlyphs, readMesos, invGeometry, readInventory, loadLoot, readBag, readScroll, readShop, shopHome };
 })();

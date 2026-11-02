@@ -10,10 +10,12 @@
 
 const MS = () => window.MapleScreen, GS = () => window.GrindSession;
 const KEY_OPEN = 'grind.open', KEY_LOCAL = 'grind.local', KEY_PRICES = 'grind.prices', KEY_MAP = 'grind.map', KEY_HOME = 'grind.mesoHome';
-const KEY_LAYOUT = 'grind.layout', KEY_SIZES = 'grind.layoutSizes', KEY_DETAIL = 'grind.detail';
+const KEY_LAYOUT = 'grind.layout', KEY_SIZES = 'grind.layoutSizes', KEY_DETAIL = 'grind.detail', KEY_LOOT = 'grind.loot';
+// the shop window is looked for over the whole frame this often (ticks) until it's been seen, then where it was each tick
+const SHOP_SEARCH_EVERY = 6;
 // sessions kept on this device for all time: up to 200, the newest 20 with their minutes (the charts), older ones without
 const LOCAL_MAX = 200, LOCAL_MINUTES = 20;
-const RESUME_MS = 30 * 60000, SAVE_MS = 60000, LEVEL_EVERY = 20, ICON_EVERY = 40, MESO_SEARCH_EVERY = 40;
+const RESUME_MS = 30 * 60000, SAVE_MS = 60000, LEVEL_EVERY = 20, ICON_EVERY = 40, MESO_SEARCH_EVERY = 40, LOST_MS = 15000, BAG_NEAR_MS = 5000;
 
 /* ---------- formatting ---------- */
 
@@ -31,6 +33,9 @@ function mesoLine(o) {
 }
 const perFmt = n => n >= 10 ? String(Math.round(n)) : n.toFixed(1);   // potions per 1%
 const signed = n => (n >= 0 ? '+' : '−') + fmt(Math.abs(n));
+// the jump question on the card: a rise is most likely loot sold to someone, a drop something bought from someone
+const jumpQuestion = n => 'Your mesos went ' + (n > 0 ? 'up' : 'down') + ' by ' + fmt(Math.abs(n)) + ' since your last peek. ' +
+  (n > 0 ? 'Sold loot to someone?' : 'Bought something from someone?');
 // deaths count against the session; this says what they cost: "1 death (−2.88%)"
 const deathText = o => o.deaths + ' death' + (o.deaths > 1 ? 's' : '') + (o.lostPct ? ' (−' + o.lostPct.toFixed(2) + '%)' : '');
 // mesos typed by hand: 165k, 1.5m, 2b, commas (the same rule as the Appraiser and the ledger)
@@ -77,6 +82,11 @@ function health(f) {
   if (C.level.state === 'bad') return say('bad', "Can't read your level. Try Find my game again");
   if (f.exp.ok == null || f.size.ok == null) return say('wait', 'Looking for your game…');
   if (f.potNone) return say('wait', 'Put the potions you drink on your quickslots so they count');
+  // Count my loot (f.loot: { on, pictures, sets, refillAfter }): a flip through the bag also reads the mesos, so it comes
+  // first, once the item pictures are in (a flip before then reads nothing)
+  if (f.loot && f.loot.on && f.loot.pictures === false) return say('wait', 'Loading the item pictures for Count my loot');
+  if (f.loot && f.loot.on && !f.loot.sets) return say('wait', 'Open your bag and flip through Equip, Use and Etc, scrolling to the bottom of each');
+  if (f.loot && f.loot.on && f.loot.refillAfter) return say('wait', 'In town? Flip through your bag so your loot counts');
   if (f.meso.unclear) return say('wait', "Can't read your meso total clearly yet. Move the mouse off it");
   if (f.meso.at == null) return say('wait', 'Open your inventory for a moment so mesos count');
   if (mesoStale) return say('wait', 'Mesos last seen ' + ago(f.meso.at) + '. Open your inventory for a moment');
@@ -94,6 +104,30 @@ function lemonTile(c, t) {
     juice: Math.round(100 * Math.min(1, c.left / (c.full || c.left || 1))), low: !!c.low };
 }
 
+// Count my loot: what a loot picture is, for the engine. L is data/loot-icons.json and potions grind.json's potions.
+// Every scroll of a grade shares one picture, so a scroll is named by its grade; items sharing a picture are worth the
+// lowest NPC price among them; pot is the potion ids in it (the quickslots count those)
+const GRADES = { Lesser: 1, Intermediate: 2, Greater: 3, Chaos: 4 };
+function lootItem(L, cell, tab, potions) {
+  const ids = L.cells[cell].ids, first = L.items[ids[0]], scroll = ids.every(id => Math.floor(id / 10000) === 204);
+  const grade = scroll ? String(first[1]).split(': ')[1] || '' : '';
+  const pot = ids.filter(id => potions && potions[id]);
+  return { key: tab[0] + cell, name: scroll && GRADES[grade] ? grade + ' scroll' : first[1], price: Math.min(...ids.map(id => L.items[id][2] || 0)),
+    kind: scroll ? 'scroll' : tab === 'Equip' ? 'equip' : tab === 'Etc' ? 'etc' : 'use', rank: scroll ? GRADES[grade] || 1 : 0, pot: pot.length ? pot : undefined };
+}
+// the session's Lemon and Meat tiles: how often, what it cost (or the HP it gave back), how many for every 1%, and a
+// line by how many went down (Lemons fill a glass, Meat comes off a pig)
+const QUIPS = { lemon: [[50, 'Barely a sip'], [200, 'A tall glass'], [500, 'A whole pitcher'], [Infinity, 'Enough to open a lemonade stand']],
+  meat: [[10, 'Just a snack'], [50, 'A hearty lunch'], [150, 'A whole barbecue'], [Infinity, 'Somewhere a Ribbon Pig is nervous']] };
+function eatLines(kind, g) {
+  const lemon = kind === 'lemon';
+  if (!g || !g.n) return ['No ' + (lemon ? 'Lemons' : 'Meat') + ' this session'];
+  const sec = g.everySec == null ? null : Math.round(g.everySec);   // whole seconds first, so never "1m 60s"
+  const every = sec == null ? null : sec < 90 ? sec + ' seconds' : Math.floor(sec / 60) + 'm' + (sec % 60 ? ' ' + sec % 60 + 's' : '');
+  return [every && (lemon ? 'A Lemon every ' : 'A bite every ') + every, lemon ? g.cost != null && fmt(g.cost) + ' mesos of lemonade' : g.hp != null && fmt(g.hp) + ' HP chewed',
+    g.perPct != null && perFmt(g.perPct) + ' for every 1%', QUIPS[lemon ? 'lemon' : 'meat'].find(([max]) => g.n < max)[1]].filter(Boolean);
+}
+
 // all time on the page, from every saved session (rows as GrindSession.toRow writes them): totals, Lemons and Meat (o.lemon
 // and o.meat: the client ids with those names, since two items are named Lemon), the most trained maps, personal bests
 // and the last 30 days. Only what was tracked counts, so it's "since you started tracking", never the whole game
@@ -105,7 +139,8 @@ function lifetime(rows, o) {
     best: { expHr: null, longest: null, lemons: null, cheap1: null }, days: 0, streak: 0, daysList: [] };
   const maps = {}, byDay = {}, top = (k, v, row, low) => { const b = L.best[k]; if (!b || (low ? v < b.v : v > b.v)) L.best[k] = { v, row }; };
   for (const r of rows) {
-    const mins = r.active_min || 0, exp = r.exp || 0, pct = r.pct || 0;
+    // EXP an hour on the EXP clock (first kill to latest), hours on the session clock; a row from before it: all of it
+    const mins = r.active_min || 0, expMins = r.exp_min != null ? r.exp_min : mins, exp = r.exp || 0, pct = r.pct || 0;
     L.mins += mins; L.exp += exp; L.deaths += r.deaths || 0;
     if (r.level_start != null) L.levelFrom = L.levelFrom == null ? r.level_start : Math.min(L.levelFrom, r.level_start);
     if (r.level_end != null) L.levelTo = L.levelTo == null ? r.level_end : Math.max(L.levelTo, r.level_end);
@@ -118,10 +153,13 @@ function lifetime(rows, o) {
     // per 1% only over the sessions that drank them, so a session on other potions doesn't thin it out
     if (lemons && pct > 0) L.lemon.pct += pct;
     if (meat && pct > 0) L.meat.pct += pct;
-    if (r.mesos_earned != null) { L.mesos = (L.mesos || 0) + r.mesos_earned; L.profit = (L.profit || 0) + r.mesos_earned - cost; }
-    const m = maps[r.map_id] || (maps[r.map_id] = { id: r.map_id, mins: 0, exp: 0 });
-    m.mins += mins; m.exp += exp;
-    if (mins >= BEST_MIN) top('expHr', exp / (mins / 60), r);
+    if (r.mesos_earned != null) L.mesos = (L.mesos || 0) + r.mesos_earned;
+    // a session with a result (its counted window, loot and all) adds that; an older one, mesos earned less its potions
+    if (r.result != null) L.profit = (L.profit || 0) + r.result;
+    else if (r.mesos_earned != null) L.profit = (L.profit || 0) + r.mesos_earned - cost;
+    const m = maps[r.map_id] || (maps[r.map_id] = { id: r.map_id, mins: 0, exp: 0, expMins: 0 });
+    m.mins += mins; m.exp += exp; m.expMins += expMins;
+    if (expMins >= BEST_MIN) top('expHr', exp / (expMins / 60), r);
     if (mins > 0) top('longest', mins, r);
     if (lemons) top('lemons', lemons, r);
     if (pct >= 0.3 && cost > 0) top('cheap1', cost / pct, r, true);   // the same 0.3% floor as the sessions list
@@ -129,7 +167,7 @@ function lifetime(rows, o) {
     byDay[k] = (byDay[k] || 0) + mins;
   }
   for (const g of [L.lemon, L.meat]) { g.per1 = g.pct ? g.used / g.pct : null; delete g.pct; }
-  L.maps = Object.values(maps).map(m => Object.assign(m, { expHr: m.mins ? m.exp / (m.mins / 60) : null })).sort((a, b) => b.mins - a.mins);
+  L.maps = Object.values(maps).map(m => Object.assign(m, { expHr: m.expMins ? m.exp / (m.expMins / 60) : null })).sort((a, b) => b.mins - a.mins);
   const keys = Object.keys(byDay).sort();
   L.days = keys.length;
   for (let i = 0, run = 0; i < keys.length; i++) {
@@ -192,17 +230,19 @@ function mount(root, deps) {
   V.health = el('div', { class: 'g-health', id: 'g-health' }, HEALTH.map(([k]) => el('span', { class: 'g-hc wait', 'data-k': k })));
   // the one thing to do, only when something needs you
   V.nudge = el('div', { class: 'g-nudge idle', id: 'g-nudge', hidden: '' }, 'Share the game window to start');
-  // a big jump between peeks: a trade or a big buy isn't grinding, so it asks
-  V.trade = el('div', { class: 'g-nudge wait', id: 'g-trade', hidden: '' }, V.tradeQ = el('span', {}), ' ',
-    el('button', { type: 'button', id: 'g-tradeyes', onclick: () => answerJump(true) }, 'Leave it out'), ' ',
-    el('button', { type: 'button', id: 'g-tradeno', onclick: () => answerJump(false) }, 'Keep it'));
+  // a big jump between peeks: a trade or a big buy isn't grinding, so it asks (a rise is likely loot sold to someone,
+  // so Keep it comes first; a drop, something bought, so Leave it out does)
+  V.tradeQ = el('span', {});
+  V.tradeYes = el('button', { type: 'button', id: 'g-tradeyes', onclick: () => answerJump(true) }, 'Leave it out');
+  V.tradeNo = el('button', { type: 'button', id: 'g-tradeno', onclick: () => answerJump(false) }, 'Keep it');
+  V.trade = el('div', { class: 'g-nudge wait', id: 'g-trade', hidden: '' }, V.tradeQ, ' ', V.tradeYes, ' ', V.tradeNo);
   const card = el('div', { class: 'g-card', id: 'g-card' },
     el('div', { class: 'g-kpis' },
       el('div', {}, el('div', { class: 'g-lbl' }, 'EXP per hour'), V.expHr = el('div', { class: 'g-big', id: 'g-exphr' }, '·')),
       el('div', { id: 'g-mesokpi' }, el('div', { class: 'g-lbl' }, 'Mesos earned'), V.mesoBig = el('div', { class: 'g-big' }, '·'),
         V.mesoSub = el('div', { class: 'g-sub' }, 'Open your inventory now and then to start counting'))),
     V.sub = el('div', { class: 'g-sub' }, 'Share the game window to start'), V.pace = el('div', { class: 'g-sub', id: 'g-pace' }), V.next = el('div', { class: 'g-sub' }),
-    V.verdict = el('div', { class: 'g-verdict', id: 'g-verdict', hidden: '' }), V.mesos = el('div', { class: 'g-sub', id: 'g-mesos' }, 'Mesos: open your inventory now and then to count them'),
+    V.mesos = el('div', { class: 'g-sub', id: 'g-mesos' }, 'Mesos: open your inventory now and then to count them'),
     V.tradeBox = el('div', { class: 'g-tradebox', id: 'g-tradebox' }, el('button', { type: 'button', class: 'linkish', id: 'g-tradebtn', onclick: () => openTrade() }, 'Leave out a trade')),
     row('gain', 'EXP gained'), row('time', 'Time'), row('kpm', 'Kills a minute'), row('pots', 'Potions used'),
     row('costHr', 'Potions an hour', true), row('per1', 'Cost per 1%', true),
@@ -238,6 +278,48 @@ function mount(root, deps) {
     if (!id) return;
     const gone = () => { jset(KEY_LOCAL, jget(KEY_LOCAL, []).filter(r => r.id !== id)); viewing = null; V.del.replaceChildren(delButton()); render(); listSessions(); setStatus('Deleted that session.'); };
     (signedIn() ? api.deleteGrind(id) : Promise.resolve()).then(gone, e => setStatus("Couldn't delete it (" + e.message + ').'));
+  }
+  // Count my loot: one switch (remembered on this device), the bag's three tabs as checks under it while it's on, and
+  // the session's result card at the top of Session details in both modes (the loot list only when it's on)
+  let lootOn = store.get(KEY_LOOT) === '1', lootIdx = null, lootImg = null, lootLoad = null;
+  const lootBtn = el('button', { type: 'button', id: 'g-loot', class: 'g-loot', 'aria-pressed': String(lootOn), onclick: () => setLoot(!lootOn) }, 'Count my loot');
+  const bagCheck = el('ul', { class: 'g-check g-bagcheck', id: 'g-bagcheck', hidden: '' }, ['Equip', 'Use', 'Etc'].map(t => el('li', { 'data-k': 'bag-' + t }, el('b', {}, t), el('span', {}, 'Open it in your bag'))));
+  V.res = el('section', { class: 'g-res', id: 'g-res', hidden: '' },
+    el('div', { class: 'g-lbl' }, 'Mesos an hour'),
+    el('div', { class: 'g-res-top' }, V.resHr = el('span', { class: 'g-res-hr', id: 'g-res-hr' }, '·'), V.resPill = el('span', { class: 'g-res-pill' })),
+    V.resSub = el('div', { class: 'g-res-sub', id: 'g-res-sub' }),
+    V.resTiles = el('div', { class: 'g-res-tiles' }),
+    V.resEats = el('div', { class: 'g-res-eats' }), V.resOther = el('p', { class: 'g-note' }),
+    V.resLootH = el('div', { class: 'g-lbl g-res-h' }, 'What you picked up'), V.resLoot = el('div', { class: 'g-res-loot', id: 'g-res-loot' }),
+    V.resLines = el('div', { class: 'g-res-lines', id: 'g-res-lines' }),
+    V.resNudge = el('div', { class: 'g-res-nudge', id: 'g-res-nudge' }, el('span', {}, "Your loot isn't counted, so this only shows mesos."),
+      el('button', { type: 'button', class: 'g-btn go', onclick: () => setLoot(true) }, 'Count my loot next time')),
+    el('p', { class: 'g-note' }, 'Count my loot reads your bag when you flip through Equip, Use and Etc: the first full look and the latest one, at what an NPC pays (the market may pay more later). ' +
+      'Without it, selling loot from an earlier session counts as earned. Items you use, wear, drop or hand over count as loot going down.'));
+  function setLoot(on) {
+    lootOn = on; store.set(KEY_LOOT, on ? '1' : '');
+    lootBtn.setAttribute('aria-pressed', String(on)); bagCheck.hidden = !on;
+    if (session) session.mode = on ? 'loot' : 'track';
+    if (on) loadLoot();
+    render();
+  }
+  // the item pictures load once, the first time the switch is on (about 900 KB)
+  function loadLoot() {
+    if (lootLoad) return lootLoad;
+    const pic = new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = 'data/loot-icons.png'; });
+    lootLoad = Promise.all([fetch('data/loot-icons.json').then(r => r.json()), pic]).then(([L, im]) => { MS().loadLoot(im, L); lootIdx = L; lootImg = im; render(); },
+      () => { lootLoad = null; setStatus("Couldn't load the item pictures for Count my loot. Turn it off and on to try again."); });
+    return lootLoad;
+  }
+  // a loot picture as an image for the card's list (its cell cut from the sheet, kept)
+  const cellPics = {};
+  function cellPic(cell) {
+    if (!lootIdx || !lootImg || cellPics[cell]) return cellPics[cell] || null;
+    const c = lootIdx.cells[cell];
+    if (!c) return null;   // an item it can't name has no picture
+    const cv = document.createElement('canvas'); cv.width = c.w; cv.height = c.h;
+    cv.getContext('2d').drawImage(lootImg, (cell % lootIdx.cols) * lootIdx.cell, Math.floor(cell / lootIdx.cols) * lootIdx.cell, c.w, c.h, 0, 0, c.w, c.h);
+    return (cellPics[cell] = cv.toDataURL());
   }
   const pots = el('table', { class: 'b-table', id: 'g-pots' },
     el('thead', {}, el('tr', {}, ['Key', 'Potion', 'Left', 'Used', 'Price', 'Cost'].map((h, i) => el('th', i > 1 ? { class: 'n' } : {}, h)))), el('tbody', {}));
@@ -275,7 +357,7 @@ function mount(root, deps) {
   V.now = el('div', { class: 'g-nowv' });
   let detailOpen = store.get(KEY_DETAIL) === '1';
   const moreBtn = el('button', { type: 'button', id: 'g-more', class: 'g-more', 'aria-controls': 'g-detail', onclick: () => { detailOpen = !detailOpen; store.set(KEY_DETAIL, detailOpen ? '1' : ''); showDetail(); } }, 'Session details');
-  const detail = el('div', { class: 'g-detail', id: 'g-detail', hidden: '' }, viewBar,
+  const detail = el('div', { class: 'g-detail', id: 'g-detail', hidden: '' }, viewBar, V.res,
     el('div', { class: 'g-dgrid' }, card, el('div', { class: 'g-dpots' }, el('h3', {}, 'Potions'), el('div', { class: 'g-scroll' }, pots),
       el('p', { class: 'g-note' }, 'Keep every potion you drink on a quickslot (the hotkey grid at the bottom right): a count going down is a potion drunk, a count jumping up is a refill. Each one is matched to the game\'s own potion picture. Prices start at 10 times what the NPC pays (a Lemon is 150); tap a price to set what you really paid, and refills you already made follow it.'))),
     charts);
@@ -296,6 +378,12 @@ function mount(root, deps) {
     return t;
   };
   LF.lemon = trophy('lemon', 'Lemons eaten', LEMON_IDS); LF.meat = trophy('meat', 'Meat eaten', MEAT_IDS);
+  // the session's Lemon and Meat tiles count both Lemon ids, and Meat's HP comes from the game's data
+  const eatCfg = () => ({ lemon: LEMON_IDS, meat: MEAT_IDS, meatHp: (data.potions[MEAT_IDS[0]] || [])[2] || 0 });
+  // a session carried on after a reload follows the switch as it is now
+  if (session) { if (!session.eat) session.eat = eatCfg(); session.mode = lootOn ? 'loot' : 'track'; }
+  bagCheck.hidden = !lootOn;
+  if (lootOn) loadLoot();
   const life = el('section', { class: 'g-life', id: 'g-life' },
     el('div', { class: 'g-lhead' }, el('h3', {}, 'All time'), LF.since = el('span', {})),
     el('div', { class: 'g-trophies' }, LF.lemon.el, LF.meat.el),
@@ -313,7 +401,7 @@ function mount(root, deps) {
     el('div', { class: 'g-page' },
       el('aside', { class: 'g-rail', id: 'g-rail' }, el('div', { class: 'g-railin' },
         el('div', { class: 'g-box g-acts' }, V.pill, shareArea, steps, popBtn, markBtn, refindBtn, newBtn, snapBtn),
-        el('div', { class: 'g-box' }, el('div', { class: 'g-boxh' }, 'Reading'), V.health, ready, check),
+        el('div', { class: 'g-box' }, el('div', { class: 'g-boxh' }, 'Reading'), V.health, ready, check, lootBtn, bagCheck),
         el('div', { class: 'g-box' }, el('div', { class: 'g-boxh' }, 'This map'), mapSel, mobs))),
       el('div', { class: 'g-main' }, status, V.nudge, V.trade, el('div', { class: 'g-now', id: 'g-now' }, V.now, moreBtn), detail, life)),
     el('p', { class: 'g-note' }, 'Item and UI pictures are from MapleStory, which belongs to Nexon.'), strip);
@@ -326,21 +414,37 @@ function mount(root, deps) {
   }
 
   /* ----- one frame from the share ----- */
+  // The share ticks every 0.5 s. A full read (EXP, level, potions, mesos) runs when 1.4 s have passed since the last one;
+  // the ticks between only look at the bag and the shop while they're open, at the spots they were seen, so a page of the
+  // bag shown for a second (Rimmah flips that fast) still reads twice and counts
   function frame(src, info) {
     if (!picturesReady) return;
+    const since = st.lastFull ? Date.now() - st.lastFull : Infinity;   // a clock set back (a replay) reads in full
+    if (since >= 0 && since < 1400) {
+      // a bag missed a moment ago (a tooltip over its mesos) is still looked for at every tick: a page shown for a
+      // second right after can come and go between two full reads
+      const bagNear = st.mesoOpen || Date.now() - (st.mesoSeen || -Infinity) < BAG_NEAR_MS;
+      if (session && info.w === st.fw && info.h === st.fh && ((lootOn && lootIdx && bagNear) || st.shopOpen)) quick(src);
+      return;
+    }
+    st.lastFull = Date.now();
     if (st.wantSnap) { st.wantSnap = false; saveFrame(src, info); }
     st.ticks++; st.sharing = true;
     const S = MS(), w = info.w, h = info.h;
     if (w !== st.fw || h !== st.fh) { st.fw = w; st.fh = h; st.line = null; S.mesoHome(null); st.homeTried = false; }   // the window changed size
     // the inventory's meso box: checked every tick where it last opened (a few ms, kept on this device for next time);
     // the whole frame is searched every third tick until it's been seen, then once a minute in case it moved (a search
-    // takes a quarter second on a big window)
+    // takes a quarter second on a big window). With Count my loot, gone from its spot moments after it was there
+    // (dragged mid flip, or put beside a shop's window), it's searched for every third tick again; a peek just closed
+    // costs a few searches, not a minute of them
     if (!st.homeTried) { st.homeTried = true; const hm = jget(KEY_HOME, null); if (hm && hm.w === w && hm.h === h && hm.box && !S.mesoHome()) S.mesoHome(hm.box); }
     let mesos = null;
-    const home = S.mesoHome(), search = st.ticks % (home ? MESO_SEARCH_EVERY : 3) === 1;
+    const home = S.mesoHome(), lost = lootOn && home && !st.mesoOpen && Date.now() - (st.mesoSeen || -Infinity) < LOST_MS,
+      search = st.ticks % (home && !lost ? MESO_SEARCH_EVERY : 3) === 1;
     if (home || search) {
       const mr = S.readMesos(src, { search });
       st.mesoOpen = mr.reason !== 'no inventory';
+      if (st.mesoOpen) st.mesoSeen = Date.now();
       st.mesoUnclear = !mr.ok && st.mesoOpen;
       if (mr.ok) {
         mesos = mr.value; st.mesos = mr.value; setCheck('mesos', 'done', fmt(mr.value) + ' at ' + timeOfDay(Date.now()));
@@ -350,6 +454,7 @@ function mount(root, deps) {
       else if (st.mesos == null) setCheck('mesos', '', 'Open your inventory now and then');
     }
     if (mesos != null && session) GS().add(session, { t: Date.now(), mesos });
+    readLoot(src, S, false);
     if (!st.line) {
       st.line = S.findExpLine(src, w, h); st.m = null; st.measureAt = 0;
       if (!st.line) { mark('exp', false); setCheck('exp', 'fix', 'Make sure the bar at the bottom of the game is showing'); updateReady(); render(); return; }
@@ -410,7 +515,7 @@ function mount(root, deps) {
       }
     }
     if (reading.exp != null || reading.counts.length) {
-      if (!session) session = GS().create({ mapId, t: reading.t, prices });
+      if (!session) { session = GS().create({ mapId, t: reading.t, prices, eat: eatCfg() }); session.mode = lootOn ? 'loot' : 'track'; }
       GS().add(session, reading); st.reads++;
     }
     // the last 10 readings, for a Something off? report (an 84 read as 684 shows up here)
@@ -421,6 +526,43 @@ function mount(root, deps) {
     render(); save(false);
   }
 
+  // a tick between full reads: the meso box and the bag where the inventory is, the shop where it was seen
+  function quick(src) {
+    const S = MS();
+    if (S.mesoHome()) {
+      const mr = S.readMesos(src, { search: false });
+      st.mesoOpen = mr.reason !== 'no inventory';
+      if (st.mesoOpen) st.mesoSeen = Date.now();
+      if (mr.ok) { st.mesos = mr.value; GS().add(session, { t: Date.now(), mesos: mr.value }); }
+    }
+    readLoot(src, S, true);   // the next full read draws it
+  }
+  // Count my loot's bag, a page at a time while the inventory is open (closing it ends the flip), and the shop's meso box
+  // in both modes. quick: only where the shop already is
+  function readLoot(src, S, quick) {
+    if (session && lootOn && lootIdx) {
+      if (st.mesoOpen) {
+        const bag = S.readBag(src);
+        if (bag.ok) {
+          // a slot it can't read (the cursor over it, a tooltip) holds its row back; an item it can't name (an event or cash
+          // item) still counts as there, worth 0, so the tab can finish
+          const slots = bag.slots.map(q => q.value == null || (q.cell == null && !q.unknown) ? { r: q.r, c: q.c, n: q.value, key: null }
+            : q.cell == null ? { r: q.r, c: q.c, n: q.value, key: bag.tab + '?', name: "An item it can't name", price: 0, kind: 'unknown', rank: 0 }
+              : Object.assign({ r: q.r, c: q.c, n: q.value }, lootItem(lootIdx, q.cell, bag.tab, data.potions)));
+          GS().add(session, { t: Date.now(), bagOpen: true, bag: { tab: bag.tab, scroll: bag.scroll, slots } });
+          st.bagWas = true;
+        }
+      } else if (st.bagWas) { st.bagWas = false; GS().add(session, { t: Date.now(), bagOpen: false }); }
+    }
+    if (session) {
+      const shome = S.shopHome();
+      if (quick ? shome && st.shopOpen : shome || st.ticks % SHOP_SEARCH_EVERY === 2) {
+        const sr = S.readShop(src, { search: !quick && (!shome || st.ticks % MESO_SEARCH_EVERY === 2) });
+        if (sr.ok) { GS().add(session, { t: Date.now(), shop: sr.value, shopOpen: true }); st.shopOpen = true; }
+        else if (st.shopOpen && sr.reason === 'no shop') { st.shopOpen = false; GS().add(session, { t: Date.now(), shopOpen: false }); }
+      }
+    }
+  }
   function saveFrame(src, info) {
     const c = document.createElement('canvas'); c.width = info.w; c.height = info.h; c.getContext('2d').drawImage(src, 0, 0);
     c.toBlob(b => {
@@ -434,6 +576,11 @@ function mount(root, deps) {
   const signedIn = () => !!(deps.session && deps.session());
   const keepLocal = r => jset(KEY_LOCAL, [r].concat(jget(KEY_LOCAL, []).filter(x => x.id !== r.id)).slice(0, LOCAL_MAX)
     .map((x, i) => i < LOCAL_MINUTES || !x.minutes ? x : Object.assign({}, x, { minutes: undefined })));
+  // The account takes one save every 20 seconds (grind.sql), so a save that comes sooner (the one when the share stops,
+  // just after a minute save, or New session straight after that) waits its turn instead of being refused. A row the
+  // account didn't take stays on the device, so starting a new session can't lose it, and goes again in a minute
+  const SAVE_GAP = 21000, waiting = new Map();
+  let lastOk = -Infinity, busy = false, nextT = null, failNote = null;
   function save(force) {
     if (!session) return Promise.resolve();
     const now = Date.now();
@@ -446,9 +593,32 @@ function mount(root, deps) {
       listSessions();
       return Promise.resolve();
     }
-    // a row the account didn't take is kept on the device too, so starting a new session can't lose it
-    return api.saveGrind(row).then(() => { jset(KEY_LOCAL, jget(KEY_LOCAL, []).filter(x => x.id !== row.id)); listSessions(); },
-      e => { keepLocal(row); listSessions(); setStatus('Saved on this device only, your account didn\'t take it (' + e.message + '). It tries again in a minute.'); });
+    // the newest row of a session takes the place of one still waiting; a row that has to wait is kept on the device
+    // meanwhile, so a reload can't lose it
+    waiting.set(row.id, row);
+    if (busy || nextT || now < lastOk + SAVE_GAP) { keepLocal(row); listSessions(); }
+    if (failNote) setStatus(failNote);   // still not in the account: it keeps saying so
+    if (!nextT) send();
+    return Promise.resolve();
+  }
+  function send() {
+    nextT = null;
+    if (busy || !waiting.size) return;
+    const wait = Math.min(SAVE_GAP, lastOk + SAVE_GAP - Date.now());
+    if (wait > 0) { nextT = setTimeout(send, wait); return; }
+    const [id, row] = waiting.entries().next().value;
+    waiting.delete(id); busy = true;
+    api.saveGrind(row).then(() => {
+      busy = false; lastOk = Date.now(); failNote = null;
+      if (!waiting.has(id)) jset(KEY_LOCAL, jget(KEY_LOCAL, []).filter(x => x.id !== id));
+      listSessions(); send();
+    }, e => {
+      busy = false; keepLocal(row); listSessions();
+      if (!waiting.has(id)) waiting.set(id, row);
+      failNote = 'Saved on this device only, your account didn\'t take it (' + e.message + '). It tries again in a minute.';
+      setStatus(failNote);
+      nextT = setTimeout(send, 60000);
+    });
   }
   // the quick reset: forget where the game was (bars, size, which potion sits on each key, the inventory) and look again;
   // the session and every number in it stay
@@ -497,7 +667,7 @@ function mount(root, deps) {
   }
 
   /* ----- the share ----- */
-  const capture = window.Reader.capture(shareArea, { el, prefix: 'g-', raw: true, limit: 0, keepWhenHidden: true, full: true, drop: false, every: 1500,
+  const capture = window.Reader.capture(shareArea, { el, prefix: 'g-', raw: true, limit: 0, keepWhenHidden: true, full: true, drop: false, every: 500,
     copy: { share: 'Share game window', stop: 'Stop sharing' },
     onImage: frame, say: setStatus,
     onState: (state, why) => {
@@ -514,6 +684,23 @@ function mount(root, deps) {
   /* ----- drawing ----- */
   function render() {
     const s = viewing || session;
+    // what the session worked out on its own since the last draw: a trade left out that was really potions
+    if (session) {
+      if (st.eventsFor !== session.id) { st.eventsFor = session.id; st.eventsSeen = (session.events || []).length; }
+      for (const e of (session.events || []).slice(st.eventsSeen)) {
+        const pot = data.potions[e.id] ? plural(data.potions[e.id][0]) : 'potions';
+        if (e.kind === 'trade-undone') setStatus('Those ' + fmt(-e.amount) + ' mesos were your ' + pot + ', so they count as potions now, at ' + fmt(e.price) + ' each.');
+      }
+      st.eventsSeen = (session.events || []).length;
+      // a price the session learned (from the shop's meso box, or a trade that was potions) is kept as if it were tapped
+      if (st.learnedFor !== session.id) { st.learnedFor = session.id; st.learnedSeen = (session.learned || []).length; }
+      for (const x of (session.learned || []).slice(st.learnedSeen)) {
+        prices[x.id] = x.price; jset(KEY_PRICES, prices);
+        const pot = data.potions[x.id] ? data.potions[x.id][0] : 'Potion';
+        if (!(session.events || []).some(e => e.kind === 'trade-undone' && e.id === x.id && e.price === x.price)) setStatus(pot + ' price set to ' + fmt(x.price) + ' from what you paid.');
+      }
+      st.learnedSeen = (session.learned || []).length;
+    }
     viewBar.hidden = !viewing;
     if (viewing) V.viewing.textContent = 'Looking at ' + mapName(viewing.mapId) + ', ' + dateOf(viewing.t0);
     if (!editing) renderPots(s);
@@ -522,16 +709,20 @@ function mount(root, deps) {
     // while sharing, Pop out is the one to press, and the three steps under Share game window go
     popBtn.classList.toggle('go', st.sharing); steps.hidden = st.sharing;
     charts.hidden = !s;
-    if (!s) { renderNow(null); fitStrip(); return; }
-    const t = viewing ? s.tLast : Date.now(), o = GS().stats(s, t, avgExp(s.mapId || mapId));
+    renderBag();
+    if (!s) { V.res.hidden = true; renderNow(null); fitStrip(); return; }
+    const t = viewing ? s.tLast : Date.now(), o = GS().stats(s, t, avgExp(s.mapId || mapId)), R = GS().result(s, t);
+    renderResult(s, R);
     V.expHr.textContent = o.expHr != null ? fmtK(o.expHr) : '·';
     V.sub.textContent = o.expMin != null ? fmt(o.expMin) + ' a minute · ' + o.pctHr.toFixed(2) + '% an hour' : 'Needs 2 minutes of EXP first';
     V.pace.hidden = !!viewing;
     V.pace.textContent = paceParts(o, true).map(p => p.label + ' ' + p.value + (p.vs ? ' ' + p.vs : '') + (p.extra ? ' · ' + p.extra : '')).join(' · ');
     V.next.textContent = o.hrsToLevel != null ? 'Level ' + ((s.level || 0) + 1) + ' at ' + timeOfDay(t + o.hrsToLevel * 3600000) + ', in ' + fmtDur(o.hrsToLevel * 60) : '';
     V.gain.textContent = fmt(o.exp) + ' · ' + o.pct.toFixed(2) + '%' + (o.deaths ? ' · ' + deathText(o) : '');
-    // the clock runs only while the EXP bar is read; time left out for a pause says so, to square with a stopwatch
-    V.time.textContent = fmtDur(o.mins) + (o.pausedMins >= 1 ? ' · ' + fmtDur(o.pausedMins) + ' paused, not counted' : '');
+    // the clock runs only while the EXP bar is read; time left out for a pause says so, to square with a stopwatch, and
+    // so do the minutes EXP an hour ran on when town before the first kill or after the last left some out
+    V.time.textContent = fmtDur(o.mins) + (o.pausedMins >= 1 ? ' · ' + fmtDur(o.pausedMins) + ' paused, not counted' : '')
+      + (o.expHr != null && o.mins - o.expMins >= 1 ? ' · EXP an hour over ' + fmtDur(o.expMins) + ', first kill to last' : '');
     V.kpm.textContent = o.kpm != null ? 'about ' + o.kpm.toFixed(1) : '·';
     V.pots.textContent = o.potUsed ? fmt(o.potUsed) + ' · ' + fmtK(o.potCost) : '·';
     V.costHr.textContent = o.costHr != null ? fmtK(o.costHr) : '·';
@@ -543,10 +734,10 @@ function mount(root, deps) {
     V.perPot2Row.hidden = !second;
     if (second) { V.perPot2L.textContent = plural(second.name) + ' per 1%'; V.perPot2.textContent = o.perPct[second.id] != null ? perFmt(o.perPct[second.id]) : '·'; }
     renderMesos(s, o);
-    renderNow(s, o, mains);
+    renderNow(s, o, mains, R);
     // all time follows the running session, so its Lemons never trail this session's line by a minute of saves
     if (!viewing && Date.now() - lifeAt > 5000) renderLife();
-    renderStrip(s, o, mains);
+    renderStrip(s, o, mains, R);
     fitStrip();
     renderCharts(s, t, o);
   }
@@ -583,7 +774,8 @@ function mount(root, deps) {
     const s = session;
     const h = lastHealth = health({ t: Date.now(), sharing: st.sharing, hasSession: !!s, exp: st.h.exp, level: st.h.level, levelNow: st.level,
       size: st.h.size, counts: st.h.counts, potNone: st.potNone, potCount: st.potCount,
-      meso: { at: s && s.meso && s.meso.last ? s.meso.last.t : null, unclear: !!(st.mesoOpen && st.mesoUnclear) } });
+      meso: { at: s && s.meso && s.meso.last ? s.meso.last.t : null, unclear: !!(st.mesoOpen && st.mesoUnclear) },
+      loot: { on: lootOn, pictures: !!lootIdx, sets: s && s.bag ? s.bag.sets : 0, refillAfter: !!s && GS().inTown(s) } });
     // the pill over the buttons goes by what the core numbers need (mesos only ever ask)
     const core = ['exp', 'level', 'potions'].map(k => h.checks[k].state);
     const ps = !st.sharing ? 'idle' : core.includes('bad') ? 'bad' : core.every(x => x === 'ok') ? 'ok' : 'wait';
@@ -608,8 +800,9 @@ function mount(root, deps) {
     const jump = s && s.meso && s.meso.jump;
     if (jump && !viewing && h.nudge.state !== 'bad') {
       SP.l3.hidden = false; SP.l3.className = 'g-l3 wait';
-      SP.l3.replaceChildren('! Mesos changed by ' + signed(jump.amount) + '. A trade?',
-        el('button', { type: 'button', onclick: () => answerJump(true) }, 'Leave it out'), el('button', { type: 'button', class: 'g-keep', onclick: () => answerJump(false) }, 'Keep it'));
+      const out = el('button', { type: 'button', onclick: () => answerJump(true) }, 'Leave it out'), keep = el('button', { type: 'button', class: 'g-keep', onclick: () => answerJump(false) }, 'Keep it');
+      SP.l3.replaceChildren('! Mesos ' + signed(jump.amount) + '. ' + (jump.amount > 0 ? 'Sold loot to someone?' : 'Bought something from someone?'),
+        ...(jump.amount > 0 ? [keep, out] : [out, keep]));
       return;
     }
     SP.l3.hidden = !!viewing || h.nudge.state === 'ok';
@@ -618,7 +811,7 @@ function mount(root, deps) {
   }
 
   /* ----- the pop out panel: the Lemon tile, three big numbers, one small line, the dots ----- */
-  function renderStrip(s, o, mains) {
+  function renderStrip(s, o, mains, R) {
     const now = Date.now(), cds = viewing ? [] : GS().countdowns(s, now);
     SP.ticks = cds.slice(0, 2);   // the two potions running out first (Lemons, then Meat)
     SP.mainIcon = mains[0] ? pictures.Icons[mains[0].id] : null;
@@ -637,7 +830,10 @@ function mount(root, deps) {
     if (o.per1 != null) bits.push(el('span', {}, '1% costs ', el('b', {}, fmtK(o.per1))));
     const pace = viewing ? null : paceParts(o, false)[o.markT ? 2 : 0];
     if (pace && pace.value !== '·') bits.push(el('span', {}, pace.label + ' ', el('b', {}, pace.value), pace.vs ? el('span', { class: pace.up ? 'up' : 'down' }, ' ' + pace.vs) : ''));
-    if (o.profitHr != null) bits.push(el('span', { class: o.profitHr >= 0 ? 'up' : 'down' }, 'profit ', el('b', {}, (o.profitHr >= 0 ? '+' : '−') + fmtK(Math.abs(o.profitHr))), '/hr'));
+    // the session's result an hour (its counted window), and with Count my loot what the bag gained and the best drop
+    if (R.perHr != null) bits.push(el('span', { class: R.perHr >= 0 ? 'up' : 'down' }, 'profit ', el('b', {}, (R.perHr >= 0 ? '+' : '−') + fmtK(Math.abs(R.perHr))), '/hr'));
+    if (R.mode === 'loot' && R.loot) bits.push(el('span', {}, 'Loot ', el('b', {}, money(R.loot.value))));
+    if (R.mode === 'loot' && R.loot && R.loot.best) bits.push(el('span', { class: 'g-best' }, '★ ' + R.loot.best.name));
     SP.mini.replaceChildren(...bits);
     SP.mini.hidden = !bits.length;
   }
@@ -833,7 +1029,11 @@ function mount(root, deps) {
   // mesos from inventory looks, and the verdict: mesos earned an hour less potions drunk an hour
   function renderMesos(s, o) {
     V.trade.hidden = !(o.mesoJump && !viewing);
-    if (o.mesoJump) V.tradeQ.textContent = 'Your mesos changed by ' + signed(o.mesoJump.amount) + ' since your last peek. A trade or a big buy?';
+    if (o.mesoJump) {
+      const up = o.mesoJump.amount > 0;
+      V.tradeQ.textContent = jumpQuestion(o.mesoJump.amount);
+      V.trade.replaceChildren(V.tradeQ, ' ', up ? V.tradeNo : V.tradeYes, ' ', up ? V.tradeYes : V.tradeNo);
+    }
     V.tradeBox.hidden = !!viewing;
     if (o.mesosEarned != null || o.etcValue != null) V.mesos.textContent = mesoLine(o);
     else if (o.mesoLooks >= 1) V.mesos.textContent = 'Counting mesos from ' + fmt(s.meso.first.v) + '. Open your inventory again in a few minutes to see what you earned';
@@ -842,12 +1042,67 @@ function mount(root, deps) {
     // one look is only where the count starts, not +0 earned: earnings show once a later look is a minute or more after it
     else if (o.mesoLooks >= 1) { V.mesoBig.textContent = '·'; V.mesoSub.textContent = 'Counting from ' + fmt(s.meso.first.v) + '. Open your inventory again in a few minutes'; }
     else { V.mesoBig.textContent = '·'; V.mesoSub.textContent = st.mesoUnclear ? "Can't read your mesos clearly yet" : 'Open your inventory now and then to start counting'; }
-    // profit: mesos earned + etc picked up - potions drunk
-    V.verdict.hidden = o.profit == null;
-    if (o.profit != null) {
-      const up = (o.profitHr != null ? o.profitHr : o.profit) >= 0;
-      V.verdict.className = 'g-verdict ' + (up ? 'up' : 'down');
-      V.verdict.textContent = (up ? '▲ Profit +' : '▼ Loss −') + fmt(Math.abs(o.profit)) + (o.profitHr != null ? ' · ' + fmtK(Math.abs(o.profitHr)) + ' an hour' : '');
+  }
+  // the result card (GrindSession.result): mesos an hour and the verdict, four even tiles that add up to the session's
+  // total, the session's Lemons and Meat, what was picked up (Count my loot), and a line or two that ties it together
+  const money = n => n == null ? '·' : (n > 0 ? '+' : n < 0 ? '−' : '') + fmt(Math.abs(Math.round(n)));
+  const tone = n => n == null || n === 0 ? '' : n > 0 ? 'pos' : 'neg';
+  function renderResult(s, R) {
+    V.res.hidden = false;
+    const has = !!R.window, loot = R.mode === 'loot';
+    V.resHr.textContent = money(R.perHr); V.resHr.className = 'g-res-hr ' + tone(R.perHr);
+    V.resPill.textContent = R.verdict || 'Counting'; V.resPill.className = 'g-res-pill ' + (R.verdict === 'Profitable' ? 'up' : R.verdict === 'Losing' ? 'down' : '');
+    const usual = has && R.perHr != null ? GS().usualOf(lastRows, { mapId: s.mapId, mode: R.mode, exceptId: s.id }) : null;
+    const bits = has ? [money(R.total) + ' this session', fmtDur(R.window.mins)]
+      // a saved session can't take another look: it says why it has no total instead of asking for one
+      : [viewing ? (loot ? 'Its bag was never looked through twice, so it has no total' : 'Its inventory was never opened twice, so it has no total')
+        : loot ? 'Flip through your bag now, and again later, to count your loot' : 'Open your inventory now and then so mesos count'];
+    if (usual != null) bits.push(fmtK(Math.abs(R.perHr - usual)) + ' an hour ' + (R.perHr >= usual ? 'better' : 'worse') + ' than your usual ' + shortMap(s.mapId));
+    const short = has && R.window.mins < R.window.sessionMins - 1;
+    V.resSub.replaceChildren(bits.join(' · '), short ? el('span', { class: 'g-res-win' }, 'Counted over ' + Math.round(R.window.mins) + ' of your ' + Math.round(R.window.sessionMins) + ' minutes. ' +
+      (loot ? 'Flip through your bag before you stop to count it all.' : 'Open your inventory before you stop to count it all.')) : '');
+    const tile = (label, v, sub, off) => el('div', { class: 'g-res-tile' + (off ? ' off' : '') }, el('div', { class: 'g-lbl' }, label),
+      el('div', { class: 'g-res-tv ' + (off ? '' : tone(v)) }, off ? 'Not counted' : money(v)), el('div', { class: 'g-res-ts' }, sub || ''));
+    V.resTiles.replaceChildren(tile('Picked up', R.pickedUp), tile('Sold at shop', R.sold, R.otherBuys ? 'bought ' + fmt(R.otherBuys) + ' besides potions' : ''),
+      // with one flip so far the mesos seen are counted, and the loot waits for the next flip
+      tile('Loot kept', R.loot ? R.loot.value : null, loot && !R.loot && has ? (viewing ? 'its bag was looked through once' : 'counts at your next flip') : '', !loot),
+      tile('Potions', R.potions == null ? null : -R.potions));
+    const eat = (k, ids, label) => {
+      const g = R.eat[k], pic = picOf(ids);
+      return el('div', { class: 'g-res-eat' }, pic ? el('img', { src: pic, alt: '' }) : el('span', {}),
+        el('div', {}, el('div', { class: 'g-res-en' }, fmt(g.n), el('span', {}, ' ' + label)), ...eatLines(k, g).map(x => el('p', {}, x))));
+    };
+    V.resEats.replaceChildren(eat('lemon', LEMON_IDS, 'Lemons'), eat('meat', MEAT_IDS, 'Meat'));
+    V.resOther.textContent = R.other && R.other.n ? 'Plus ' + fmt(R.other.n) + ' other potions, ' + fmt(R.other.cost) + ' mesos of them.' : '';
+    // what you picked up: the best drop first, every row the same height, the NPC total under them
+    V.resLootH.hidden = V.resLoot.hidden = !loot;
+    if (loot) {
+      const L = R.loot, best = L && L.best;
+      const row = i => el('div', { class: 'g-res-li' + (best && i.key === best.key ? ' best' : '') },
+        el('span', { class: 'g-res-ic' }, cellPic(+i.key.slice(1)) ? el('img', { src: cellPic(+i.key.slice(1)), alt: '' }) : ''),
+        el('span', {}, i.name + (i.n !== 1 ? ' ×' + fmt(i.n) : ''), best && i.key === best.key ? el('small', {}, '★ Best drop. Sell it on the market') : ''),
+        el('b', {}, (i.value < 0 ? '−' : '') + fmt(Math.abs(i.value))));
+      V.resLoot.replaceChildren(...(!L ? [el('p', { class: 'g-note' }, 'Your loot shows once your bag has been looked through twice, a minute or more apart.')]
+        : L.items.length ? L.items.map(row).concat([el('div', { class: 'g-res-li sum' }, el('span', {}), el('span', {}, 'Worth at the NPC'), el('b', {}, (L.value < 0 ? '−' : '') + fmt(Math.abs(L.value))))])
+          : [el('p', { class: 'g-note' }, 'Nothing new in your bag yet.')]));
+    }
+    const lines = [];
+    if (R.flipped) lines.push(el('div', {}, 'Mesos alone: ', el('b', { class: 'neg' }, money(R.mesosOnly)), '. Your loot turned it around.'));
+    if (R.perPct != null) lines.push(el('div', {}, 'Each 1% EXP ' + (R.perPct >= 0 ? 'made you ' : 'cost you '), el('b', { class: tone(R.perPct) }, money(R.perPct)), ' mesos.'));
+    V.resLines.replaceChildren(...lines);
+    V.resNudge.hidden = loot || !!viewing;
+  }
+  // the bag's three tabs under the switch: seen in full (when), part of it (scroll on), or not yet
+  function renderBag() {
+    bagCheck.hidden = !lootOn;
+    if (!lootOn) return;
+    const B = session && session.bag;
+    for (const tab of ['Equip', 'Use', 'Etc']) {
+      const li = bagCheck.querySelector('[data-k="bag-' + tab + '"]'), A = B && B.acc[tab], full = B && B.done[tab] ? B.done[tab].t : B && B.last ? B.last.t : null;
+      // pages of a tab not finished in this opening, unless this opening already made a set (they're left from it)
+      const part = !!(A && A.strips.length) && !(B.done[tab]) && !(B.last && B.last.t >= B.openT);
+      li.className = part ? 'fix' : full ? 'done' : '';
+      li.lastChild.textContent = part ? 'Scroll to its top and bottom, slowly' : full ? 'Seen at ' + timeOfDay(full) : 'Open it in your bag';
     }
   }
   // the pop out's clocks tick every second between frames
@@ -900,7 +1155,7 @@ function mount(root, deps) {
   const iconOf = (id, name) => pictures.Icons[id] ? el('img', { src: pictures.Icons[id], alt: name }) : null;
   const usedOf = (s, id) => Object.values(s.slots).concat(s.retired || []).filter(x => String(x.id) === String(id)).reduce((a, x) => a + x.used, 0);
   const shortMap = id => mapName(id).replace(/^.*? : /, '');
-  function renderNow(s, o, mains) {
+  function renderNow(s, o, mains, R) {
     const k = (cls, v, label) => el('span', { class: 'g-nk ' + cls }, el('b', {}, v), label ? ' ' + label : '');
     if (!s) {
       V.now.replaceChildren(el('span', { class: 'g-nl' }, 'This session'), el('span', { class: 'g-nm' }, st.sharing ? 'It starts with your next EXP' : 'Share the game window to start one'));
@@ -910,7 +1165,9 @@ function mount(root, deps) {
     V.now.replaceChildren(...[el('span', { class: 'g-nl' }, viewing ? 'Looking at ' + shortMap(viewing.mapId) + ', ' + dateOf(viewing.t0) : 'This session'),
       k('y', o.expHr != null ? fmtK(o.expHr) : '·', 'EXP an hour'), k('b', fmt(o.exp), 'EXP'),
       main ? el('span', { class: 'g-nk l' }, iconOf(main.id, main.name), el('b', {}, fmt(usedOf(s, main.id))), ' ' + plural(main.name)) : null,
-      o.mesosEarned != null ? k('g', (o.mesosEarned >= 0 ? '+' : '−') + fmtK(Math.abs(o.mesosEarned)), 'mesos') : null,
+      // the session's result: mesos an hour and the verdict once there is one, else what the mesos did so far
+      R && R.perHr != null ? k('g', money(R.perHr), 'mesos an hour') : R && R.total != null ? k('g', money(R.total), 'mesos') : null,
+      R && R.verdict ? el('span', { class: 'g-nk v ' + (R.verdict === 'Profitable' ? 'up' : 'down') }, R.verdict) : null,
       k('t', fmtDur(o.mins))].filter(Boolean));
     moreBtn.hidden = !!viewing;
   }
@@ -928,8 +1185,9 @@ function mount(root, deps) {
       for (const r of rows) (byMap[r.map_id] = byMap[r.map_id] || []).push(r);
       sessions.replaceChildren(...Object.entries(byMap).map(([id, rs]) => el('div', { class: 'g-sess' }, el('b', {}, mapName(id)), rs.map(r => {
         const hrs = (r.active_min || 0) / 60, cost = (r.potions || []).reduce((a, p) => a + p.used * (p.price || 0), 0);
+        const eh = (r.exp_min != null ? r.exp_min : r.active_min || 0) / 60;   // EXP an hour on the EXP clock
         return el('button', { type: 'button', onclick: () => openSession(r) }, el('span', {}, dateOf(Date.parse(r.started_at))),
-          el('span', { class: 'n' }, fmtDur(r.active_min || 0) + ' · ' + (hrs ? fmtK(r.exp / hrs) + ' EXP an hour · ' + fmt(r.exp / (hrs * 60)) + ' a minute' : '·') +
+          el('span', { class: 'n' }, fmtDur(r.active_min || 0) + ' · ' + (eh ? fmtK(r.exp / eh) + ' EXP an hour · ' + fmt(r.exp / (eh * 60)) + ' a minute' : '·') +
             (hrs && cost ? ' · potions ' + fmtK(cost / hrs) + ' an hour' : '') + (r.pct >= 0.3 && cost ? ' · ' + fmtK(cost / r.pct) + ' per 1%' : '') +
             (r.mesos_earned != null && r.meso_min >= 2 ? ' · mesos ' + fmtK(r.mesos_earned / (r.meso_min / 60)) + ' an hour' : '')));
       }))));
@@ -938,7 +1196,7 @@ function mount(root, deps) {
   function openSession(r) {
     // older sessions kept on this device have no minutes any more: they open without charts
     const full = r.minutes || jget(KEY_LOCAL, []).some(x => x.id === r.id) ? Promise.resolve(r) : api.getGrind(r.id);
-    return full.then(row => { viewing = GS().fromRow(row); render(); detail.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, e => setStatus("Couldn't open that session (" + e.message + ').'));
+    return full.then(row => { viewing = GS().fromRow(row, eatCfg()); render(); detail.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, e => setStatus("Couldn't open that session (" + e.message + ').'));
   }
   // all time: the listed sessions with the running one as it is now (its last save swapped for the live numbers)
   function renderLife() {
@@ -987,16 +1245,22 @@ function mount(root, deps) {
   showMap(); render(); listSessions();
   if (session) setStatus('Carrying on your session from ' + timeOfDay(session.t0) + '. Share the game window to keep going.');
   window.Grind.debug = { session: () => session, state: () => ({ reads: st.reads, ticks: st.ticks, line: st.line, m: st.m, level: st.level }),
-    save: () => save(true), load: row => { viewing = GS().fromRow(row); render(); }, capture: () => capture, mesoLine };
+    save: () => save(true), load: row => { viewing = GS().fromRow(row, eatCfg()); render(); }, capture: () => capture, mesoLine,
+    // a session carried in whole (the page tests' mockup session), as if it had been read here
+    use: x => { session = x; viewing = null; if (!session.eat) session.eat = eatCfg(); session.mode = lootOn ? 'loot' : 'track'; render(); } };
   // what a Something off? report carries from this tab (index.html keeps it), and the pop out to draw beside the page
   return {
     report: () => ({ sharing: st.sharing, ticks: st.ticks, reads: st.reads, frame: [st.fw, st.fh],
       stretch: st.m ? { s: st.m.s, score: st.m.score, countScore: st.m.countScore } : null, line: st.line, level: st.level,
       slots: st.slots, mesos: st.mesos == null ? null : st.mesos, mesoHome: MS().mesoHome(), checks: lastHealth, recent: st.recent.slice(),
-      map: mapId, session: session ? GS().stats(session, Date.now(), avgExp(session.mapId || mapId)) : null, popout: pipWin ? { layout } : null }),
+      map: mapId, session: session ? GS().stats(session, Date.now(), avgExp(session.mapId || mapId)) : null, popout: pipWin ? { layout } : null,
+      // Count my loot: the switch, how far each tab's flip got, the bag sets, shop visits and prices learned
+      loot: { on: lootOn, mode: session ? session.mode : null, pictures: !!lootIdx, sets: session && session.bag ? session.bag.sets : 0,
+        acc: session && session.bag ? Object.fromEntries(Object.entries(session.bag.acc).map(([k, a]) => [k, a.strips.map(x => ({ rows: x.rows.length, top: x.top, bottom: x.bottom }))])) : null,
+        shop: session && session.shop ? { open: session.shop.open, visits: session.shop.visits.length } : null, learned: session ? session.learned || [] : [] } }),
     popout: () => pipWin ? pipWin.document.body : null,
   };
 }
 
-window.Grind = { mount, fmtK, clock, health, lemonTile, lifetime };
+window.Grind = { mount, fmtK, clock, health, lemonTile, lifetime, lootItem, eatLines };
 })();
