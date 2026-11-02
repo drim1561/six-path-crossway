@@ -192,6 +192,12 @@ select { background: var(--surface); border: 1.5px solid var(--btn-line); border
 .b-bar i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
 .b-more { display: block; background: none; border: 0; padding: 10px 0 0; color: var(--muted); font: 800 13px var(--font-body); text-decoration: underline; cursor: pointer; }
 .b-foot { margin: 10px 0 0; }
+.b-sec { margin: 16px 0 4px; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.b-sec:first-child { margin-top: 0; }
+.b-here { padding: 10px 12px; border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 10px; background: var(--surface); }
+.b-here .b-name { font: 700 19px var(--font-title); }
+.b-try { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
+.b-tryone { padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; }
 .b-time { list-style: none; margin: 6px 0 0; padding: 0; }
 .b-ev { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--row-line); }
 .b-ev .num { font: 700 13px var(--font-num); color: var(--num); }

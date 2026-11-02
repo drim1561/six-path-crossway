@@ -130,6 +130,8 @@ function hash(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) h = Ma
 // Average casts over n simulated kills; null when the monster is effectively unkillable (over 20 casts).
 function castsToKill({ hp, range, hits, crit, hit, mult }, rng, n = 2000) {
   if (!(hit * mult > 0)) return null;
+  // Far past 20 casts on average damage: no need to simulate it to know.
+  if (hp / (hits * hit * mult * (range[0] + range[1]) / 2 * (1 + crit.rate * crit.dmg)) > 25) return null;
   let total = 0;
   for (let i = 0; i < n; i++) {
     let left = hp, casts = 0;
@@ -286,41 +288,70 @@ function critSkill(s, cls) {
 
 /* ---------- Ranking ---------- */
 
+// Damaging skills that hit several monsters a cast (Thunder Bolt, Iron Arrow, Power Knockback, Double Shot). Rush is left
+// out: it's a dash that shoves monsters along, nobody trains with it, and at 1 point it sent a level 60 Spearman to Wraiths.
+const MULTI = [2201004, 3201004, 3001003, 3001002];
+const SKILL_ELEMENT = { 2201004: 'L' };
+// Monsters one cast reaches: about one for every 8 the map spawns, up to what the skill can hit. Gathering them costs
+// a cast of walking for each one past the first, so a crowd only wins when its monsters are worth the trip.
+const CROWD = 8;
+const crowdHits = (count, mobCount) => Math.min(mobCount, Math.max(1, Math.floor(count / CROWD)));
+const groupGap = k => KILL_GAP + (k - 1);
+
 // What one cast does: damage range per hit, hits per cast, crits, which defense and element apply.
-function attackModel(s, cls, Wover) {
+// skillId picks the skill cast (the phase's attack when left out).
+function attackModel(s, cls, Wover, skillId) {
   const sk = id => level(DATA.skills[id], s.skills[id]) || {};
   if (cls.family === 'claw') {
     const cm = sk(cls.mastery), ap = cm.x || 0, sec = s.str + s.dex;
-    const W = Wover !== undefined ? Wover : weaponAttackFromMax(s.atkMax, { P: s.luk, sec, mult: 2.5, ap });
+    const W = Wover !== undefined ? Wover : s.W !== undefined ? s.W : weaponAttackFromMax(s.atkMax, { P: s.luk, sec, mult: 2.5, ap });
     const l7 = sk(cls.attack);
     return { range: physRange({ S: (l7.damage || 0) / 100, W, P: s.luk, sec, mult: 3, M: 0.5, ap }), hits: l7.bulletCount || 2,
-      crit: { rate: s.critRate / 100, dmg: s.critDmg / 100 - 1 }, def: 'pdd', element: null, W };
+      crit: { rate: s.critRate / 100, dmg: s.critDmg / 100 - 1 }, def: 'pdd', element: null, W, skill: cls.attack, targets: 1 };
   }
-  const P = phaseOf(cls, s.level);
+  const P = phaseOf(cls, s.level), id = skillId || P.attack, targets = Math.max(1, num(sk(id).mobCount));
   if (cls.family === 'phys') {
     const g = DATA.gear.find(x => x.id === s.weapon), slot = g ? g.slot : cls.weapons[0], sh = physShape(s, cls, slot);
     // A typed attack range gives the weapon attack back (as the claw does); otherwise the attack box is used.
-    const W = Wover !== undefined ? Wover : weaponAttackFromMax(s.atkMax, { P: sh.P, sec: sh.sec, mult: windowMults(slot)[1], ap: sh.ap });
-    const a = sk(P.attack), w = WEAPONS[slot], mult = w.shoot || w.mixed;
+    const W = Wover !== undefined ? Wover : s.W !== undefined ? s.W : weaponAttackFromMax(s.atkMax, { P: sh.P, sec: sh.sec, mult: windowMults(slot)[1], ap: sh.ap });
+    const a = sk(id), w = WEAPONS[slot], mult = w.shoot || w.mixed;
     return { range: physRange({ S: num(a.damage) / 100, W, P: sh.P, sec: sh.sec, mult, M: sh.M, ap: sh.ap }),
       hits: Math.max(1, num(a.attackCount)) * Math.max(1, num(a.bulletCount)),
-      crit: { rate: s.critRate / 100, dmg: s.critDmg / 100 - 1 }, def: 'pdd', element: null, W, slot };
+      crit: { rate: s.critRate / 100, dmg: s.critDmg / 100 - 1 }, def: 'pdd', element: null, W, slot, skill: id, targets };
   }
-  const ha = sk(P.attack), el = P.phase === 2 ? cls.element : null;
+  const ha = sk(id), el = SKILL_ELEMENT[id] || (P.phase === 2 ? cls.element : null);
   return { range: spellRange({ S: (ha.mad || 0) / 100, magic: s.magic, int: s.int, M: mastery(num(ha.mastery)) }), hits: num(ha.attackCount) || 1,
-    crit: { rate: 0, dmg: 0 }, def: 'mdd', element: el };
+    crit: { rate: 0, dmg: 0 }, def: 'mdd', element: el, skill: id, targets };
 }
 // Time between kills (walking to the next monster, respawns, loot) in casts. Without it, anything one cast kills
 // looked as good as a monster three levels of EXP richer, so a level 49 Cleric was sent to Zombie Mushrooms.
 const KILL_GAP = 2;
-function rankWith(s, cls, data) {
-  const am = attackModel(s, cls), seed = hash(JSON.stringify(s)), out = [];
+// Each monster is fought with whichever skill the character has points in gives the best pace: the attack, or a
+// multi-target skill that kills a group (every monster in reach takes the same casts) for one walk.
+function rankWith(s, cls, data, n) {
+  const P = phaseOf(cls, s.level), seed = hash(JSON.stringify(s)), out = [];
+  const models = [attackModel(s, cls)].concat(MULTI.filter(id => id !== P.attack && s.skills[id] >= 1 && DATA.skills[id]).map(id => attackModel(s, cls, undefined, id)));
   for (const mob of data.mobs) {
-    const hit = hitChance(s.acc, s.level, mob), mult = defend(1, mob[am.def]) * elemMult(mob, am.element) * levelScale(mob.level, s.level);
-    const casts = castsToKill({ hp: mob.hp, range: am.range, hits: am.hits, crit: am.crit, hit, mult }, makeRng(seed ^ mob.id));
-    if (casts === null) continue;
+    let best = null;
+    // A skill whose pace on average damage is well behind another's isn't worth simulating.
+    const fights = models.map(am => {
+      const hit = hitChance(s.acc, s.level, mob), mult = defend(1, mob[am.def]) * elemMult(mob, am.element) * levelScale(mob.level, s.level);
+      const k = crowdHits(mob.maps[0][1], am.targets), avg = am.hits * hit * mult * (am.range[0] + am.range[1]) / 2 * (1 + am.crit.rate * am.crit.dmg);
+      return { am, hit, mult, k, guess: avg > 0 ? k * mob.exp / (Math.max(1, mob.hp / avg) + groupGap(k)) : 0 };
+    });
+    const top = Math.max(...fights.map(f => f.guess));
+    for (const { am, hit, mult, k, guess } of fights) {
+      if (guess < 0.8 * top) continue;
+      const casts = castsToKill({ hp: mob.hp, range: am.range, hits: am.hits, crit: am.crit, hit, mult }, makeRng(seed ^ mob.id), n);
+      if (casts === null) continue;
+      const pace = k * mob.exp / (casts + groupGap(k));
+      if (best && best.pace >= pace) continue;
+      best = { pace, casts, k, hit, am };
+    }
+    if (!best) continue;
+    const { casts, k, hit, am } = best;
     out.push({ id: mob.id, name: mob.name, level: mob.level, hp: mob.hp, exp: mob.exp, def: mob[am.def], casts: Math.round(casts * 100) / 100,
-      expPerCast: Math.round(mob.exp / casts * 10) / 10, pace: Math.round(mob.exp / (casts + KILL_GAP) * 10) / 10,
+      expPerCast: Math.round(k * mob.exp / casts * 10) / 10, pace: Math.round(best.pace * 10) / 10, hits: k, skill: am.skill,
       hit: Math.round(hit * 100), map: mob.maps[0][0], count: mob.maps[0][1] });
   }
   return out.sort((a, b) => b.pace - a.pace || b.exp - a.exp);
@@ -433,7 +464,7 @@ function planAP(s, cls) {
     const why = p.why || 'Your main stat, it adds the most damage.';
     const last = rows[rows.length - 1];
     if (last && last.put === put && last.why === why && last.to === lv - 1) last.to = lv;
-    else rows.push({ from: lv, to: lv, put, why, ...(p.wear ? { wear: p.wear } : {}) });
+    else rows.push({ from: lv, to: lv, put, why, req: p.req, ...(p.wear ? { wear: p.wear } : {}) });
   }
   return rows;
 }
@@ -501,13 +532,98 @@ function buildGuide(raw, clsId, data) {
       ...(cls.family === 'claw' ? [['+1 LUK', { luk: 1 }], ['+1 DEX or STR', { str: 1 }]]
         : [['+1 ' + STAT_NAME[cls.mainStat], { [cls.mainStat]: 1 }], ['+1 ' + STAT_NAME[cls.reqStat], { [cls.reqStat]: 1 }]])]
     : [['+1 magic attack', { mad: 1 }], ['+1 INT', { int: 1 }]];
-  const gear = planGear(s, cls), skills = planSkills(s, cls), slot = slotOf(s, cls);
+  const gear = planGear(s, cls), skills = planSkills(s, cls), slot = slotOf(s, cls), rank = rankWith(s, cls, data), ap = planAP(s, cls);
   const held = cls.family === 'phys' && DATA.gear.find(x => x.id === s.weapon);
   const weapon = physical(cls) ? { id: held ? held.id : null, slot, name: held ? held.name : null, wat: held ? held.inc.wat || 0 : null, W: am.W } : null;
   return { ok: true, phase: P.phase, estimated: cls.family === 'phys' && !CHECKED_WEAPONS.has(slot), weapon, assumed: v.assumed, stats: s,
     attack: { min: Math.round(am.range[0]), max: Math.round(am.range[1]), avg: Math.round(sum / 2 * am.hits) },
-    train: rankWith(s, cls, data).slice(0, 10), skills, ap: planAP(s, cls), gear, next: planNext(s, cls, P, skills, physical(cls) ? am.W : bestWeapon(slot, s.level, 'mad')),
+    train: rank.slice(0, 10), here: rank[0] || null, tryNext: worthTry(rank, s.level, rank[0] && rank[0].id), stages: forecast(s, cls, ap),
+    skills, ap, gear, next: planNext(s, cls, P, skills, physical(cls) ? am.W : bestWeapon(slot, s.level, 'mad')),
     scrolls: planScrolls(s, cls, gear), worth: worth.map(([what, d]) => ({ what, pct: gainPct(s, cls, d) })) };
+}
+
+/* ---------- The road ahead ---------- */
+
+// Monsters above your level, up to 8 levels up, that you hit at least 70% of the time: worth trying now.
+const worthTry = (rank, lv, nowId) => rank.filter(m => m.level > lv && m.level <= lv + 8 && m.hit >= 70 && m.id !== nowId).slice(0, 3);
+
+// The best weapon of a type this class can wear by a level, by its attack (weapon attack, or magic attack for mages).
+function bestGearAt(cls, slot, lv) {
+  const key = physical(cls) ? 'wat' : 'mad';
+  return DATA.gear.filter(g => g.slot === slot && fits(g, cls) && g.level <= lv).reduce((b, g) => !b || (g.inc[key] || 0) > (b.inc[key] || 0) ? g : b, null);
+}
+// Skills at a later level for someone who follows the guide: the 1st job's order to 29, then 1 point at 30 and 3 a level.
+function skillsAt(s, cls, lv, slot) {
+  const out = { ...s.skills };
+  const run = (P, points) => {
+    const plan = {};
+    for (const id of Object.keys(DATA.skills).map(Number)) if (DATA.skills[id].job === P.job) plan[id] = out[id] || 0;
+    if (P.attack !== undefined && plan[P.attack] === undefined) plan[P.attack] = out[P.attack] || 0;
+    spend([[P.attack, 1]].concat(orderFor(cls, P, slot)), plan, points);
+    Object.assign(out, plan);
+  };
+  const P0 = phaseOf(cls, s.level);
+  if (P0.phase === 2) run(P0, 3 * (lv - s.level));
+  else {
+    run(P0, 3 * (Math.min(lv, ADVANCE - 1) - s.level));
+    if (lv >= ADVANCE) run(phaseOf(cls, lv), 1 + 3 * (lv - ADVANCE));
+  }
+  return out;
+}
+// The character at a later level following the plan: AP rows, skill order, and the best weapon they can wear by then.
+// Only the stats typed now are real; everything after is the guide's own plan.
+function statsAt(s, cls, lv, ap) {
+  const d = { str: 0, dex: 0, int: 0, luk: 0 }, slot = slotOf(s, cls), key = physical(cls) ? 'wat' : 'mad';
+  for (const r of ap) for (let l = r.from; l <= Math.min(r.to, lv); l++) { d[cls.reqStat] += r.req; d[cls.mainStat] += 5 - r.req; }
+  const t = { ...s, level: lv, skills: skillsAt(s, cls, lv, slot) };
+  for (const k in d) t[k] = s[k] + d[k];
+  const held = cls.family === 'phys' && DATA.gear.find(x => x.id === s.weapon), now = bestGearAt(cls, slot, s.level), then = bestGearAt(cls, slot, lv);
+  const cur = held ? held.inc.wat || 0 : now ? now.inc[key] || 0 : 0, gain = Math.max(0, (then ? then.inc[key] || 0 : 0) - cur);
+  if (physical(cls)) {
+    t.W = attackModel(s, cls).W + gain;
+    t.acc = Math.round(s.acc + (lv - s.level) + 0.8 * d.dex + 0.5 * d.luk);
+  } else {
+    t.magic = s.magic + Math.floor(d.int / 2) + gain;
+    t.acc = s.acc + (lv - s.level);
+  }
+  return t;
+}
+// The next 10 levels (or to 70) as stages: the ranking rerun at each level, grouped while the top pick holds. A one level
+// blip folds into the stage before it (or after, at the start), and each stage says what changed to start it.
+function forecast(s, cls, ap) {
+  const end = Math.max(s.level, Math.min(s.level + 10, NEXT_ADVANCE)), slot = slotOf(s, cls), runs = [];
+  for (let lv = s.level; lv <= end; lv++) {
+    const t = lv === s.level ? s : statsAt(s, cls, lv, ap), r = rankWith(t, cls, DATA, 150);
+    if (r.length) runs.push({ lv, t, r });
+  }
+  let st = [];
+  for (const x of runs) {
+    const last = st[st.length - 1];
+    if (last && last.top === x.r[0].id) last.to = x.lv;
+    else st.push({ from: x.lv, to: x.lv, top: x.r[0].id, run: x });
+  }
+  for (let i = 0; i < st.length - 1; i++) if (st[i].from === st[i].to && st.length > 1) {
+    if (i > 0) st[i - 1].to = st[i].to; else { st[1].from = st[0].from; st[1].run = st[0].run; st[1].top = st[0].top; }
+    st.splice(i, 1); i = -1;
+  }
+  // Neighbours with the same pick after folding become one.
+  st = st.reduce((a, x) => { const l = a[a.length - 1]; if (l && l.top === x.top) l.to = x.to; else a.push(x); return a; }, []);
+  return st.map((x, i) => {
+    const r = x.run.r, picks = [r[0]].concat(r[1] && r[1].pace >= 0.9 * r[0].pace ? [r[1]] : []);
+    return { from: x.from, to: x.to, picks, why: i ? whyStage(st[i - 1].run.t, x.run.t, cls, slot, r[0], st[i - 1].run.r[0]) : '' };
+  });
+}
+// What changed between two points of the plan: the 2nd job, a skill the new pick uses maxing or taking over from the last
+// stage's, a better weapon, any skill maxed.
+function whyStage(a, b, cls, slot, pick, was) {
+  if (a.level < ADVANCE && b.level >= ADVANCE) return '2nd job';
+  const maxed = id => DATA.skills[id] && b.skills[id] >= DATA.skills[id].max && !(a.skills[id] >= DATA.skills[id].max);
+  if (maxed(pick.skill)) return DATA.skills[pick.skill].name + ' maxed';
+  if (pick.skill !== was.skill) return DATA.skills[pick.skill].name + ' at ' + b.skills[pick.skill];
+  const wa = bestGearAt(cls, slot, a.level), wb = bestGearAt(cls, slot, b.level);
+  if (wb && wb !== wa) return wb.name + ' at ' + wb.level;
+  const any = Object.keys(b.skills).map(Number).find(id => DATA.skills[id] && DATA.skills[id].name && maxed(id));
+  return any ? DATA.skills[any].name + ' maxed' : '';
 }
 
 // The ability points, skill points and upgrades ahead as one list by level, split at the next milestone (the next level a
@@ -698,13 +814,32 @@ function renderNow(g, cls) {
 
 function renderPanels(g) {
   const lv = g.stats.level, top = g.train.length ? g.train[0].pace : 1;
-  const train = ui.root.querySelector('#train');
-  train.replaceChildren(...g.train.map((m, i) => extra(E('div', { class: 'b-mob' },
-    E('div', {}, E('div', {}, E('b', { class: 'b-name' }, m.name), ' ', E('span', { class: 'small' }, 'lv ' + m.level)),
-      E('div', { class: 'small' }, m.map + ', ' + castsText(m) + ', ' + m.hit + '% hit, ' + fmt(m.hp) + ' HP'),
-      bar(m.pace / top * 100)),
-    E('div', { class: 'num' }, fmt(m.exp) + ' EXP a kill')), i, 3)),
-    E('p', { class: 'small b-foot' }, 'Ranked by EXP over time at your level: casts to kill, from a few thousand simulated kills with your damage range, crits, monster defense and hit chance, plus about 2 casts of walking between kills. So a monster you one shot only wins if its EXP holds up.'));
+  const train = ui.root.querySelector('#train'), h = g.here;
+  const sec = text => E('h4', { class: 'b-sec' }, text), ahead = g.stages.length ? g.stages[g.stages.length - 1].to - lv : 0;
+  const where = m => m.map.replace(/^.*? : /, '');
+  const crowd = m => m.hits > 1 ? ui.data.skills[m.skill].name + ' hits about ' + m.hits + ' at a time' : '';
+  train.replaceChildren(
+    sec('Train here now'),
+    h ? E('div', { class: 'b-here' }, E('div', {}, E('b', { class: 'b-name' }, h.name), ' ', E('span', { class: 'small' }, 'lv ' + h.level)),
+      E('div', { class: 'small' }, [where(h), castsText(h), h.hit + '% hit', fmt(h.exp) + ' EXP each', crowd(h)].filter(Boolean).join(', ')))
+      : E('p', { class: 'small' }, 'Nothing you can kill yet.'),
+    sec('Worth a try'),
+    g.tryNext.length ? E('div', { class: 'b-try' }, g.tryNext.map(m => E('div', { class: 'b-tryone' },
+      E('b', {}, m.name), ' ', E('span', { class: 'small' }, 'lv ' + m.level), E('div', { class: 'small' }, [where(m), castsText(m), m.hit + '% hit', crowd(m)].filter(Boolean).join(', ')))))
+      : E('p', { class: 'small' }, 'Nothing up to 8 levels above you that you hit often enough yet.'),
+    sec(ahead > 0 ? 'Your next ' + ahead + ' levels' : 'From here'),
+    E('ul', { class: 'b-time' }, g.stages.map(st => E('li', { class: 'b-ev b-stage' }, E('span', { class: 'num' }, range(st.from, st.to)),
+      E('span', {}, E('b', {}, st.picks.map(m => m.name).join(', ')), ' ', E('span', { class: 'small' }, st.picks.map(where).filter((x, i, a) => a.indexOf(x) === i).join(', ')),
+        st.why ? [' ', E('span', { class: 'b-chip up' }, st.why)] : null)))),
+    sec('Every map, ranked'),
+    ...g.train.map((m, i) => extra(E('div', { class: 'b-mob' },
+      E('div', {}, E('div', {}, E('b', { class: 'b-name' }, m.name), ' ', E('span', { class: 'small' }, 'lv ' + m.level)),
+        E('div', { class: 'small' }, [m.map, castsText(m), m.hit + '% hit', fmt(m.hp) + ' HP', crowd(m)].filter(Boolean).join(', ')),
+        bar(m.pace / top * 100)),
+      E('div', { class: 'num' }, fmt(m.exp) + ' EXP a kill')), i, 0)),
+    E('p', { class: 'small b-foot' }, 'Ranked by EXP over time: casts to kill, from a few thousand simulated kills with your damage range, crits, monster defense and hit chance, plus about 2 casts of walking between kills. So a monster you one shot only wins if its EXP holds up. ',
+      'Skills that hit several monsters get credit for about one monster in reach for every ' + CROWD + ' the map spawns, and each extra one costs a cast of walking to gather. ',
+      'Only "Train here now" and "Worth a try" use your numbers. The next levels assume you follow this guide: its AP, skill points and the best weapon you can wear.'));
   moreButton(train, 'Show all ' + g.train.length + ' maps');
   train.append(train.querySelector('.b-foot'));
 
