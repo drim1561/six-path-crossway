@@ -1108,7 +1108,8 @@ function renderOverview(g, cls) {
     E('div', { class: 'b-ovgo' }, go('points', 'Points tab'), go('gear', 'Gear tab'), go('scrolls', 'Scrolls tab')),
     sec(end > g.stats.level ? 'Your next ' + (end - g.stats.level) + ' levels' : 'From here'),
     E('p', {}, stageText + '.' + (end > g.stats.level ? ' About ' + Math.max(1, hrs) + ' hours of grinding to ' + end + '.' : '')), go('train', 'The stages on the Train tab'),
-    best ? sec('Skill paths') : null, best ? E('p', {}, g.paths.why, g.paths.estimated ? E('span', { class: 'small' }, ' ' + g.paths.estimated) : null) : null, best ? go('paths', 'Compare them on the Skill paths tab') : null,
+    // replaceChildren writes a null as the text "null", so a class without paths leaves the three out
+    ...(best ? [sec('Skill paths'), E('p', {}, g.paths.why, g.paths.estimated ? E('span', { class: 'small' }, ' ' + g.paths.estimated) : null), go('paths', 'Compare them on the Skill paths tab')] : []),
     E('p', { class: 'small b-foot' }, 'EXP an hour: ' + tuneText(g.tune)));
 }
 
