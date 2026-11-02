@@ -144,6 +144,8 @@ const $ = id => ui.root.querySelector('#' + id);
 function mount(root, deps) {
   ui.root = root; ui.data = deps.data; E = deps.el;
   Object.assign(ui, { equip: null, pick: 0, prices: {}, priceKeys: '', storyKeys: '' });
+  // Cozy Market's number for each item and scroll that has one (meowdb uses the same numbers), so a row can link to it
+  ui.cozy = new Map([...ui.data.equips, ...ui.data.families.flatMap(f => f.tiers)].filter(x => x.cozy).map(x => [x.name, x.cozy]));
   const field = (label, input, hint) => E('label', {}, label, input, hint ? E('span', { class: 'small' }, hint) : null);
   const num = (id, extra = {}) => E('input', { id, inputmode: 'numeric', autocomplete: 'off', ...extra });
   const names = [...new Set(ui.data.equips.map(e => e.name))].sort();
@@ -213,10 +215,18 @@ function renderPrices(rows) {
     const input = E('input', { 'data-price': name, autocomplete: 'off', placeholder: 'like 150k' });
     input.value = ui.prices[name] || '';
     input.addEventListener('input', () => { ui.prices[name] = input.value; update(); });
-    const btn = E('button', { type: 'button', class: 'cozy', 'data-name': name, title: 'Copies the name and opens Cozy Market' }, 'Check on Cozy');
-    btn.addEventListener('click', () => checkCozy(name));
-    return E('label', {}, E('span', { class: 'ap-label' }, label, btn), input);
+    return E('label', {}, E('span', { class: 'ap-label' }, label, ...lookups(name)), input);
   }));
+}
+
+// Straight to the item's page on Cozy and on meowdb when its number is known, otherwise copy the name and open Cozy.
+function lookups(name) {
+  const n = ui.cozy.get(name);
+  if (n) return [E('a', { class: 'cozy', href: 'https://cozy.markets/items/' + n, target: '_blank', rel: 'noopener', title: 'Sales and listings on Cozy Market' }, 'Cozy'),
+    E('a', { class: 'cozy', href: 'https://meowdb.com/msclassic/item-db/' + n, target: '_blank', rel: 'noopener', title: 'The item on meowdb' }, 'meowdb')];
+  const btn = E('button', { type: 'button', class: 'cozy', 'data-name': name, title: 'Copies the name and opens Cozy Market' }, 'Check on Cozy');
+  btn.addEventListener('click', () => checkCozy(name));
+  return [btn];
 }
 
 function checkCozy(name) {
