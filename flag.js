@@ -2,7 +2,8 @@
 // presses it. One click takes a picture of the page, a few words, Send, and the report goes to functions/api/report.js,
 // which passes it to Rimmah's private #bug-reports channel on Discord. Design: docs/superpowers/specs/2026-11-02-flag-button-design.md.
 //
-// Flag.open({ api, el, config, view, reporter, game, session, button }) draws the page, then shows the panel.
+// Flag.open({ api, el, config, view, reporter, game, gameAt, session, button }) draws the page, then shows the panel.
+// gameAt (ms) says game is the last picture a tab's reader read rather than the live share.
 // Flag.details(ctx) is everything that goes along quietly (shown in full behind See everything); never the sign in token,
 // which travels as its own field for the relay to check. Flag.capDetails(obj) keeps it under the relay's 200,000 bytes.
 (function () {
@@ -35,6 +36,7 @@
     gameTooBig: 'Your game window is too big to send a picture of, so that one stays on your computer.',
     open: 'Open full size',
     shots: { page: 'This page', game: 'Your game', popout: 'Pop out' },
+    lastRead: 'From your last Read from game', leaveLastRead: 'Leave out the picture from your last Read from game',
   };
 
   // html-to-image, pinned like supabase-js, fetched the first time a picture is drawn
@@ -152,6 +154,8 @@
     let strips = null, note = '';
     if (deps.game) {
       base.gameSize = [deps.game.width, deps.game.height];
+      base.gameFrom = deps.gameAt ? 'last read' : 'live';
+      if (deps.gameAt) base.gameAgeSec = Math.max(0, Math.round((when - deps.gameAt) / 1000));
       try {
         const g = await gameStrips(deps.game);
         if (g.strips) { strips = g.strips; keep('game', g.whole, 'game.png'); base.gameParts = strips.length; }
@@ -192,10 +196,11 @@
     };
     for (const key of ['page', 'game', 'popout']) {
       if (!pics[key]) continue;
+      const last = key === 'game' && deps.gameAt, name = last ? COPY.lastRead : COPY.shots[key];
       shots.append(E('figure', { class: 'flag-shot', id: SHOT_ID[key] },
-        E('a', { href: pics[key].url, target: '_blank', rel: 'noopener', title: COPY.open }, E('img', { src: pics[key].url, alt: COPY.shots[key] })),
-        E('figcaption', {}, COPY.shots[key]),
-        E('button', { type: 'button', class: 'flag-drop', 'aria-label': 'Leave out ' + COPY.shots[key], title: 'Leave out', onclick: () => drop(key) }, '✕')));
+        E('a', { href: pics[key].url, target: '_blank', rel: 'noopener', title: COPY.open }, E('img', { src: pics[key].url, alt: name })),
+        E('figcaption', {}, name),
+        E('button', { type: 'button', class: 'flag-drop', 'aria-label': last ? COPY.leaveLastRead : 'Leave out ' + name, title: 'Leave out', onclick: () => drop(key) }, '✕')));
     }
     const current = () => Object.assign({}, base, { kind, pictures: Object.assign({}, pictures) });
     const pre = E('pre', { id: 'flag-details', hidden: '' });
