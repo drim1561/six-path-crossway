@@ -212,9 +212,19 @@ function validateStats(raw, clsId) {
     stats[k] = n;
   };
   const main = cls && cls.mainStat, req = cls && cls.reqStat;
-  for (const k of ['str', 'dex', 'int', 'luk']) take(k, () => k === main ? 4 + 5 * (lv - 1) : k === req ? 25 : 4);
+  // The second stat meets what the held weapon asks for (a Zard at 40 needs 40 DEX), paid for out of the main stat.
+  const held = cls && cls.family === 'phys' && DATA ? weaponOf(cls, lv, raw.weapon) : null;
+  const reqGuess = Math.max(25, held ? held.req[req] || 0 : 0);
+  for (const k of ['str', 'dex', 'int', 'luk']) take(k, () => k === main ? 4 + 5 * (lv - 1) - (reqGuess - 25) : k === req ? reqGuess : 4);
   const sk = raw.skills || {}, P = cls && phaseOf(cls, lv);
-  if (cls) for (const id of skillsFor(cls, lv)) {
+  // No skill typed at all: assume the guide's own skill order was followed (1st job passives included).
+  const noneTyped = cls && DATA && skillsFor(cls, lv).every(id => blank(sk[id]));
+  if (noneTyped) {
+    const w = cls.family === 'phys' ? weaponOf(cls, lv, raw.weapon) : null;
+    Object.assign(stats.skills, typicalSkills(cls, lv, w ? w.slot : cls.weaponSlot || cls.weapons[0]));
+    assumed.push('skills');
+  }
+  if (cls && !noneTyped) for (const id of skillsFor(cls, lv)) {
     const max = DATA && DATA.skills[id] ? DATA.skills[id].max : 30;
     // A blank attack skill: as high as the points spent in this job allow (3 a level), up to its max.
     const typical = Math.max(1, Math.min(max, 1 + 3 * (lv - (P.phase === 1 ? ADV1(cls.id) : ADVANCE))));
@@ -254,7 +264,8 @@ function validateStats(raw, clsId) {
     take('atkMin', () => r[0]);
     take('atkMax', () => r[1]);
     if (assumed.includes('atkMin') !== assumed.includes('atkMax')) errors.push('Type both ends of the attack range.');
-    take('acc', () => Math.floor(0.8 * stats.dex + 0.5 * stats.luk) + lv);
+    const skillAcc = Object.entries(stats.skills).reduce((t, [id, n]) => t + num((level(DATA && DATA.skills[id], n) || {}).accX), 0);
+    take('acc', () => Math.floor(0.8 * stats.dex + 0.5 * stats.luk) + lv + skillAcc);
     const c = critSkill(stats, cls);
     take('critRate', () => 5 + num(c.crtX));
     take('critDmg', () => 120 + num(c.crdX));
@@ -299,6 +310,9 @@ function attackModel(s, cls, Wover) {
   return { range: spellRange({ S: (ha.mad || 0) / 100, magic: s.magic, int: s.int, M: mastery(num(ha.mastery)) }), hits: num(ha.attackCount) || 1,
     crit: { rate: 0, dmg: 0 }, def: 'mdd', element: el };
 }
+// Time between kills (walking to the next monster, respawns, loot) in casts. Without it, anything one cast kills
+// looked as good as a monster three levels of EXP richer, so a level 49 Cleric was sent to Zombie Mushrooms.
+const KILL_GAP = 2;
 function rankWith(s, cls, data) {
   const am = attackModel(s, cls), seed = hash(JSON.stringify(s)), out = [];
   for (const mob of data.mobs) {
@@ -306,9 +320,10 @@ function rankWith(s, cls, data) {
     const casts = castsToKill({ hp: mob.hp, range: am.range, hits: am.hits, crit: am.crit, hit, mult }, makeRng(seed ^ mob.id));
     if (casts === null) continue;
     out.push({ id: mob.id, name: mob.name, level: mob.level, hp: mob.hp, exp: mob.exp, def: mob[am.def], casts: Math.round(casts * 100) / 100,
-      expPerCast: Math.round(mob.exp / casts * 10) / 10, hit: Math.round(hit * 100), map: mob.maps[0][0], count: mob.maps[0][1] });
+      expPerCast: Math.round(mob.exp / casts * 10) / 10, pace: Math.round(mob.exp / (casts + KILL_GAP) * 10) / 10,
+      hit: Math.round(hit * 100), map: mob.maps[0][0], count: mob.maps[0][1] });
   }
-  return out.sort((a, b) => b.expPerCast - a.expPerCast || b.exp - a.exp);
+  return out.sort((a, b) => b.pace - a.pace || b.exp - a.exp);
 }
 function rankMobs(raw, clsId, data) {
   DATA = data;
@@ -348,19 +363,40 @@ function planSkills(s, cls) {
   const ids = skillsFor(cls, s.level).filter(id => DATA.skills[id] && DATA.skills[id].job === P.job);
   const now = {}, plan = {};
   for (const id of ids) now[id] = plan[id] = s.skills[id] || 0;
-  let left = Math.max(0, 3 * (P.until - s.level)), used = 0;
-  const steps = [];
-  const atLevel = i => s.level + 1 + Math.floor(i / 3);
+  const atLevel = i => s.level + 1 + Math.floor(i / 3), steps = [];
+  const spare = spend(order, plan, 3 * (P.until - s.level), (id, from, add) => steps.push({ from: atLevel(from), to: atLevel(from + add - 1), id,
+    target: plan[id], text: DATA.skills[id].name + ' to ' + plan[id] + ' (' + add + (add === 1 ? ' point)' : ' points)') }));
+  return { now, plan, steps, spare, until: P.until };
+}
+// Spends points down a skill order into plan (only the ids it holds), prerequisites first; onAdd(id, pointsUsedBefore, added).
+function spend(order, plan, points, onAdd) {
+  let left = Math.max(0, points), used = 0;
   function raise(id, target) {
-    const row = DATA.skills[id];
-    for (const [rid, rlv] of Object.entries(row.req || {})) if (plan[rid] !== undefined) raise(Number(rid), rlv);
+    for (const [rid, rlv] of Object.entries(DATA.skills[id].req || {})) if (plan[rid] !== undefined) raise(Number(rid), rlv);
     const add = Math.min(Math.max(0, target - plan[id]), left);
     if (!add) return;
-    steps.push({ from: atLevel(used), to: atLevel(used + add - 1), id, target: plan[id] + add, text: row.name + ' to ' + (plan[id] + add) + ' (' + add + (add === 1 ? ' point)' : ' points)') });
-    plan[id] += add; left -= add; used += add;
+    plan[id] += add; left -= add;
+    if (onAdd) onAdd(id, used, add);
+    used += add;
   }
-  for (const [id, target] of order) if (plan[id] !== undefined) raise(id, Math.min(target, DATA.skills[id].max));
-  return { now, plan, steps, spare: left, until: P.until };
+  for (const [id, target] of order) if (plan[id] !== undefined && DATA.skills[id]) raise(id, Math.min(target, DATA.skills[id].max));
+  return left;
+}
+// The skills of someone who followed the guide: 1 point at each advancement plus 3 a level, down each job's order.
+function typicalSkills(cls, lv, slot) {
+  const out = {}, jobs = [phaseOf(cls, Math.min(lv, ADVANCE - 1))].concat(lv >= ADVANCE ? [phaseOf(cls, lv)] : []);
+  for (const P of jobs) {
+    const start = P.phase === 1 ? ADV1(cls.id) : ADVANCE, end = P.phase === 1 ? Math.min(lv, ADVANCE - 1) : lv;
+    const plan = {};
+    for (const id of Object.keys(DATA.skills).map(Number)) if (DATA.skills[id].job === P.job) plan[id] = 0;
+    // A warrior's 2nd job still swings Power Strike, so the attack carries its 1st job points in.
+    if (P.attack !== undefined && plan[P.attack] === undefined) plan[P.attack] = out[P.attack] || 0;
+    spend([[P.attack, 1]].concat(orderFor(cls, P, slot)), plan, 1 + 3 * (end - start));
+    // The attack always has a point, even when its prerequisite took the only one (Double Shot at 10).
+    if (P.attack !== undefined && plan[P.attack] < 1) plan[P.attack] = 1;
+    Object.assign(out, plan);
+  }
+  return out;
 }
 
 // The weapon tiers ahead of a level in one weapon type: the lowest second stat each level needs.
@@ -661,14 +697,14 @@ function renderNow(g, cls) {
 }
 
 function renderPanels(g) {
-  const lv = g.stats.level, top = g.train.length ? g.train[0].expPerCast : 1;
+  const lv = g.stats.level, top = g.train.length ? g.train[0].pace : 1;
   const train = ui.root.querySelector('#train');
   train.replaceChildren(...g.train.map((m, i) => extra(E('div', { class: 'b-mob' },
     E('div', {}, E('div', {}, E('b', { class: 'b-name' }, m.name), ' ', E('span', { class: 'small' }, 'lv ' + m.level)),
       E('div', { class: 'small' }, m.map + ', ' + castsText(m) + ', ' + m.hit + '% hit, ' + fmt(m.hp) + ' HP'),
-      bar(m.expPerCast / top * 100)),
-    E('div', { class: 'num' }, m.expPerCast.toFixed(0) + ' EXP a cast')), i, 3)),
-    E('p', { class: 'small b-foot' }, 'Ranked by EXP per cast at your level, over a few thousand simulated kills with your damage range, crits, monster defense and hit chance. Walking time is not counted.'));
+      bar(m.pace / top * 100)),
+    E('div', { class: 'num' }, fmt(m.exp) + ' EXP a kill')), i, 3)),
+    E('p', { class: 'small b-foot' }, 'Ranked by EXP over time at your level: casts to kill, from a few thousand simulated kills with your damage range, crits, monster defense and hit chance, plus about 2 casts of walking between kills. So a monster you one shot only wins if its EXP holds up.'));
   moreButton(train, 'Show all ' + g.train.length + ' maps');
   train.append(train.querySelector('.b-foot'));
 
@@ -1122,6 +1158,6 @@ function mount(root, deps) {
 }
 const estimatedNote = () => E('p', { id: 'b-estimated', class: 'b-badge', hidden: '' }, E('b', {}, 'Estimated. '), "Damage for this weapon comes from meowdb's table and hasn't been checked against a real stat window yet.");
 
-window.Builds = { CLASSES, BRANCHES, branchOf, weaponsFor, mastery, physRange, spellRange, weaponAttackFromMax, WEAPONS, CHECKED_WEAPONS, windowRange, levelScale, hitChance, defend, elemMult, makeRng, castsToKill,
+window.Builds = { KILL_GAP, CLASSES, BRANCHES, branchOf, weaponsFor, mastery, physRange, spellRange, weaponAttackFromMax, WEAPONS, CHECKED_WEAPONS, windowRange, levelScale, hitChance, defend, elemMult, makeRng, castsToKill,
   validateStats, rankMobs, buildGuide, pointsPlan, mount, fill, refresh, shrinkImage, take, classOf };
 })();
