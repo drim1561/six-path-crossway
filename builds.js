@@ -596,6 +596,8 @@ function forecast(s, cls, ap) {
     const t = lv === s.level ? s : statsAt(s, cls, lv, ap), r = rankWith(t, cls, DATA, 150);
     if (r.length) runs.push({ lv, t, r });
   }
+  const byLv = {};
+  for (const x of runs) byLv[x.lv] = x;
   let st = [];
   for (const x of runs) {
     const last = st[st.length - 1];
@@ -610,20 +612,26 @@ function forecast(s, cls, ap) {
   st = st.reduce((a, x) => { const l = a[a.length - 1]; if (l && l.top === x.top) l.to = x.to; else a.push(x); return a; }, []);
   return st.map((x, i) => {
     const r = x.run.r, picks = [r[0]].concat(r[1] && r[1].pace >= 0.9 * r[0].pace ? [r[1]] : []);
-    return { from: x.from, to: x.to, picks, why: i ? whyStage(st[i - 1].run.t, x.run.t, cls, slot, r[0], st[i - 1].run.r[0]) : '' };
+    // The latest change in the 3 levels leading into the stage, so a reason from long before doesn't take the credit.
+    let why = '';
+    for (let lv = x.from; i && !why && lv > Math.max(st[i - 1].from, x.from - 3); lv--)
+      why = whyStage(byLv[lv - 1].t, byLv[lv].t, cls, slot, r[0], lv === x.from ? st[i - 1].run.r[0] : null, x.from);
+    return { from: x.from, to: x.to, picks, why };
   });
 }
-// What changed between two points of the plan: the 2nd job, a skill the new pick uses maxing or taking over from the last
-// stage's, a better weapon, any skill maxed.
-function whyStage(a, b, cls, slot, pick, was) {
-  if (a.level < ADVANCE && b.level >= ADVANCE) return '2nd job';
-  const maxed = id => DATA.skills[id] && b.skills[id] >= DATA.skills[id].max && !(a.skills[id] >= DATA.skills[id].max);
-  if (maxed(pick.skill)) return DATA.skills[pick.skill].name + ' maxed';
-  if (pick.skill !== was.skill) return DATA.skills[pick.skill].name + ' at ' + b.skills[pick.skill];
+// What changed from level a to the next level b of the plan: the 2nd job, a skill the stage's pick uses maxing or
+// taking over from the last stage's (was, only at the stage's first level), a better weapon, any skill maxed. Changes
+// before the stage's first level (from) say their level.
+function whyStage(a, b, cls, slot, pick, was, from) {
+  const at = b.level < from ? ' at ' + b.level : '';
+  if (a.level < ADVANCE && b.level >= ADVANCE) return '2nd job at ' + ADVANCE;
+  const maxed = id => DATA.skills[id] && DATA.skills[id].name && b.skills[id] >= DATA.skills[id].max && !(a.skills[id] >= DATA.skills[id].max);
+  if (maxed(pick.skill)) return DATA.skills[pick.skill].name + ' maxed' + at;
+  if (was && pick.skill !== was.skill) return DATA.skills[pick.skill].name + ' ' + b.skills[pick.skill] + ' takes over';
   const wa = bestGearAt(cls, slot, a.level), wb = bestGearAt(cls, slot, b.level);
   if (wb && wb !== wa) return wb.name + ' at ' + wb.level;
-  const any = Object.keys(b.skills).map(Number).find(id => DATA.skills[id] && DATA.skills[id].name && maxed(id));
-  return any ? DATA.skills[any].name + ' maxed' : '';
+  const any = Object.keys(b.skills).map(Number).find(maxed);
+  return any ? DATA.skills[any].name + ' maxed' + at : '';
 }
 
 // The ability points, skill points and upgrades ahead as one list by level, split at the next milestone (the next level a
