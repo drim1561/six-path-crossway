@@ -1298,6 +1298,10 @@ function mount(root, deps) {
   buildForm();
   renderGuide();
   refresh();
+  // what a Something off? report carries from this tab (index.html keeps it)
+  // (what Read from game filled, what it asked to be typed, and what the form turned down)
+  return { report: () => ({ tab: ui.deps.store.get('bt.btab') || 'train', form: ui.form, read: rd.last, filled: [...ui.read],
+    asked: [...rd.asked], bad: Object.fromEntries(rd.bad) }) };
 }
 const estimatedNote = () => E('p', { id: 'b-estimated', class: 'b-badge', hidden: '' }, E('b', {}, 'Estimated. '), "Damage for this weapon comes from meowdb's table and hasn't been checked against a real stat window yet.");
 

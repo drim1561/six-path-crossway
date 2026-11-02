@@ -155,7 +155,7 @@ function mount(root, deps) {
   if (open && open.tLast && Date.now() - open.tLast < RESUME_MS) session = open;   // carry on after a reload or a dropped share
   // per share: where the EXP line is, the measured stretch, and what each reader last saw
   const st = { line: null, m: null, fw: 0, fh: 0, reads: 0, ticks: 0, expMiss: 0, measureAt: 0, levelAt: 0, level: null, party: null, slots: {}, lastSave: 0,
-    sharing: false, potNone: false, potCount: 0, h: null };
+    sharing: false, potNone: false, potCount: 0, h: null, recent: [] };
   // when each reader last worked and when its current run of misses began, for the checks on the card
   const fresh = () => ({ exp: { ok: null, fail: null }, level: { ok: null, fail: null }, size: { ok: null, fail: null }, counts: { ok: null, fail: null } });
   st.h = fresh();
@@ -413,6 +413,10 @@ function mount(root, deps) {
       if (!session) session = GS().create({ mapId, t: reading.t, prices });
       GS().add(session, reading); st.reads++;
     }
+    // the last 10 readings, for a Something off? report (an 84 read as 684 shows up here)
+    st.recent.push({ t: reading.t, exp: reading.exp, pct: reading.pct, level: reading.level, mesos,
+      counts: reading.counts.map(c => ({ key: c.key, id: c.id, value: c.value })) });
+    if (st.recent.length > 10) st.recent.shift();
     updateReady();
     render(); save(false);
   }
@@ -984,6 +988,14 @@ function mount(root, deps) {
   if (session) setStatus('Carrying on your session from ' + timeOfDay(session.t0) + '. Share the game window to keep going.');
   window.Grind.debug = { session: () => session, state: () => ({ reads: st.reads, ticks: st.ticks, line: st.line, m: st.m, level: st.level }),
     save: () => save(true), load: row => { viewing = GS().fromRow(row); render(); }, capture: () => capture, mesoLine };
+  // what a Something off? report carries from this tab (index.html keeps it), and the pop out to draw beside the page
+  return {
+    report: () => ({ sharing: st.sharing, ticks: st.ticks, reads: st.reads, frame: [st.fw, st.fh],
+      stretch: st.m ? { s: st.m.s, score: st.m.score, countScore: st.m.countScore } : null, line: st.line, level: st.level,
+      slots: st.slots, mesos: st.mesos == null ? null : st.mesos, mesoHome: MS().mesoHome(), checks: lastHealth, recent: st.recent.slice(),
+      map: mapId, session: session ? GS().stats(session, Date.now(), avgExp(session.mapId || mapId)) : null, popout: pipWin ? { layout } : null }),
+    popout: () => pipWin ? pipWin.document.body : null,
+  };
 }
 
 window.Grind = { mount, fmtK, clock, health, lemonTile, lifetime };

@@ -5,6 +5,24 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Six Path Crossway</title>
 <script>
+// Something off? reports carry the page's last 20 errors, so they're kept from the first moment, before any other
+// script runs. Capture phase, so a script or picture that fails to load counts too.
+window.BT_ERRORS = [];
+(function () {
+  var keep = function (e) { var a = window.BT_ERRORS; a.push(e); if (a.length > 20) a.shift(); };
+  var cut = function (s) { return String(s || '').slice(0, 2000); };
+  addEventListener('error', function (e) {
+    var t = e.target;
+    if (t && t !== window && (t.src || t.href)) return keep({ t: Date.now(), msg: 'failed to load', src: t.src || t.href, line: 0, col: 0, stack: '' });
+    keep({ t: Date.now(), msg: cut(e.message || 'error'), src: e.filename || '', line: e.lineno || 0, col: e.colno || 0, stack: cut(e.error && e.error.stack) });
+  }, true);
+  addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    keep({ t: Date.now(), msg: cut((r && r.message) || r), src: '', line: 0, col: 0, stack: cut(r && r.stack) });
+  });
+})();
+</script>
+<script>
 // Theme before first paint: the player's saved choice, else their system setting.
 (function () {
   var t = null;
@@ -14,7 +32,7 @@
 })();
 </script>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap">
+<link rel="stylesheet" crossorigin="anonymous" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap">
 <style>
 :root {
   color-scheme: light;
@@ -616,6 +634,39 @@ button:disabled, input:disabled { opacity: .5; cursor: not-allowed; }
 #hiddenlist .postlist { margin-left: 0; }
 b.t { font-family: var(--font-num); }
 
+/* Something off? (flag.js): the pill in the corner of every tab, its panel and the thank you note */
+.flag { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 50; border-radius: 99px; padding: 8px 15px;
+  background: var(--accent); border-color: var(--accent); color: #2a1a00; box-shadow: 0 3px 12px #0003; }
+.flag:hover { border-color: #2a1a00; }
+.flag[hidden] { display: none; }
+#flag-panel { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 51; width: min(420px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px); overflow: auto; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 16px;
+  padding: 14px 16px; box-shadow: 0 10px 34px #0004; }
+#flag-panel h2 { font: 600 19px var(--font-title); margin: 0 0 10px; }
+.flag-kinds { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.flag-kinds button[aria-pressed="true"] { border-color: var(--focus); box-shadow: 0 0 0 1px var(--focus); }
+.flag-shots { display: flex; gap: 8px; margin-bottom: 10px; }
+.flag-shots:empty { display: none; }
+.flag-shot { position: relative; flex: 1 1 0; min-width: 0; margin: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface-2); }
+.flag-shot a { display: block; }
+/* the whole picture, chat box and all: what goes is what they see; a click opens it full size */
+.flag-shot img { display: block; width: 100%; height: 84px; object-fit: contain; background: var(--track); }
+.flag-shot figcaption { font-size: 12px; padding: 3px 8px; color: var(--muted); }
+.flag-drop { position: absolute; top: 4px; right: 4px; padding: 0 7px; border-radius: 99px; font-size: 12px; line-height: 20px; }
+#flag-text { display: block; width: 100%; min-height: 76px; resize: vertical; background: var(--surface); border: 1.5px solid var(--btn-line);
+  border-radius: 10px; padding: 8px 10px; font: inherit; color: inherit; }
+.flag-small { font-size: 12px; color: var(--muted); margin: 8px 0 0; }
+#flag-details { max-height: 220px; overflow: auto; font: 500 11px/1.4 var(--font-num); background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: 8px; padding: 8px; margin: 6px 0 0; white-space: pre-wrap; word-break: break-all; }
+#flag-details[hidden] { display: none; }
+#flag-msg { color: var(--bad); font-weight: 700; font-size: 13px; margin: 8px 0 0; }
+#flag-msg:empty { display: none; }
+.flag-row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+#flag-send { background: var(--btn-k); border-color: var(--btn-k); color: var(--btn-k-ink); }
+#flag-toast { position: fixed; right: 16px; bottom: calc(66px + env(safe-area-inset-bottom, 0px)); z-index: 51; max-width: calc(100vw - 32px);
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; box-shadow: 0 6px 20px #0003; font-weight: 700; }
+#flag-toast a { color: var(--focus); margin-left: 8px; }
+
 /* phone: shorter stage with the stats under the name, board keeps CH, STATUS and the time */
 @media (max-width: 640px) {
   main { padding: 12px; }
@@ -635,6 +686,8 @@ b.t { font-family: var(--font-num); }
   .row .ch { font-size: 18px; }
   .row .when { font-size: 15px; }
   .postlist { margin-left: 0; }
+  .flag { right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); padding: 6px 12px; font-size: 12px; }
+  #flag-panel { right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); width: calc(100vw - 24px); }
 }
 </style>
 </head>
@@ -733,16 +786,25 @@ b.t { font-family: var(--font-num); }
   <p>Prices are what you type. The Check on Cozy button copies the item name and opens Cozy Market, where you paste it into the search. How far a dropped item's stats can swing isn't in the game files, so when a scroll story leaves a point or two over, the page calls it the drop roll.</p>
   <p>The answer is a ceiling, not what a buyer pays. When lots of the same item are already for sale, it often sells for much less, so check Cozy's listings with the same stats too.</p>
 
+  <h3>Discord</h3>
+  <p>Something look off, or have an idea? Press Something off? in the corner of any page and it comes straight to Rimmah, with a picture of what you saw. Fixes and news go up in our Discord. <a id="how-discord" href="https://discord.gg/sHupB2U7tD" target="_blank" rel="noopener">Join our Discord</a></p>
+
   <h3>Fair play</h3>
   <p>One post every 15 seconds. Your Discord name shows on everything you post. False posts get hidden and the account blocked.</p>
 
   <p class="small smallprint">Fan made, not affiliated with Nexon. Boss art comes from the MapleStory client and belongs to Nexon.</p>
 </main>
+<button id="flag" class="flag" type="button" aria-label="Report something off">⚑ Something off?</button>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
 <script>
 const CONFIG = {
   supabaseUrl: 'https://umnomoiwjtaorvljisqu.supabase.co',
   supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtbm9tb2l3anRhb3J2bGppc3F1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMwNTkyODUsImV4cCI6MjEwODYzNTI4NX0.43QM25wqDaU5XIcZ235_A0UiMT_EmcUMCOumICu4fyY',
+  // Something off? reports go to functions/api/report.js on the Cloudflare copy (the GitHub Pages copy posts there too)
+  reportUrl: 'https://sixpathcrossway.pages.dev/api/report',
+  discordInvite: 'https://discord.gg/sHupB2U7tD',
+  // which version is live, in every report: the date and a letter, bumped on every ship
+  version: '2026-11-02a',
 };
 
 /* BOSSES:START */
@@ -948,7 +1010,7 @@ window.BossTimer = { parseLine, fmtGame, fmtLocal, measurements, estimateWindow,
 function makeSupabaseApi(cfg) {
   const down = () => Promise.reject(new Error('The timer database is not set up yet.'));
   if (!cfg.supabaseUrl || !window.supabase) {
-    return { getSession: async () => null, onAuth() {}, signIn: down, signOut: down, list: down, subscribe: () => () => {},
+    return { getSession: async () => null, token: async () => null, onAuth() {}, signIn: down, signOut: down, list: down, subscribe: () => () => {},
       post: down, remove: down, hide: down, unhide: down, block: down, isAdmin: async () => false,
       listBuilds: down, saveBuild: down, deleteBuild: down, uploadShot: down, removeShot: down, shotUrl: () => '', hideBuild: down,
       listGrind: down, getGrind: down, saveGrind: down, deleteGrind: down };
@@ -965,6 +1027,8 @@ function makeSupabaseApi(cfg) {
   const check = ({ error }) => { if (error) throw new Error(error.message); };
   return {
     async getSession() { const { data } = await sb.auth.getSession(); return who(data.session); },
+    // the sign in token, sent with a Something off? report so the relay can ask Supabase who it's from
+    async token() { const { data } = await sb.auth.getSession(); return data.session ? data.session.access_token : null; },
     // supabase-js awaits these callbacks while holding its auth lock; calling back into Supabase from
     // inside one (isAdmin does) waits on that same lock forever. Hand off to a fresh task instead.
     onAuth(cb) { sb.auth.onAuthStateChange((_event, s) => { setTimeout(() => cb(who(s)), 0); }); },
@@ -1319,9 +1383,12 @@ const ONLY = 'bt.only';
 }
 const onlyGrind = () => store.get(ONLY) === 'grind';
 document.body.classList.toggle('only-grind', onlyGrind());
+function viewNow() {
+  const view = { '#how': 'how', '#builds': 'builds', '#appraiser': 'appraiser', '#grind': 'grind' }[location.hash] || 'timer';
+  return onlyGrind() && view !== 'how' ? 'grind' : view;
+}
 function showView() {
-  let view = { '#how': 'how', '#builds': 'builds', '#appraiser': 'appraiser', '#grind': 'grind' }[location.hash] || 'timer';
-  if (onlyGrind() && view !== 'how') view = 'grind';
+  const view = viewNow();
   for (const v of ['timer', 'builds', 'appraiser', 'grind', 'how']) {
     $('view-' + v).hidden = v !== view;
     if ($('tab-' + v)) $('tab-' + v).setAttribute('aria-selected', String(v === view));
@@ -1341,7 +1408,7 @@ function loadBuilds() {
   });
   const data = fetch('data/builds.json').then(r => { if (!r.ok) throw new Error('builds.json'); return r.json(); });
   buildsLoading = Promise.all([script, data]).then(([, d]) => {
-    window.Builds.mount($('builds-root'), { api, store, el, data: d, session: () => state.session, admin: () => state.admin, signIn: () => signIn() });
+    reporters.builds = window.Builds.mount($('builds-root'), { api, store, el, data: d, session: () => state.session, admin: () => state.admin, signIn: () => signIn() });
   }).catch(() => {
     buildsLoading = null;
     $('builds-root').replaceChildren(el('p', { class: 'empty' }, "The calculator didn't load. Try reloading the page."));
@@ -1375,13 +1442,36 @@ function loadGrind() {
   const json = f => fetch('data/' + f).then(r => { if (!r.ok) throw new Error(f); return r.json(); });
   const scripts = (window.Reader ? Promise.resolve() : script('reader.js')).then(() => Promise.all([script('screen.js'), script('grind-session.js')])).then(() => script('grind.js'));
   grindLoading = Promise.all([scripts, json('grind.json'), json('grind-pictures.json')]).then(([, data, pictures]) => {
-    window.Grind.mount($('grind-root'), { api, store, el, data, pictures, session: () => state.session, signIn: () => signIn() });
+    reporters.grind = window.Grind.mount($('grind-root'), { api, store, el, data, pictures, session: () => state.session, signIn: () => signIn() });
   }).catch(() => {
     grindLoading = null;
     $('grind-root').replaceChildren(el('p', { class: 'empty' }, "The grind tracker didn't load. Try reloading the page."));
   });
   return grindLoading;
 }
+// Something off?: flag.js loads the first time someone presses the pill. Each tab can hand the report its own state
+// through a reporter ({ report(), popout() }), kept here by view.
+const reporters = {
+  timer: { report: () => ({ boss: boss().name, channel: state.channel, live: state.live, down: state.down, posts: allPosts().length, admin: state.admin }) },
+};
+let flagLoading = null;
+function loadFlag() {
+  if (flagLoading) return flagLoading;
+  flagLoading = new Promise((resolve, reject) => {
+    document.head.append(el('script', { src: 'flag.js', onload: resolve, onerror: () => reject(new Error('flag.js')) }));
+  }).catch(err => { flagLoading = null; throw err; });
+  return flagLoading;
+}
+$('flag').addEventListener('click', () => {
+  if ($('flag').disabled || $('flag-panel')) return;
+  $('flag').disabled = true;   // one panel, however fast the clicks come
+  const view = viewNow();
+  // the shared game frame right now, before anything else happens (null when nothing is shared)
+  const game = window.Reader && window.Reader.grab ? window.Reader.grab() : null;
+  loadFlag()
+    .then(() => window.Flag.open({ api, el, config: CONFIG, view, reporter: reporters[view], game, session: state.session, button: $('flag') }))
+    .catch(() => { $('flag').disabled = false; });
+});
 $('tab-appraiser').addEventListener('click', () => { if (location.hash !== '#appraiser') location.hash = '#appraiser'; });
 $('tab-grind').addEventListener('click', () => { if (location.hash !== '#grind') location.hash = '#grind'; });
 $('tab-how').addEventListener('click', () => { if (location.hash !== '#how') location.hash = '#how'; });

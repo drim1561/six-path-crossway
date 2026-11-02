@@ -619,6 +619,19 @@ var SEEDS = {"glyphs":{"0":[{"g":[21,83,153,177,177,164,115,22,90,154,206,222,22
     var s = null;     // the share: {starting} while the browser's prompt is open, then {stream, track, frames, latest, video, worker, interval, limit, t0, busy}
     var dead = false; // destroyed: a prompt that answers late is turned down
     var me = { stop: function () { stop('stop'); } };
+    // the frame the share last gave, on a canvas of its own size, for a Something off? report (Reader.grab); null when
+    // nothing is coming in. Synchronous, and the share's loop isn't touched.
+    me.grab = function () {
+      var cur = s;
+      if (!cur || cur.starting) return null;
+      var src = cur.frames ? cur.latest : cur.video;
+      if (!src || (cur.video && cur.video.readyState < 2)) return null;
+      var w = src.displayWidth || src.videoWidth, h = src.displayHeight || src.videoHeight;
+      if (!w || !h) return null;
+      var c = document.createElement('canvas'); c.width = w; c.height = h;
+      try { c.getContext('2d').drawImage(src, 0, 0); } catch (e) { return null; }   // a frame closed under us
+      return c;
+    };
 
     function start() {
       if (s || !canShare || dead) return;
@@ -767,6 +780,7 @@ var SEEDS = {"glyphs":{"0":[{"g":[21,83,153,177,177,164,115,22,90,154,206,222,22
     setIcons: function (json, img) { ICONS = iconSet(json, img, function (id) { return jobOf(id) > 0; }); },
     findSkills: findSkills, skillView: skillView, levelBox: levelBox, readSkills: readSkills, readAll: readAll,
     capture: capture,
+    grab: function () { return activeShare && activeShare.grab ? activeShare.grab() : null; },
     setSeeds: function (s) { SEEDS = { glyphs: (s && s.glyphs) || {}, letters: (s && s.letters) || {} }; window.Reader.SEEDS = SEEDS; },
     SEEDS: SEEDS,
     limits: { MAX_DIST: MAX_DIST, RATIO: RATIO, LEAD_MAX: LEAD_MAX, GAP_MAX: GAP_MAX, SPACE_MAX: SPACE_MAX, SCALE_MIN: SCALE_MIN, SCALE_MAX: SCALE_MAX, RESAMPLE_TOL: RESAMPLE_TOL, ICON_MAX: ICON_MAX, MIN_ROWS: MIN_ROWS }
