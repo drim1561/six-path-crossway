@@ -603,6 +603,8 @@ var SEEDS = {"glyphs":{"0":[{"g":[21,83,153,177,177,164,115,22,90,154,206,222,22
   // For a long share (the Grind tab), all off by default: raw hands onImage(src, { from, w, h }) the live frame itself
   // instead of a copy; limit 0 means no time limit; keepWhenHidden keeps sharing while the area is hidden; full asks the
   // browser for the window at full size; drop false leaves out the paste and drop area.
+  // opts.beforeStart (the Windows app finding the game itself): awaited before the browser is asked for the window; false,
+  // or a rejection, puts the buttons back with no onState call.
   var CAPTURE_COPY = { share: 'Share the game window', stop: 'Stop', drop: 'Or paste a screenshot here (Win+Shift+S, then Ctrl+V)',
     notPicture: "That file isn't a picture.", failed: "Couldn't start sharing the game window. Try again, or paste a screenshot instead." };
   var activeShare = null; // the one capture that is sharing right now
@@ -637,56 +639,64 @@ var SEEDS = {"glyphs":{"0":[{"g":[21,83,153,177,177,164,115,22,90,154,206,222,22
       if (s || !canShare || dead) return;
       var pending = s = { starting: true }, got = null, cur = null;
       share.disabled = true;
-      var video = o.full ? { frameRate: 5, width: { ideal: 7680 }, height: { ideal: 4320 } } : { frameRate: 5 };
-      // the picker opens on its Window list, where the game is, and leaves this tab out (a page can't pick the window
-      // itself: the browser makes the player choose). Entire screen stays, as some games only share that way in full screen
-      video.displaySurface = 'window';
-      navigator.mediaDevices.getDisplayMedia({ video: video, audio: false, selfBrowserSurface: 'exclude' }).then(function (stream) {
-        got = stream;
-        if (dead || s !== pending) { stream.getTracks().forEach(function (t) { t.stop(); }); return; }
-        var track = stream.getVideoTracks()[0];
-        if (!track) return failed('failed');
-        // one share at a time across every reader panel on the page
-        if (activeShare && activeShare !== me) activeShare.stop();
-        activeShare = me;
-        cur = s = { stream: stream, track: track, t0: Date.now(), busy: false, latest: null };
-        track.addEventListener('ended', function () { if (s === cur) stop('ended'); });
-        // A background tab still gets frames from MediaStreamTrackProcessor, so use it when the browser has one.
-        if (typeof MediaStreamTrackProcessor === 'function') {
+      // without beforeStart the browser is asked straight away, inside the click
+      if (o.beforeStart) Promise.resolve().then(o.beforeStart).then(function (go) { if (go) ask(); else back(); }, back);
+      else ask();
+      // beforeStart said no: idle again, quietly (a share destroyed meanwhile stays as it is)
+      function back() { if (s === pending) { s = null; idleButtons(); } }
+      function ask() {
+        if (dead || s !== pending) return;
+        var video = o.full ? { frameRate: 5, width: { ideal: 7680 }, height: { ideal: 4320 } } : { frameRate: 5 };
+        // the picker opens on its Window list, where the game is, and leaves this tab out (a page can't pick the window
+        // itself: the browser makes the player choose). Entire screen stays, as some games only share that way in full screen
+        video.displaySurface = 'window';
+        navigator.mediaDevices.getDisplayMedia({ video: video, audio: false, selfBrowserSurface: 'exclude' }).then(function (stream) {
+          got = stream;
+          if (dead || s !== pending) { stream.getTracks().forEach(function (t) { t.stop(); }); return; }
+          var track = stream.getVideoTracks()[0];
+          if (!track) return failed('failed');
+          // one share at a time across every reader panel on the page
+          if (activeShare && activeShare !== me) activeShare.stop();
+          activeShare = me;
+          cur = s = { stream: stream, track: track, t0: Date.now(), busy: false, latest: null };
+          track.addEventListener('ended', function () { if (s === cur) stop('ended'); });
+          // A background tab still gets frames from MediaStreamTrackProcessor, so use it when the browser has one.
+          if (typeof MediaStreamTrackProcessor === 'function') {
+            try {
+              cur.frames = new MediaStreamTrackProcessor({ track: track }).readable.getReader();
+              (function pump() {
+                cur.frames.read().then(function (r) {
+                  if (r.done) return;
+                  if (s !== cur) { r.value.close(); return; }
+                  if (cur.latest) cur.latest.close();
+                  cur.latest = r.value; pump();
+                }).catch(function () {});
+              })();
+            } catch (e) { cur.frames = null; }
+          }
+          if (!cur.frames) { cur.video = document.createElement('video'); cur.video.muted = true; cur.video.srcObject = stream; cur.video.play().catch(function () {}); }
+          // ticks from a worker, since a hidden tab slows the page's own timers down to once a minute
           try {
-            cur.frames = new MediaStreamTrackProcessor({ track: track }).readable.getReader();
-            (function pump() {
-              cur.frames.read().then(function (r) {
-                if (r.done) return;
-                if (s !== cur) { r.value.close(); return; }
-                if (cur.latest) cur.latest.close();
-                cur.latest = r.value; pump();
-              }).catch(function () {});
-            })();
-          } catch (e) { cur.frames = null; }
-        }
-        if (!cur.frames) { cur.video = document.createElement('video'); cur.video.muted = true; cur.video.srcObject = stream; cur.video.play().catch(function () {}); }
-        // ticks from a worker, since a hidden tab slows the page's own timers down to once a minute
-        try {
-          var url = URL.createObjectURL(new Blob(['setInterval(function () { postMessage(0); }, ' + o.every + ');'], { type: 'text/javascript' }));
-          cur.worker = new Worker(url); URL.revokeObjectURL(url);
-          cur.worker.onmessage = tick;
-        } catch (e) { cur.interval = setInterval(tick, o.every); }
-        if (o.limit) cur.limit = setTimeout(function () { if (s === cur) stop('time'); }, o.limit);
-        share.hidden = true; share.disabled = false; stopBtn.hidden = false;
-        o.onState('sharing');
-      }).catch(function (e) {
-        if (got === null) {
-          // the prompt itself said no: a denied prompt stays quiet, anything else says so
-          if (s !== pending) return;
-          return failed(e && e.name === 'NotAllowedError' ? 'denied' : 'failed');
-        }
-        // a bug after the share started (onState threw, say): clean up so the panel isn't stuck, then show the error
-        if (s === cur && cur) teardown(); else if (s === pending) s = null;
-        got.getTracks().forEach(function (t) { t.stop(); });
-        idleButtons();
-        setTimeout(function () { throw e; });
-      });
+            var url = URL.createObjectURL(new Blob(['setInterval(function () { postMessage(0); }, ' + o.every + ');'], { type: 'text/javascript' }));
+            cur.worker = new Worker(url); URL.revokeObjectURL(url);
+            cur.worker.onmessage = tick;
+          } catch (e) { cur.interval = setInterval(tick, o.every); }
+          if (o.limit) cur.limit = setTimeout(function () { if (s === cur) stop('time'); }, o.limit);
+          share.hidden = true; share.disabled = false; stopBtn.hidden = false;
+          o.onState('sharing');
+        }).catch(function (e) {
+          if (got === null) {
+            // the prompt itself said no: a denied prompt stays quiet, anything else says so
+            if (s !== pending) return;
+            return failed(e && e.name === 'NotAllowedError' ? 'denied' : 'failed');
+          }
+          // a bug after the share started (onState threw, say): clean up so the panel isn't stuck, then show the error
+          if (s === cur && cur) teardown(); else if (s === pending) s = null;
+          got.getTracks().forEach(function (t) { t.stop(); });
+          idleButtons();
+          setTimeout(function () { throw e; });
+        });
+      }
       // back to idle without a share; 'failed' also gets a short note
       function failed(why) {
         if (got) got.getTracks().forEach(function (t) { t.stop(); });

@@ -250,6 +250,45 @@ select { background: var(--surface); border: 1.5px solid var(--btn-line); border
 .b-here .b-name { font: 700 19px var(--font-title); }
 .b-try { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
 .b-tryone { padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; }
+/* Drops on Train here now and Worth a try (2026-11-03) */
+.b-drops { margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--row-line); }
+.b-drop, .b-drow { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.b-drop { min-height: 30px; }
+.b-drop .b-icon { transform: scale(.75); margin: -5px; }
+.b-drop > span, .b-drow > span { min-width: 0; overflow-wrap: anywhere; }
+.b-drow > span { display: flex; flex-direction: column; }
+.b-drow b { font-size: 14px; }
+.b-drop .small, .b-drow .small { white-space: nowrap; }
+.b-dropsum { margin-top: 4px; }
+.b-seeall { font-weight: 700; }
+.b-dropall { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--row-line); }
+#b-tryall { margin-top: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.b-dhead .b-name { font: 700 17px var(--font-title); }
+.b-dgrp { margin-top: 10px; }
+.b-dgt { font-weight: 800; margin-bottom: 4px; }
+.b-dgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr)); gap: 6px 10px; }
+.b-dmore { display: block; background: none; border: 0; padding: 8px 0 0; color: var(--muted); font: 800 13px var(--font-body); text-align: left; text-decoration: underline; cursor: pointer; }
+/* The item finder at the top of the Train tab (2026-11-03) */
+#b-find { margin-bottom: 4px; }
+#b-find-q { box-sizing: border-box; width: 100%; min-width: 0; font: 600 15px var(--font-body); }
+#b-find-list { display: flex; flex-direction: column; margin-top: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; }
+.b-sug { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 34px; text-align: left; background: none; border: 0; border-radius: 0; padding: 4px 10px; font: 700 14px var(--font-body); }
+.b-sug + .b-sug { border-top: 1px solid var(--row-line); }
+.b-sug:hover, .b-sug:focus-visible { background: var(--band); }
+.b-sug .b-icon { transform: scale(.75); margin: -5px; }
+#b-find-out > p { margin: 8px 0; }
+.b-fhead { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.b-fhead .b-name, .b-fbox .b-name { font: 700 17px var(--font-title); }
+.b-fboxes { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr)); gap: 10px; }
+.b-fbox { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--band); }
+.b-fbox.first { border-left: 4px solid var(--accent); }
+/* greyed by an empty dashed box and a muted name, not opacity: muted text at .55 fell to about 2:1 in the light theme */
+.b-fbox.dim { background: none; border-style: dashed; }
+.b-fbox.dim .b-name { color: var(--muted); }
+.b-fbig { margin-top: 6px; }
+.b-fbig .num { font: 700 18px var(--font-num); color: var(--num); }
+.b-out { align-self: flex-start; margin-top: 6px; color: var(--watch-fg); font-size: 13px; font-weight: 700; text-decoration: none; }
+.b-out:hover { text-decoration: underline; }
 .b-scard { margin: 8px 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
 .b-scard .top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .b-scard .top b { font: 600 16px var(--font-title); }
@@ -286,6 +325,8 @@ select { background: var(--surface); border: 1.5px solid var(--btn-line); border
 body.only-grind #tab-timer, body.only-grind #tab-builds, body.only-grind #tab-appraiser { display: none; }
 /* the Timer is off for now (window.BT_TIMER turns it on): its tab and its parts of How it works go */
 body.timer-off #tab-timer, body.timer-off .timer-only { display: none; }
+/* the Windows app is only the Grind page, and is the app already: no tabs, no Get the app */
+body.in-app .tabs, body.in-app #g-getapp { display: none; }
 #view-grind h2 { font: 600 30px/1.2 var(--font-title); margin: 8px 0 4px; }
 #view-grind h3 { font: 600 20px var(--font-title); margin: 26px 0 8px; }
 #view-grind [hidden] { display: none !important; }
@@ -308,6 +349,9 @@ body.timer-off #tab-timer, body.timer-off .timer-only { display: none; }
 .g-check li::before { content: '…'; color: var(--muted); font-weight: 800; }
 .g-check li.done::before { content: '✓'; color: var(--up-fg); }
 .g-check li.fix::before { content: '!'; color: var(--over-fg); }
+/* before a share the checks only list what will be read: no sign, nothing beside them, in line with the heading */
+.g-check li.idle::before { content: none; }
+.g-check li.idle, .g-box .g-check li.idle { grid-template-columns: auto minmax(0, 1fr); }
 /* Count my loot: the switch and the bag's tabs under the reading checks, and the result card at the top of Session
    details (four even tiles, the session's Lemons and Meat, what was picked up). Every tile in a row is the same size */
 .g-loot { display: block; width: 100%; margin-top: 10px; padding: 10px 14px; border-radius: 12px; border: 1.5px solid var(--btn-line); background: var(--btn); color: var(--ink); font: 800 15px var(--font-body); text-align: left; cursor: pointer; }
@@ -363,7 +407,6 @@ body.timer-off #tab-timer, body.timer-off .timer-only { display: none; }
 .g-check li b { font-weight: 800; }
 .g-check li span { color: var(--muted); overflow-wrap: anywhere; }
 .g-check li.done span { color: var(--ink); }
-.g-ready { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; padding: 10px 14px; background: var(--up-bg); color: var(--up-fg); border-radius: 14px; font-weight: 800; font-size: 14px; margin-bottom: 8px; }
 .g-scroll { overflow-x: auto; }
 #g-map { width: 100%; max-width: 520px; }
 .g-price { background: none; border: 0; padding: 0; font: inherit; font-family: var(--font-num); color: var(--focus); text-decoration: underline dotted; cursor: pointer; }
@@ -378,11 +421,16 @@ body.timer-off #tab-timer, body.timer-off .timer-only { display: none; }
 .g-sess .n { font-family: var(--font-num); color: var(--muted); }
 /* Grind charts: EXP is categorical slot 1 (blue), potions take slots 2 to 4 (orange, aqua, yellow), the heatmap one blue ramp */
 /* the page: big buttons down the left (kept in view while scrolling), this session in one slim line, then all time */
-.g-page { display: grid; grid-template-columns: 292px minmax(0, 1fr); gap: 18px; align-items: stretch; margin-top: 14px; }
-.g-railin { position: sticky; top: 12px; display: flex; flex-direction: column; gap: 10px; max-height: calc(100vh - 24px); overflow-y: auto; scrollbar-width: thin; }
+/* one gap between every block on the page (--g-gap on #view-grind): columns, rail boxes, the main column and all time are
+   flex or grid stacks with no margins of their own, and an empty line takes no room, so adding a block never leaves an
+   odd gap */
+.g-page { display: grid; grid-template-columns: 292px minmax(0, 1fr); gap: var(--g-gap); align-items: stretch; margin-top: 14px; }
+.g-railin { position: sticky; top: 12px; display: flex; flex-direction: column; gap: var(--g-gap); max-height: calc(100vh - 24px); overflow-y: auto; scrollbar-width: thin; }
 .g-box { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 12px; }
 .g-boxh { font: 800 11px var(--font-body); letter-spacing: .09em; text-transform: uppercase; color: var(--muted); margin: 2px 2px 9px; }
 .g-acts { display: flex; flex-direction: column; gap: 9px; }
+/* the app's version line under its buttons: the column's gap is its only spacing */
+.g-acts .g-ver { margin: 0; }
 #g-sharearea, #g-sharearea .r-bar { display: contents; }
 #g-stop { order: 10; }
 .g-btn { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 8px 16px; border-radius: 14px; font: 800 16px var(--font-body); text-align: left; color: var(--ink); background: var(--btn); border: 1.5px solid var(--btn-line); }
@@ -394,6 +442,10 @@ body.timer-off #tab-timer, body.timer-off .timer-only { display: none; }
 .g-btn.go:hover { border-color: #d98a17; }
 .g-btn.go:active { transform: translateY(2px); box-shadow: 0 2px 0 #d98a17; }
 #g-share.go { min-height: 64px; font-size: 19px; justify-content: center; white-space: nowrap; }
+/* the app's game chooser, when more than one MapleStory window is open: a button per window with its picture and title */
+.g-choose { display: grid; gap: 7px; }
+.g-choose p { margin: 2px 2px 0; font: 800 14px var(--font-body); }
+.g-pick img { width: 96px; height: 54px; object-fit: cover; border-radius: 8px; flex: none; background: var(--surface-2); }
 .g-pill { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 4px 12px; border-radius: 99px; font: 800 14px var(--font-body); background: var(--surface-2); color: var(--muted); text-align: center; }
 .g-pdot { width: 9px; height: 9px; border-radius: 50%; background: currentColor; flex: none; }
 .g-pill.ok { background: var(--up-bg); color: var(--up-fg); } .g-pill.ok .g-pdot { box-shadow: 0 0 0 4px rgba(108,191,63,.25); }
@@ -402,17 +454,25 @@ body.timer-off #tab-timer, body.timer-off .timer-only { display: none; }
 .g-steps { margin: 2px 0 0; padding: 0 0 0 4px; list-style: none; counter-reset: s; display: grid; gap: 7px; font-size: 13px; color: var(--muted); }
 .g-steps li { counter-increment: s; display: flex; gap: 8px; align-items: baseline; }
 .g-steps li::before { content: counter(s); display: inline-grid; place-items: center; flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--ink); color: var(--page); font-size: 11px; font-weight: 800; }
-.g-box .g-health { margin: 0 0 8px; }
 .g-box .g-check { padding: 0; border: 0; background: none; }
 .g-box .g-check li { grid-template-columns: 18px 76px minmax(0, 1fr); font-size: 13px; }
-.g-box .g-ready { margin: 0; font-size: 13px; padding: 8px 10px; }
+/* the Reading box: the same gap as the buttons between whatever shows in it (chips, checks, Count my loot, the bag), so a
+   part that hides leaves no odd space; Details sits beside the heading */
+.g-read { display: flex; flex-direction: column; gap: 9px; }
+.g-read > .g-boxh { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 2px 2px 0; }
+.g-read > .g-boxh .linkish { font: 700 12px var(--font-body); letter-spacing: 0; text-transform: none; }
+.g-read > .g-health, .g-read > .g-loot, .g-read > .g-bagcheck { margin: 0; }
 .g-box #g-map { max-width: none; }
 .g-mobs { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; font-size: 12.5px; color: var(--muted); }
 .g-mobs b { color: var(--ink); }
 .g-mobs .g-chip { margin-left: 4px; }
-.g-main { min-width: 0; }
-.g-main > .g-status { margin: 0 0 8px; }
-.g-main > .g-nudge { font-size: 14px; padding: 10px 14px; border-radius: 12px; margin: 0 0 10px; }
+.g-main { min-width: 0; display: flex; flex-direction: column; gap: var(--g-gap); }
+.g-main > .g-status { margin: 0; }
+/* an empty status line takes no room and no gap, but stays in the page as a live region (display: none would drop the
+   next thing it says before a screen reader hears it) */
+.g-main > .g-status:empty { position: absolute; width: 1px; height: 0; min-height: 0; overflow: hidden; }
+.g-life > .g-note:empty { display: none; }
+.g-main > .g-nudge { font-size: 14px; padding: 10px 14px; border-radius: 12px; margin: 0; }
 .g-now { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 18px; padding: 10px 12px 10px 16px; border-radius: 16px; background: #10141f; color: #eef1f7; border: 1px solid #232a3d; }
 .g-nowv { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 18px; flex: 1; min-width: 0; font-size: 14px; color: #c9d2e3; }
 .g-nl { font: 800 11px var(--font-body); letter-spacing: .09em; text-transform: uppercase; color: #93a0bd; }
@@ -423,16 +483,17 @@ body.timer-off #tab-timer, body.timer-off .timer-only { display: none; }
 .g-nk img { width: 22px; height: 22px; image-rendering: pixelated; }
 .g-more { background: rgba(255,255,255,.08); color: #eef1f7; border: 1px solid rgba(255,255,255,.16); border-radius: 12px; padding: 8px 14px; font-size: 14px; }
 .g-more:hover { border-color: rgba(255,255,255,.4); }
-.g-detail { margin-top: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface-2); }
+.g-detail { padding: 14px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface-2); }
 .g-detail .g-viewing { margin: 0 0 12px; }
 .g-dgrid { display: grid; grid-template-columns: minmax(0, 360px) minmax(0, 1fr); gap: 14px; align-items: start; }
 .g-dpots h3 { margin-top: 0 !important; }
 /* all time: Lemons and Meat as two big trophies, five totals, the maps and bests, the days and the sessions */
-.g-life { margin-top: 18px; }
-.g-lhead { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 10px; }
+.g-life { display: flex; flex-direction: column; gap: var(--g-gap); }
+.g-life > .g-note { margin: 0; }
+.g-lhead { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; }
 .g-lhead h3 { margin: 0 !important; }
 .g-lhead span { font-size: 13px; color: var(--muted); }
-.g-trophies { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.g-trophies { display: grid; grid-template-columns: 1fr 1fr; gap: var(--g-gap); }
 .g-trophy { display: flex; gap: 16px; align-items: center; padding: 18px 20px; border-radius: 20px; min-width: 0; }
 .g-t-lemon { background: linear-gradient(135deg, #fff6c9, #ffe27a); border: 1px solid #f3d36a; --t-k: #7a5a10; --t-n: #7a4f00; --t-s: #6a5520; }
 .g-t-meat { background: linear-gradient(135deg, #ffe3d6, #ffc2a3); border: 1px solid #f2a987; --t-k: #8a3d1c; --t-n: #8a2f10; --t-s: #7a3a1c; }
@@ -445,16 +506,18 @@ body.timer-off #tab-timer, body.timer-off .timer-only { display: none; }
 .g-ts { font-size: 13.5px; color: var(--t-s); margin-top: 6px; }
 .g-trow { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin-top: 8px; font-size: 11.5px; font-weight: 700; color: var(--t-s); }
 .g-trow img { width: 20px; height: 20px; image-rendering: pixelated; }
-.g-tots { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+.g-tots { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--g-gap); }
 .g-tot { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; min-width: 0; }
 .g-tot .g-tv { font: 700 24px/1.15 var(--font-num); color: var(--num); margin-top: 8px; white-space: nowrap; }
 .g-tot .g-tv.b { color: #2f74c9; } .g-tot .g-tv.y { color: #c98a00; } .g-tot .g-tv.g { color: var(--up-fg); }
 :root[data-theme="dark"] .g-tot .g-tv.b { color: #8fc8ff; } :root[data-theme="dark"] .g-tot .g-tv.y { color: #ffd66b; }
 .g-tsub { font-size: 12px; color: var(--muted); margin-top: 4px; }
-.g-lgrid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 12px; margin-top: 12px; }
+.g-lgrid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--g-gap); }
 .g-lgrid2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); }
 .g-lcard { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; min-width: 0; }
 .g-lcard h4 { margin: 0 0 10px; font: 600 16px var(--font-title); }
+/* a note that opens its card sits right under the heading in every card (a grid box would keep its top margin) */
+.g-lcard .g-note:first-child { margin-top: 0; }
 .g-mrow { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--row-line); font-size: 13.5px; }
 .g-mrow:last-child { border-bottom: 0; }
 .g-rk { font-weight: 800; color: var(--muted); }
@@ -480,13 +543,13 @@ body.timer-off #tab-timer, body.timer-off .timer-only { display: none; }
   .g-page { grid-template-columns: minmax(0, 1fr); }
   .g-railin { position: static; max-height: none; overflow: visible; }
   .g-acts { display: grid; grid-template-columns: 1fr 1fr; }
-  .g-acts .g-pill, .g-acts .g-steps, #g-share.go { grid-column: 1 / -1; }
+  .g-acts .g-pill, .g-acts .g-steps, #g-share.go, .g-acts .g-choose, .g-acts .g-ver { grid-column: 1 / -1; }
   .g-btn { font-size: 14px; padding: 8px 10px; gap: 6px; }
   .g-trophies { grid-template-columns: minmax(0, 1fr); }
   .g-tots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .g-tn { font-size: 40px; }
 }
-#view-grind { --g-exp: #2a78d6; --g-p1: #eb6834; --g-p2: #1baf7a; --g-p3: #eda100; --g-other: #8b8a85;
+#view-grind { --g-gap: 12px; --g-exp: #2a78d6; --g-p1: #eb6834; --g-p2: #1baf7a; --g-p3: #eda100; --g-other: #8b8a85;
   --g-h0: #cde2fb; --g-h1: #9ec5f4; --g-h2: #6da7ec; --g-h3: #3987e5; --g-h4: #256abf; --g-h5: #184f95; }
 :root[data-theme="dark"] #view-grind { --g-exp: #3987e5; --g-p1: #d95926; --g-p2: #199e70; --g-p3: #c98500; --g-other: #8d93ad;
   --g-h0: #104281; --g-h1: #184f95; --g-h2: #256abf; --g-h3: #2a78d6; --g-h4: #5598e7; --g-h5: #86b6ef; }
@@ -522,72 +585,181 @@ html:has(body.g-pip), body.g-pip { overflow: hidden; scrollbar-width: none; }
 body.g-pip { margin: 0; padding: 0; background: #10141f; }
 body.g-pip::-webkit-scrollbar { display: none; }
 body.g-pip #view-grind { max-width: none; }
-/* every size is in em off the panel's font size, which fitStrip sets so the layout fills its window: dragging the pop
-   out bigger makes it all bigger, and a small window shrinks it rather than scrolling */
-.g-strip { font-family: var(--font-body); font-size: 16px; color: #eef1f7; background: #10141f; padding: .55em; }
+/* the app's overlay, a transparent window of its own (grind-app/): the game shows through around the panel, which draws
+   its own rounded corners, and a press anywhere on it but its buttons moves the window (grind-overlay.js, by script: a
+   drag region would be a title bar to Windows, with no hover over it). The site's pop out is unchanged */
+html:has(body.g-ov), body.g-ov { overflow: hidden; scrollbar-width: none; background: transparent; }
+body.g-ov { margin: 0; padding: 0; }
+body.g-ov::-webkit-scrollbar { display: none; }
+body.g-ov #view-grind { max-width: none; }
+body.g-ov .g-strip { border-radius: .9em; cursor: grab; user-select: none; }
+body.g-ov .g-strip.g-moving { cursor: grabbing; }
+/* every size is in em off the panel's font size, which the overlay's fit() sets so the layout fills its window: dragging
+   the pop out bigger makes it all bigger, and a small window shrinks it rather than scrolling */
+/* See-through (the app only): --g-see on the strip is the alpha every background in the panel is drawn with (the
+   strip's, the tiles' own alphas times it, the potion tiles and their juice, the alert); words, pictures and buttons
+   stay solid. Without it (the site) it's 1, a solid panel. Background colors as longhands: the pop out copies these
+   rules by their text */
+.g-strip { --pots: 1; font-family: var(--font-body); font-size: 16px; color: #eef1f7; background-color: rgba(16, 20, 31, var(--g-see, 1)); padding: .5em .55em .55em; border-radius: .65em; transition: opacity .15s ease; }
+/* faded to 60% or less: a dark shadow under every word and number, so they read over a bright map */
+.g-strip.g-faint, .g-strip.g-faint .g-pclock { text-shadow: 0 1px 2px rgba(0, 0, 0, .95), 0 0 4px rgba(0, 0, 0, .8); }
+.g-strip[data-pots="2"] { --pots: 2; }
+/* a layout picked: the panel fades out, takes the new layout, and fades back in */
+.g-strip.g-swap { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .g-strip { transition: none; } }
+/* the top strip: Lv in and Elapsed, the buttons at the right end */
+.g-top { display: flex; align-items: center; gap: .5em 1.1em; margin: 0 .1em .5em; font-size: .86em; color: #d0d6e4; white-space: nowrap; }
+.g-top b { color: #fff; font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.g-btns { display: flex; gap: .4em; margin-left: auto; font-size: .88em; }
+.g-btns button, .g-alert button { font: inherit; color: #cfe0ff; border: 1px solid #3c5a8f; border-radius: .5em; padding: .15em .7em; background: #22304d; cursor: pointer; }
+/* the mouse on a button lights it: while clicks pass through to the game it's how the player sees the overlay take the
+   click (g-hold) */
+.g-btns button:hover { background: #2d3e63; }
+.g-btns .g-gear[aria-pressed="true"] { background: #ffb648; color: #2a1a00; border-color: #ffb648; }
+/* ⇆ Layout's row: the four layouts as pictures with their names over the panel, under ⇆ (beside it in Bar, which has no
+   room under), the one showing lit. Solid whatever See-through says: it's only there while it's being used. While clicks
+   pass through to the game (g-pass) it waits for the mouse on ⇆ to hold them (g-hold) */
+.g-layw { position: relative; display: inline-flex; }
+.g-laypick { position: absolute; z-index: 5; top: calc(100% + .35em); right: 0; display: flex; gap: .3em; padding: .3em; background-color: #10141f; border: 1px solid #3c5a8f; border-radius: .6em; box-shadow: 0 .4em 1em rgba(0, 0, 0, .45); }
+.g-laypick[hidden], .g-strip.g-pass:not(.g-hold) .g-laypick { display: none !important; }
+.g-btns .g-laypic { display: flex; flex-direction: column; align-items: center; gap: .2em; padding: .3em .35em .25em; font-size: .8em; font-weight: 700; line-height: 1.1; color: #cfe0ff; background: #22304d; border: 1px solid #3c5a8f; border-radius: .5em; }
+.g-btns .g-laypic:hover { background: #2d3e63; }
+.g-btns .g-laypic[aria-pressed="true"] { color: #ffb648; border-color: #ffb648; box-shadow: inset 0 0 0 1px #ffb648; }
+.g-laypic svg { display: block; width: 3.2em; height: 1.8em; }
+.g-laypic rect { fill: #5a6d96; }
+.g-laypic rect.l { fill: #a08a3c; }
+.g-laypic[aria-pressed="true"] rect.l { fill: #ffd66b; }
+/* Column is narrow: two by two */
+.g-strip[data-layout="column"] .g-laypick { right: auto; left: 0; display: grid; grid-template-columns: repeat(2, auto); }
+.g-strip[data-layout="bar"] .g-laypick { top: 50%; right: calc(100% + .4em); transform: translateY(-50%); }
+.g-strip[data-layout="bar"] .g-laypic { flex-direction: row; gap: .35em; }
 .g-grid { display: grid; gap: .5em; }
-.g-lemon, .g-k, .g-mini { position: relative; overflow: hidden; min-width: 0; background: rgba(255,255,255,.055); border: 1px solid rgba(255,255,255,.08); border-radius: .75em; padding: .55em .75em; }
-.g-kl { font-size: .62em; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: #93a0bd; white-space: nowrap; }
-.g-kn { font: 700 1.9em/1.05 var(--font-num); font-variant-numeric: tabular-nums; margin-top: .18em; white-space: nowrap; }
-.g-ks { font-size: .72em; color: #a8b2c7; margin-top: .3em; white-space: nowrap; }
+.g-k, .g-pot { position: relative; overflow: hidden; min-width: 0; background-color: rgba(255, 255, 255, calc(.055 * var(--g-see, 1))); border: 1px solid rgba(255,255,255,.08); border-radius: .75em; padding: .5em .7em; }
+.g-kl { font-size: .66em; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #a3aecb; white-space: nowrap; }
+/* the number fonts as longhands: the pop out copies these rules by their text, and Chromium writes a font shorthand
+   holding var() followed by a font longhand as empty values, so the copy would lose the font */
+.g-kn { font-family: var(--font-num); font-weight: 700; font-size: 1.45em; line-height: 1.05; font-variant-numeric: tabular-nums; margin-top: .2em; white-space: nowrap; }
+.g-ks { font-size: .82em; color: #c0c8da; margin-top: .3em; white-space: nowrap; }
 .g-k-exp .g-kn { color: #ffd66b; } .g-k-meso .g-kn { color: #5fe0a0; } .g-k-gain .g-kn { color: #8fc8ff; }
-/* the Lemon tile: a glass of lemonade that drains as the potion runs down, orange and shaking under 5 minutes */
-.g-lemon { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; background: rgba(255,214,64,.07); border-color: rgba(255,214,64,.28); }
-.g-lemon > :not(.g-juice) { position: relative; }
-.g-juice { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: linear-gradient(to top, rgba(255,206,48,.38), rgba(255,206,48,.12)); border-top: 2px solid rgba(255,226,120,.55); transition: height 1s ease; }
-.g-juice::before, .g-juice::after { content: ""; position: absolute; top: -.5em; width: .4em; height: .4em; border-radius: 50%; background: rgba(255,236,160,.6); animation: g-fizz 3.2s linear infinite; }
-.g-juice::before { left: 14%; } .g-juice::after { left: 70%; animation-duration: 2.4s; animation-delay: .8s; }
-.g-lemon img { width: 3em; height: 3em; image-rendering: pixelated; animation: g-bob 2.6s ease-in-out infinite; }
-.g-lclock { font: 800 2.4em/1 var(--font-num); font-variant-numeric: tabular-nums; color: #fff1a8; margin-top: .12em; text-shadow: 0 2px 0 rgba(0,0,0,.35); white-space: nowrap; }
-.g-lcap { font-size: .7em; color: #f3e3a0; margin-top: .35em; white-space: nowrap; }
-.g-lleft { font-size: .72em; color: #d8cfa6; margin-top: .1em; white-space: nowrap; }
-.g-lemon.low { background: rgba(255,120,60,.1); border-color: #ff9f43; animation: g-glow 1.4s ease-in-out infinite; }
-.g-lemon.low .g-juice { background: linear-gradient(to top, rgba(255,150,60,.42), rgba(255,150,60,.12)); border-top-color: rgba(255,190,120,.7); }
-.g-lemon.low img { animation: g-shake .5s ease-in-out infinite; }
-.g-lemon.low .g-lclock { color: #ffb27a; } .g-lemon.low .g-lcap { color: #ffc79e; font-weight: 700; }
+.g-strip .up { color: #5fe0a0; } .g-strip .down { color: #f39a90; }
+/* a potion tile: a glass that drains as the potion runs down (Lemons yellow, Meat orange, the rest blue),
+   orange and shaking under 5 minutes. The picture beside the clock, what's left and the caption under them */
+.g-pot { display: flex; flex-direction: column; justify-content: center; }
+.g-pot > :not(.g-juice) { position: relative; }
+.g-juice { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background-image: linear-gradient(to top, rgba(120, 170, 255, calc(.3 * var(--g-see, 1))), rgba(120, 170, 255, calc(.08 * var(--g-see, 1)))); transition: height 1s ease; }
+.g-ph { display: flex; align-items: center; gap: .3em; }
+.g-pot img { width: 1.9em; height: 1.9em; image-rendering: pixelated; animation: g-bob 2.6s ease-in-out infinite; }
+.g-pclock { font-family: var(--font-num); font-weight: 800; font-size: 1.45em; line-height: 1; font-variant-numeric: tabular-nums; color: #e6ecf8; text-shadow: 0 2px 0 rgba(0,0,0,.35); white-space: nowrap; }
+.g-pleft, .g-pcap { font-size: .78em; color: #c0c8da; white-space: nowrap; }
+.g-pleft { margin-top: .3em; } .g-pleft:empty { display: none; } .g-pleft:empty + .g-pcap { margin-top: .3em; }
+.g-pot.lemon { background-color: rgba(255, 214, 64, calc(.07 * var(--g-see, 1))); border-color: rgba(255,214,64,.28); }
+.g-pot.lemon .g-juice { background-image: linear-gradient(to top, rgba(255, 206, 48, calc(.36 * var(--g-see, 1))), rgba(255, 206, 48, calc(.1 * var(--g-see, 1)))); }
+.g-pot.lemon .g-pclock { color: #fff1a8; } .g-pot.lemon :is(.g-pleft, .g-pcap) { color: #f3e3a0; }
+.g-pot.meat { background-color: rgba(255, 130, 80, calc(.08 * var(--g-see, 1))); border-color: rgba(255,150,100,.3); }
+.g-pot.meat .g-juice { background-image: linear-gradient(to top, rgba(230, 110, 60, calc(.32 * var(--g-see, 1))), rgba(230, 110, 60, calc(.08 * var(--g-see, 1)))); }
+.g-pot.meat .g-pclock { color: #ffcfae; } .g-pot.meat :is(.g-pleft, .g-pcap) { color: #f0c4a6; }
+.g-pot.other { background-color: rgba(110, 160, 255, calc(.07 * var(--g-see, 1))); border-color: rgba(130,170,255,.28); }
+.g-pot.other .g-pclock { color: #d6e4ff; } .g-pot.other :is(.g-pleft, .g-pcap) { color: #bcd0f5; }
+.g-pot.low { background-color: rgba(255, 120, 60, calc(.1 * var(--g-see, 1))); border-color: #ff9f43; animation: g-glow 1.4s ease-in-out infinite; }
+.g-pot.low .g-juice { background-image: linear-gradient(to top, rgba(255, 150, 60, calc(.42 * var(--g-see, 1))), rgba(255, 150, 60, calc(.12 * var(--g-see, 1)))); }
+.g-pot.low img { animation: g-shake .5s ease-in-out infinite; }
+.g-pot.low .g-pclock { color: #ffb27a; } .g-pot.low .g-pcap { color: #ffc79e; font-weight: 700; }
 @keyframes g-bob { 0%, 100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-.25em) rotate(4deg); } }
 @keyframes g-shake { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-12deg); } 75% { transform: rotate(12deg); } }
 @keyframes g-glow { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,159,67,0); } 50% { box-shadow: 0 0 0 .25em rgba(255,159,67,.35); } }
-@keyframes g-fizz { 0% { transform: translateY(0); opacity: 0; } 15% { opacity: 1; } 100% { transform: translateY(-2.8em); opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .g-lemon img, .g-juice::before, .g-juice::after, .g-lemon.low { animation: none; } }
-.g-mini { display: flex; gap: .3em 1.1em; align-items: center; font-size: .78em; color: #c3cbdb; white-space: nowrap; }
-.g-mini b { color: #fff; font-family: var(--font-num); font-variant-numeric: tabular-nums; }
-.g-mini img { width: 1.35em; height: 1.35em; image-rendering: pixelated; vertical-align: -.35em; margin-right: .2em; }
-.g-strip .up { color: #5fe0a0; } .g-strip .down { color: #f39a90; }
-.g-foot { display: flex; align-items: center; gap: .5em; margin-top: .5em; font-size: .72em; color: #9aa3b5; white-space: nowrap; }
-.g-dots { display: flex; gap: .5em; align-items: center; }
-.g-dw { display: inline-flex; align-items: center; gap: .2em; }
-.g-dot { width: .6em; height: .6em; border-radius: 50%; background: #4b5368; }
-.g-dw.ok .g-dot { background: #4cc38a; } .g-dw.wait .g-dot { background: #f5b942; } .g-dw.bad .g-dot { background: #f06a5d; }
-.g-dw.wait small { color: #f5c96a; } .g-dw.bad small { color: #f39a90; }
-.g-foot button, .g-l3 button { font: inherit; color: #cfe0ff; border: 1px solid #3c5a8f; border-radius: .5em; padding: .15em .7em; background: #22304d; cursor: pointer; }
-.g-lay { margin-left: auto; }
-.g-l3 { margin-top: .45em; padding-top: .4em; border-top: 1px solid #2a3145; font-size: .78em; color: #a7afc0; display: flex; flex-wrap: wrap; gap: .25em .9em; align-items: center; }
-.g-l3.wait { color: #f5c96a; } .g-l3.bad { color: #f39a90; } .g-l3.idle { color: #a7afc0; }
-.g-l3 button { margin-left: auto; } .g-l3 .g-keep { margin-left: 0; }
-/* the four layouts. Hero: the Lemon tile beside three big numbers, the rest in one line under them */
-.g-strip[data-layout="hero"] .g-grid { grid-template-columns: 10.5em repeat(3, minmax(0, 1fr)); }
-.g-strip[data-layout="hero"] .g-lemon { grid-row: 1 / span 2; }
-.g-strip[data-layout="hero"] .g-mini { grid-column: 2 / span 3; }
-/* Corner: two by two, the small line under */
-.g-strip[data-layout="corner"] .g-grid { grid-template-columns: 1fr 1fr; }
-.g-strip[data-layout="corner"] .g-mini { grid-column: 1 / span 2; }
-.g-strip[data-layout="corner"] .g-lcap { display: none; }
-/* Column: stacked down the side, the small line as a list, the buttons as icons */
-.g-strip[data-layout="column"] .g-grid { grid-template-columns: 1fr; }
-.g-strip[data-layout="column"] .g-mini { flex-direction: column; align-items: flex-start; gap: .35em; }
-.g-strip[data-layout="column"] .g-bl { display: none; }
-/* Bar: one slim row, the clock, the three numbers and the next level */
-.g-strip[data-layout="bar"] { display: flex; flex-wrap: wrap; align-items: center; column-gap: .9em; }
+@media (prefers-reduced-motion: reduce) { .g-pot img, .g-pot.low img, .g-pot.low { animation: none; } }
+/* the alert: the one thing to do, under the tiles and only when something needs you; amber to wait, red when it's stuck */
+.g-alert { margin-top: .5em; padding: .4em .7em; border-radius: .6em; background-color: rgba(27, 33, 49, var(--g-see, 1)); border: 1px solid #333c55; color: #c3cbdb; font-size: .86em; display: flex; flex-wrap: wrap; gap: .25em .9em; align-items: center; }
+.g-alert.wait { background-color: rgba(58, 44, 18, var(--g-see, 1)); border-color: #8a6420; color: #ffd98a; }
+.g-alert.bad { background-color: rgba(61, 25, 22, var(--g-see, 1)); border-color: #9b3b33; color: #ffb3a8; }
+.g-alert button { margin-left: auto; } .g-alert .g-keep { margin-left: 0; }
+/* the four layouts. Hero: the top strip on one line, the three numbers and the potion tiles in a row. The numbers each
+   take their own width (never under 7.5em, so they stay even and don't shrink while they wait), the potion tiles share
+   the rest evenly: equal number tiles would all be as wide as the longest small line, and Hero would outgrow its window */
+.g-strip[data-layout="hero"] .g-grid { grid-template-columns: repeat(3, minmax(7.5em, auto)) repeat(var(--pots), minmax(0, 1fr)); }
+/* Bar, Column and Corner show the buttons as icons */
+.g-strip:not([data-layout="hero"]) .g-bl { display: none; }
+/* Corner: two columns, the potion tiles in the next cells */
+.g-strip[data-layout="corner"] .g-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* Column: one column, the top strip stacked (Lv in, Elapsed, then the buttons in a row) */
+.g-strip[data-layout="column"] .g-grid { grid-template-columns: minmax(0, 1fr); }
+.g-strip[data-layout="column"] .g-top { flex-direction: column; align-items: flex-start; gap: .3em; }
+.g-strip[data-layout="column"] .g-btns { margin-left: 0; }
+/* Bar: one slim row, the numbers with their labels, the potions as picture and clock, then Lv in, Elapsed and the
+   buttons at the right end; the alert goes under */
+.g-strip[data-layout="bar"] { display: flex; flex-wrap: wrap; align-items: center; column-gap: 1.1em; }
 .g-strip[data-layout="bar"] .g-grid { display: flex; align-items: center; gap: 1.1em; }
-.g-strip[data-layout="bar"] .g-lemon, .g-strip[data-layout="bar"] .g-k, .g-strip[data-layout="bar"] .g-mini { background: none; border: 0; padding: 0; overflow: visible; animation: none; }
-.g-strip[data-layout="bar"] .g-lemon { flex-direction: row; gap: .45em; }
-.g-strip[data-layout="bar"] .g-lemon img { width: 2em; height: 2em; }
-.g-strip[data-layout="bar"] .g-lclock { margin: 0; font-size: 1.9em; }
-.g-strip[data-layout="bar"] .g-kn { font-size: 1.6em; }
-.g-strip[data-layout="bar"] :is(.g-juice, .g-lcap, .g-lleft, .g-ks, .g-mini > :not(.g-eta), .g-bl) { display: none; }
-.g-strip[data-layout="bar"] .g-foot { margin: 0 0 0 auto; }
-.g-strip[data-layout="bar"] .g-l3 { flex-basis: 100%; }
+.g-strip[data-layout="bar"] :is(.g-k, .g-pot) { background: none; border: 0; padding: 0; overflow: visible; animation: none; }
+.g-strip[data-layout="bar"] :is(.g-ks, .g-juice, .g-pleft, .g-pcap) { display: none; }
+.g-strip[data-layout="bar"] .g-top { order: 1; margin: 0 0 0 auto; }
+.g-strip[data-layout="bar"] .g-alert { order: 2; flex-basis: 100%; }
+/* Settings (grind-settings.js), opened by ⚙ Settings on the top strip: under the panel inside the pop-out, which grows to
+   fit it. Always dark like the panel, on the site's dark tokens, after the approved mockup (overlay-settings.html). Its
+   sections stack as in the mockup, and sit side by side when the window is wide. Fonts as longhands, as on .g-kn: the
+   pop-out copies these rules by their text. Should the window not grow, Settings scrolls rather than being cut off */
+html:has(body.g-pip #g-set) { overflow-y: auto; }
+#g-set { --surface: #141927; --ink: #ece8f6; --muted: #8d93ad; --line: #2c3450; --row-line: #1e2436; --btn: #1b2134; --btn-k: #ffb648; --btn-k-ink: #2a1a00; --accent: #ffb648; --num: #ffcf7a;
+  container-type: inline-size; color-scheme: dark; background: var(--surface); color: var(--ink); border-top: 1px solid var(--line); font-family: var(--font-body); font-size: 14px; font-weight: 600; line-height: 1.4; }
+.g-set-h { display: flex; align-items: center; gap: 8px; padding: 7px 8px 7px 14px; background: #0b0e17; border-bottom: 1px solid var(--line); }
+#g-set .g-set-h h2 { flex: 1; margin: 0; font-family: var(--font-title); font-size: 17px; font-weight: 600; line-height: 1.2; color: var(--ink); }
+.g-set-x { width: 30px; height: 30px; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--muted); font-family: var(--font-body); font-size: 20px; line-height: 1; cursor: pointer; }
+.g-set-x:hover { background: var(--btn); color: var(--ink); }
+.g-set-body { display: grid; }
+.g-set-sec { min-width: 0; padding: 12px 14px; }
+.g-set-sec + .g-set-sec { border-top: 1px solid var(--row-line); }
+/* a wide window: Overlay and Tracking side by side with You along the bottom; wider still, all three in a row */
+@container (min-width: 600px) {
+  .g-set-body { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .g-set-sec.g-set-tr { border-top: 0; border-left: 1px solid var(--row-line); }
+  .g-set-you { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 0 16px; }
+  #g-set .g-set-you h3 { flex-basis: 100%; }
+  .g-set-you .g-set-who { flex: 1 1 260px; }
+  .g-set-you .g-set-links { margin-top: 0; }
+}
+@container (min-width: 900px) {
+  .g-set-body { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .g-set-sec.g-set-you { grid-column: auto; display: block; border-top: 0; border-left: 1px solid var(--row-line); }
+  .g-set-you .g-set-links { margin-top: 8px; }
+}
+#g-set .g-set-sec h3 { margin: 0 0 8px; font-family: var(--font-body); font-size: 11px; font-weight: 800; line-height: 1.4; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.g-set-row { display: flex; align-items: center; gap: 10px; min-height: 34px; }
+.g-set-row + .g-set-row { margin-top: 6px; }
+.g-set-lbl { flex: 1; min-width: 0; }
+.g-set-lbl small { display: block; color: var(--muted); font-size: 12px; font-weight: 500; line-height: 1.3; }
+.g-set-pics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.g-set-pic { min-width: 0; padding: 8px 6px 6px; background: var(--btn); border: 1px solid var(--line); border-radius: 10px; color: var(--ink); font-family: var(--font-body); font-size: 12px; font-weight: 700; text-align: center; cursor: pointer; }
+.g-set-pic[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); color: var(--accent); }
+.g-set-pic svg { display: block; width: 100%; height: 36px; margin-bottom: 4px; }
+.g-set-pic rect { fill: #2c3450; }
+.g-set-pic rect.l { fill: #6b6033; }
+.g-set-pic[aria-pressed="true"] rect.l { fill: #ffd66b; }
+.g-set-sw { position: relative; flex: none; width: 38px; height: 22px; padding: 0; border: 0; border-radius: 11px; background: #2c3450; cursor: pointer; }
+.g-set-sw::after { content: ""; position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: #8d93ad; transition: left .15s; }
+.g-set-sw[aria-pressed="true"] { background: var(--accent); }
+.g-set-sw[aria-pressed="true"]::after { left: 19px; background: #2a1a00; }
+.g-set-btn { padding: 5px 10px; background: var(--btn); border: 1px solid var(--line); border-radius: 8px; color: var(--ink); font-family: var(--font-body); font-size: 13px; font-weight: 700; white-space: nowrap; cursor: pointer; }
+.g-set-btn.k { background: var(--btn-k); border-color: var(--btn-k); color: var(--btn-k-ink); }
+.g-set-av { flex: none; display: grid; place-items: center; width: 30px; height: 30px; overflow: hidden; border-radius: 50%; background: #5865f2; color: #fff; font-weight: 800; }
+.g-set-av img { width: 100%; height: 100%; object-fit: cover; }
+.g-set-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+/* the app's rows: See-through's slider, Size's − and + around its number, the version line (kept one line tall while
+   the app's answer comes, so the window doesn't jump) */
+.g-set-pics + .g-set-row { margin-top: 10px; }
+.g-set-tight { flex: none; }
+.g-set-see { flex: 1 1 auto; min-width: 0; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.g-set-num { flex: none; min-width: 44px; text-align: right; font-family: var(--font-num); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--num); }
+.g-set-step { width: 30px; padding: 3px 0; text-align: center; font-size: 17px; line-height: 1.2; }
+.g-set-btn:disabled { opacity: .45; cursor: default; }
+#g-set :is(button, select, input):focus-visible { outline: 2px solid #4f8cff; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .g-set-sw::after { transition: none; } }
+/* the app's Settings window: Settings alone in it, its header bar moves the window (its × still clicks) */
+html:has(body.g-setwin), body.g-setwin { background: #141927; color-scheme: dark; }
+/* the window takes Settings' height; on a screen too short for it, it scrolls without a bar taking its width */
+html:has(body.g-setwin) { scrollbar-width: none; }
+body.g-setwin { margin: 0; }
+body.g-setwin #g-set { border-top: 0; }
+body.g-setwin .g-set-h { -webkit-app-region: drag; }
+body.g-setwin .g-set-h button { -webkit-app-region: no-drag; }
 
 /* Read from game (reader.js draws .r-bar and .r-drop) */
 .b-reader { margin: 14px 0 0; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; display: grid; gap: 8px; }
@@ -982,8 +1154,12 @@ const CONFIG = {
   reportUrl: 'https://sixpathcrossway.pages.dev/api/report',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-02h',
+  version: '2026-11-04a',
+  // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
+  appDownload: null,
 };
+// the Windows app (grind-app/): its preload hands the page this bridge, and the page turns into the app's Grind page
+const APP = window.sixPathApp || null;
 
 /* BOSSES:START */
 const BOSSES = [
@@ -1204,7 +1380,7 @@ function makeSupabaseApi(cfg) {
   const who = s => {
     if (!s || !s.user) return null;
     const m = s.user.user_metadata || {};
-    return { user_id: s.user.id, user_name: (m.custom_claims && m.custom_claims.global_name) || m.full_name || m.name || 'You' };
+    return { user_id: s.user.id, user_name: (m.custom_claims && m.custom_claims.global_name) || m.full_name || m.name || 'You', avatar: m.avatar_url || m.picture || null };
   };
   const check = ({ error }) => { if (error) throw new Error(error.message); };
   return {
@@ -1591,7 +1767,9 @@ const ONLY = 'bt.only';
   const q = new URLSearchParams(location.search).get('only');
   if (q === 'grind' || q === 'all') { store.set(ONLY, q === 'grind' ? 'grind' : ''); history.replaceState(null, '', location.pathname + location.hash); }
 }
-const onlyGrind = () => store.get(ONLY) === 'grind';
+// the app is only the Grind page: the site's other tabs and their nav are hidden there (Builds and Appraiser open the browser)
+const onlyGrind = () => !!APP || store.get(ONLY) === 'grind';
+document.body.classList.toggle('in-app', !!APP);
 document.body.classList.toggle('only-grind', onlyGrind());
 document.body.classList.toggle('timer-off', !TIMER_ON);
 // the front page is How it works while the Timer is off; the tester link opens Grind wherever it lands, How it works aside
@@ -1652,9 +1830,10 @@ function loadGrind() {
     document.head.append(el('script', { src, onload: resolve, onerror: () => reject(new Error(src)) }));
   });
   const json = f => fetch('data/' + f).then(r => { if (!r.ok) throw new Error(f); return r.json(); });
-  const scripts = (window.Reader ? Promise.resolve() : script('reader.js')).then(() => Promise.all([script('screen.js'), script('grind-session.js')])).then(() => script('grind.js'));
+  const scripts = (window.Reader ? Promise.resolve() : script('reader.js')).then(() => Promise.all([script('screen.js'), script('grind-session.js'), script('grind-overlay.js'), script('grind-settings.js')])).then(() => script('grind.js'));
   grindLoading = Promise.all([scripts, json('grind.json'), json('grind-pictures.json')]).then(([, data, pictures]) => {
-    reporters.grind = window.Grind.mount($('grind-root'), { api, store, el, data, pictures, session: () => state.session, signIn: () => signIn() });
+    reporters.grind = window.Grind.mount($('grind-root'), { api, store, el, data, pictures, session: () => state.session, signIn: () => signIn(),
+      signOut: () => api.signOut().catch(() => {}).then(() => setSession(null)), app: APP, appDownload: CONFIG.appDownload });
   }).catch(() => {
     grindLoading = null;
     $('grind-root').replaceChildren(el('p', { class: 'empty' }, "The grind tracker didn't load. Try reloading the page."));

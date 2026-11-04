@@ -11,11 +11,18 @@
 const MS = () => window.MapleScreen, GS = () => window.GrindSession;
 const KEY_OPEN = 'grind.open', KEY_LOCAL = 'grind.local', KEY_PRICES = 'grind.prices', KEY_MAP = 'grind.map', KEY_HOME = 'grind.mesoHome';
 const KEY_LAYOUT = 'grind.layout', KEY_SIZES = 'grind.layoutSizes', KEY_DETAIL = 'grind.detail', KEY_LOOT = 'grind.loot';
+// the app's overlay: See-through (25 to 100%, in fives) and Size (60 to 160%, in tens), kept on this device
+const KEY_SEE = 'grind.seeThrough', KEY_SCALE = 'grind.overlayScale';
 // the shop window is looked for over the whole frame this often (ticks) until it's been seen, then where it was each tick
 const SHOP_SEARCH_EVERY = 6;
 // sessions kept on this device for all time: up to 200, the newest 20 with their minutes (the charts), older ones without
 const LOCAL_MAX = 200, LOCAL_MINUTES = 20;
 const RESUME_MS = 30 * 60000, SAVE_MS = 60000, LEVEL_EVERY = 20, ICON_EVERY = 40, MESO_SEARCH_EVERY = 40, LOST_MS = 15000, BAG_NEAR_MS = 5000;
+// the Windows app's bridge (window.sixPathApp, deps.app) this page needs; an older app is asked to update. RELEASES is
+// where the app downloads from until CONFIG.appDownload is set
+const NEED_BRIDGE = 1, RELEASES = 'https://github.com/drim1561/six-path-crossway/releases/latest';
+// quitting the app waits this long at most for saves still on their way to the account
+const LET_GO_MS = 3000;
 
 /* ---------- formatting ---------- */
 
@@ -71,14 +78,18 @@ function health(f) {
   C.potions = stuckOn(f.size) ? { state: 'bad', text: "can't measure the game" } : stuckOn(f.counts) ? { state: 'bad', text: "can't read the numbers" }
     : f.counts.ok == null ? { state: 'wait', text: 'looking' } : f.potNone ? { state: 'wait', text: 'none on quickslots' } : { state: 'ok', text: f.potCount ? String(f.potCount) : 'reading' };
   const mesoStale = f.meso.at != null && t - f.meso.at > STALE_MS;
-  C.mesos = f.meso.unclear ? { state: 'wait', text: "can't read clearly" } : f.meso.at == null ? { state: 'wait', text: 'open inventory' } : { state: mesoStale ? 'wait' : 'ok', text: ago(f.meso.at) };
+  // "Mesos waiting": the one line (the nudge) is the only place that asks for the inventory
+  C.mesos = f.meso.unclear ? { state: 'wait', text: "can't read clearly" } : f.meso.at == null ? { state: 'wait', text: 'waiting' } : { state: mesoStale ? 'wait' : 'ok', text: ago(f.meso.at) };
 
   const stuck = ['exp', 'potions', 'level'].some(k => C[k].state === 'bad');
   const say = (state, text) => ({ checks: C, nudge: { state, text }, stuck });
-  if (!f.sharing) return say('idle', f.hasSession ? 'Share stopped. Share the game window again to carry on' : 'Share the game window to start');
-  if (C.exp.state === 'bad') return say('bad', "Can't see your EXP bar, paused. Is the game still shared, with the bar showing?");
-  if (stuckOn(f.size)) return say('bad', "Can't measure the game. Share the game window itself, at full size");
-  if (C.potions.state === 'bad') return say('bad', "Can't read your quickslot numbers. Make the game window bigger, or share it again");
+  const app = !!f.app;   // the Windows app has no share step: Start picks the game
+  // f.stopped: the player pressed Stop, so in the app the game wasn't lost
+  if (!f.sharing) return say('idle', app ? (!f.hasSession ? 'Press Start to begin' : f.stopped ? 'Stopped. Press Start to carry on' : 'Lost the game window. Press Start to carry on')
+    : f.hasSession ? 'Share stopped. Share the game window again to carry on' : 'Share the game window to start');
+  if (C.exp.state === 'bad') return say('bad', app ? "Can't see your EXP bar, paused. Is the game open, with the bar showing?" : "Can't see your EXP bar, paused. Is the game still shared, with the bar showing?");
+  if (stuckOn(f.size)) return say('bad', app ? "Can't measure the game. Is it minimized, or very small?" : "Can't measure the game. Share the game window itself, at full size");
+  if (C.potions.state === 'bad') return say('bad', app ? "Can't read your quickslot numbers. Make the game window bigger, or press Find my game again" : "Can't read your quickslot numbers. Make the game window bigger, or share it again");
   if (C.level.state === 'bad') return say('bad', "Can't read your level. Try Find my game again");
   if (f.exp.ok == null || f.size.ok == null) return say('wait', 'Looking for your game…');
   if (f.potNone) return say('wait', 'Put the potions you drink on your quickslots so they count');
@@ -93,15 +104,39 @@ function health(f) {
   return say('ok', 'Reading everything');
 }
 
-// the pop-out's Lemon tile from the clock of the potion running out first (GrindSession.countdowns): the clock, what's
-// left and when, a caption (Lemons get the lemonade jokes), how full the glass is (0 to 100, against how full the slot
-// was since the last refill) and low under 5 minutes
-function lemonTile(c, t) {
-  if (!c) return { clock: '··:··', left: '', cap: 'starts once you drink', juice: 0, low: false };
-  const lemon = /lemon/i.test(c.name || '');
-  return { clock: clock((c.doneAt - t) / 1000), left: fmt(c.left) + ' left · ' + timeOfDay(c.doneAt),
-    cap: c.low ? (lemon ? 'Squeeze time! Refill soon' : 'Almost out! Refill soon') : (lemon ? 'till the juice runs out' : 'till they run out'),
+// the panel's potion tiles. slots: Object.values(s.slots).concat(s.retired || []), where a retired slot is flagged
+// retired: true so its stale count is never shown (the caller adds the flag); cds: GrindSession.countdowns (sorted).
+// One tile per kind being drunk (both Lemon ids are one kind), at most 2: the kinds with a clock by what runs out first,
+// then the ones without by how much was drunk. [null] while nothing has been drunk.
+const potionKind = name => /lemon/i.test(name || '') ? 'lemon' : /meat/i.test(name || '') ? 'meat' : 'other';
+function potionTiles(slots, cds) {
+  const kinds = {};
+  for (const sl of slots) {
+    if (!(sl.used > 0) || sl.id == null) continue;
+    const k = potionKind(sl.name), g = kinds[k] || (kinds[k] = { kind: k, id: sl.id, name: sl.name, used: 0, count: undefined, cd: null });
+    g.used += sl.used;
+    // a big change still in its 15 second check shows at once (GrindSession books it once it holds)
+    const n = sl.big ? sl.big.v : sl.count;
+    if (!sl.retired && n != null && (g.count === undefined || n > g.count)) g.count = n;
+  }
+  for (const cd of cds || []) { const g = kinds[potionKind(cd.name)]; if (g && !g.cd) { g.cd = cd; g.id = cd.id; g.name = cd.name; } }
+  const list = Object.values(kinds).sort((a, b) => a.cd && b.cd ? a.cd.secs - b.cd.secs : a.cd ? -1 : b.cd ? 1 : b.used - a.used).slice(0, 2);
+  return list.length ? list.map(g => ({ kind: g.kind, id: g.id, name: g.name, count: g.cd ? g.cd.left : g.count, cd: g.cd })) : [null];
+}
+// one tile's text: the clock, what's left, a caption (Lemons get the lemonade jokes, Meat the plate), how full the glass is
+// (0 to 100, against how full the slot was since the last refill) and low under 5 minutes
+const POTION_CAPS = { lemon: ['till the juice runs out', 'Squeeze time! Refill soon'], meat: ["till the plate's empty", 'Almost out! Refill soon'], other: ['till they run out', 'Almost out! Refill soon'] };
+function potionTile(tile, t, viewing) {
+  if (!tile) return { kind: 'none', clock: '··:··', left: '', cap: 'starts once you drink', juice: 0, low: false };
+  const c = tile.cd, left = tile.count != null ? fmt(tile.count) + ' left' : '';
+  if (!c) return { kind: tile.kind, clock: '··:··', left, cap: viewing ? 'a saved session' : 'counting how fast you drink', juice: 0, low: false };
+  return { kind: tile.kind, clock: clock((c.doneAt - t) / 1000), left: fmt(c.left) + ' left', cap: POTION_CAPS[tile.kind][c.low ? 1 : 0],
     juice: Math.round(100 * Math.min(1, c.left / (c.full || c.left || 1))), low: !!c.low };
+}
+// the session clock: active time, ticking between reads, still in a pause (GrindSession's maxGapMs)
+function elapsedSecs(s, now, live) {
+  const gap = now - s.tLast;
+  return s.activeMs / 1000 + (live && gap >= 0 && gap < (GS() ? GS().CFG.maxGapMs : 30000) ? gap / 1000 : 0);
 }
 
 // Count my loot: what a loot picture is, for the engine. L is data/loot-icons.json and potions grind.json's potions.
@@ -183,6 +218,9 @@ function lifetime(rows, o) {
 
 function mount(root, deps) {
   const { el, store, api, data, pictures } = deps;
+  // in the Windows app: Start finds the game itself (no browser picker), the overlay is a window of its own that opens with
+  // the share, and quitting lets the last save go first. appOld: an app older than this page, which can't start
+  const app = deps.app || null, appOld = !!app && !(app.v >= NEED_BRIDGE);
   const jget = (k, d) => { try { const v = store.get(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } };
   const jset = (k, v) => store.set(k, JSON.stringify(v));
   const prices = jget(KEY_PRICES, {});
@@ -193,7 +231,7 @@ function mount(root, deps) {
   if (open && open.tLast && Date.now() - open.tLast < RESUME_MS) session = open;   // carry on after a reload or a dropped share
   // per share: where the EXP line is, the measured stretch, and what each reader last saw
   const st = { line: null, m: null, fw: 0, fh: 0, reads: 0, ticks: 0, expMiss: 0, measureAt: 0, levelAt: 0, level: null, party: null, slots: {}, lastSave: 0,
-    sharing: false, potNone: false, potCount: 0, h: null, recent: [] };
+    sharing: false, stopped: false, potNone: false, potCount: 0, h: null, recent: [] };
   // when each reader last worked and when its current run of misses began, for the checks on the card
   const fresh = () => ({ exp: { ok: null, fail: null }, level: { ok: null, fail: null }, size: { ok: null, fail: null }, counts: { ok: null, fail: null } });
   st.h = fresh();
@@ -207,10 +245,12 @@ function mount(root, deps) {
   /* ----- layout: big buttons down the left with what reads the game and the map under them; on the right this session
      in one slim line (its card, potions and charts fold away under Session details, since the pop out is the live view)
      and all time, every saved session added up, filling the rest ----- */
-  const status = el('p', { class: 'g-status', id: 'g-status' });
+  // the status line and the pill are polite live regions: what they say reaches a screen reader without looking for it
+  const status = el('p', { class: 'g-status', id: 'g-status', role: 'status' });
   const shareArea = el('div', { id: 'g-sharearea' });
   const btn = (id, icon, label, onclick) => el('button', { type: 'button', id, class: 'g-btn', onclick }, el('i', { 'aria-hidden': 'true' }, icon), label);
-  const popBtn = btn('g-pop', '⧉', 'Pop out over the game', () => popOut());
+  // in the app the overlay opens with the share, so this only shows while it's closed during a session (showPop)
+  const popBtn = btn('g-pop', '⧉', app ? 'Show the overlay' : 'Pop out over the game', () => popOut());
   // a fresh average from now on, to try another way of grinding; the session average keeps going
   const markBtn = btn('g-mark', '↺', 'Reset average', () => resetAverage());
   // the quick reset: look for the bars, measure and name the potions again, keeping the session
@@ -218,18 +258,31 @@ function mount(root, deps) {
   const newBtn = btn('g-new', '＋', 'New session', () => newSession());
   // the next frame from the share comes down as a picture, to send when something reads wrong
   const snapBtn = btn('g-snap', '◉', 'Save a frame', () => { st.wantSnap = true; setStatus('Saving the next frame from your game…'); });
+  // the app's power button (an app built before its bridge had quit shows none); the shell saves first, as the tray's Quit does
+  const quitBtn = app && typeof app.quit === 'function' ? btn('g-quit', '⏻', 'Quit the app', () => Promise.resolve().then(() => app.quit()).catch(() => {})) : null;
+  // the app's Settings window from the main window too (Rimmah, 2026-11-04: with clicks passing through, the way back to
+  // the overlay's ⚙ was Alt+Tab), the overlay open or not; the site keeps Settings in its pop-out
+  const setBtn = app ? btn('g-settings', '⚙', 'Settings', () => openSettings()) : null;
+  // the app's version and what its own update check found (it checks each time it starts; the answer is kept a minute),
+  // in small print under the buttons (Rimmah, 2026-11-04: not in the pop-out's Settings)
+  const verLine = app ? el('p', { id: 'g-ver', class: 'g-note g-ver' }, 'Version ' + (app.version || '')) : null;
+  if (verLine) new Promise(res => res(app.checkUpdate())).then(window.GrindSettings.updateLine, () => window.GrindSettings.updateLine(null))
+    .then(t => { verLine.textContent = 'Version ' + (app.version || '') + ' · ' + t; });
   const HEALTH = [['exp', 'EXP'], ['level', 'Level'], ['potions', 'Potions'], ['mesos', 'Mesos']];
   const SIGN = { ok: '✓', wait: '!', bad: '✕', idle: '·' };
   const CHECKS = [['exp', 'EXP line'], ['size', 'Game size'], ['level', 'Level'], ['potions', 'Potions'], ['mesos', 'Mesos']];
   const NEEDED = ['exp', 'size', 'level', 'potions'];   // mesos only come when the inventory opens
-  const check = el('ul', { class: 'g-check', id: 'g-check' }, CHECKS.map(([k, label]) => el('li', { 'data-k': k }, el('b', {}, label), el('span', {}, 'Looking…'))));
+  // before a share the checks only list what will be read; Looking… starts with the share (startChecks)
+  const check = el('ul', { class: 'g-check', id: 'g-check' }, CHECKS.map(([k, label]) => el('li', { 'data-k': k, class: 'idle' }, el('b', {}, label), el('span', {}))));
   const V = {};
   const row = (k, label, strong) => el('div', { class: 'g-row' }, strong ? el('b', {}, label) : el('span', {}, label), V[k] = el(strong ? 'b' : 'span', {}, '·'));
-  V.pill = el('div', { class: 'g-pill idle', id: 'g-pill' }, el('i', { class: 'g-pdot' }), V.pillText = el('span', {}, 'Not sharing yet'));
-  const steps = el('ol', { class: 'g-steps' }, ['Pick the MapleStory window', 'Grind, nothing to type', 'Open your inventory now and then for mesos'].map(t => el('li', {}, t)));
+  V.pill = el('div', { class: 'g-pill idle', id: 'g-pill', role: 'status' }, el('i', { class: 'g-pdot' }), V.pillText = el('span', {}, 'Not sharing yet'));
+  const steps = el('ol', { class: 'g-steps' }, (app ? ['Open MapleStory', 'Press Start, it finds the game by itself', 'Open your inventory now and then for mesos']
+    : ['Pick the MapleStory window', 'Grind, nothing to type', 'Open your inventory now and then for mesos']).map(t => el('li', {}, t)));
   V.health = el('div', { class: 'g-health', id: 'g-health' }, HEALTH.map(([k]) => el('span', { class: 'g-hc wait', 'data-k': k })));
   // the one thing to do, only when something needs you
-  V.nudge = el('div', { class: 'g-nudge idle', id: 'g-nudge', hidden: '' }, 'Share the game window to start');
+  const toStart = app ? 'Press Start to begin' : 'Share the game window to start';
+  V.nudge = el('div', { class: 'g-nudge idle', id: 'g-nudge', hidden: '' }, toStart);
   // a big jump between peeks: a trade or a big buy isn't grinding, so it asks (a rise is likely loot sold to someone,
   // so Keep it comes first; a drop, something bought, so Leave it out does)
   V.tradeQ = el('span', {});
@@ -240,33 +293,122 @@ function mount(root, deps) {
     el('div', { class: 'g-kpis' },
       el('div', {}, el('div', { class: 'g-lbl' }, 'EXP per hour'), V.expHr = el('div', { class: 'g-big', id: 'g-exphr' }, '·')),
       el('div', { id: 'g-mesokpi' }, el('div', { class: 'g-lbl' }, 'Mesos earned'), V.mesoBig = el('div', { class: 'g-big' }, '·'),
-        V.mesoSub = el('div', { class: 'g-sub' }, 'Open your inventory now and then to start counting'))),
-    V.sub = el('div', { class: 'g-sub' }, 'Share the game window to start'), V.pace = el('div', { class: 'g-sub', id: 'g-pace' }), V.next = el('div', { class: 'g-sub' }),
-    V.mesos = el('div', { class: 'g-sub', id: 'g-mesos' }, 'Mesos: open your inventory now and then to count them'),
+        V.mesoSub = el('div', { class: 'g-sub' }, 'Not counted yet'))),
+    V.sub = el('div', { class: 'g-sub' }, toStart), V.pace = el('div', { class: 'g-sub', id: 'g-pace' }), V.next = el('div', { class: 'g-sub' }),
+    V.mesos = el('div', { class: 'g-sub', id: 'g-mesos' }, 'Mesos: not counted yet'),
     V.tradeBox = el('div', { class: 'g-tradebox', id: 'g-tradebox' }, el('button', { type: 'button', class: 'linkish', id: 'g-tradebtn', onclick: () => openTrade() }, 'Leave out a trade')),
     row('gain', 'EXP gained'), row('time', 'Time'), row('kpm', 'Kills a minute'), row('pots', 'Potions used'),
     row('costHr', 'Potions an hour', true), row('per1', 'Cost per 1%', true),
     el('div', { class: 'g-row' }, V.perPotL = el('span', {}, 'Potions per 1%'), V.perPot = el('span', {}, '·')),
     V.perPot2Row = el('div', { class: 'g-row', hidden: '' }, V.perPot2L = el('span', {}), V.perPot2 = el('span', {}, '·')), row('level', 'Level'));
   // the pop out over the game: one dark panel built here and moved into the pop out window, in one of four layouts that
-  // ⇆ Layout flips (kept on the device, each at its own window size): Hero (the Lemon tile beside three big numbers, the
-  // rest in one small line), Bar (one slim row), Column (stacked down the side) and Corner (two by two). A dot per check
-  // (one that isn't green says its name), and the one thing to do on its own line, only when it needs you
+  // ⇆ Layout flips (kept on the device): a top strip (Lv in, Elapsed and the buttons), three big numbers and a tile for
+  // each potion being drunk (one or two), and the one thing to do under them, only when it needs you. Hero (one row),
+  // Bar (one slim row), Column (stacked down the side) and Corner (two columns). Each layout has its own window size for
+  // one potion tile and for two
   const SP = {};
-  const LAYOUTS = { hero: [660, 236], bar: [800, 92], column: [250, 640], corner: [430, 330] }, ORDER = Object.keys(LAYOUTS);
-  let layout = ORDER.includes(store.get(KEY_LAYOUT)) ? store.get(KEY_LAYOUT) : 'hero', pipWin = null, sizeTimer = null;
+  const LAYOUTS = { hero: { 1: [560, 170], 2: [720, 170] }, bar: { 1: [860, 70], 2: [980, 70] }, column: { 1: [240, 560], 2: [240, 680] }, corner: { 1: [420, 250], 2: [420, 340] } };
+  const ORDER = Object.keys(LAYOUTS);
+  let layout = ORDER.includes(store.get(KEY_LAYOUT)) ? store.get(KEY_LAYOUT) : 'hero';
+  // the app's own (the site's pop-out can't be see-through, so there both stay at 100%): See-through fades the panel's
+  // background, never its text, pictures or buttons; Size scales the overlay window. Always on top and Clicks pass through
+  // are the app's, read from it at the start and each time Settings opens (its tray can change Clicks pass through)
+  const kept = (k, lo, hi, step, d) => { const v = Math.round(+store.get(k) / step) * step; return v >= lo && v <= hi ? v : d; };
+  let see = app ? kept(KEY_SEE, 25, 100, 5, 100) : 100, scale = app ? kept(KEY_SCALE, 60, 160, 10, 100) : 100;
+  const prefs = { onTop: true, pass: false };
+  let prefsAt = 0;   // when the app was last asked for them
   const kTile = (k, label) => el('div', { class: 'g-k g-k-' + k }, el('div', { class: 'g-kl' }, label), SP[k] = el('div', { class: 'g-kn' }, '·'), SP[k + 'Sub'] = el('div', { class: 'g-ks' }));
-  const strip = el('div', { class: 'g-strip', id: 'g-strip', 'data-layout': layout, hidden: '' },
-    el('div', { class: 'g-grid' },
-      SP.lemon = el('div', { class: 'g-lemon' }, SP.juice = el('div', { class: 'g-juice' }), SP.lIcon = el('img', { alt: '', hidden: '' }),
-        SP.lClock = el('div', { class: 'g-lclock' }, '··:··'), SP.lCap = el('div', { class: 'g-lcap' }), SP.lLeft = el('div', { class: 'g-lleft' })),
-      kTile('exp', 'EXP an hour'), kTile('meso', 'Mesos earned'), kTile('gain', 'EXP gained'),
-      SP.mini = el('div', { class: 'g-mini' })),
-    el('div', { class: 'g-foot' },
-      SP.dots = el('span', { class: 'g-dots' }, ['exp', 'level', 'potions', 'mesos'].map(k => el('span', { class: 'g-dw', 'data-k': k }, el('i', { class: 'g-dot' }), el('small', {})))),
-      el('button', { type: 'button', class: 'g-lay', title: 'Layout', onclick: () => nextLayout() }, '⇆', el('span', { class: 'g-bl' }, ' Layout')),
-      el('button', { type: 'button', class: 'g-reset', title: 'Reset average', onclick: () => resetAverage() }, '↺', el('span', { class: 'g-bl' }, ' Reset average'))),
-    SP.l3 = el('div', { class: 'g-l3', hidden: '' }));
+  // a potion tile: a glass that drains (the potion's picture beside its clock), what's left and a caption under them
+  const potTile = () => {
+    const P = {};
+    P.box = el('div', { class: 'g-pot none' }, P.juice = el('div', { class: 'g-juice' }),
+      el('div', { class: 'g-ph' }, P.img = el('img', { alt: '', hidden: '' }), P.clock = el('span', { class: 'g-pclock' }, '··:··')),
+      P.left = el('div', { class: 'g-pleft' }), P.cap = el('div', { class: 'g-pcap' }));
+    return P;
+  };
+  SP.pots = [potTile(), potTile()];
+  // ⇆ Layout (Rimmah, 2026-11-04: pick one, not flip through): hovering it shows the four layouts as pictures with their
+  // names, the one showing lit; a click on ⇆ shows them too (touch, keys). It opens a moment after the mouse arrives, so
+  // passing over ⇆ on the way to ⚙ doesn't flash it, and shuts a moment after the mouse leaves, so the way over to the
+  // pictures keeps it. While clicks pass through to the game it stays out of sight until the mouse on ⇆ holds them (the
+  // CSS, g-pass and g-hold)
+  const layName = l => l.charAt(0).toUpperCase() + l.slice(1);
+  SP.lay = el('button', { type: 'button', class: 'g-lay', 'aria-label': 'Layout', 'aria-haspopup': 'true', 'aria-expanded': 'false', onclick: () => layRow(true) }, '⇆', el('span', { class: 'g-bl' }, ' Layout'));
+  SP.layRow = el('span', { class: 'g-laypick', hidden: '' }, ORDER.map(l => el('button', { type: 'button', class: 'g-laypic', 'data-l': l, 'aria-pressed': 'false', title: layName(l),
+    onclick: () => { layRow(false); setLayout(l); } }, window.GrindSettings.picture(l), el('span', {}, layName(l)))));
+  let layT = null;
+  function layRow(on, wait) {
+    clearTimeout(layT);
+    if (wait) { layT = setTimeout(() => layRow(on), wait); return; }
+    SP.layRow.hidden = !on;
+    SP.lay.setAttribute('aria-expanded', String(on));
+    if (on) litRow();
+  }
+  const litRow = () => { for (const b of SP.layRow.children) b.setAttribute('aria-pressed', String(b.dataset.l === layout)); };
+  const layWrap = el('span', { class: 'g-layw', onpointerenter: () => layRow(true, 120), onpointerleave: () => layRow(false, 300),
+    onkeydown: e => { if (e.key === 'Escape' && !SP.layRow.hidden) { layRow(false); SP.lay.focus(); } },
+    onfocusout: e => { if (!layWrap.contains(e.relatedTarget)) layRow(false, 300); } }, SP.lay, SP.layRow);
+  const strip = el('div', { class: 'g-strip', id: 'g-strip', 'data-layout': layout, 'data-pots': '1', hidden: '' },
+    el('div', { class: 'g-top' },
+      SP.lvin = el('span', { class: 'g-lvin', hidden: '' }),
+      el('span', { class: 'g-el' }, 'Elapsed ', SP.elapsed = el('b', {}, '0:00')),
+      el('span', { class: 'g-btns' },
+        layWrap,
+        el('button', { type: 'button', class: 'g-reset', title: 'Reset average', onclick: () => resetAverage() }, '↺', el('span', { class: 'g-bl' }, ' Reset average')),
+        SP.gear = el('button', { type: 'button', class: 'g-gear', title: 'Settings', 'aria-pressed': 'false', onclick: () => toggleSettings() }, '⚙', el('span', { class: 'g-bl' }, ' Settings')),
+        // the app's overlay has no frame: ✕ closes just it and brings the main window up, the session goes on (Show the
+        // overlay brings it back). The site's pop-out has the browser's own ✕
+        app ? el('button', { type: 'button', class: 'g-close', title: 'Back to the main window', onclick: () => backToMain() }, '✕', el('span', { class: 'g-bl' }, ' Close')) : null)),
+    SP.grid = el('div', { class: 'g-grid' }, kTile('exp', 'EXP an hour'), kTile('meso', 'Mesos earned'), kTile('gain', 'EXP gained'), SP.pots[0].box),
+    SP.l3 = el('div', { class: 'g-l3 g-alert', hidden: '' }));
+  const potCount = () => +strip.dataset.pots || 1;
+  // the window the panel lives in; on the site a window dragged to a new size keeps that size for the layout and tile
+  // count it showed when it was dragged (the app's overlay can't be dragged: the page alone sizes it). The app's overlay
+  // and Settings are windows of their own, titled as the app's windows are
+  const overlay = window.GrindOverlay.create({ strip, home: root, app, title: app ? 'Six Path EXP Tracker overlay' : 'Grind', setTitle: 'Six Path EXP Tracker settings', hide: () => [SP.l3],
+    sizeKey: () => strip.dataset.layout + potCount(),
+    onResize: (w, h, key) => { const all = jget(KEY_SIZES, {}); all[key] = [Math.round(w), Math.round(h)]; jset(KEY_SIZES, all); },
+    // the window closed (Settings with it, if it was open); the share and the session go on
+    onClose: () => { SP.gear.setAttribute('aria-pressed', 'false'); showPop(); },
+    // the app's Settings window closed by itself, as its × does
+    onSettingsClose: () => SP.gear.setAttribute('aria-pressed', 'false'),
+    // a button takes the click from the game only while clicks pass through. Asked only while the mouse is on a button: if
+    // the page has them off, the app is asked again (at most every 2 seconds), since its tray may have turned them on
+    passing: () => { if (!prefs.pass && Date.now() - prefsAt > 2000) readPrefs(); return prefs.pass; } });
+  // See-through on the panel (the app only): its backgrounds take the alpha, and at 60% or less its words and numbers get
+  // a dark shadow so they read over a bright map
+  function applySee() {
+    if (!app) return;
+    strip.style.setProperty('--g-see', String(see / 100));
+    strip.classList.toggle('g-faint', see <= 60);
+  }
+  applySee();
+  function setSee(v) {
+    see = Math.max(25, Math.min(100, Math.round(+v / 5) * 5 || 100));
+    store.set(KEY_SEE, String(see)); applySee(); syncSettings();
+  }
+  // Size: the overlay window at its layout's size times the scale; the panel grows with its window (fit())
+  function setScale(v) {
+    scale = Math.max(60, Math.min(160, Math.round(+v / 10) * 10 || 100));
+    store.set(KEY_SCALE, String(scale)); syncSettings();
+    overlay.resize(...layoutSize(layout, potCount()));
+    overlay.fit();
+  }
+  // a call to the app's bridge as a promise: a method this app doesn't have, or one that throws, is a rejection
+  const bridge = (name, ...a) => new Promise(res => res(app[name](...a)));
+  // the app's two switches as it has them; a read that fails keeps what the page had
+  function readPrefs() {
+    if (!app || appOld) return;
+    prefsAt = Date.now();
+    bridge('getSettings').then(s => { if (!s) return; prefs.onTop = s.onTop !== false; prefs.pass = !!s.clickThrough; syncSettings(); }, () => {});
+  }
+  readPrefs();
+  // a switch flips at once, and goes back if the app says no
+  function setPref(k, method, on) {
+    const was = prefs[k];
+    prefs[k] = on; syncSettings();
+    bridge(method, on).catch(() => { if (prefs[k] === on) { prefs[k] = was; syncSettings(); } });
+  }
   const viewBar = el('div', { class: 'g-viewing', hidden: '' }, V.viewing = el('span', {}), el('button', { type: 'button', onclick: () => { viewing = null; render(); } }, 'Back to live'),
     V.del = el('span', {}));
   // a saved session with bad numbers can go: Delete, then Yes (from the account, and from this device)
@@ -323,9 +465,54 @@ function mount(root, deps) {
   }
   const pots = el('table', { class: 'b-table', id: 'g-pots' },
     el('thead', {}, el('tr', {}, ['Key', 'Potion', 'Left', 'Used', 'Price', 'Cost'].map((h, i) => el('th', i > 1 ? { class: 'n' } : {}, h)))), el('tbody', {}));
-  const mapSel = el('select', { id: 'g-map', 'aria-label': 'Map', onchange: () => { mapId = +mapSel.value; store.set(KEY_MAP, String(mapId)); if (session) session.mapId = mapId; showMap(); render(); } },
+  const mapSel = el('select', { id: 'g-map', 'aria-label': 'Map', onchange: () => setMap(mapSel.value) },
     Object.keys(data.maps).sort((a, b) => mapName(a).localeCompare(mapName(b))).map(id => el('option', { value: id }, mapName(id))));
   mapSel.value = String(mapId);
+  // This map, picked here (Settings has none since 2026-11-04): one pick, kept on the device and given to the running session
+  function setMap(id) {
+    mapId = +id; mapSel.value = String(mapId); store.set(KEY_MAP, String(mapId));
+    if (session) session.mapId = mapId;
+    showMap(); render();
+  }
+  // ⚙ Settings (grind-settings.js): one panel under the strip inside the pop-out (in the app, a window of its own beside
+  // the overlay, with the app's rows), built the first time it opens. Its Count my loot is the left column's own
+  // (setLoot), and render() hands it the state while it's open, so the two places always agree
+  let settings = null;
+  const userNow = () => { const s = deps.session && deps.session(); return s ? { name: s.user_name, avatar: s.avatar || null } : null; };
+  const settingsState = () => ({ layout, loot: lootOn, mapId, user: userNow(), see, scale, onTop: prefs.onTop, pass: prefs.pass });
+  // (g-pass on the panel: the app passes clicks through to the game, so ⇆'s row of layouts waits for the mouse on ⇆)
+  const syncSettings = () => { strip.classList.toggle('g-pass', !!app && prefs.pass); if (settings && overlay.settingsOpen()) settings.update(settingsState()); };
+  const siteLink = hash => location.origin + location.pathname + hash;
+  // the site's Settings sits under the panel in the pop-out, so it needs one; the app's is a window of its own (opened
+  // again, it comes to the front)
+  function openSettings() {
+    if (!overlay.win() && !app) return;
+    if (!settings) settings = window.GrindSettings.build({ el, app, layouts: ORDER,
+      onLayout: l => setLayout(l), onLoot: on => setLoot(on), onSignIn: () => signIn(), onSignOut: () => signOut(),
+      onProfile: () => openProfile(), links: { builds: siteLink('#builds'), appraiser: siteLink('#appraiser') }, onClose: () => closeSettings(),
+      onSee: v => setSee(v), onSize: v => setScale(v), onTop: on => setPref('onTop', 'setOnTop', on), onPass: on => setPref('pass', 'setClickThrough', on) });
+    readPrefs();   // the app's tray may have changed Clicks pass through since
+    settings.update(settingsState());   // before it's measured: who is signed in changes its height
+    if (overlay.showSettings(settings.el)) SP.gear.setAttribute('aria-pressed', 'true');
+  }
+  function closeSettings() { overlay.hideSettings(); SP.gear.setAttribute('aria-pressed', 'false'); }
+  function toggleSettings() { if (overlay.settingsOpen()) closeSettings(); else openSettings(); }
+  // Sign out from Settings: this device's sessions take over from the account's
+  function signOut() { return deps.signOut().then(() => { listSessions(); render(); }); }
+  // in the app Settings is a window of its own, and Sign in and Open my profile act on the main window: it comes to the
+  // front first (it may be minimized)
+  const toMain = () => { if (app) bridge('showMain').catch(() => { /* an app without it: the page carries on */ }); };
+  // Sign in from Settings; one that fails says why on the page, as the top bar does
+  function signIn() {
+    toMain();
+    return new Promise(res => res(deps.signIn())).catch(e => setStatus(e && e.message ? e.message : "Couldn't sign in. Try again."));
+  }
+  // Open my profile: this page, at All time
+  function openProfile() {
+    toMain();
+    try { window.focus(); } catch (e) { /* the browser keeps the focus where it is */ }
+    life.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }
   const mobs = el('ul', { class: 'g-mobs' }), mapNote = el('p', { class: 'g-note' });
   card.append(mapNote);   // it explains Kills a minute, a row on the card
   const sessions = el('div', { class: 'g-sess', id: 'g-sessions' });
@@ -342,15 +529,19 @@ function mount(root, deps) {
   charts.addEventListener('pointerover', e => showTip(e));
   charts.addEventListener('pointermove', e => showTip(e));
   charts.addEventListener('pointerleave', () => { tip.hidden = true; });
-  // once everything is found, the checklist folds into one line; Details opens it again
-  let checkOpen = false, namedCount = 0;
-  const readyText = el('span', {});
-  const ready = el('div', { class: 'g-ready', id: 'g-ready', hidden: '' }, readyText,
-    el('button', { type: 'button', class: 'linkish', onclick: () => { checkOpen = !checkOpen; updateReady(); } }, 'Details'));
-  function updateReady() {
+  // once everything is found the checklist folds away: the pill says it's reading, a check that isn't OK keeps its chip,
+  // and Details beside the Reading heading opens the list again
+  let checkOpen = false;
+  const checkBtn = el('button', { type: 'button', class: 'linkish', id: 'g-checkbtn', 'aria-controls': 'g-check', 'aria-expanded': 'true', hidden: '',
+    onclick: () => { checkOpen = !checkOpen; foldChecks(); } }, 'Details');
+  function foldChecks() {
     const all = NEEDED.every(k => check.querySelector('[data-k="' + k + '"]').classList.contains('done'));
-    ready.hidden = !all; check.hidden = all && !checkOpen;
-    readyText.textContent = '✓ Reading your game · Level ' + st.level + ' · ' + namedCount + ' potion' + (namedCount === 1 ? '' : 's') + ' · ' + (st.mesos != null ? fmt(st.mesos) + ' mesos' : st.mesoUnclear ? 'mesos unclear' : 'open your inventory for mesos');
+    checkBtn.hidden = !all; check.hidden = all && !checkOpen;
+    checkBtn.setAttribute('aria-expanded', String(!check.hidden)); checkBtn.textContent = check.hidden ? 'Details' : 'Hide details';
+  }
+  // the share started: every check not read yet is looked for now (one already read keeps what it read)
+  function startChecks() {
+    for (const [k] of CHECKS) if (check.querySelector('[data-k="' + k + '"]').classList.contains('idle')) setCheck(k, '', 'Looking…');
   }
   // this session: one slim line, and its details (the card, the potions with their prices, the charts) folded away until
   // asked for (kept on the device); a saved session opened from the list always shows them
@@ -397,11 +588,12 @@ function mount(root, deps) {
       el('div', { class: 'g-lcard' }, el('h4', {}, 'Your sessions'), sessions)));
   root.replaceChildren(
     el('h2', {}, 'Grind'),
-    el('p', { class: 'g-lead' }, 'Share the game window and grind: your EXP, level and potions read themselves, nothing to type. Pop it out over the game for the live numbers; this page keeps your record.'),
+    el('p', { class: 'g-lead' }, app ? 'Press Start and grind: your EXP, level and potions read themselves, nothing to type. The overlay sits over the game; this page keeps your record.'
+      : 'Share the game window and grind: your EXP, level and potions read themselves, nothing to type. Pop it out over the game for the live numbers; this page keeps your record.'),
     el('div', { class: 'g-page' },
       el('aside', { class: 'g-rail', id: 'g-rail' }, el('div', { class: 'g-railin' },
-        el('div', { class: 'g-box g-acts' }, V.pill, shareArea, steps, popBtn, markBtn, refindBtn, newBtn, snapBtn),
-        el('div', { class: 'g-box' }, el('div', { class: 'g-boxh' }, 'Reading'), V.health, ready, check, lootBtn, bagCheck),
+        el('div', { class: 'g-box g-acts' }, V.pill, shareArea, steps, popBtn, markBtn, refindBtn, newBtn, snapBtn, setBtn, quitBtn, verLine),
+        el('div', { class: 'g-box g-read' }, el('div', { class: 'g-boxh' }, el('span', {}, 'Reading'), checkBtn), V.health, check, lootBtn, bagCheck),
         el('div', { class: 'g-box' }, el('div', { class: 'g-boxh' }, 'This map'), mapSel, mobs))),
       el('div', { class: 'g-main' }, status, V.nudge, V.trade, el('div', { class: 'g-now', id: 'g-now' }, V.now, moreBtn), detail, life)),
     el('p', { class: 'g-note' }, 'Item and UI pictures are from MapleStory, which belongs to Nexon.'), strip);
@@ -409,7 +601,7 @@ function mount(root, deps) {
   const setStatus = msg => { status.textContent = msg; };
   function setCheck(k, state, text) {
     const li = check.querySelector('[data-k="' + k + '"]');
-    li.className = state === 'done' ? 'done' : state === 'fix' ? 'fix' : '';
+    li.className = state === 'done' || state === 'fix' || state === 'idle' ? state : '';
     li.lastChild.textContent = text;
   }
 
@@ -451,22 +643,26 @@ function mount(root, deps) {
         if (!home || Math.abs(home.x - mr.box.x) > 3 || Math.abs(home.y - mr.box.y) > 3) jset(KEY_HOME, { w, h, box: mr.box });
       }
       else if (st.mesoOpen) setCheck('mesos', 'fix', "Can't read your mesos clearly (a tooltip over them, or a digit it hasn't learned yet)");
-      else if (st.mesos == null) setCheck('mesos', '', 'Open your inventory now and then');
+      else if (st.mesos == null) setCheck('mesos', '', 'Not seen yet');   // the nudge is the one place that asks for them
     }
     if (mesos != null && session) GS().add(session, { t: Date.now(), mesos });
     readLoot(src, S, false);
     if (!st.line) {
       st.line = S.findExpLine(src, w, h); st.m = null; st.measureAt = 0;
-      if (!st.line) { mark('exp', false); setCheck('exp', 'fix', 'Make sure the bar at the bottom of the game is showing'); updateReady(); render(); return; }
+      if (!st.line) { mark('exp', false); setCheck('exp', 'fix', 'Make sure the bar at the bottom of the game is showing'); foldChecks(); render(); return; }
     }
     const exp = S.readExp(src, st.line);
     mark('exp', exp.ok);
-    if (exp.ok) { st.expMiss = 0; setCheck('exp', 'done', fmt(exp.exp) + ' [' + exp.pct.toFixed(2) + '%]'); }
+    if (exp.ok) {
+      st.expMiss = 0; setCheck('exp', 'done', fmt(exp.exp) + ' [' + exp.pct.toFixed(2) + '%]');
+      // the game is found: the line telling the player to pick it has done its job
+      if (status.textContent === WATCHING) setStatus('');
+    }
     else {
       setCheck('exp', 'fix', "Can't read the EXP line right now");
       // 30 seconds of misses: look for it again next frame. The size was measured from the bar, so it goes too, and this
       // frame stops here (reading the quickslots without a bar threw, which stopped the share)
-      if (++st.expMiss >= 20) { st.line = null; st.m = null; st.expMiss = 0; updateReady(); render(); return; }
+      if (++st.expMiss >= 20) { st.line = null; st.m = null; st.expMiss = 0; foldChecks(); render(); return; }
     }
     // the level box not where it was on two reads running (every 30 seconds, a few milliseconds each): UI Size in the
     // game's options changed the HUD without changing the window, and reading at the old size invents counts, so measure
@@ -500,16 +696,23 @@ function mount(root, deps) {
         for (const c of S.readCounts(src, st.line, st.m)) {
           let known = st.slots[c.key];
           nth++;
-          // which potion: once per slot, then now and then in case it was swapped (spread over ticks, ~35 ms each)
-          if (!known || st.ticks >= known.at) {
-            const ic = S.readIcon(src, c, st.m);
-            known = st.slots[c.key] = { id: ic.diff < 75 && data.potions[ic.id] ? +ic.id : null, at: st.ticks + ICON_EVERY + nth * 3 };
+          // which potion: once per slot, again on any read its count changed (Rimmah, 2026-11-04: Pure Water put on a key
+          // was 2 White Potions drunk until the next look a minute later; a swap always shows as a new count), and now and
+          // then anyway (spread over ticks, ~35 ms each). A new count under a picture it can't make out (the item being
+          // dragged, the cursor, the inventory over the quickslots) might be another item: the key is left out of this read,
+          // as covered, rather than counted against the potion it held
+          const changed = !!known && known.v !== c.value;
+          if (!known || changed || st.ticks >= known.at) {
+            const ic = S.readIcon(src, c, st.m), id = ic.diff < 75 && data.potions[ic.id] ? +ic.id : null;
+            if (changed && known.id && !id) continue;
+            known = st.slots[c.key] = { id, at: changed && known.id === id ? known.at : st.ticks + ICON_EVERY + nth * 3 };
           }
+          known.v = c.value;
           const pot = known.id ? data.potions[known.id] : null;
           reading.counts.push({ key: c.key, id: known.id, name: pot ? pot[0] : 'Unknown item', price: known.id && prices[known.id] != null ? prices[known.id] : (pot ? pot[1] : 0), value: c.value });
         }
         const named = reading.counts.filter(c => c.id);
-        namedCount = named.length; st.potNone = !named.length; st.potCount = named.length;
+        st.potNone = !named.length; st.potCount = named.length;
         if (named.length) setCheck('potions', 'done', named.length + ' potion' + (named.length > 1 ? 's' : '') + ': ' + named.map(c => c.name).join(', '));
         else setCheck('potions', '', 'No potions in your quickslots yet');
       }
@@ -522,7 +725,7 @@ function mount(root, deps) {
     st.recent.push({ t: reading.t, exp: reading.exp, pct: reading.pct, level: reading.level, mesos,
       counts: reading.counts.map(c => ({ key: c.key, id: c.id, value: c.value })) });
     if (st.recent.length > 10) st.recent.shift();
-    updateReady();
+    foldChecks();
     render(); save(false);
   }
 
@@ -580,7 +783,8 @@ function mount(root, deps) {
   // just after a minute save, or New session straight after that) waits its turn instead of being refused. A row the
   // account didn't take stays on the device, so starting a new session can't lose it, and goes again in a minute
   const SAVE_GAP = 21000, waiting = new Map();
-  let lastOk = -Infinity, busy = false, nextT = null, failNote = null;
+  // sending: the row on its way to the account; settled: told each time a send finishes (quitting the app listens)
+  let lastOk = -Infinity, busy = false, nextT = null, failNote = null, sending = null, settled = null;
   function save(force) {
     if (!session) return Promise.resolve();
     const now = Date.now();
@@ -607,17 +811,35 @@ function mount(root, deps) {
     const wait = Math.min(SAVE_GAP, lastOk + SAVE_GAP - Date.now());
     if (wait > 0) { nextT = setTimeout(send, wait); return; }
     const [id, row] = waiting.entries().next().value;
-    waiting.delete(id); busy = true;
+    waiting.delete(id); busy = true; sending = row;
     api.saveGrind(row).then(() => {
-      busy = false; lastOk = Date.now(); failNote = null;
+      busy = false; sending = null; lastOk = Date.now(); failNote = null;
       if (!waiting.has(id)) jset(KEY_LOCAL, jget(KEY_LOCAL, []).filter(x => x.id !== id));
       listSessions(); send();
+      if (settled) settled();
     }, e => {
-      busy = false; keepLocal(row); listSessions();
+      busy = false; sending = null; keepLocal(row); listSessions();
       if (!waiting.has(id)) waiting.set(id, row);
       failNote = 'Saved on this device only, your account didn\'t take it (' + e.message + '). It tries again in a minute.';
       setStatus(failNote);
       nextT = setTimeout(send, 60000);
+      if (settled) settled();
+    });
+  }
+  // quitting the app: the share stops (which saves, as Stop does), and the app is let go once nothing is waiting to reach
+  // the account, or after LET_GO_MS; anything still on its way by then is kept on this device, so it isn't lost
+  const nothingWaiting = () => !busy && !nextT && !waiting.size;
+  function letGo() {
+    capture.stop();
+    return new Promise(res => {
+      const done = () => {
+        clearTimeout(timer); settled = null;
+        if (!nothingWaiting()) { for (const r of waiting.values()) keepLocal(r); if (sending) keepLocal(sending); }
+        res();
+      };
+      const timer = setTimeout(done, LET_GO_MS);
+      settled = () => { if (nothingWaiting()) done(); };
+      settled();
     });
   }
   // the quick reset: forget where the game was (bars, size, which potion sits on each key, the inventory) and look again;
@@ -666,20 +888,61 @@ function mount(root, deps) {
     save(true).then(() => { session = null; viewing = null; store.set(KEY_OPEN, ''); render(); setStatus('New session. It starts with your next EXP.'); });
   }
 
-  /* ----- the share ----- */
+  /* ----- the share. In the app it's Start: the app finds the game window itself (beforeStart), and the overlay opens with
+     the share ----- */
+  const LOST = 'Lost the game window. Press Start to try again.';
+  // the site's line while a share starts; the first EXP line read clears it (frame)
+  const WATCHING = 'Watching. Pick the Window tab and MapleStory if you haven\'t.';
   const capture = window.Reader.capture(shareArea, { el, prefix: 'g-', raw: true, limit: 0, keepWhenHidden: true, full: true, drop: false, every: 500,
-    copy: { share: 'Share game window', stop: 'Stop sharing' },
+    // failed: the reader's own note when a share won't start would talk about pasting a screenshot, which the app hasn't
+    copy: app ? { share: 'Start', stop: 'Stop', failed: LOST } : { share: 'Share game window', stop: 'Stop sharing' },
+    beforeStart: app ? findGame : null,
     onImage: frame, say: setStatus,
     onState: (state, why) => {
-      st.sharing = state === 'sharing'; render();
-      if (state === 'sharing') { setStatus('Watching. Pick the Window tab and MapleStory if you haven\'t.'); return; }
-      setStatus(why === 'denied' ? 'Sharing was turned down. Press Share game window to try again.' : 'Stopped. This session is kept, share again to carry on.');
+      // stopped: the player pressed Stop (not the game going away), which the one line says
+      st.sharing = state === 'sharing'; st.stopped = !st.sharing && why === 'stop';
+      if (st.sharing) startChecks();
+      render();
+      if (state === 'sharing') {
+        if (app) { setStatus('Found MapleStory. Grind away, nothing to type.'); if (!overlay.win()) popOut(); return; }
+        setStatus(WATCHING); return;
+      }
+      if (app) setStatus(why === 'denied' || why === 'failed' ? LOST : 'Stopped. This session is kept, press Start to carry on.');
+      else setStatus(why === 'denied' ? 'Sharing was turned down. Press Share game window to try again.' : 'Stopped. This session is kept, share again to carry on.');
       save(true);
     } });
   // before sharing, Share game window is the one to press; Stop sits at the bottom of the buttons
   for (const b of shareArea.querySelectorAll('button')) b.classList.add('g-btn');
   const shareBtn = shareArea.querySelector('#g-share');
   if (shareBtn) shareBtn.classList.add('go');
+  // an app older than this page can't start: the one line says to update it (renderHealth)
+  if (appOld && shareBtn) shareBtn.disabled = true;
+  if (app && typeof app.onClosing === 'function') app.onClosing(letGo);
+  // Start in the app: the game window, found by the app. None: say so, and Start becomes Try again. One: that one. Several:
+  // the player picks (Cancel starts nothing). The share starts once the app has it
+  async function findGame() {
+    if (appOld) return false;
+    const notFound = () => { setStatus("Can't find MapleStory. Open the game, then press Try again."); if (shareBtn) shareBtn.textContent = 'Try again'; return false; };
+    let wins = [];
+    try { wins = (await app.findGame()) || []; } catch (e) { /* the same as none */ }
+    if (!wins.length) return notFound();
+    if (shareBtn) shareBtn.textContent = 'Start';
+    setStatus('');
+    const id = wins.length > 1 ? await choose(wins) : wins[0].id;
+    if (id == null) return false;
+    try { await app.pickGame(id); } catch (e) { return notFound(); }
+    return true;
+  }
+  // which MapleStory window: a button for each (its picture and title) and Cancel, under Start until one is pressed
+  function choose(wins) {
+    return new Promise(res => {
+      const pick = id => { box.remove(); res(id); };
+      const box = el('div', { class: 'g-choose', id: 'g-choose' }, el('p', {}, 'Which MapleStory window?'),
+        wins.map(w => el('button', { type: 'button', class: 'g-btn g-pick', onclick: () => pick(w.id) }, w.thumb ? el('img', { src: w.thumb, alt: '' }) : null, el('span', {}, w.title))),
+        el('button', { type: 'button', class: 'g-btn', onclick: () => pick(null) }, 'Cancel'));
+      shareArea.append(box);
+    });
+  }
 
   /* ----- drawing ----- */
   function render() {
@@ -701,16 +964,17 @@ function mount(root, deps) {
       }
       st.learnedSeen = (session.learned || []).length;
     }
+    syncSettings();
     viewBar.hidden = !viewing;
     if (viewing) V.viewing.textContent = 'Looking at ' + mapName(viewing.mapId) + ', ' + dateOf(viewing.t0);
     if (!editing) renderPots(s);
     renderHealth();
     showDetail();
     // while sharing, Pop out is the one to press, and the three steps under Share game window go
-    popBtn.classList.toggle('go', st.sharing); steps.hidden = st.sharing;
+    popBtn.classList.toggle('go', st.sharing); steps.hidden = st.sharing; showPop();
     charts.hidden = !s;
     renderBag();
-    if (!s) { V.res.hidden = true; renderNow(null); fitStrip(); return; }
+    if (!s) { V.res.hidden = true; renderNow(null); overlay.fit(); return; }
     const t = viewing ? s.tLast : Date.now(), o = GS().stats(s, t, avgExp(s.mapId || mapId)), R = GS().result(s, t);
     renderResult(s, R);
     V.expHr.textContent = o.expHr != null ? fmtK(o.expHr) : '·';
@@ -737,8 +1001,8 @@ function mount(root, deps) {
     renderNow(s, o, mains, R);
     // all time follows the running session, so its Lemons never trail this session's line by a minute of saves
     if (!viewing && Date.now() - lifeAt > 5000) renderLife();
-    renderStrip(s, o, mains, R);
-    fitStrip();
+    renderStrip(s, o, mains);
+    overlay.fit();
     renderCharts(s, t, o);
   }
   // the pace: EXP an hour over the last 5 and 10 minutes and since Reset average, each against the session's average
@@ -769,10 +1033,11 @@ function mount(root, deps) {
     });
   }
 
-  /* ----- is it reading everything: the pill and checks down the left, the one thing to do, and the strip's dots ----- */
+  /* ----- is it reading everything: the pill and checks down the left, and the one thing to do (on the card, and under
+     the pop out's tiles) ----- */
   function renderHealth() {
     const s = session;
-    const h = lastHealth = health({ t: Date.now(), sharing: st.sharing, hasSession: !!s, exp: st.h.exp, level: st.h.level, levelNow: st.level,
+    const h = lastHealth = health({ t: Date.now(), app: !!app, sharing: st.sharing, stopped: !!st.stopped, hasSession: !!s, exp: st.h.exp, level: st.h.level, levelNow: st.level,
       size: st.h.size, counts: st.h.counts, potNone: st.potNone, potCount: st.potCount,
       meso: { at: s && s.meso && s.meso.last ? s.meso.last.t : null, unclear: !!(st.mesoOpen && st.mesoUnclear) },
       loot: { on: lootOn, pictures: !!lootIdx, sets: s && s.bag ? s.bag.sets : 0, refillAfter: !!s && GS().inTown(s) } });
@@ -780,102 +1045,118 @@ function mount(root, deps) {
     const core = ['exp', 'level', 'potions'].map(k => h.checks[k].state);
     const ps = !st.sharing ? 'idle' : core.includes('bad') ? 'bad' : core.every(x => x === 'ok') ? 'ok' : 'wait';
     V.pill.className = 'g-pill ' + ps;
-    // the chips only mean something once the game is shared; before that the pill says so
-    V.health.hidden = !st.sharing;
-    V.pillText.textContent = ps === 'idle' ? (s ? 'Share stopped' : 'Not sharing yet') : ps === 'bad' ? "Can't read your game" : ps === 'ok' ? 'Reading · Lv ' + (st.level || '·') : 'Looking for your game…';
+    // the pill is the one health line; a chip shows only for a check that isn't OK, and only once the game is shared
+    // (before that the pill says so)
+    V.health.hidden = !st.sharing || HEALTH.every(([k]) => h.checks[k].state === 'ok');
+    const pillText = ps === 'idle' ? (app ? (s ? 'Stopped' : 'Not started') : s ? 'Share stopped' : 'Not sharing yet') : ps === 'bad' ? "Can't read your game" : ps === 'ok' ? 'Reading · Lv ' + (st.level || '·') : 'Looking for your game…';
+    // written only when it changes: the pill is a live region, and this runs on every frame
+    if (V.pillText.textContent !== pillText) V.pillText.textContent = pillText;
     // the one thing to do, only when there is one (a saved session being looked at isn't live)
     V.nudge.hidden = !!viewing || h.nudge.state === 'ok' || (h.nudge.state === 'idle' && !s);
     for (const [k, label] of HEALTH) {
       const c = h.checks[k], e = V.health.querySelector('[data-k="' + k + '"]');
-      e.className = 'g-hc ' + c.state; e.textContent = SIGN[c.state] + ' ' + label + ' ' + c.text;
+      e.className = 'g-hc ' + c.state; e.textContent = SIGN[c.state] + ' ' + label + ' ' + c.text; e.hidden = c.state === 'ok';
     }
     V.nudge.className = 'g-nudge ' + h.nudge.state; V.nudge.textContent = SIGN[h.nudge.state] + ' ' + h.nudge.text;
-    refindBtn.classList.toggle('hi', h.stuck);
-    for (const w of SP.dots.children) {
-      const c = h.checks[w.dataset.k], name = HEALTH.find(x => x[0] === w.dataset.k)[1];
-      w.className = 'g-dw ' + c.state; w.title = name + ': ' + c.text;
-      w.lastChild.textContent = c.state === 'ok' ? '' : name;
+    // an app older than this page: that comes first, with where to get the new one
+    if (appOld) {
+      V.nudge.hidden = false; V.nudge.className = 'g-nudge bad';
+      V.nudge.replaceChildren(SIGN.bad + ' This page needs a newer app. ', el('a', { href: deps.appDownload || RELEASES, target: '_blank', rel: 'noopener' }, 'Update the app'));
     }
-    // line 3: the one thing to do, live only; a mesos jump to answer comes before anything amber
+    refindBtn.classList.toggle('hi', h.stuck);
+    // the pop out's alert under the tiles: the one thing to do, live only; a mesos jump to answer comes before anything amber
     const jump = s && s.meso && s.meso.jump;
     if (jump && !viewing && h.nudge.state !== 'bad') {
-      SP.l3.hidden = false; SP.l3.className = 'g-l3 wait';
+      SP.l3.hidden = false; SP.l3.className = 'g-l3 g-alert wait';
       const out = el('button', { type: 'button', onclick: () => answerJump(true) }, 'Leave it out'), keep = el('button', { type: 'button', class: 'g-keep', onclick: () => answerJump(false) }, 'Keep it');
       SP.l3.replaceChildren('! Mesos ' + signed(jump.amount) + '. ' + (jump.amount > 0 ? 'Sold loot to someone?' : 'Bought something from someone?'),
         ...(jump.amount > 0 ? [keep, out] : [out, keep]));
       return;
     }
     SP.l3.hidden = !!viewing || h.nudge.state === 'ok';
-    SP.l3.className = 'g-l3 ' + h.nudge.state;
+    SP.l3.className = 'g-l3 g-alert ' + h.nudge.state;
     SP.l3.replaceChildren(SIGN[h.nudge.state] + ' ' + h.nudge.text, h.stuck ? el('button', { type: 'button', onclick: () => refind() }, '↻ Find my game again') : '');
   }
 
-  /* ----- the pop out panel: the Lemon tile, three big numbers, one small line, the dots ----- */
-  function renderStrip(s, o, mains, R) {
-    const now = Date.now(), cds = viewing ? [] : GS().countdowns(s, now);
-    SP.ticks = cds.slice(0, 2);   // the two potions running out first (Lemons, then Meat)
-    SP.mainIcon = mains[0] ? pictures.Icons[mains[0].id] : null;
-    renderLemon(now);
-    SP.exp.textContent = o.expHr != null ? fmtK(o.expHr) : '·';
-    SP.expSub.textContent = o.pctHr != null ? o.pctHr.toFixed(2) + '% an hour' : 'after 2 minutes';
-    SP.meso.textContent = o.mesosEarned != null ? (o.mesosEarned >= 0 ? '+' : '−') + fmtK(Math.abs(o.mesosEarned)) : '·';
-    SP.mesoSub.textContent = o.mesosHr != null ? fmtK(o.mesosHr) + ' an hour' : o.mesosEarned != null ? 'this session' : o.mesoLooks ? 'peek again later' : 'no peek yet';
-    SP.gain.textContent = fmtK(o.exp);
-    SP.gainSub.textContent = (o.pct >= 0 ? '+' : '−') + Math.abs(o.pct).toFixed(2) + '% · ' + fmtDur(o.mins) + (o.deaths ? ' · ' + deathText(o) : '');
-    // the small line: the second clock (Meat), the next level, Lemons per 1%, what 1% costs, the pace and profit
-    const bits = [], c2 = SP.ticks[1], main = mains[0], icon = (id, name) => pictures.Icons[id] ? el('img', { src: pictures.Icons[id], alt: name }) : name + ' ';
-    if (c2) bits.push(el('span', { class: 'g-c2' }, icon(c2.id, c2.name), el('b', {}, clock((c2.doneAt - now) / 1000))));
-    if (o.hrsToLevel != null) bits.push(el('span', { class: 'g-eta' }, 'Lv ' + ((s.level || 0) + 1) + ' in ', el('b', {}, fmtDur(o.hrsToLevel * 60))));
-    if (main && o.perPct[main.id] != null) bits.push(el('span', {}, icon(main.id, main.name), el('b', {}, perFmt(o.perPct[main.id])), ' per 1%'));
-    if (o.per1 != null) bits.push(el('span', {}, '1% costs ', el('b', {}, fmtK(o.per1))));
-    const pace = viewing ? null : paceParts(o, false)[o.markT ? 2 : 0];
-    if (pace && pace.value !== '·') bits.push(el('span', {}, pace.label + ' ', el('b', {}, pace.value), pace.vs ? el('span', { class: pace.up ? 'up' : 'down' }, ' ' + pace.vs) : ''));
-    // the session's result an hour (its counted window), and with Count my loot what the bag gained and the best drop
-    if (R.perHr != null) bits.push(el('span', { class: R.perHr >= 0 ? 'up' : 'down' }, 'profit ', el('b', {}, (R.perHr >= 0 ? '+' : '−') + fmtK(Math.abs(R.perHr))), '/hr'));
-    if (R.mode === 'loot' && R.loot) bits.push(el('span', {}, 'Loot ', el('b', {}, money(R.loot.value))));
-    if (R.mode === 'loot' && R.loot && R.loot.best) bits.push(el('span', { class: 'g-best' }, '★ ' + R.loot.best.name));
-    SP.mini.replaceChildren(...bits);
-    SP.mini.hidden = !bits.length;
-  }
-  // the Lemon tile, every frame and every second between: the potion running out first as a glass that drains
-  function renderLemon(now) {
-    const c = (SP.ticks || [])[0], x = lemonTile(c, now), icon = c ? pictures.Icons[c.id] : SP.mainIcon;
-    SP.lemon.classList.toggle('low', x.low);
-    SP.juice.style.height = x.juice + '%';
-    if (icon && SP.lIcon.getAttribute('src') !== icon) SP.lIcon.src = icon;
-    SP.lIcon.hidden = !icon; SP.lIcon.alt = c ? c.name : '';
-    SP.lClock.textContent = x.clock; SP.lCap.textContent = viewing ? 'a saved session' : x.cap; SP.lLeft.textContent = x.left;
-  }
-  // ⇆ Layout: the next layout, at its own window size (a click lets the pop out resize itself; the frame around the page
-  // is added on), kept for next time
-  function nextLayout() {
-    layout = ORDER[(ORDER.indexOf(layout) + 1) % ORDER.length];
-    strip.dataset.layout = layout; store.set(KEY_LAYOUT, layout);
-    if (pipWin) {
-      const [w, h] = layoutSize(layout), fw = Math.max(0, Math.min(40, pipWin.outerWidth - pipWin.innerWidth)), fh = Math.max(0, Math.min(80, pipWin.outerHeight - pipWin.innerHeight));
-      try { pipWin.resizeTo(w + fw, h + fh); } catch (e) { /* this browser won't: it can be dragged to size */ }
+  /* ----- the pop out panel: Lv in and Elapsed along the top, three big numbers, the potion tiles ----- */
+  function renderStrip(s, o, mains) {
+    const now = Date.now();
+    // a saved session has no live clock, and its counts are where it stopped: no countdowns and no counts for it; retired
+    // slots are marked so a stale count never shows
+    const slots = Object.values(s.slots).map(sl => viewing ? Object.assign({}, sl, { count: null }) : sl)
+      .concat((s.retired || []).map(r => Object.assign({}, r, { retired: true })));
+    SP.tiles = potionTiles(slots, viewing ? [] : GS().countdowns(s, now));
+    SP.main = mains[0] || null;   // the waiting tile shows the main potion's picture
+    // one potion tile or two: the window takes that count's size when it can, and the panel fits it either way
+    const n = SP.tiles.length;
+    if (potCount() !== n) {
+      strip.dataset.pots = String(n);
+      if (n === 2) SP.grid.append(SP.pots[1].box); else SP.pots[1].box.remove();
+      overlay.resize(...layoutSize(layout, n));
+      overlay.fit();
     }
-    fitStrip();
+    // the next level, live only, once there's a pace to go by
+    const lvin = !viewing && o.hrsToLevel != null;
+    SP.lvin.hidden = !lvin;
+    if (lvin) SP.lvin.replaceChildren('Lv ' + ((s.level || 0) + 1) + ' in ', el('b', {}, fmtDur(o.hrsToLevel * 60)));
+    renderClocks(now);
+    SP.exp.textContent = o.expHr != null ? fmtK(o.expHr) : '·';
+    SP.expSub.replaceChildren(...expPace(o));
+    const minus = v => v < 0 ? '−' : '';
+    SP.meso.textContent = o.mesosEarned != null ? minus(o.mesosEarned) + fmt(Math.abs(o.mesosEarned)) : '·';
+    SP.mesoSub.textContent = o.profit != null ? minus(o.profit) + fmt(Math.abs(o.profit)) + ' after potions' : o.mesoLooks ? 'peek again later' : 'no peek yet';
+    SP.gain.textContent = fmtK(o.exp);
+    SP.gainSub.textContent = minus(o.pct) + Math.abs(o.pct).toFixed(2) + '%' + (s.level ? ' of Lv ' + s.level : '') + (o.deaths ? ' · ' + deathText(o) : '');
   }
-  // each layout's window size: where it was last dragged to, or its own
-  function layoutSize(l) {
-    const s = jget(KEY_SIZES, {})[l];
-    return s && s[0] >= 120 && s[1] >= 50 ? s : LAYOUTS[l];
+  // the EXP tile's small line: the pace against the session's average, since Reset average or over the last 5 minutes
+  // (an arrow only past 2%); a saved session says how long EXP an hour ran over
+  function expPace(o) {
+    if (o.expHr == null) return ['after 2 minutes'];
+    if (viewing) return ['over ' + fmtDur(o.expMins)];
+    const arrow = p => el('span', { class: p.up ? 'up' : 'down' }, p.vs);
+    if (o.markT) {
+      const p = paceParts(o, false)[2], at = timeOfDay(o.markT);
+      return p.value === '·' ? ['counting since ' + at] : p.vs ? [arrow(p), ' since ' + at] : ['steady since ' + at];
+    }
+    const p = paceParts(o, false)[0];
+    return p.value === '·' ? ['pace after 5 minutes'] : p.vs ? [arrow(p), ' last 5 min'] : ['steady, last 5 min'];
   }
-  // the panel fits its pop out window: as big as its natural size (each tile's text on one line) allows across and
-  // down; the one thing to do may wrap, so the height is checked again at the new size
-  function fitStrip() {
-    const w = strip.ownerDocument.defaultView;
-    if (strip.hidden || !w || w === window) return;
-    strip.style.fontSize = '16px'; strip.style.width = 'max-content'; SP.l3.style.display = 'none';
-    const nat = strip.getBoundingClientRect();
-    strip.style.width = ''; SP.l3.style.display = '';
-    let f = Math.max(8, Math.min(48, 16 * Math.min(w.innerWidth / nat.width, w.innerHeight / nat.height)));
-    strip.style.fontSize = f + 'px';
-    const tall = strip.scrollHeight;
-    if (tall > w.innerHeight) strip.style.fontSize = Math.max(8, f * w.innerHeight / tall) + 'px';
+  // every frame and every second between: the potion tiles (each a glass that drains) and Elapsed
+  function renderClocks(now) {
+    const s = viewing || session;
+    if (!s) return;
+    (SP.tiles || [null]).forEach((tile, i) => {
+      const P = SP.pots[i], x = potionTile(tile, now, viewing), pic = tile ? pictures.Icons[tile.id] : SP.main && pictures.Icons[SP.main.id];
+      P.box.className = 'g-pot ' + x.kind + (x.low ? ' low' : '');
+      P.juice.style.height = x.juice + '%';
+      if (pic && P.img.getAttribute('src') !== pic) P.img.src = pic;
+      P.img.hidden = !pic; P.img.alt = tile ? tile.name : SP.main ? SP.main.name : '';
+      P.clock.textContent = x.clock; P.left.textContent = x.left; P.cap.textContent = x.cap;
+    });
+    SP.elapsed.textContent = clock(elapsedSecs(s, now, !viewing && st.sharing));
   }
-
+  // a layout picked (from ⇆ Layout's row, or its picture in Settings): the panel fades out, takes the new layout at its
+  // own window size for the tiles shown (the overlay resizes its window when the browser lets it), fades back in, and is
+  // kept for next time. The pick counts at once, so a second pick straight after wins
+  let swapT = null;
+  function setLayout(l) {
+    if (!LAYOUTS[l]) return;
+    layout = l; syncSettings(); litRow();
+    strip.classList.add('g-swap');
+    clearTimeout(swapT);
+    swapT = setTimeout(() => {
+      strip.dataset.layout = layout; strip.classList.remove('g-swap'); store.set(KEY_LAYOUT, layout);
+      overlay.resize(...layoutSize(layout, potCount()));
+      overlay.fit();
+    }, 150);
+  }
+  // a layout's window size with n potion tiles: on the site where it was last dragged to, or its own (sizes kept before
+  // the panel had potion tiles, under the layout's name alone, are left behind); in the app always its own, as its
+  // overlay can't be dragged (a size an older page kept there is left behind). Times the app's Size (100% on the site)
+  function layoutSize(l, n) {
+    const s = app ? null : jget(KEY_SIZES, {})[l + n], base = s && s[0] >= 120 && s[1] >= 50 ? s : LAYOUTS[l][n], k = scale / 100;
+    return [Math.round(base[0] * k), Math.round(base[1] * k)];
+  }
   /* ----- charts: A EXP every minute, B potions every minute, D the minute heatmap ----- */
   const NS = 'http://www.w3.org/2000/svg', W = 640, X0 = 44, X1 = 632;
   function svg(tag, attrs, ...kids) {
@@ -1002,30 +1283,20 @@ function mount(root, deps) {
   }
 
   /* ----- the pop out over the game: the slim strip moves into a small window that stays on top; the card stays here ----- */
+  // in the app the overlay opens by itself when the share starts (and from Show the overlay), in the last layout
   function popOut() {
-    if (!window.documentPictureInPicture) { setStatus("Your browser can't pop out a window. Use Edge or Chrome on a computer."); return; }
-    const [w0, h0] = layoutSize(layout);
-    documentPictureInPicture.requestWindow({ width: w0, height: h0 }).then(pip => {
-      pipWin = pip;
-      const d = pip.document;
-      for (const ss of document.styleSheets) {
-        try { const s = d.createElement('style'); s.textContent = Array.from(ss.cssRules).map(r => r.cssText).join('\n'); d.head.append(s); } catch (e) { /* a stylesheet from another site */ }
-      }
-      if (document.documentElement.dataset.theme) d.documentElement.dataset.theme = document.documentElement.dataset.theme;
-      d.title = 'Grind';
-      d.body.className = 'g-pip';
-      strip.hidden = false;
-      const wrap = d.createElement('div'); wrap.id = 'view-grind'; wrap.append(strip); d.body.append(wrap);
-      pip.addEventListener('pagehide', () => { pipWin = null; strip.hidden = true; strip.style.fontSize = ''; root.append(strip); });
-      // dragged to a new size: fit to it, and keep it as this layout's size
-      pip.addEventListener('resize', () => {
-        fitStrip();
-        clearTimeout(sizeTimer);
-        sizeTimer = setTimeout(() => { if (pipWin === pip) { const all = jget(KEY_SIZES, {}); all[layout] = [pip.innerWidth, pip.innerHeight]; jset(KEY_SIZES, all); } }, 400);
-      });
-      fitStrip();
-    }).catch(e => setStatus("Couldn't pop out: " + e.message));
+    const [w0, h0] = layoutSize(layout, potCount());
+    return overlay.open(w0, h0).then(() => showPop(),
+      e => setStatus(e.message !== 'no-window' ? "Couldn't pop out: " + e.message
+        : app ? "Couldn't open the overlay. Restart the app and try again." : "Your browser can't pop out a window. Use Edge or Chrome on a computer."));
   }
+  // the overlay's ✕ in the app: close it, then the main window comes up (Show the overlay waits there)
+  function backToMain() {
+    overlay.close();
+    Promise.resolve().then(() => app && app.showMain()).catch(() => {});
+  }
+  // the app's Pop out reads Show the overlay, and shows only while the overlay is closed during a session
+  function showPop() { if (app) popBtn.hidden = appOld || !!overlay.win() || !(st.sharing || session); }
   // mesos from inventory looks, and the verdict: mesos earned an hour less potions drunk an hour
   function renderMesos(s, o) {
     V.trade.hidden = !(o.mesoJump && !viewing);
@@ -1036,12 +1307,13 @@ function mount(root, deps) {
     }
     V.tradeBox.hidden = !!viewing;
     if (o.mesosEarned != null || o.etcValue != null) V.mesos.textContent = mesoLine(o);
-    else if (o.mesoLooks >= 1) V.mesos.textContent = 'Counting mesos from ' + fmt(s.meso.first.v) + '. Open your inventory again in a few minutes to see what you earned';
-    else V.mesos.textContent = 'Mesos: open your inventory now and then to count them';
+    // what isn't counted yet says so; asking for the inventory is the nudge's job alone
+    else if (o.mesoLooks >= 1) V.mesos.textContent = 'Counting mesos from ' + fmt(s.meso.first.v) + '. What you earned shows after your next look';
+    else V.mesos.textContent = 'Mesos: not counted yet';
     if (o.mesosEarned != null) { V.mesoBig.textContent = (o.mesosEarned >= 0 ? '+' : '−') + fmt(Math.abs(o.mesosEarned)); V.mesoSub.textContent = o.mesosHr != null ? fmtK(o.mesosHr) + ' an hour' : 'this session'; }
     // one look is only where the count starts, not +0 earned: earnings show once a later look is a minute or more after it
-    else if (o.mesoLooks >= 1) { V.mesoBig.textContent = '·'; V.mesoSub.textContent = 'Counting from ' + fmt(s.meso.first.v) + '. Open your inventory again in a few minutes'; }
-    else { V.mesoBig.textContent = '·'; V.mesoSub.textContent = st.mesoUnclear ? "Can't read your mesos clearly yet" : 'Open your inventory now and then to start counting'; }
+    else if (o.mesoLooks >= 1) { V.mesoBig.textContent = '·'; V.mesoSub.textContent = 'Counting from ' + fmt(s.meso.first.v); }
+    else { V.mesoBig.textContent = '·'; V.mesoSub.textContent = st.mesoUnclear ? "Can't read your mesos clearly yet" : 'Not counted yet'; }
   }
   // the result card (GrindSession.result): mesos an hour and the verdict, four even tiles that add up to the session's
   // total, the session's Lemons and Meat, what was picked up (Count my loot), and a line or two that ties it together
@@ -1056,7 +1328,7 @@ function mount(root, deps) {
     const bits = has ? [money(R.total) + ' this session', fmtDur(R.window.mins)]
       // a saved session can't take another look: it says why it has no total instead of asking for one
       : [viewing ? (loot ? 'Its bag was never looked through twice, so it has no total' : 'Its inventory was never opened twice, so it has no total')
-        : loot ? 'Flip through your bag now, and again later, to count your loot' : 'Open your inventory now and then so mesos count'];
+        : loot ? 'No total yet, it counts from two flips through your bag' : 'No total yet, it counts from two looks at your inventory'];
     if (usual != null) bits.push(fmtK(Math.abs(R.perHr - usual)) + ' an hour ' + (R.perHr >= usual ? 'better' : 'worse') + ' than your usual ' + shortMap(s.mapId));
     const short = has && R.window.mins < R.window.sessionMins - 1;
     V.resSub.replaceChildren(bits.join(' · '), short ? el('span', { class: 'g-res-win' }, 'Counted over ' + Math.round(R.window.mins) + ' of your ' + Math.round(R.window.sessionMins) + ' minutes. ' +
@@ -1105,14 +1377,10 @@ function mount(root, deps) {
       li.lastChild.textContent = part ? 'Scroll to its top and bottom, slowly' : full ? 'Seen at ' + timeOfDay(full) : 'Open it in your bag';
     }
   }
-  // the pop out's clocks tick every second between frames
+  // the pop out's potion clocks and Elapsed tick every second between frames
   const ticker = setInterval(() => {
     if (!root.isConnected) { clearInterval(ticker); return; }
-    if (!strip.hidden) {
-      renderLemon(Date.now());
-      const b2 = SP.mini.querySelector('.g-c2 b'), c2 = (SP.ticks || [])[1];
-      if (b2 && c2) b2.textContent = clock((c2.doneAt - Date.now()) / 1000);
-    }
+    if (!strip.hidden) renderClocks(Date.now());
   }, 1000);
 
   function renderPots(s) {
@@ -1121,7 +1389,7 @@ function mount(root, deps) {
     body.replaceChildren(...list.map(sl => el('tr', {},
       el('td', {}, sl.key.replace(/^p\d+$/, '·')),
       el('td', {}, pictures.Icons[sl.id] ? el('img', { class: 'g-ico', src: pictures.Icons[sl.id], alt: '' }) : null, sl.name),
-      el('td', { class: 'n' }, viewing ? '·' : fmt(sl.count)), el('td', { class: 'n' }, fmt(sl.used)),
+      el('td', { class: 'n' }, viewing ? '·' : fmt(sl.big ? sl.big.v : sl.count)), el('td', { class: 'n' }, fmt(sl.used)),
       el('td', { class: 'n' }, sl.id && !viewing ? el('button', { type: 'button', class: 'g-price', onclick: e => editPrice(e.currentTarget, sl) }, fmt(sl.price)) : fmt(sl.price || 0)),
       el('td', { class: 'n' }, fmtK(sl.used * (sl.price || 0))))));
     if (!list.length) body.append(el('tr', {}, el('td', { colspan: '6' }, 'Your quickslot potions show up here once the game is shared.')));
@@ -1158,7 +1426,7 @@ function mount(root, deps) {
   function renderNow(s, o, mains, R) {
     const k = (cls, v, label) => el('span', { class: 'g-nk ' + cls }, el('b', {}, v), label ? ' ' + label : '');
     if (!s) {
-      V.now.replaceChildren(el('span', { class: 'g-nl' }, 'This session'), el('span', { class: 'g-nm' }, st.sharing ? 'It starts with your next EXP' : 'Share the game window to start one'));
+      V.now.replaceChildren(el('span', { class: 'g-nl' }, 'This session'), el('span', { class: 'g-nm' }, st.sharing ? 'It starts with your next EXP' : app ? toStart : 'Share the game window to start one'));
       moreBtn.hidden = true; return;
     }
     const main = mains[0];
@@ -1224,7 +1492,7 @@ function mount(root, deps) {
       tot('EXP gained', fmtK(L.exp), hrs ? fmtK(L.exp / hrs) + ' an hour on average' : '·', 'b'),
       tot('Levels gained', levels ? String(L.levelTo - L.levelFrom) : '·', levels ? L.levelFrom + ' → ' + L.levelTo : '·', 'y'),
       tot('Mesos earned', L.mesos != null ? (L.mesos >= 0 ? '+' : '−') + fmtK(Math.abs(L.mesos)) : '·',
-        L.profit != null ? (L.profit >= 0 ? '+' : '−') + fmtK(Math.abs(L.profit)) + ' after potions' : 'open your inventory while you grind', 'g'),
+        L.profit != null ? (L.profit >= 0 ? '+' : '−') + fmtK(Math.abs(L.profit)) + ' after potions' : 'not counted yet', 'g'),
       tot('Deaths', String(L.deaths), L.deaths ? 'one every ' + fmtDur(L.mins / L.deaths) : L.sessions ? 'none yet' : '·'));
     const top = L.maps.slice(0, 5), most = top.length ? top[0].mins || 1 : 1;
     LF.maps.replaceChildren(...(top.length ? top.map((m, i) => el('div', { class: 'g-mrow' }, el('span', { class: 'g-rk' }, String(i + 1)),
@@ -1243,8 +1511,10 @@ function mount(root, deps) {
   }
 
   showMap(); render(); listSessions();
-  if (session) setStatus('Carrying on your session from ' + timeOfDay(session.t0) + '. Share the game window to keep going.');
+  if (session) setStatus('Carrying on your session from ' + timeOfDay(session.t0) + (app ? '. Press Start to carry on.' : '. Share the game window to keep going.'));
   window.Grind.debug = { session: () => session, state: () => ({ reads: st.reads, ticks: st.ticks, line: st.line, m: st.m, level: st.level }),
+    // the overlay, opened as Start opens it (the app's own test); resolves to whether it's open
+    overlay: () => (overlay.win() ? Promise.resolve() : popOut()).then(() => !!overlay.win()),
     save: () => save(true), load: row => { viewing = GS().fromRow(row, eatCfg()); render(); }, capture: () => capture, mesoLine,
     // a session carried in whole (the page tests' mockup session), as if it had been read here
     use: x => { session = x; viewing = null; if (!session.eat) session.eat = eatCfg(); session.mode = lootOn ? 'loot' : 'track'; render(); } };
@@ -1253,14 +1523,14 @@ function mount(root, deps) {
     report: () => ({ sharing: st.sharing, ticks: st.ticks, reads: st.reads, frame: [st.fw, st.fh],
       stretch: st.m ? { s: st.m.s, score: st.m.score, countScore: st.m.countScore } : null, line: st.line, level: st.level,
       slots: st.slots, mesos: st.mesos == null ? null : st.mesos, mesoHome: MS().mesoHome(), checks: lastHealth, recent: st.recent.slice(),
-      map: mapId, session: session ? GS().stats(session, Date.now(), avgExp(session.mapId || mapId)) : null, popout: pipWin ? { layout } : null,
+      map: mapId, session: session ? GS().stats(session, Date.now(), avgExp(session.mapId || mapId)) : null, popout: overlay.win() ? { layout } : null,
       // Count my loot: the switch, how far each tab's flip got, the bag sets, shop visits and prices learned
       loot: { on: lootOn, mode: session ? session.mode : null, pictures: !!lootIdx, sets: session && session.bag ? session.bag.sets : 0,
         acc: session && session.bag ? Object.fromEntries(Object.entries(session.bag.acc).map(([k, a]) => [k, a.strips.map(x => ({ rows: x.rows.length, top: x.top, bottom: x.bottom }))])) : null,
         shop: session && session.shop ? { open: session.shop.open, visits: session.shop.visits.length } : null, learned: session ? session.learned || [] : [] } }),
-    popout: () => pipWin ? pipWin.document.body : null,
+    popout: () => overlay.win() ? overlay.win().document.body : null,
   };
 }
 
-window.Grind = { mount, fmtK, clock, health, lemonTile, lifetime, lootItem, eatLines };
+window.Grind = { mount, fmtK, clock, health, potionTile, potionTiles, elapsedSecs, lifetime, lootItem, eatLines };
 })();

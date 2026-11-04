@@ -113,6 +113,8 @@
     const d = {
       v: 1, kind, tab: view, url: location.origin + location.pathname + location.search + hash,
       version: (config && config.version) || 'unknown', when: (when || new Date()).toISOString(),
+      // the Windows app's version when the report comes from inside it (grind-app/), else null
+      app: (window.sixPathApp && window.sixPathApp.version) || null,
       browser: navigator.userAgent, screen: [screen.width, screen.height], window: [innerWidth, innerHeight], dpr: window.devicePixelRatio || 1,
       theme: document.documentElement.dataset.theme || 'light', signedIn: !!signedIn, onlyGrind: document.body.classList.contains('only-grind'),
       errors: (window.BT_ERRORS || []).slice(-20), inputs: inputsOf(view), pictures: Object.assign({}, pictures),
@@ -135,7 +137,7 @@
       j = json(o);
       if (j != null && bytes(j) <= max) return { json: j, cut: true };
     }
-    return { json: JSON.stringify({ v: obj.v, kind: obj.kind, tab: obj.tab, version: obj.version, when: obj.when, stateCut: true }), cut: true };
+    return { json: JSON.stringify({ v: obj.v, kind: obj.kind, tab: obj.tab, version: obj.version, app: obj.app, when: obj.when, stateCut: true }), cut: true };
   }
 
   async function open(deps) {

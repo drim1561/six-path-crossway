@@ -793,7 +793,7 @@ function buildGuide(raw, clsId, data) {
   return { ok: true, sec: STEP_SEC, phase: P.phase, estimated: cls.family === 'phys' && !CHECKED_WEAPONS.has(slot), weapon, assumed: v.assumed, stats: s,
     attack: { min: Math.round(am.range[0]), max: Math.round(am.range[1]), avg: Math.round(sum / 2 * am.hits) },
     heal: hasHeal(s, cls) ? (h => ({ min: h.range[0], max: h.range[1], level: s.skills[HEAL], targets: h.targets }))(attackModel(s, cls, undefined, HEAL)) : null,
-    paths, overview: overviewSpots(s, cls, rank), train: rank.slice(0, 10), here: rank[0] || null, tryNext: worthTry(rank, s.level, rank[0] && rank[0].id), stages,
+    paths, overview: overviewSpots(s, cls, rank), ranked: rank, train: rank.slice(0, 10), here: rank[0] || null, tryNext: worthTry(rank, s.level, rank[0] && rank[0].id), stages,
     stageHours: stageHours(s, stages),
     skills, ap, gear, next: planNext(s, cls, P, skills, physical(cls) ? am.W : bestWeapon(slot, s.level, 'mad')),
     scrolls: planScrolls(s, cls, gear, spot), standing: standing(s, cls, spot), worth: worthTable(s, cls, spot), prices: data.prices || null };
@@ -803,6 +803,63 @@ function buildGuide(raw, clsId, data) {
 
 // Monsters above your level, up to 8 levels up, that you hit at least 70% of the time: worth trying now.
 const worthTry = (rank, lv, nowId) => rank.filter(m => m.level > lv && m.level <= lv + 8 && m.hit >= 70 && m.id !== nowId).slice(0, 3);
+
+/* ---------- Drops ---------- */
+
+// Who drops what, from community-data/drops.json folded into builds.json as data.drops (no rates: nobody has them).
+// These take data as a parameter so they work before the guide has set DATA.
+const gearById = (() => { const memo = new WeakMap(); return data => {
+  if (!memo.has(data)) memo.set(data, new Map((data.gear || []).map(g => [g.id, g])));
+  return memo.get(data);
+}; })();
+const WEAPON_SLOTS = new Set([...Object.keys(WEAPONS), 'Wand', 'Staff']);
+// A monster's drops for a class and level, useful first: gear the class wears within 10 levels either way (wearable now
+// before soon, then highest level first), then scrolls, ores, and everything else in the sheet's order.
+function dropGroups(mobId, clsId, lv, data) {
+  const list = data.drops && data.drops.mobs[mobId];
+  if (!list) return null;
+  const cls = CLASSES[clsId], gear = gearById(data), out = { mine: [], scrolls: [], ores: [], rest: [], total: list.length };
+  for (const id of list) {
+    const name = data.drops.names[id] || '', g = gear.get(id), e = { id, name };
+    if (g) Object.assign(e, { slot: g.slot, level: g.level, soon: g.level > lv });
+    const mine = g && cls && fits(g, cls) && g.level >= lv - 10 && g.level <= lv + 10 && (!WEAPON_SLOTS.has(g.slot) || cls.weapons.includes(g.slot));
+    (mine ? out.mine : Math.floor(id / 10000) === 204 ? out.scrolls : / Ore$/.test(name) ? out.ores : out.rest).push(e);
+  }
+  out.mine.sort((a, b) => a.soon - b.soon || b.level - a.level);
+  return out;
+}
+// Lowercase letters, digits and single spaces, so "cats eye" finds Cat's Eye and "(" finds nothing.
+const normName = s => String(s).toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ').trim();
+// Items on the drop list whose name holds the query: names that start with it first, then shorter, then A to Z. One entry
+// per item id, so the few names two items share (Lemon, Blue Moon) show twice.
+function findItems(query, data) {
+  const q = normName(query);
+  if (!q || !data.drops) return [];
+  return Object.entries(data.drops.names).map(([id, name]) => ({ id: +id, name, n: normName(name) })).filter(x => x.n.includes(q))
+    .sort((a, b) => b.n.startsWith(q) - a.n.startsWith(q) || a.name.length - b.name.length || (a.n < b.n ? -1 : a.n > b.n ? 1 : a.id - b.id))
+    .slice(0, 8).map(({ id, name }) => ({ id, name }));
+}
+// Every monster that drops an item. ranked: rows of the guide's ranking, by EXP an hour, then kills an hour (EXP an hour
+// over its EXP: with no drop rates, more kills is more tries). weak: in the mob list but not ranked for this build.
+// others: not in the mob list (bosses, too few on any map), with the map they spawn on most, or none.
+function droppers(itemId, ranked, data) {
+  const d = data.drops, out = { ranked: [], weak: [], others: [] };
+  if (!d) return out;
+  const ids = new Set(Object.keys(d.mobs).filter(m => d.mobs[m].includes(itemId)).map(Number)), seen = new Set();
+  for (const r of ranked) if (ids.has(r.id)) { out.ranked.push({ ...r, kills: Math.round(r.expHour / r.exp) }); seen.add(r.id); }
+  out.ranked.sort((a, b) => b.expHour - a.expHour || b.kills - a.kills);
+  for (const m of data.mobs) if (ids.has(m.id) && !seen.has(m.id)) out.weak.push({ id: m.id, name: m.name, level: m.level, map: m.maps[0][0], mapId: m.maps[0][2] });
+  for (const id of ids) if (d.others[id]) out.others.push({ id, ...d.others[id] });
+  out.weak.sort((a, b) => a.level - b.level);
+  out.others.sort((a, b) => a.level - b.level);
+  return out;
+}
+// The map's page on meowdb (it has Find path here): the client map id padded to 9 digits, or it says Map Not Found.
+const meowMap = mapId => 'https://meowdb.com/msclassic/maps/' + String(mapId).padStart(9, '0');
+const JOB_NAMES = [[1, 'Warrior'], [2, 'Magician'], [4, 'Bowman'], [8, 'Thief']];
+const wearers = job => job === 0 ? 'Any class' : JOB_NAMES.filter(([bit]) => job & bit).map(([, n]) => n).join(' or ');
+const kindOf = (id, name) => Math.floor(id / 10000) === 204 ? 'Scroll' : / Ore$/.test(name) ? 'Ore'
+  : ({ 1: 'Equip', 2: 'Use', 3: 'Setup', 4: 'Etc' })[Math.floor(id / 1000000)] || 'Etc';
 
 // The best weapon of a type this class can wear by a level, by its attack (weapon attack, or magic attack for mages).
 function bestGearAt(cls, slot, lv) {
@@ -918,7 +975,9 @@ const ASSUMED_LABEL = { ...LABEL, atkMin: 'attack range', atkMax: 'attack range'
 // form.from: where the numbers came from, for a Something off? report ('mine' or 'community' for a loaded build, 'read'
 // for Read from game, none when typed by hand), and form.edited once the player changed something after that
 // lastPic: the picture Read from game read last ({ img, at }), kept for a report until the next one or a reload
-const ui = { deps: null, data: null, root: null, form: { cls: 'cleric', v: {}, s: {} }, timer: 0, read: new Set(), lastPic: null };
+// find: the Train tab's item finder ({ q typed, id picked }), not saved anywhere; findBox is built once and kept
+const ui = { deps: null, data: null, root: null, form: { cls: 'cleric', v: {}, s: {} }, timer: 0, read: new Set(), lastPic: null,
+  find: { q: '', id: null }, findBox: null, findG: null };
 const FROM = ['mine', 'community', 'read', 'friend'];
 const E = (...a) => ui.deps.el(...a);
 const fieldsOf = cls => cls.fields.flatMap(f => INPUTS[f]).concat([['apLeft', 'AP left']]);
@@ -1143,26 +1202,149 @@ const tuneText = t => TUNE_TEXT[t.why](t);
 function applyTune(g, t) {
   g.sec = t.sec; g.tune = t;
   const o = g.overview;
-  for (const r of [...g.train, ...g.tryNext, ...g.stages.flatMap(st => st.picks), ...o.spots.map(x => x.row), ...(o.maxed ? [o.maxed.row] : [])]) r.expHour = expHour(r.pace, t.sec);
+  // g.ranked too, so the item finder's numbers match the ranking's
+  for (const r of [...g.ranked, ...g.train, ...g.tryNext, ...g.stages.flatMap(st => st.picks), ...o.spots.map(x => x.row), ...(o.maxed ? [o.maxed.row] : [])]) r.expHour = expHour(r.pace, t.sec);
+}
+
+// Drops on Train here now and Worth a try (2026-11-03): the best few for this build by name, the rest as counts, and
+// See all opening the whole list in groups. No drop rates anywhere: nobody has them.
+const plain = (n, one) => n + ' ' + one + (n === 1 ? '' : 's');
+// "Cape, lv 50 (in 4)", without the slot when the name already says it (Gold Moon Shoes, lv 40).
+const gearText = (d, lv) => (d.slot && !(' ' + d.name.toLowerCase() + ' ').includes(' ' + d.slot.toLowerCase() + ' ') ? d.slot + ', ' : '') + 'lv ' + d.level
+  + (lv !== undefined && d.soon ? ' (in ' + (d.level - lv) + ')' : '');
+const dropRow = (d, cls, lv) => E('div', { class: cls }, itemPic(d.id), E('span', {}, E('b', {}, d.name), d.slot ? [' ', E('span', { class: 'small' }, gearText(d, lv))] : null));
+// The whole list for a monster, grouped: For you, Scrolls, Ores, then Everything else folded behind its own show more
+// (.b-dextra and .b-dmore, so the maps' show more doesn't open it).
+function dropList(m, dg, lv) {
+  const grp = (title, note, rows, fold) => rows.length ? E('div', { class: 'b-dgrp' }, E('div', { class: 'b-dgt' }, title + ' ', E('span', { class: 'small' }, note)),
+    E('div', { class: 'b-dgrid' }, rows.map(d => { const r = dropRow(d, 'b-drow', undefined); if (fold) { r.classList.add('b-dextra'); r.hidden = true; } return r; })),
+    fold ? E('button', { type: 'button', class: 'b-dmore', onclick: e => {
+      const box = e.target.closest('.b-dgrp'), rows = [...box.querySelectorAll('.b-dextra')], show = rows.some(x => x.hidden);
+      rows.forEach(x => { x.hidden = !show; });
+      e.target.textContent = show ? 'Show less' : fold;
+    } }, fold) : null) : null;
+  const cls = CLASSES[ui.form.cls];
+  return [E('div', { class: 'b-dhead' }, E('b', { class: 'b-name' }, m.name + ' drops'), ' ', E('span', { class: 'small' }, plain(dg.total, 'item') + ', no drop rates')),
+    grp('For you', 'gear ' + (/^[aeiou]/i.test(cls.name) ? 'an ' : 'a ') + cls.name + ' wears, lv ' + Math.max(1, lv - 10) + ' to ' + (lv + 10), dg.mine),
+    grp('Scrolls', String(dg.scrolls.length), dg.scrolls), grp('Ores', String(dg.ores.length), dg.ores),
+    grp('Everything else', String(dg.rest.length), dg.rest, "Show " + dg.rest.length + " more: other classes' gear, potions, etc items")].filter(Boolean);
+}
+// A spot's drops line: up to `shown` named drops for you, then the counts and See all. open(button, m, dg) toggles the list.
+function dropsLine(m, lv, shown, open) {
+  const dg = dropGroups(m.id, ui.form.cls, lv, ui.data);
+  if (!dg) return null;
+  const more = dg.mine.length - Math.min(shown, dg.mine.length);
+  const parts = [more ? more + ' more for you' : '', dg.scrolls.length ? plain(dg.scrolls.length, 'scroll') : '', dg.ores.length ? plain(dg.ores.length, 'ore') : ''].filter(Boolean);
+  const see = 'See all ' + dg.total + ' drops';
+  return E('div', { class: 'b-drops' }, dg.mine.slice(0, shown).map(d => dropRow(d, 'b-drop', lv)),
+    E('div', { class: 'small b-dropsum' }, parts.length ? parts.join(', ') + '. ' : '',
+      E('button', { type: 'button', class: 'linkish b-seeall', 'data-label': see, onclick: e => open(e.target, m, dg) }, see)));
+}
+
+// The Train tab's short map name: the part after "Area : ".
+const shortMap = map => map.replace(/^.*? : /, '');
+
+// The item finder (2026-11-03): who drops an item, sorted by the EXP an hour this build gets farming it, with a meowdb
+// map link. Built once and kept in ui.findBox, so the guide's re-renders (every form edit, Grind tuning) never take its
+// text, focus or results; typing redraws only the finder.
+function findBox() {
+  if (ui.findBox) return ui.findBox;
+  const q = E('input', { id: 'b-find-q', type: 'search', autocomplete: 'off', 'aria-label': 'Find an item', placeholder: 'Hunting for an item? Type its name, like Arc Staff',
+    oninput: e => {
+      ui.find.q = e.target.value;
+      const n = normName(ui.find.q), same = n ? findItems(ui.find.q, ui.data).find(x => normName(x.name) === n) : null;
+      ui.find.id = same ? same.id : null;
+      drawFind();
+    },
+    onkeydown: e => {
+      if (e.key !== 'Enter' || ui.find.id !== null) return;
+      const first = findItems(ui.find.q, ui.data)[0];
+      if (first) { e.preventDefault(); pickFind(first); }
+    } });
+  ui.findBox = E('section', { id: 'b-find' }, q, E('div', { id: 'b-find-list', hidden: '' }), E('div', { id: 'b-find-out' }));
+  return ui.findBox;
+}
+function pickFind(it) {
+  const q = ui.findBox.querySelector('#b-find-q');
+  ui.find.id = it.id; ui.find.q = it.name; q.value = it.name;
+  drawFind();
+  q.focus();
+}
+function renderFind(g) { ui.findG = g; drawFind(); }
+function drawFind() {
+  const box = ui.findBox, g = ui.findG;
+  if (!box || !g) return;
+  const list = box.querySelector('#b-find-list'), out = box.querySelector('#b-find-out'), q = ui.find.q.trim();
+  const hits = ui.find.id === null ? findItems(q, ui.data) : [];
+  list.replaceChildren(...hits.map(it => E('button', { type: 'button', class: 'b-sug', onclick: () => pickFind(it) }, itemPic(it.id), it.name)));
+  list.hidden = !hits.length;
+  if (!q) return out.replaceChildren(E('p', { class: 'small' }, "Type an item to see who drops it and where you'd level best farming it."));
+  if (ui.find.id === null) return out.replaceChildren(...(hits.length ? [] : [E('p', { class: 'small' }, 'No drops logged for “' + q + '” yet.')]));
+  const id = ui.find.id, name = ui.data.drops.names[id], gear = gearById(ui.data).get(id), d = droppers(id, g.ranked, ui.data);
+  const n = d.ranked.length + d.weak.length + d.others.length;
+  const most = d.ranked.reduce((b, r) => !b || r.kills > b.kills ? r : b, null);
+  const link = mapId => E('a', { class: 'b-out', href: meowMap(mapId), target: '_blank', rel: 'noopener' }, 'Map on meowdb ↗');
+  const head = m => E('div', {}, E('b', { class: 'b-name' }, m.name), ' ', E('span', { class: 'small' }, 'lv ' + m.level));
+  const small = t => E('div', { class: 'small' }, t);
+  const boxes = [
+    ...d.ranked.map((r, i) => E('div', { class: 'b-fbox' + (i ? '' : ' first') }, head(r), small(shortMap(r.map) + ', ' + r.hit + '% hit'),
+      E('div', { class: 'b-fbig' }, 'About ', E('b', { class: 'num' }, perHour(r.expHour))),
+      E('div', { class: 'small' }, fmt(Math.round(r.kills / 10) * 10) + ' kills an hour', i && r === most ? [' ', E('span', { class: 'b-chip up' }, 'most kills')] : null),
+      link(r.mapId))),
+    ...d.weak.map(m => E('div', { class: 'b-fbox dim' }, head(m), small('Too strong for you yet'), small(shortMap(m.map)), link(m.mapId))),
+    ...d.others.map(m => E('div', { class: 'b-fbox dim' }, head(m),
+      m.mapId != null ? [small('Not a training spot'), small(shortMap(m.map)), link(m.mapId)] : small('No map for it in the game files')))];
+  out.replaceChildren(
+    E('div', { class: 'b-fhead' }, itemPic(id), E('div', {}, E('b', { class: 'b-name' }, name), small(gear ? gear.slot + ', lv ' + gear.level + ', ' + wearers(gear.job) : kindOf(id, name)))),
+    E('p', { class: 'small' }, (n === 1 ? '1 monster drops it.' : n + ' monsters drop it.')
+      + (d.ranked.length > 1 ? " They're sorted by the EXP you'd get an hour while you farm." : '')
+      + (d.ranked.length ? ' Nobody knows the drop rates, so kills an hour is your chances: more kills, more tries.' : '')),
+    E('div', { class: 'b-fboxes' }, boxes));
 }
 
 function renderPanels(g) {
+  loadPics();
   const lv = g.stats.level, top = g.train.length ? g.train[0].pace : 1;
   const train = ui.root.querySelector('#train'), h = g.here;
   const sec = text => E('h4', { class: 'b-sec' }, text), ahead = g.stages.length ? g.stages[g.stages.length - 1].to - lv : 0;
-  const where = m => m.map.replace(/^.*? : /, '');
+  const where = m => shortMap(m.map);
   const crowd = m => m.hits > 1 ? ui.data.skills[m.skill].name + ' hits about ' + m.hits + ' at a time' : '';
-  train.replaceChildren(
+  // See all on Train here now opens under its own card; on Worth a try, one shared list under the grid, refilled by
+  // another card's button and closed by the same one.
+  const openHere = (btn, m, dg) => {
+    const box = btn.closest('.b-here'), cur = box.querySelector('.b-dropall');
+    if (cur) { cur.remove(); btn.textContent = btn.dataset.label; return; }
+    box.append(E('div', { class: 'b-dropall' }, dropList(m, dg, lv)));
+    btn.textContent = 'Hide drops';
+  };
+  const tryAll = E('section', { id: 'b-tryall', class: 'b-dropall', hidden: '' });
+  const openTry = (btn, m, dg) => {
+    const again = !tryAll.hidden && tryAll.dataset.mob === String(m.id);
+    train.querySelectorAll('.b-tryone .b-seeall').forEach(b => { b.textContent = b.dataset.label; });
+    if (again) { tryAll.hidden = true; return; }
+    tryAll.replaceChildren(...dropList(m, dg, lv));
+    tryAll.dataset.mob = String(m.id); tryAll.hidden = false;
+    btn.textContent = 'Hide drops';
+  };
+  // The finder stays first and is never taken out of the page (taking it out, even to put it straight back, drops its
+  // focus), so everything after it is cleared and redrawn.
+  const finder = findBox();
+  for (const c of [...train.childNodes]) if (c !== finder) c.remove();
+  if (train.firstChild !== finder) train.prepend(finder);
+  train.append(
     sec('Train here now'),
     h ? E('div', { class: 'b-here' }, E('div', {}, E('b', { class: 'b-name' }, h.name), ' ', E('span', { class: 'small' }, 'lv ' + h.level)),
       E('div', { class: 'small' }, [where(h), castsText(h), h.hit + '% hit', fmt(h.exp) + ' EXP each', crowd(h)].filter(Boolean).join(', ')),
-      E('div', { class: 'b-hrbig' }, 'About ', E('b', { class: 'num' }, perHour(h.expHour)), h.skill === HEAL ? ' with Heal' : ''))
+      E('div', { class: 'b-hrbig' }, 'About ', E('b', { class: 'num' }, perHour(h.expHour)), h.skill === HEAL ? ' with Heal' : ''),
+      dropsLine(h, lv, 3, openHere))
       : E('p', { class: 'small' }, 'Nothing you can kill yet.'),
     E('p', { class: 'small b-tune' }, 'EXP an hour: ' + tuneText(g.tune)),
     sec('Worth a try'),
     g.tryNext.length ? E('div', { class: 'b-try' }, g.tryNext.map(m => E('div', { class: 'b-tryone' },
-      E('b', {}, m.name), ' ', E('span', { class: 'small' }, 'lv ' + m.level), E('div', { class: 'small' }, [where(m), castsText(m), m.hit + '% hit', crowd(m)].filter(Boolean).join(', ')))))
+      E('b', {}, m.name), ' ', E('span', { class: 'small' }, 'lv ' + m.level), E('div', { class: 'small' }, [where(m), castsText(m), m.hit + '% hit', crowd(m)].filter(Boolean).join(', ')),
+      dropsLine(m, lv, 1, openTry))))
       : E('p', { class: 'small' }, 'Nothing up to 8 levels above you that you hit often enough yet.'),
+    ...(g.tryNext.length ? [tryAll] : []),
     sec(ahead > 0 ? 'Your next ' + ahead + ' levels' : 'From here'),
     E('ul', { class: 'b-time' }, g.stages.map(st => E('li', { class: 'b-ev b-stage' }, E('span', { class: 'num' }, range(st.from, st.to)),
       E('span', {}, E('b', {}, st.picks.map(m => m.name).join(', ')), ' ', E('span', { class: 'small' }, st.picks.map(where).filter((x, i, a) => a.indexOf(x) === i).join(', ')),
@@ -1178,6 +1360,7 @@ function renderPanels(g) {
       'Only "Train here now" and "Worth a try" use your numbers. The next levels assume you follow this guide: its AP, skill points and the best weapon you can wear.'));
   moreButton(train, 'Show all ' + g.train.length + ' maps');
   train.append(train.querySelector('.b-foot'));
+  renderFind(g);
 
   const pts = pointsPlan(g), chip = { ap: 'AP', sp: 'SP', up: 'upgrade', job: 'job' };
   const row = e => E('li', { class: 'b-ev', 'data-from': String(e.from) }, E('span', { class: 'num' }, e.now ? 'Now' : range(e.from, e.to)),
@@ -1764,7 +1947,7 @@ function mount(root, deps) {
   // what a Something off? report carries from this tab (index.html keeps it)
   // (what Read from game filled, what it asked to be typed, and what the form turned down)
   return { report: () => ({ tab: ui.deps.store.get('bt.btab') || 'train', form: ui.form, read: rd.last, filled: [...ui.read],
-    asked: [...rd.asked], bad: Object.fromEntries(rd.bad) }),
+    asked: [...rd.asked], bad: Object.fromEntries(rd.bad), find: { q: ui.find.q, id: ui.find.id } }),
     // the last picture Read from game read, on a canvas of its own, once the share has stopped (while it runs, the
     // live frame goes instead); null when nothing was read since the page loaded
     frame: () => {
@@ -1778,5 +1961,6 @@ function mount(root, deps) {
 const estimatedNote = () => E('p', { id: 'b-estimated', class: 'b-badge', hidden: '' }, E('b', {}, 'Estimated. '), "Damage for this weapon comes from meowdb's table and hasn't been checked against a real stat window yet.");
 
 window.Builds = { comparePaths, PATHS, tuneSeconds, EXP_TABLE, STEP_SEC, expHour, hoursTo, healRange, HEAL, standingText, KILL_GAP, CLASSES, BRANCHES, branchOf, weaponsFor, mastery, physRange, spellRange, weaponAttackFromMax, WEAPONS, CHECKED_WEAPONS, windowRange, levelScale, hitChance, defend, elemMult, makeRng, castsToKill,
-  validateStats, rankMobs, buildGuide, pointsPlan, mount, fill, refresh, shrinkImage, take, classOf };
+  validateStats, rankMobs, buildGuide, pointsPlan, mount, fill, refresh, shrinkImage, take, classOf,
+  dropGroups, findItems, droppers, meowMap, wearers, kindOf };
 })();

@@ -75,10 +75,11 @@ function takeExp(s, t, exp, pct) {
 /* ---------- potions ---------- */
 
 // BIG: a change of more than this between two reads holds HOLD_MS before it counts. PICKUP: a rise this small is a
-// potion picked up off the ground, not bought (a mob drops one at a time; a shop trip buys dozens)
-const BIG = 30, HOLD_MS = 15000, PICKUP = 5;
+// potion picked up off the ground, not bought (a mob drops one at a time; a shop trip buys dozens). AWAY_MS: potions
+// moved out (a drop over BIG) that come back within this are moved back, not bought
+const BIG = 30, HOLD_MS = 15000, PICKUP = 5, AWAY_MS = 5 * 60000;
 // every slot starts over from its next read (grind.js calls this when the HUD changed size)
-function rebase(s) { for (const sl of Object.values(s.slots)) { sl.rebase = true; sl.pend = null; sl.big = null; } }
+function rebase(s) { for (const sl of Object.values(s.slots)) { sl.rebase = true; sl.pend = null; sl.big = null; sl.away = null; } }
 function takeCounts(s, t, counts) {
   const seen = {};
   for (const c of counts || []) {
@@ -105,7 +106,7 @@ function takeCounts(s, t, counts) {
     if (Math.abs(d) > BIG) {
       if (!sl.big || sl.big.v !== c.value) { sl.big = { v: c.value, t }; continue; }
       if (t - sl.big.t < HOLD_MS) continue;
-      const t0 = sl.big.t; sl.big = null; sl.pend = null; change(s, sl, t, d, t0); continue;
+      const t0 = sl.big.t; sl.big = null; sl.pend = null; moved(s, sl, t, d, t0); continue;
     }
     sl.big = null;
     if (sl.pend !== c.value) { sl.pend = c.value; continue; }   // wait for a second read
@@ -118,6 +119,19 @@ function takeCounts(s, t, counts) {
     sl.missing++;
     if (sl.missing >= 2 && sl.count > 0 && sl.count <= 3) change(s, sl, t, -sl.count);
   }
+}
+// a big change that held (Rimmah, 2026-11-04: a store setup read as 34 Orange Potions and 59 Meat drunk, then bought): a
+// drop is potions moved out (a store, storage, a trade, dropped, sold), never drunk, since no one drinks 30 between two
+// reads; a rise first brings back what went out in the last AWAY_MS, and only the rest is a refill (or a pickup)
+function moved(s, sl, t, d, t0) {
+  if (sl.away && t - sl.away.t > AWAY_MS) sl.away = null;
+  if (d < 0) { sl.away = { n: (sl.away ? sl.away.n : 0) - d, t }; sl.count += d; return; }
+  const back = sl.away ? Math.min(d, sl.away.n) : 0;
+  if (back) {
+    sl.away.n -= back; if (!sl.away.n) sl.away = null;
+    sl.count += back; sl.full = Math.max(sl.full || 0, sl.count);
+  }
+  if (d > back) change(s, sl, t, d - back, t0);
 }
 // t0: when the change first showed (a big one books 15 s later), so a refill is dated when it was bought
 function change(s, sl, t, d, t0) {
@@ -676,8 +690,10 @@ function clocks(s, t) {
     const from = Math.max(t - CFG.rateWindow, sl.firstUse), used = sl.uses.filter(u => u[0] > from && u[0] <= t).reduce((a, u) => a + u[1], 0);
     const perMin = used / ((t - from) / 60000);
     if (!perMin) continue;
-    const secs = Math.round(sl.count / perMin * 60);
-    list.push({ id: sl.id, name: sl.name, key: sl.key, left: sl.count, full: Math.max(sl.full || 0, sl.count), perMin, secs, doneAt: t + secs * 1000, low: secs < CFG.low });
+    // a big change still in its 15 second check is shown at once (Rimmah, 2026-11-04: a refill took 15 s to show);
+    // only drunk, bought and cost wait for it
+    const left = sl.big ? sl.big.v : sl.count, secs = Math.round(left / perMin * 60);
+    list.push({ id: sl.id, name: sl.name, key: sl.key, left, full: Math.max(sl.full || 0, left), perMin, secs, doneAt: t + secs * 1000, low: secs < CFG.low });
   }
   return { list: list.sort((a, b) => a.secs - b.secs), measuring };
 }
