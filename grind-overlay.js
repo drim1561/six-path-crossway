@@ -8,6 +8,8 @@
 // the game: then the mouse on one of its buttons lets it take clicks again (app.holdClicks) until the mouse moves off.
 // onResize(w, h, key) is a drag on the site: the window settled at a size the page didn't ask for, key being what
 // sizeKey() said when it was dragged. The app's overlay can't be dragged (only the page sizes it), so there it never comes.
+// The site's pop-out lets a page resize it only just after a press in it, once a press, so a size asked for between presses
+// (the first bite of Meat) waits for the next press anywhere in the pop-out. A later size replaces it, and a drag drops it.
 // In the app the overlay and Settings windows close when this page goes (a Document PiP window does that by itself).
 (function () {
 // Settings is never narrower than this
@@ -15,6 +17,9 @@ const SET_W = 360;
 // what takes a click on the overlay while the rest pass through to the game, and how long after the mouse leaves one the
 // clicks go back (the way from ⇆ to its row crosses a gap)
 const CLICKABLE = 'button, a, input, select, textarea, label, .g-laypick', GIVE_BACK = 400;
+// a press in the pop-out gives what it asked for itself this long to go first (a layout picked resizes 150 ms after its
+// click), since it's one resize a press; then a size still waiting goes
+const PRESS_ROOM = 250;
 // a bridge call as a promise: a method the app doesn't have, or one that throws, is a rejection
 const call = (app, name, ...a) => new Promise(res => res(app[name](...a)));
 function create(o) {
@@ -28,26 +33,57 @@ function create(o) {
   let holding = false;
   // the panel's size the page last asked the window for: a window that settles there was sized by the page, not dragged
   let asked = null;
+  // on the site, the size asked for that the window hasn't reached yet, and the press that will try it again
+  let unmet = null, pressT = null;
+  const reached = (win, s) => Math.abs(win.innerWidth - s[0]) <= 2 && Math.abs(win.innerHeight - s[1]) <= 2;
   // in the app the overlay and Settings are windows of their own, which (unlike the site's pop-out) stay when this page
   // goes: a reload or sign in on Discord would leave them on top of the game, frozen. They go with it (the app closes
   // them too)
   if (o.app) window.addEventListener('pagehide', () => { shutSetWin(); close(); });
   // Settings sits under the panel in the same window (the site), so the panel fits in the room left above it
   const under = () => !!setEl && !o.app;
-  // the panel fits the window: as big as its natural size (each tile's text on one line) allows across and down;
-  // the one thing to do may wrap, so the height is checked again at the new size. Settings' room under it is left out
+  // the panel fits the window: as big as its natural size (each tile's text on one line) allows across and down, measured
+  // as if the one thing to do weren't there, so the text doesn't change size when it comes and goes (what makes its room is
+  // the page's CSS). The panel isn't linear in its font size (its frame and art pixels are whole pixels), so the size from
+  // one measure is measured again, up to four times, until it holds, and the biggest size that was measured to fit wins. It
+  // may wrap, so the height is checked again at the new size. Settings' room under it is left out
   function fit() {
     const w = strip.ownerDocument.defaultView;
     if (strip.hidden || !w || w === window) return;
-    const H = w.innerHeight - (under() ? setEl.offsetHeight : 0);
+    const H = w.innerHeight - (under() ? setEl.offsetHeight : 0), W = w.innerWidth;
     const out = (o.hide ? o.hide() : []).filter(Boolean);
-    strip.style.fontSize = '16px'; strip.style.width = 'max-content'; out.forEach(e => { e.style.display = 'none'; });
-    const nat = strip.getBoundingClientRect();
-    strip.style.width = ''; out.forEach(e => { e.style.display = ''; });
-    let f = Math.max(8, Math.min(48, 16 * Math.min(w.innerWidth / nat.width, H / nat.height)));
+    const was = out.map(e => e.hidden), size = () => strip.getBoundingClientRect();
+    const clamp = v => Math.max(8, Math.min(48, v));
+    strip.style.minHeight = ''; strip.style.width = 'max-content'; out.forEach(e => { e.hidden = true; });
+    let f = 16, best = 0;
+    for (let i = 0; i < 4; i++) {
+      strip.style.fontSize = f + 'px';
+      const nat = size(), next = clamp(f * Math.min(W / nat.width, H / nat.height));
+      if (nat.width <= W + 0.5 && nat.height <= H + 0.5) best = Math.max(best, f);
+      if (Math.abs(next - f) < 0.01) break;
+      f = next;
+    }
+    // none of the passes measured to fit (the panel isn't smooth in its font size, so they can keep overshooting): measure where
+    // it ended, and if that doesn't fit either, search down for a size that does, so a size is only kept once it was measured
+    if (!best) {
+      strip.style.fontSize = f + 'px';
+      const fits = () => { const r = size(); return r.width <= W + 0.5 && r.height <= H + 0.5; };
+      if (fits()) best = f;
+      else { let lo = 8, hi = f; for (let i = 0; i < 8 && hi - lo > 0.05; i++) { const mid = (lo + hi) / 2; strip.style.fontSize = mid + 'px'; if (fits()) lo = mid; else hi = mid; } best = lo; }
+    }
+    strip.style.width = ''; out.forEach((e, i) => { e.hidden = was[i]; });
+    f = best;
     strip.style.fontSize = f + 'px';
-    const tall = strip.scrollHeight;
-    if (tall > H) strip.style.fontSize = Math.max(8, f * H / tall) + 'px';
+    // the alert's lines wrap differently at each size, so the panel's height isn't a straight line in its font size: the biggest size
+    // that fits is searched for between the smallest and the one that didn't
+    if (size().height > H + 0.5) {
+      let lo = 8, hi = f;
+      for (let i = 0; i < 7 && hi - lo > 0.05; i++) { const mid = (lo + hi) / 2; strip.style.fontSize = mid + 'px'; if (size().height <= H + 0.5) lo = mid; else hi = mid; }
+      f = lo; strip.style.fontSize = f + 'px';
+    }
+    // a floating window is a solid rectangle, so the frame reaches its bottom edge: what the font can't use goes inside the panel
+    // (spread between its rows), never as a band under it. The app's window is sized to the panel, so it needs none
+    if (!o.app) strip.style.minHeight = H + 'px';
   }
   function open(w0, h0) {
     if (o.app) return openApp(w0, h0);
@@ -121,10 +157,31 @@ function create(o) {
     // turned Clicks pass through off, or the call failed). It asks again once the mouse comes back to a button
     call(o.app, 'holdClicks', true).then(r => { if (r === true && holding) strip.classList.add('g-hold'); }, () => {});
   }
+  // the windows that follow the page's theme: toggling it on the page reaches the open pop-out, overlay and Settings at once
+  const themed = new Set();
+  let themeWatch = null;
+  function unfollow(win) {
+    themed.delete(win);
+    if (!themed.size && themeWatch) { themeWatch.disconnect(); themeWatch = null; }
+  }
+  function followTheme(win) {
+    themed.add(win);
+    if (themeWatch) return;
+    try {
+      themeWatch = new MutationObserver(() => {
+        const t = document.documentElement.dataset.theme;
+        for (const x of themed) {
+          try { if (x.closed) unfollow(x); else if (t) x.document.documentElement.dataset.theme = t; else delete x.document.documentElement.dataset.theme; } catch (e) { unfollow(x); }
+        }
+      });
+      themeWatch.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    } catch (e) { /* the window keeps the theme it opened with */ }
+  }
   // a new window takes the page's styles and theme, and is told apart by its body's class (g-pip on the site, g-ov for
   // the app's overlay, g-setwin for the app's Settings)
   function dress(win, cls, title) {
     const d = win.document;
+    followTheme(win);
     for (const ss of document.styleSheets) {
       try { const s = d.createElement('style'); s.textContent = Array.from(ss.cssRules).map(r => r.cssText).join('\n'); d.head.append(s); } catch (e) { /* a stylesheet from another site */ }
     }
@@ -140,12 +197,21 @@ function create(o) {
     strip.hidden = false;
     const wrap = d.createElement('div'); wrap.id = 'view-grind'; wrap.append(strip); d.body.append(wrap);
     pip.addEventListener('pagehide', () => gone(pip));
+    if (!o.app) {
+      const press = () => {
+        clearTimeout(pressT);
+        pressT = setTimeout(() => { if (pipWin === pip && unmet && !reached(pip, unmet)) sizeTo(...unmet); }, PRESS_ROOM);
+      };
+      d.addEventListener('pointerup', press, true);
+      d.addEventListener('keydown', press, true);
+    }
     // resized: fit to it. Dragged to a new size: tell the page once it has settled, with what the window showed when it
     // was dragged (a ⇆ Layout click meanwhile doesn't move it to the next layout). Not a size the page asked for (its
     // own resizes aren't drags), not while Settings is open (that size has Settings in it, and isn't the panel's), and
     // never in the app, whose overlay only the page sizes
     pip.addEventListener('resize', () => {
       fit();
+      if (unmet && reached(pip, unmet)) unmet = null;
       if (o.app || !o.onResize) return;
       const key = o.sizeKey ? o.sizeKey() : null;
       clearTimeout(sizeTimer);
@@ -153,7 +219,7 @@ function create(o) {
         if (pipWin !== pip || setEl) return;
         const w = pip.innerWidth, h = pip.innerHeight;
         if (asked && Math.abs(w - asked[0]) <= 2 && Math.abs(h - asked[1]) <= 2) return;
-        asked = null;   // it's at the dragged size now
+        asked = null; unmet = null;   // it's at the dragged size now
         o.onResize(w, h, key);
       }, 400);
     });
@@ -163,8 +229,8 @@ function create(o) {
   // the window closed: the panel goes back to the page (once, however it was seen), and Settings closes with it
   function gone(pip) {
     if (pipWin !== pip) return;
-    pipWin = null; strip.hidden = true; strip.style.fontSize = '';
-    clearTimeout(sizeTimer); asked = null;
+    pipWin = null; unfollow(pip); strip.hidden = true; strip.style.fontSize = '';
+    clearTimeout(sizeTimer); clearTimeout(pressT); asked = null; unmet = null;
     if (holding) { holding = false; strip.classList.remove('g-hold'); }   // its window is gone, and the app's hold with it
     if (setEl) { setEl.remove(); setEl = null; }   // it opens next time without
     shutSetWin();
@@ -176,7 +242,12 @@ function create(o) {
     try { win.resizeTo(w + fw, h + fh); return true; } catch (e) { return false; /* this browser won't: it can be dragged to size */ }
   }
   // the overlay at the panel's w × h (with Settings' room, while it's under it): kept as the size asked for
-  const sizeTo = (w, h) => { asked = [w, h]; return sizeWin(pipWin, w, h); };
+  const sizeTo = (w, h) => {
+    asked = [w, h];
+    clearTimeout(sizeTimer);   // a window settling at the size asked for before isn't a drag away from this one
+    if (!o.app) unmet = reached(pipWin, asked) ? null : asked;
+    return sizeWin(pipWin, w, h);
+  };
   // the window for a panel of w × h with Settings under it: at least Settings' width, and Settings' height measured at the
   // width the window will have (its sections sit side by side when there's room)
   function withSettings(w, h) {
@@ -199,7 +270,7 @@ function create(o) {
     if (!pipWin && !o.app) return false;
     if (setEl) { if (setWin && !setWin.closed) try { setWin.focus(); } catch (e) { /* it's there, just not raised */ } return true; }
     if (o.app) return openSetWin(el);
-    panel = [pipWin.innerWidth, pipWin.innerHeight];
+    panel = unmet || [pipWin.innerWidth, pipWin.innerHeight];
     setEl = el;
     strip.after(el);
     sizeTo(...withSettings(panel[0], panel[1]));
@@ -234,13 +305,14 @@ function create(o) {
   // the app's Settings window closed by itself (the app, or Alt+F4): the same as its ×
   function setGone(win) {
     if (setWin !== win) return;
+    unfollow(win);
     setWin = null;
     hideSettings();
     if (o.onSettingsClose) o.onSettingsClose();
   }
   function shutSetWin() {
     const w = setWin;
-    setWin = null;
+    setWin = null; if (w) unfollow(w);
     if (w && !w.closed) try { w.close(); } catch (e) { /* already going */ }
   }
   function hideSettings() {
@@ -251,7 +323,8 @@ function create(o) {
     if (pipWin && panel) sizeTo(panel[0], panel[1]);
     fit();
   }
-  const close = () => { if (pipWin) try { pipWin.close(); } catch (e) { /* already gone */ } };
+  // closing stops the theme being followed for the pop-out at once (its pagehide may come late, or never in a window that was only asked to close)
+  const close = () => { if (pipWin) { try { pipWin.close(); } catch (e) { /* already gone */ } unfollow(pipWin); } };
   return { open, win: () => pipWin, resize, fit, close, showSettings, hideSettings, settingsOpen: () => !!setEl };
 }
 window.GrindOverlay = { create };

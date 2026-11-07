@@ -39,6 +39,9 @@
     lastRead: 'From your last Read from game', leaveLastRead: 'Leave out the picture from your last Read from game',
   };
 
+  // the pixel cross on a picture's Leave out button (pixel-icons.js), a plain one without it
+  const closeMark = () => window.PixelIcons ? window.PixelIcons.railIcon('close') : document.createTextNode('✕');
+
   // html-to-image, pinned like supabase-js, fetched the first time a picture is drawn
   let lib = null;
   function loadLib() {
@@ -61,7 +64,9 @@
     const H = await loadLib();
     const w = Math.max(1, document.documentElement.clientWidth);
     const filter = n => !skip.includes(n) && drawable(n);
-    const opts = ratio => ({ pixelRatio: ratio, filter, imagePlaceholder: BLANK, backgroundColor: getComputedStyle(document.body).backgroundColor });
+    // the page's color fills the canvas under the drawing, and the drawn body itself is clear: the forest scene is a fixed canvas behind
+    // everything (z-index -1), and an opaque body in the drawing would paint over it, leaving bare paper in the picture
+    const opts = ratio => ({ pixelRatio: ratio, filter, imagePlaceholder: BLANK, backgroundColor: getComputedStyle(document.body).backgroundColor, style: { backgroundColor: 'transparent' } });
     const draw = async ratio => {
       let canvas;
       try { canvas = await H.toCanvas(document.body, opts(ratio)); } catch (e) { canvas = await H.toCanvas(document.body, Object.assign({ skipFonts: true }, opts(ratio))); }
@@ -143,8 +148,9 @@
   async function open(deps) {
     const { el: E, api, config, view, reporter, button } = deps;
     if (document.getElementById('flag-panel')) return;
-    const label = button.textContent;
-    button.disabled = true; button.textContent = COPY.busy;
+    // the words sit in their own span beside the pixel flag, and show only on a wide window
+    const labelEl = button.querySelector('.flag-txt') || button, label = labelEl.textContent;
+    button.disabled = true; labelEl.textContent = COPY.busy;
     const when = new Date(), signedIn = !!deps.session;
     // the state at the moment of the click, so the numbers match the picture
     const base = details({ kind: 'wrong', view, reporter, config, signedIn, pictures: {}, when });
@@ -178,7 +184,7 @@
         keep('popout', blob, 'popout.png');
       } catch (e) { pictures.popout = 'failed'; }
     }
-    button.textContent = label; button.hidden = true;
+    labelEl.textContent = label; button.hidden = true;
 
     let kind = 'wrong', sending = false;
     const text = E('textarea', { id: 'flag-text', maxlength: '1000', placeholder: COPY.place.wrong, 'aria-label': COPY.place.wrong });
@@ -188,7 +194,7 @@
       for (const [x, b] of Object.entries(kinds)) b.setAttribute('aria-pressed', String(x === k));
       text.placeholder = COPY.place[k]; text.setAttribute('aria-label', COPY.place[k]);
     };
-    for (const k of ['wrong', 'idea']) kinds[k] = E('button', { type: 'button', id: 'flag-kind-' + k, 'aria-pressed': String(k === kind), onclick: () => setKind(k) }, COPY[k]);
+    for (const k of ['wrong', 'idea']) kinds[k] = E('button', { type: 'button', id: 'flag-kind-' + k, class: 'k-btn sm', 'aria-pressed': String(k === kind), onclick: () => setKind(k) }, COPY[k]);
     const shots = E('div', { class: 'flag-shots' });
     const drop = key => {
       const fig = document.getElementById(SHOT_ID[key]);
@@ -202,7 +208,7 @@
       shots.append(E('figure', { class: 'flag-shot', id: SHOT_ID[key] },
         E('a', { href: pics[key].url, target: '_blank', rel: 'noopener', title: COPY.open }, E('img', { src: pics[key].url, alt: name })),
         E('figcaption', {}, name),
-        E('button', { type: 'button', class: 'flag-drop', 'aria-label': last ? COPY.leaveLastRead : 'Leave out ' + name, title: 'Leave out', onclick: () => drop(key) }, '✕')));
+        E('button', { type: 'button', class: 'k-sq flag-drop', 'aria-label': last ? COPY.leaveLastRead : 'Leave out ' + name, title: 'Leave out', onclick: () => drop(key) }, closeMark())));
     }
     const current = () => Object.assign({}, base, { kind, pictures: Object.assign({}, pictures) });
     const pre = E('pre', { id: 'flag-details', hidden: '' });
@@ -214,15 +220,17 @@
     const name = deps.session && deps.session.user_name;
     const msg = E('p', { id: 'flag-msg', role: 'status' });
     const say = s => { msg.textContent = s; };
-    const sendBtn = E('button', { type: 'button', id: 'flag-send', onclick: () => send() }, COPY.send);
-    const panel = E('div', { id: 'flag-panel', role: 'dialog', 'aria-labelledby': 'flag-h' },
-      E('h2', { id: 'flag-h' }, COPY.title),
-      E('div', { class: 'flag-kinds' }, kinds.wrong, kinds.idea),
-      shots, text,
-      E('p', { class: 'flag-small' }, COPY.also, ' ', see), pre,
-      E('p', { id: 'flag-who', class: 'flag-small' }, signedIn ? 'Sending as ' + (name || 'you') : COPY.anon),
-      msg,
-      E('div', { class: 'flag-row' }, E('button', { type: 'button', id: 'flag-cancel', onclick: () => close() }, COPY.cancel), sendBtn));
+    const sendBtn = E('button', { type: 'button', id: 'flag-send', class: 'k-btn key sm', onclick: () => send() }, COPY.send);
+    // a Window: the title on the plank, the rest on the paper
+    const panel = E('div', { id: 'flag-panel', class: 'k-win', role: 'dialog', 'aria-labelledby': 'flag-h' },
+      E('div', { class: 'k-bar' }, E('h2', { id: 'flag-h' }, COPY.title)),
+      E('div', { class: 'k-pad' },
+        E('div', { class: 'flag-kinds' }, kinds.wrong, kinds.idea),
+        shots, text,
+        E('p', { class: 'flag-small' }, COPY.also, ' ', see), pre,
+        E('p', { id: 'flag-who', class: 'flag-small' }, signedIn ? 'Sending as ' + (name || 'you') : COPY.anon),
+        msg,
+        E('div', { class: 'flag-row' }, E('button', { type: 'button', id: 'flag-cancel', class: 'k-btn sm', onclick: () => close() }, COPY.cancel), sendBtn)));
     const lock = on => { for (const b of panel.querySelectorAll('#flag-cancel, .flag-drop, .flag-kinds button')) b.disabled = on; };
     if (note) say(note);
     const onKey = e => { if (e.key === 'Escape' && !sending) close(); };

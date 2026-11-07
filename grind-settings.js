@@ -7,32 +7,32 @@
 //   picture: the little SVG of a layout (⇆ Layout's row on the panel uses them too)
 //   updateLine: the app's update check in words (the main window's version line)
 //   o = { el, app, layouts, onLayout(l), onLoot(on), onSignIn(), onSignOut(), onProfile(),
-//         links: { builds, appraiser }, onClose(), onSee(v), onSize(scale), onTop(on), onPass(on) }; user { name, avatar }
+//         links: { builds }, onClose(), onSee(v), onSize(scale), onTop(on), onPass(on) }; user { name, avatar }
 //   or null. With o.app (the app's bridge): See-through (25 to 100%), Size (60 to 160% by 10), Always on top of the game
 //   and Clicks pass through to the game. This map and the app's version are on the page (Rimmah, 2026-11-04)
 (function () {
 'use strict';
 
-// a little picture of each layout as the panel draws it: [x, y, width, height, corner, the potion tile (drawn bright)].
-// The thin bars are the top strip (Lv in and Elapsed, the buttons); the tiles are the three numbers, then the potion
+// a little picture of each layout as the panel draws it: [x, y, width, height, corner, what it is]. e is EXP an hour, l a
+// timer tile, and nothing is the top strip's bits and the little columns
 const PICS = {
-  // the top strip across, then the three numbers on the left and the potion tile taking the rest on the right
-  hero: [[2, 6, 24, 3, 1], [46, 6, 16, 3, 1], [2, 11, 12, 18, 3], [16, 11, 12, 18, 3], [30, 11, 12, 18, 3], [44, 11, 18, 18, 3, 1]],
-  // one slim row: the numbers, the potion, then the top strip's bits at the right end
-  bar: [[2, 13, 10, 10, 2], [14, 13, 10, 10, 2], [26, 13, 10, 10, 2], [38, 13, 9, 10, 2, 1], [50, 15, 12, 3, 1], [50, 19, 8, 3, 1]],
-  // stacked down the side: the top strip's lines, then each tile under the one before
-  column: [[24, 1, 11, 2, 1], [24, 4, 16, 2, 1], [24, 8, 16, 6, 2], [24, 15, 16, 6, 2], [24, 22, 16, 6, 2], [24, 29, 16, 6, 2, 1]],
-  // the top strip across, then two columns: EXP an hour and mesos, EXP gained and the potion
-  corner: [[12, 3, 18, 3, 1], [40, 3, 12, 3, 1], [12, 8, 19, 12, 3], [33, 8, 19, 12, 3], [12, 22, 19, 12, 3], [33, 22, 19, 12, 3, 1]],
+  // the top strip across, EXP an hour with the four columns under it on the left, the timers stacked on the right
+  hero: [[2, 3, 24, 3, 1], [48, 3, 14, 3, 1], [2, 8, 42, 11, 2, 'e'], [2, 21, 9, 11, 2], [13, 21, 9, 11, 2], [24, 21, 9, 11, 2], [35, 21, 9, 11, 2], [46, 8, 16, 11, 2, 'l'], [46, 21, 16, 11, 2, 'l']],
+  // one slim row: EXP an hour, the four columns, the timers, the buttons at the right end
+  bar: [[2, 12, 13, 12, 2, 'e'], [17, 14, 6, 8, 1], [24, 14, 6, 8, 1], [31, 14, 6, 8, 1], [38, 14, 6, 8, 1], [46, 12, 6, 12, 2, 'l'], [53, 12, 6, 12, 2, 'l'], [60, 13, 3, 3, 1], [60, 17, 3, 3, 1], [60, 21, 3, 3, 1]],
+  // stacked down the side: the top strip, EXP an hour, the timers, the numbers as rows
+  column: [[22, 1, 20, 2, 1], [22, 4, 20, 7, 2, 'e'], [22, 12, 20, 5, 1, 'l'], [22, 18, 20, 5, 1, 'l'], [22, 24, 20, 2, 1], [22, 27, 20, 2, 1], [22, 30, 20, 2, 1], [22, 33, 20, 2, 1]],
+  // the top strip across, EXP an hour, the timers side by side, the four columns along the bottom
+  corner: [[12, 2, 40, 3, 1], [12, 7, 40, 9, 2, 'e'], [12, 18, 19, 8, 2, 'l'], [33, 18, 19, 8, 2, 'l'], [12, 28, 9, 7, 1], [22, 28, 9, 7, 1], [33, 28, 9, 7, 1], [43, 28, 9, 7, 1]],
 };
 const NS = 'http://www.w3.org/2000/svg';
 function picture(l) {
   const svg = document.createElementNS(NS, 'svg');
   svg.setAttribute('viewBox', '0 0 64 36'); svg.setAttribute('aria-hidden', 'true');
-  for (const [x, y, width, height, rx, lit] of PICS[l] || []) {
+  for (const [x, y, width, height, rx, what] of PICS[l] || []) {
     const r = document.createElementNS(NS, 'rect');
     for (const [k, v] of Object.entries({ x, y, width, height, rx })) r.setAttribute(k, v);
-    if (lit) r.setAttribute('class', 'l');
+    if (what) r.setAttribute('class', what);
     svg.append(r);
   }
   return svg;
@@ -52,7 +52,7 @@ function updateLine(r) {
 
 function build(o) {
   const el = o.el, app = o.app || null;
-  const btn = (label, onclick, cls) => el('button', { type: 'button', class: 'g-set-btn' + (cls ? ' ' + cls : ''), onclick }, label);
+  const btn = (label, onclick, cls) => el('button', { type: 'button', class: 'g-set-btn k-btn sm' + (cls === 'k' ? ' key k' : cls ? ' ' + cls : ''), onclick }, label);
   const section = (cls, title, ...kids) => el('section', { class: 'g-set-sec ' + cls }, title ? el('h3', {}, title) : null, ...kids);
   const sw = (id, label, onclick) => el('button', { type: 'button', id, class: 'g-set-sw', 'aria-pressed': 'false', 'aria-label': label, onclick });
   const flip = b => b.getAttribute('aria-pressed') !== 'true';
@@ -67,9 +67,9 @@ function build(o) {
     A.see = el('input', { type: 'range', id: 'g-set-see', class: 'g-set-see', min: '25', max: '100', step: '5', value: '100', oninput: () => o.onSee(+A.see.value) });
     A.seeN = el('span', { class: 'g-set-num' }, '100%');
     A.scale = 100;
-    A.smaller = el('button', { type: 'button', id: 'g-set-smaller', class: 'g-set-btn g-set-step', 'aria-label': 'Smaller', onclick: () => o.onSize(Math.max(60, A.scale - 10)) }, '−');
+    A.smaller = el('button', { type: 'button', id: 'g-set-smaller', class: 'g-set-btn g-set-step k-sq', 'aria-label': 'Smaller', onclick: () => o.onSize(Math.max(60, A.scale - 10)) }, '−');
     A.sizeN = el('span', { class: 'g-set-num' }, '100%');
-    A.bigger = el('button', { type: 'button', id: 'g-set-bigger', class: 'g-set-btn g-set-step', 'aria-label': 'Bigger', onclick: () => o.onSize(Math.min(160, A.scale + 10)) }, '+');
+    A.bigger = el('button', { type: 'button', id: 'g-set-bigger', class: 'g-set-btn g-set-step k-sq', 'aria-label': 'Bigger', onclick: () => o.onSize(Math.min(160, A.scale + 10)) }, '+');
     A.top = sw('g-set-top', 'Always on top of the game', () => o.onTop(flip(A.top)));
     A.pass = sw('g-set-pass', 'Clicks pass through to the game', () => o.onPass(flip(A.pass)));
     appRows.push(
@@ -79,7 +79,7 @@ function build(o) {
       el('div', { class: 'g-set-row' }, el('span', { class: 'g-set-lbl' }, 'Clicks pass through to the game', el('small', {}, 'Its buttons still take clicks')), A.pass));
   }
 
-  // Tracking: Count my loot, the same switch as the page's left column. This map stays on the page only (Rimmah,
+  // Tracking: Count my loot, the same switch as the page's Count my loot button. This map stays on the page only (Rimmah,
   // 2026-11-04: not needed here)
   const loot = el('button', { type: 'button', id: 'g-set-loot', class: 'g-set-sw', 'aria-pressed': 'false', 'aria-label': 'Count my loot',
     onclick: () => o.onLoot(loot.getAttribute('aria-pressed') !== 'true') });
@@ -102,13 +102,13 @@ function build(o) {
   // (the app's version and its update check are on the main window: grind.js, with updateLine)
   const root = el('div', { id: 'g-set', class: 'g-set', role: 'dialog', 'aria-label': 'Settings' },
     el('header', { class: 'g-set-h' }, el('h2', {}, 'Settings'),
-      el('button', { type: 'button', class: 'g-set-x', title: 'Close Settings', 'aria-label': 'Close Settings', onclick: () => o.onClose() }, '×')),
+      el('button', { type: 'button', class: 'g-set-x k-sq', title: 'Close Settings', 'aria-label': 'Close Settings', onclick: () => o.onClose() }, (window.Grind && window.Grind.railIcon && window.Grind.railIcon('close')) || '×')),
     el('div', { class: 'g-set-body' },
       section('g-set-ov', 'Overlay', el('div', { class: 'g-set-pics' }, pics), ...appRows),
       section('g-set-tr', 'Tracking',
         el('div', { class: 'g-set-row' }, el('span', { class: 'g-set-lbl' }, 'Count my loot', el('small', {}, 'Flip through Equip, Use and Etc at the start and the end')), loot)),
       section('g-set-you', 'You', who,
-        el('div', { class: 'g-set-links' }, btn('Open my profile', () => o.onProfile(), 'k'), btn('Builds ↗', open(o.links.builds)), btn('Appraiser ↗', open(o.links.appraiser))))));
+        el('div', { class: 'g-set-links' }, btn('Open my profile', () => o.onProfile(), 'k'), btn('Builds ↗', open(o.links.builds))))));
 
   let userKey;   // who You was last drawn for, so a picture isn't fetched again on every update
   function update(s) {

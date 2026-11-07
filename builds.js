@@ -56,7 +56,7 @@ const CLASSES = {
 const BRANCHES = {
   warrior: { id: 'warrior', name: 'Warrior', job1: 100, advance: 10, npc: 'Dances with Balrog in Perion', paths: ['fighter', 'page', 'spearman'],
     skillOrder: [[1001001, 1], [1001002, 1], [1001001, 20], [1000002, 15], [1000000, 3], [1000001, 15], [1001002, 20], [1001000, 20]] },
-  magician: { id: 'magician', name: 'Magician', job1: 200, advance: 8, npc: 'Grendel the Really Old in Ellinia', paths: ['fpwizard', 'ilwizard', 'cleric'],
+  magician: { id: 'magician', name: 'Magician', job1: 200, advance: 10, npc: 'Grendel the Really Old in Ellinia', paths: ['fpwizard', 'ilwizard', 'cleric'],
     skillOrder: [[2001002, 1], [2001003, 20], [2001000, 20], [2000000, 15], [2000001, 10], [2001001, 20]] },
   bowman: { id: 'bowman', name: 'Bowman', job1: 300, advance: 10, npc: 'Athena Pierce in Henesys', paths: ['hunter', 'crossbowman'],
     skillOrder: [[3001001, 1], [3001002, 20], [3000001, 20], [3000000, 20], [3001000, 20], [3001001, 20]] },
@@ -976,7 +976,7 @@ const ASSUMED_LABEL = { ...LABEL, atkMin: 'attack range', atkMax: 'attack range'
 // for Read from game, none when typed by hand), and form.edited once the player changed something after that
 // lastPic: the picture Read from game read last ({ img, at }), kept for a report until the next one or a reload
 // find: the Train tab's item finder ({ q typed, id picked }), not saved anywhere; findBox is built once and kept
-const ui = { deps: null, data: null, root: null, form: { cls: 'cleric', v: {}, s: {} }, timer: 0, read: new Set(), lastPic: null,
+const ui = { deps: null, data: null, root: null, form: { cls: 'cleric', v: {}, s: {} }, fresh: true, timer: 0, read: new Set(), lastPic: null,
   find: { q: '', id: null }, findBox: null, findG: null };
 const FROM = ['mine', 'community', 'read', 'friend'];
 const E = (...a) => ui.deps.el(...a);
@@ -989,7 +989,7 @@ const fmt = n => Math.round(n).toLocaleString('en-US');
 function loadForm() {
   try {
     const f = JSON.parse(ui.deps.store.get('bt.calc'));
-    if (f && CLASSES[f.cls]) ui.form = { cls: f.cls, v: f.v || {}, s: f.s || {}, ...(FROM.includes(f.from) ? { from: f.from } : {}), ...(f.edited === true ? { edited: true } : {}) };
+    if (f && CLASSES[f.cls]) { ui.form = { cls: f.cls, v: f.v || {}, s: f.s || {}, ...(FROM.includes(f.from) ? { from: f.from } : {}), ...(f.edited === true ? { edited: true } : {}) }; ui.fresh = false; }
   } catch { /* nothing saved yet */ }
 }
 // The player changed the form by hand after it was loaded or read.
@@ -1004,7 +1004,7 @@ function buildForm() {
     ...(ui.read.has(key) ? { class: 'b-read' } : {}), oninput: e => { ui.read.delete(key); e.target.classList.remove('b-read'); on(e); typedIn(key); } }));
   const kids = [];
   ui.root.querySelector('#b-name').textContent = cls.name;
-  ui.root.querySelector('#b-avatar').textContent = cls.name[0];
+  ui.root.querySelector('#b-branch').textContent = BRANCHES[branchOf(cls.id)].name;
   const lvBox = ui.root.querySelector('#b-f-level'), lv = ui.form.v.level == null ? '' : String(ui.form.v.level);
   if (lvBox.value !== lv) lvBox.value = lv;
   lvBox.classList.toggle('b-read', ui.read.has('v:level'));
@@ -1071,14 +1071,16 @@ function pickClass(id) {
 // The four 1st job tiles and, under them, the picked tile's 2nd job paths.
 function renderTiles() {
   const br = branchOf(ui.form.cls), lv = formLevel();
-  ui.root.querySelector('#b-tiles').replaceChildren(...Object.values(BRANCHES).map(b => E('button', { type: 'button', class: 'b-tile', 'data-branch': b.id,
+  ui.root.querySelector('#b-tiles').replaceChildren(...Object.values(BRANCHES).map(b => E('button', { type: 'button', class: 'b-tile k-btn sm', 'data-branch': b.id,
     'aria-pressed': String(b.id === br), onclick: () => pickClass(b.paths.includes(ui.form.cls) ? ui.form.cls : b.paths[0]) }, b.name)));
   ui.root.querySelector('#b-paths').replaceChildren(E('span', { class: 'b-paths-label' }, lv < ADVANCE ? "Where you're heading" : 'Your 2nd job'),
-    ...BRANCHES[br].paths.map(id => E('button', { type: 'button', 'data-path': id, 'aria-pressed': String(id === ui.form.cls), onclick: () => pickClass(id) }, CLASSES[id].name)));
+    ...BRANCHES[br].paths.map(id => E('button', { type: 'button', class: 'k-btn sm', 'data-path': id, 'aria-pressed': String(id === ui.form.cls), onclick: () => pickClass(id) }, CLASSES[id].name)));
 }
 // The signed in player's own builds, one tap to open each; signed out, a nudge to sign in.
 async function renderMine() {
   const box = ui.root.querySelector('#b-mine'), s = me(), gen = ui.mineGen = (ui.mineGen || 0) + 1;
+  // signed out it is a quiet line at the character window's foot (CSS order), signed in My builds sit under the button row
+  box.classList.toggle('quiet', !s);
   if (!s) {
     box.replaceChildren(E('p', { class: 'small' }, 'Sign in with Discord to keep your characters here. ',
       E('button', { type: 'button', class: 'linkish', onclick: () => ui.deps.signIn && ui.deps.signIn() }, 'Sign in')));
@@ -1089,7 +1091,7 @@ async function renderMine() {
     if (gen !== ui.mineGen) return;
     const mine = rows.filter(b => b.user_id === s.user_id);
     box.replaceChildren(E('h3', {}, 'My builds'), mine.length
-      ? E('div', { class: 'b-mine-list' }, mine.map(b => E('button', { type: 'button', class: 'b-mine-card', onclick: () => fill(b.stats, b.class, 'mine') },
+      ? E('div', { class: 'b-mine-list' }, mine.map(b => E('button', { type: 'button', class: 'b-mine-card k-card', onclick: () => fill(b.stats, b.class, 'mine') },
         E('b', {}, b.ign), ' Lv ' + b.level + ' ' + (CLASSES[b.class] ? CLASSES[b.class].name : b.class))))
       : E('p', { class: 'small' }, 'Builds you save show up here.'));
   } catch (e) { if (gen === ui.mineGen) box.replaceChildren(E('p', { class: 'small' }, "Couldn't load your builds: " + e.message)); }
@@ -1098,7 +1100,6 @@ function changed() { edited(); saveForm(); clearTimeout(ui.timer); ui.timer = se
 
 const incText = inc => Object.entries(inc).filter(([k]) => STAT_NAME[k]).map(([k, v]) => STAT_NAME[k] + ' +' + v).join(', ');
 const range = (a, b) => a === b ? String(a) : a + ' to ' + b;
-const bar = pct => E('div', { class: 'b-bar' }, E('i', { style: 'width:' + Math.max(2, Math.min(100, pct)) + '%' }));
 // A row that waits behind "show more": hidden until the panel's button opens it.
 const extra = (node, i, keep) => { if (i >= keep) { node.classList.add('b-extra'); node.hidden = true; } return node; };
 // The panel's "show more" button, or nothing when every row already shows.
@@ -1111,20 +1112,20 @@ function moreButton(box, label) {
   } }, label));
 }
 const castsText = m => m.casts.toFixed(1) === '1.0' ? '1 cast a kill' : m.casts.toFixed(1) + ' casts a kill';
-const tile = (k, label, v, s) => E('div', { class: 'b-nowt', 'data-k': k }, E('div', { class: 'k' }, label), E('div', { class: 'v' }, v), E('div', { class: 's' }, s || ''));
+const tile = (k, label, v, s) => E('div', { class: 'b-nowt k-card', 'data-k': k }, E('div', { class: 'k' }, label), E('div', { class: 'v' }, v), E('div', { class: 's' }, s || ''));
 
 // The card's big numbers: the two stats this class cares about, magic or weapon attack, the attack per hit, and what a point is worth.
 function renderBig(g, cls) {
   const guess = k => g.assumed.includes(k);
-  const big = (k, v, sub, guessed) => E('div', { class: 'b-bigone' }, E('div', { class: 'k' }, k), E('div', { class: 'v' + (guessed ? ' guess' : '') }, v),
+  const big = (k, v, sub, guessed) => E('div', { class: 'b-bigone k-card' }, E('div', { class: 'k' }, k), E('div', { class: 'v' + (guessed ? ' guess' : '') }, v),
     guessed || sub ? E('div', { class: 's' }, guessed ? 'guessed' : sub) : null);
   const atk = ui.data.skills[g.phase === 1 ? cls.attack1 : cls.attack].name;
   // the attacks first and big (Heal ahead of Holy Arrow for a Cleric with points in it), then the stats: a six column
-  // grid where the attacks share one row and the three stats the next, so every row is full
+  // grid (CSS) where the attacks share one row and the three stats the next, so every row is full
   const skills = (g.heal ? [['heal', 'Heal, Lv ' + g.heal.level, fmt(g.heal.min) + ' to ' + fmt(g.heal.max), 'per undead hit, up to ' + g.heal.targets + ' at once. Estimated']] : [])
     .concat([['atk', atk, fmt(g.attack.min) + ' to ' + fmt(g.attack.max), 'per hit']]);
   ui.root.querySelector('#b-big').replaceChildren(
-    ...skills.map(([k, name, v, sub]) => { const t = big(name, v, sub); t.classList.add('sk', k); t.style.gridColumn = 'span ' + 6 / skills.length; return t; }),
+    ...skills.map(([k, name, v, sub]) => { const t = big(name, v, sub); t.classList.add('sk', k); return t; }),
     big(STAT_NAME[cls.mainStat], fmt(g.stats[cls.mainStat]), '', guess(cls.mainStat)),
     big(STAT_NAME[cls.reqStat], fmt(g.stats[cls.reqStat]), '', guess(cls.reqStat)),
     physical(cls) ? big('Weapon attack', fmt(g.weapon.W), '', ['wat', 'weapon', 'atkMin', 'atkMax'].some(guess)) : big('Magic', fmt(g.stats.magic), '', guess('magic')));
@@ -1152,11 +1153,9 @@ function renderOverview(g, cls) {
   const go = (tab, text) => E('button', { type: 'button', class: 'linkish b-go', 'data-go': tab, onclick: () => showTab(tab) }, text);
   const sec = text => E('h4', { class: 'b-sec' }, text);
   const rows = o.spots.map(x => ({ ...x, tag: x.row.skill === HEAL ? 'your skills now, estimated' : '' })).concat(o.maxed ? [{ ...o.maxed, tag: 'with ' + o.maxed.more + ' more points' }] : []);
-  const most = Math.max(1, ...rows.map(x => x.row.pace));
-  const row = x => E('div', { class: 'b-ovrow' },
-    E('div', {}, E('div', {}, E('b', {}, x.label), ' at ', E('b', { class: 'b-name' }, x.row.name), x.tag ? E('span', { class: 'b-chip' }, x.tag) : null),
-      E('div', { class: 'small' }, [x.row.map.replace(/^.*? : /, ''), castsText(x.row), x.row.hits > 1 ? x.row.hits + ' at a time' : ''].filter(Boolean).join(', ')),
-      bar(x.row.pace / most * 100)),
+  const row = x => E('div', { class: 'b-ovrow k-row' },
+    E('div', {}, E('div', {}, E('b', {}, x.label), ' at ', E('b', { class: 'b-name' }, x.row.name), x.tag ? [' ', E('span', { class: 'k-tag y' }, x.tag[0].toUpperCase() + x.tag.slice(1))] : null),
+      E('div', { class: 'small' }, [x.row.map.replace(/^.*? : /, ''), castsText(x.row), x.row.hits > 1 ? x.row.hits + ' at a time' : ''].filter(Boolean).join(', '))),
     E('div', { class: 'num b-hr' }, perHour(expHour(x.row.pace, g.sec))));
   const st = g.stages, end = st.length ? st[st.length - 1].to : g.stats.level, hrs = Math.round(g.stageHours * g.sec / STEP_SEC);
   const stageText = st.map(x => x.picks[0].name + ' with ' + (sk(x.picks[0].skill) || 'your attack') + (x.from === x.to ? ' at ' + x.from : ' from ' + x.from + ' to ' + x.to)).join(', then ');
@@ -1287,12 +1286,12 @@ function drawFind() {
   const head = m => E('div', {}, E('b', { class: 'b-name' }, m.name), ' ', E('span', { class: 'small' }, 'lv ' + m.level));
   const small = t => E('div', { class: 'small' }, t);
   const boxes = [
-    ...d.ranked.map((r, i) => E('div', { class: 'b-fbox' + (i ? '' : ' first') }, head(r), small(shortMap(r.map) + ', ' + r.hit + '% hit'),
+    ...d.ranked.map((r, i) => E('div', { class: 'b-fbox k-card' + (i ? '' : ' first') }, head(r), small(shortMap(r.map) + ', ' + r.hit + '% hit'),
       E('div', { class: 'b-fbig' }, 'About ', E('b', { class: 'num' }, perHour(r.expHour))),
-      E('div', { class: 'small' }, fmt(Math.round(r.kills / 10) * 10) + ' kills an hour', i && r === most ? [' ', E('span', { class: 'b-chip up' }, 'most kills')] : null),
+      E('div', { class: 'small' }, fmt(Math.round(r.kills / 10) * 10) + ' kills an hour', i && r === most ? [' ', E('span', { class: 'k-tag' }, 'most kills')] : null),
       link(r.mapId))),
-    ...d.weak.map(m => E('div', { class: 'b-fbox dim' }, head(m), small('Too strong for you yet'), small(shortMap(m.map)), link(m.mapId))),
-    ...d.others.map(m => E('div', { class: 'b-fbox dim' }, head(m),
+    ...d.weak.map(m => E('div', { class: 'b-fbox k-card dim' }, head(m), small('Too strong for you yet'), small(shortMap(m.map)), link(m.mapId))),
+    ...d.others.map(m => E('div', { class: 'b-fbox k-card dim' }, head(m),
       m.mapId != null ? [small('Not a training spot'), small(shortMap(m.map)), link(m.mapId)] : small('No map for it in the game files')))];
   out.replaceChildren(
     E('div', { class: 'b-fhead' }, itemPic(id), E('div', {}, E('b', { class: 'b-name' }, name), small(gear ? gear.slot + ', lv ' + gear.level + ', ' + wearers(gear.job) : kindOf(id, name)))),
@@ -1304,7 +1303,7 @@ function drawFind() {
 
 function renderPanels(g) {
   loadPics();
-  const lv = g.stats.level, top = g.train.length ? g.train[0].pace : 1;
+  const lv = g.stats.level;
   const train = ui.root.querySelector('#train'), h = g.here;
   const sec = text => E('h4', { class: 'b-sec' }, text), ahead = g.stages.length ? g.stages[g.stages.length - 1].to - lv : 0;
   const where = m => shortMap(m.map);
@@ -1317,7 +1316,7 @@ function renderPanels(g) {
     box.append(E('div', { class: 'b-dropall' }, dropList(m, dg, lv)));
     btn.textContent = 'Hide drops';
   };
-  const tryAll = E('section', { id: 'b-tryall', class: 'b-dropall', hidden: '' });
+  const tryAll = E('section', { id: 'b-tryall', class: 'b-dropall k-card', hidden: '' });
   const openTry = (btn, m, dg) => {
     const again = !tryAll.hidden && tryAll.dataset.mob === String(m.id);
     train.querySelectorAll('.b-tryone .b-seeall').forEach(b => { b.textContent = b.dataset.label; });
@@ -1333,14 +1332,14 @@ function renderPanels(g) {
   if (train.firstChild !== finder) train.prepend(finder);
   train.append(
     sec('Train here now'),
-    h ? E('div', { class: 'b-here' }, E('div', {}, E('b', { class: 'b-name' }, h.name), ' ', E('span', { class: 'small' }, 'lv ' + h.level)),
+    h ? E('div', { class: 'b-here k-card' }, E('div', {}, E('b', { class: 'b-name' }, h.name), ' ', E('span', { class: 'small' }, 'lv ' + h.level)),
       E('div', { class: 'small' }, [where(h), castsText(h), h.hit + '% hit', fmt(h.exp) + ' EXP each', crowd(h)].filter(Boolean).join(', ')),
       E('div', { class: 'b-hrbig' }, 'About ', E('b', { class: 'num' }, perHour(h.expHour)), h.skill === HEAL ? ' with Heal' : ''),
       dropsLine(h, lv, 3, openHere))
       : E('p', { class: 'small' }, 'Nothing you can kill yet.'),
     E('p', { class: 'small b-tune' }, 'EXP an hour: ' + tuneText(g.tune)),
     sec('Worth a try'),
-    g.tryNext.length ? E('div', { class: 'b-try' }, g.tryNext.map(m => E('div', { class: 'b-tryone' },
+    g.tryNext.length ? E('div', { class: 'b-try' }, g.tryNext.map(m => E('div', { class: 'b-tryone k-card' },
       E('b', {}, m.name), ' ', E('span', { class: 'small' }, 'lv ' + m.level), E('div', { class: 'small' }, [where(m), castsText(m), m.hit + '% hit', crowd(m)].filter(Boolean).join(', ')),
       dropsLine(m, lv, 1, openTry))))
       : E('p', { class: 'small' }, 'Nothing up to 8 levels above you that you hit often enough yet.'),
@@ -1348,12 +1347,11 @@ function renderPanels(g) {
     sec(ahead > 0 ? 'Your next ' + ahead + ' levels' : 'From here'),
     E('ul', { class: 'b-time' }, g.stages.map(st => E('li', { class: 'b-ev b-stage' }, E('span', { class: 'num' }, range(st.from, st.to)),
       E('span', {}, E('b', {}, st.picks.map(m => m.name).join(', ')), ' ', E('span', { class: 'small' }, st.picks.map(where).filter((x, i, a) => a.indexOf(x) === i).join(', ')),
-        st.why ? [' ', E('span', { class: 'b-chip up' }, st.why)] : null)))),
+        st.why ? [' ', E('span', { class: 'k-tag' }, st.why)] : null)))),
     sec('Every map, ranked'),
     ...g.train.map((m, i) => extra(E('div', { class: 'b-mob' },
       E('div', {}, E('div', {}, E('b', { class: 'b-name' }, m.name), ' ', E('span', { class: 'small' }, 'lv ' + m.level)),
-        E('div', { class: 'small' }, [m.map, castsText(m), m.hit + '% hit', fmt(m.hp) + ' HP', crowd(m)].filter(Boolean).join(', ')),
-        bar(m.pace / top * 100)),
+        E('div', { class: 'small' }, [m.map, castsText(m), m.hit + '% hit', fmt(m.hp) + ' HP', crowd(m)].filter(Boolean).join(', '))),
       E('div', { class: 'num' }, E('div', { class: 'n b-hr' }, perHour(m.expHour)), E('div', { class: 'small' }, fmt(m.exp) + ' EXP a kill'))), i, 0)),
     E('p', { class: 'small b-foot' }, 'Ranked by EXP over time: casts to kill, from a few thousand simulated kills with your damage range, crits, monster defense and hit chance, plus about 2 casts of walking between kills. So a monster you one shot only wins if its EXP holds up. ',
       'Skills that hit several monsters get credit for about one monster in reach for every ' + CROWD + ' the map spawns, and each extra one costs a cast of walking to gather. ',
@@ -1364,7 +1362,7 @@ function renderPanels(g) {
 
   const pts = pointsPlan(g), chip = { ap: 'AP', sp: 'SP', up: 'upgrade', job: 'job' };
   const row = e => E('li', { class: 'b-ev', 'data-from': String(e.from) }, E('span', { class: 'num' }, e.now ? 'Now' : range(e.from, e.to)),
-    E('span', {}, E('b', {}, e.text), e.note ? E('span', { class: 'small' }, ' ' + e.note) : null, ' ', E('span', { class: 'b-chip ' + e.kind }, chip[e.kind])));
+    E('span', {}, E('b', {}, e.text), e.note ? E('span', { class: 'small' }, ' ' + e.note) : null, ' ', E('span', { class: 'k-tag' + (e.kind === 'sp' ? ' y' : '') }, chip[e.kind])));
   const now = Object.keys(g.skills.now).map(id => ui.data.skills[id].name + ' ' + g.skills.now[id]).join(', ');
   const points = ui.root.querySelector('#points');
   points.replaceChildren(E('ul', { class: 'b-time' }, pts.shown.map(row), pts.rest.map(e => extra(row(e), 1, 0))),
@@ -1376,7 +1374,7 @@ function renderPanels(g) {
   gear.replaceChildren(E('div', { class: 'b-gear' }, g.gear.map(s => {
     const cur = s.rows.filter(r => r.level <= lv).pop(), nxt = s.rows.find(r => r.level > lv);
     const item = r => [E('b', {}, r.name), ' (' + r.level + (incText(r.inc) ? ', ' + incText(r.inc) : '') + ') ', r.craft ? E('span', { class: 'b-craft' }, 'craft') : null];
-    return E('div', { class: 'b-gcard' }, E('div', { class: 'k' }, s.slot),
+    return E('div', { class: 'b-gcard k-card' }, E('div', { class: 'k' }, s.slot),
       E('div', { class: 'b-item' }, cur ? item(cur) : E('span', { class: 'small' }, 'Nothing for your level yet')),
       nxt ? E('div', { class: 'small' }, 'Next: ', E('b', {}, nxt.name), ' at ' + nxt.level) : null,
       extra(E('ul', { class: 'b-ladder' }, s.rows.map(r => E('li', {}, item(r)))), 1, 0));
@@ -1405,8 +1403,8 @@ function renderPaths(g, cls) {
     return;
   }
   const scale = g.sec / STEP_SEC, hrs = h => isFinite(h) ? Math.round(h * scale) + ' hours' : 'a long time';
-  const col = x => E('div', { class: 'b-pcol' + (x.id === g.paths.best ? ' best' : '') },
-    E('div', { class: 'top' }, E('b', {}, x.name), x.id === g.paths.best ? E('span', { class: 'b-pill' }, 'Recommended') : null),
+  const col = x => E('div', { class: 'b-pcol k-card' + (x.id === g.paths.best ? ' best' : '') },
+    E('div', { class: 'top' }, E('b', {}, x.name), x.id === g.paths.best ? E('span', { class: 'k-tag' }, 'Recommended') : null),
     E('p', { class: 'small' }, x.how),
     E('p', {}, 'About ', E('b', { class: 'num' }, hrs(x.hours)), ' of grinding to ' + g.paths.target + (x.needsReset ? '. Needs an SP Reset Scroll from the Cash Shop.' : '.')),
     E('table', { class: 'b-table' },
@@ -1416,7 +1414,7 @@ function renderPaths(g, cls) {
         : E('tr', {}, E('td', { class: 'n' }, String(r.level)), E('td', {}, r.skill ? name(r.skill) : ''),
           E('td', { class: 'n' }, r.attack ? r.attack.min + ' to ' + r.attack.max : ''), E('td', {}, r.spot || 'nothing yet'),
           E('td', { class: 'n b-hr' }, r.pace ? perHour(expHour(r.pace, g.sec)) : '0/hr'))))));
-  box.replaceChildren(E('h4', { class: 'b-sec' }, 'Ways to spend your skill points'), E('div', { class: 'b-here' }, g.paths.why),
+  box.replaceChildren(E('h4', { class: 'b-sec' }, 'Ways to spend your skill points'), E('div', { class: 'b-here k-card' }, g.paths.why),
     E('div', { class: 'b-pcols' }, g.paths.paths.map(col)),
     E('p', { class: 'small b-foot' }, 'Each path starts from the points you have now and puts every new point where it says. EXP an hour is at the best spot for that level. ' +
       'Next SP and the Points tab follow the recommended path. ' + (g.paths.estimated ? g.paths.estimated + ' ' : '') + tuneText(g.tune)));
@@ -1437,7 +1435,8 @@ function standingText(st) {
 // Scrolls tab: where you stand, a card per slot with the three tiers priced from Cozy, and what a stat is worth.
 // Item pictures from the client, the same sheet Count my loot uses (data/loot-icons.*, npm run boss:grind), loaded the
 // first time the Scrolls tab draws a card; a card drawn before then gets its picture when the sheet arrives.
-function itemPic(id) { const e = E('div', { class: 'b-icon', 'data-item': String(id || ''), 'aria-hidden': 'true' }); paintPic(e); return e; }
+// the picture sits in a ring (the kit's) wherever a row has one: .b-icon is the 38 pixel cell inside it
+function itemPic(id) { const e = E('div', { class: 'b-icon', 'data-item': String(id || ''), 'aria-hidden': 'true' }); paintPic(e); return E('span', { class: 'k-ring', 'aria-hidden': 'true' }, e); }
 function paintPic(e) {
   const L = ui.pics, k = L && L.items[e.dataset.item] ? L.items[e.dataset.item][3] : null;
   if (k == null) return;
@@ -1454,13 +1453,13 @@ function loadPics() {
 function renderScrolls(g) {
   const box = ui.root.querySelector('#scrolls'), st = g.standing;
   const mobs = st ? plural(st.mob) : '', expAt = x => x > 0 ? '+' + x + '%' : 'no change';
-  const say = st ? E('div', { class: 'b-here' }, 'You train best at ', E('b', {}, mobs), ': ' + (ui.data.skills[st.skill] ? ui.data.skills[st.skill].name : 'your attack') + ' takes about ',
+  const say = st ? E('div', { class: 'b-here k-card' }, 'You train best at ', E('b', {}, mobs), ': ' + (ui.data.skills[st.skill] ? ui.data.skills[st.skill].name : 'your attack') + ' takes about ',
     E('b', { class: 'num' }, st.casts.toFixed(1)), ' casts each.', E('div', { class: 'small', style: 'margin-top:6px' }, ...standingText(st))) : null;
   const cheapest = Math.min(...g.scrolls.flatMap(c => c.tiers.map(t => t.per1).filter(x => x !== null)));
   const most = Math.max(...g.scrolls.map(c => c.top));
   const cards = g.scrolls.map((c, i) => {
     const mid = c.tiers[1], name = STAT_NAME[c.stat];
-    const pill = i === 0 && c.best !== null ? E('span', { class: 'b-pill' }, 'best per meso') : c.top === most ? E('span', { class: 'b-pill warm' }, 'most damage') : null;
+    const pill = i === 0 && c.best !== null ? E('span', { class: 'k-tag' }, 'best per meso') : c.top === most ? E('span', { class: 'k-tag y' }, 'most damage') : null;
     const row = t => E('tr', { class: t.per1 !== null && t.per1 === cheapest ? 'best' : '' },
       E('td', {}, t.cozy ? E('a', { href: 'https://cozy.markets/items/' + t.cozy, target: '_blank', rel: 'noopener' }, t.tier) : t.tier),
       E('td', { class: 'n' }, t.rate + '%'),
@@ -1469,7 +1468,7 @@ function renderScrolls(g) {
       E('td', { class: 'n' }, expAt(t.exp)),
       E('td', { class: 'n' }, t.cost ? meso(t.cost) : ''),
       E('td', { class: 'n' }, t.per1 !== null ? meso(t.per1) : ''));
-    return E('div', { class: 'b-scard' },
+    return E('div', { class: 'b-scard k-card' },
       E('div', { class: 'top' }, itemPic(c.itemId), E('div', {}, E('b', { class: 'b-slot' }, c.slot), ' ', E('span', {}, c.family.startsWith(c.slot + ' ') ? c.family.slice(c.slot.length + 1) : c.family)), pill),
       E('div', { class: 'small' }, c.slots + ' slots on your ' + c.item + '. Intermediates (60%) should add +' + mid.expect + ' ' + name +
         (st ? ', about ' + (mid.exp > 0 ? mid.exp + '% more EXP an hour at ' + mobs : 'no change at ' + mobs) : '') + '.'),
@@ -1730,7 +1729,7 @@ function openReader() {
     btn.hidden = true; note.textContent = "Open your Character Stat window with DETAIL, then your Skill window, and click through your 1st and 2nd job tabs. Every box it fills is marked so you can check it. Reading happens on your computer, and your game pictures stay there unless you send one with a Something off? report.";
     const area = E('div', { class: 'r-area' });
     panel.append(area, E('ul', { id: 'r-check' }), E('p', { id: 'r-status' }), E('div', { id: 'r-msg' }));
-    ui.capture = window.Reader.capture(area, { el: E, onImage,
+    ui.capture = window.Reader.capture(area, { el: (t, a, ...k) => E(t, t === 'button' ? { ...a, class: 'k-btn sm' } : a, ...k), onImage,
       say: t => { rd.status = t; renderReader(); },
       onState: (state, why) => {
         if (state === 'sharing') { rd = newSession(); rd.status = 'Watching your game window. It stops by itself once everything is read.'; }
@@ -1781,16 +1780,15 @@ function typedStats() {
 }
 
 function renderSave() {
-  const box = ui.root.querySelector('#b-save'), s = me(), ed = ui.editing;
+  const box = ui.root.querySelector('#b-savebody'), s = me(), ed = ui.editing;
+  ui.root.querySelector('#b-savetitle').textContent = s && ed ? 'Edit ' + ed.ign : 'Save this build';
   if (!s) {
-    box.replaceChildren(E('h3', {}, 'Save this build'),
-      E('p', {}, 'Sign in with Discord to save this build. Saved builds show the character name you type, never your Discord name.'),
-      E('button', { type: 'button', onclick: () => ui.deps.signIn && ui.deps.signIn() }, 'Sign in with Discord'));
+    box.replaceChildren(E('p', {}, 'Sign in with Discord to save this build. Saved builds show the character name you type, never your Discord name.'),
+      E('button', { type: 'button', class: 'k-btn', onclick: () => ui.deps.signIn && ui.deps.signIn() }, 'Sign in with Discord'));
     return;
   }
   const field = (id, label, value, max, cls) => E('label', cls ? { class: cls } : {}, label, E('input', { id, maxlength: String(max), value: value || '', autocomplete: 'off' }));
-  box.replaceChildren(E('h3', {}, ed ? 'Edit ' + ed.ign : 'Save this build'),
-    E('p', { class: 'small' }, 'Saves the stats in the calculator above. Anyone can see saved builds.'),
+  box.replaceChildren(E('p', { class: 'small' }, 'Saves the stats in the calculator above. Anyone can see saved builds.'),
     E('div', { class: 'b-row' },
       field('b-ign', 'Character name', ed ? ed.ign : ui.lastIgn, 12),
       field('b-trains', 'Where you train', ed ? ed.trains_at : '', 80, 'grow')),
@@ -1798,8 +1796,8 @@ function renderSave() {
       field('b-note', 'Note (gear, scrolls, anything)', ed ? ed.note : '', 280, 'grow'),
       E('label', {}, ed && ed.shot_path ? 'Replace equip screenshot' : 'Equip screenshot (optional)', E('input', { id: 'b-shot', type: 'file', accept: 'image/*' }))),
     E('div', { class: 'b-row' },
-      E('button', { id: 'b-savebtn', type: 'button', onclick: save }, ed ? 'Save changes' : 'Save this build'),
-      ed ? E('button', { type: 'button', onclick: () => { ui.editing = null; renderSave(); } }, 'Cancel') : null),
+      E('button', { id: 'b-savebtn', type: 'button', class: 'k-btn key', onclick: save }, ed ? 'Save changes' : 'Save this build'),
+      ed ? E('button', { type: 'button', class: 'k-btn', onclick: () => { ui.editing = null; renderSave(); } }, 'Cancel') : null),
     E('p', { id: 'b-savemsg' }));
 }
 
@@ -1846,7 +1844,7 @@ function renderFilters() {
 function card(b) {
   const s = me(), mine = s && b.user_id === s.user_id, admin = ui.deps.admin && ui.deps.admin();
   const cls = CLASSES[b.class];
-  return E('article', { class: 'b-card' },
+  return E('article', { class: 'b-card k-card' },
     E('h4', {}, b.ign),
     E('p', { class: 'b-nums' }, 'Lv ' + b.level + ' ' + (cls ? cls.name : b.class) + (b.hidden ? ', hidden' : '')),
     E('p', {}, statLine(b)),
@@ -1854,13 +1852,13 @@ function card(b) {
     b.note ? E('p', { class: 'muted' }, b.note) : null,
     b.shot_path ? E('img', { src: ui.deps.api.shotUrl(b.shot_path), alt: b.ign + "'s equipment", loading: 'lazy' }) : null,
     E('div', { class: 'b-actions' },
-      E('button', { type: 'button', onclick: () => {
+      E('button', { type: 'button', class: 'k-btn sm', onclick: () => {
         if (ui.editing && ui.editing.id !== b.id) { ui.editing = null; renderSave(); }
         fill(b.stats, b.class, mine ? 'mine' : 'community'); ui.root.scrollIntoView({ behavior: 'smooth' });
       } }, 'Load into calculator'),
-      mine ? E('button', { type: 'button', onclick: () => { ui.editing = b; fill(b.stats, b.class, 'mine'); renderSave(); setOpen('b-save', true); ui.root.querySelector('#b-save').scrollIntoView({ behavior: 'smooth' }); } }, 'Edit') : null,
-      mine ? E('button', { type: 'button', onclick: () => remove(b) }, 'Delete') : null,
-      admin && !mine ? E('button', { type: 'button', onclick: () => ui.deps.api.hideBuild(b.id).then(loadList, e => alert(e.message)) }, 'Hide') : null));
+      mine ? E('button', { type: 'button', class: 'k-btn sm', onclick: () => { ui.editing = b; fill(b.stats, b.class, 'mine'); renderSave(); setOpen('b-save', true); ui.root.querySelector('#b-save').scrollIntoView({ behavior: 'smooth' }); } }, 'Edit') : null,
+      mine ? E('button', { type: 'button', class: 'k-btn sm', onclick: () => remove(b) }, 'Delete') : null,
+      admin && !mine ? E('button', { type: 'button', class: 'k-btn sm', onclick: () => ui.deps.api.hideBuild(b.id).then(loadList, e => alert(e.message)) }, 'Hide') : null));
 }
 
 async function remove(b) {
@@ -1901,45 +1899,51 @@ function mount(root, deps) {
   loadForm();
   const editOpen = !!ui.deps.store.get('bt.bedit');
   const shut = open => open ? {} : { hidden: '' };
-  const btn = (id, label, onclick, more) => E('button', { id, type: 'button', class: 'g-btn', onclick, ...more }, label);
-  root.replaceChildren(E('div', { class: 'g-page b-page' },
-    // the buttons down the left, like the Grind tab's
-    E('aside', { class: 'g-rail', id: 'b-rail' }, E('div', { class: 'g-railin' },
-      E('div', { class: 'g-box g-acts' },
-        E('button', { id: 'b-readbtn', type: 'button', class: 'g-btn go', onclick: openReader }, 'Read from game'),
-        btn('b-edit', 'Edit stats and skills', () => toggle('b-drawer', 'bt.bedit'), { 'aria-controls': 'b-drawer', 'aria-expanded': String(editOpen) }),
-        btn('b-new', 'New build', newBuild),
-        btn('b-friend', "New friend's build", newFriendBuild, { title: "For a build that isn't your character" })),
-      E('div', { class: 'g-box g-acts' }, E('div', { class: 'g-boxh' }, 'Keep this character'),
-        btn('b-savetoggle', 'Save build', () => toggle('b-save'), { 'aria-controls': 'b-save', 'aria-expanded': 'false' }),
-        btn('b-browsetoggle', 'Community builds', () => toggle('b-browse'), { 'aria-controls': 'b-browse', 'aria-expanded': 'false' }),
-        E('p', { class: 'small' }, "Save it, or see other players' builds.")))),
-    E('div', { class: 'b-main' },
-    E('section', { class: 'b-calc' },
-      E('div', { id: 'b-mine', class: 'b-mine' }),
-      E('div', { class: 'b-picker' }, E('div', { id: 'b-tiles', class: 'b-tiles' }), E('div', { id: 'b-paths', class: 'b-paths' })),
-      E('div', { id: 'b-hero', class: 'b-hero' },
-        E('div', { id: 'b-avatar', class: 'b-avatar', 'aria-hidden': 'true' }),
-        E('div', { class: 'b-who' }, E('h2', { id: 'b-name' }),
-          E('div', { class: 'b-lv' },
-            E('button', { id: 'b-lvdown', type: 'button', class: 'b-step', 'aria-label': 'Level down', onclick: () => stepLevel(-1) }, '−'),
-            E('input', { id: 'b-f-level', inputmode: 'numeric', autocomplete: 'off', 'aria-label': 'Level', oninput: typeLevel }),
-            E('button', { id: 'b-lvup', type: 'button', class: 'b-step', 'aria-label': 'Level up', onclick: () => stepLevel(1) }, '+'),
-            E('span', { class: 'small' }, 'level'))),
+  const P = window.PixelIcons;
+  // a wood sign button with its pixel picture (the Grind page's buttons); the minus is built from the same bitmap tool
+  const sign = (id, icon, label, onclick, more) => E('button', { id, type: 'button', class: 'k-btn', onclick, ...more }, E('i', { 'aria-hidden': 'true' }, P.railIcon(icon)), E('span', {}, label));
+  const step = (id, label, d, glyph) => E('button', { id, type: 'button', class: 'k-sq', 'aria-label': label, title: label, onclick: () => stepLevel(d) }, glyph);
+  const glyph = rows => { const t = document.createElement('template'); t.innerHTML = P.pixelSvg(rows); const s = t.content.firstChild; s.setAttribute('width', String(rows[0].length * 2)); s.setAttribute('height', String(rows.length * 2)); return s; };
+  const minus = () => glyph(['#####']), plus = () => glyph(['..#..', '..#..', '#####', '..#..', '..#..']);
+  // a visitor with no class yet sees the class pills open; everyone else finds them behind Change class
+  const pickOpen = ui.fresh;
+  // one column: the character window (name, level, buttons, numbers), the guide window (tabs on its plank), then Save build and Community
+  // builds as windows of their own when open
+  root.replaceChildren(E('div', { class: 'k-col b-col' },
+    E('section', { id: 'b-char', class: 'k-win b-win' },
+      E('div', { class: 'k-bar k-grass' }, E('h2', { id: 'b-name' }), E('small', { id: 'b-branch' }),
+        E('button', { id: 'b-chgclass', type: 'button', class: 'b-chg', 'aria-controls': 'b-picker', 'aria-expanded': String(pickOpen), onclick: () => toggle('b-picker') }, 'Change class'),
+        E('span', { class: 'push b-lv' }, E('span', { class: 'b-lvl' }, 'Level'),
+          step('b-lvdown', 'Level down', -1, minus()),
+          E('input', { id: 'b-f-level', inputmode: 'numeric', autocomplete: 'off', 'aria-label': 'Level', oninput: typeLevel }),
+          step('b-lvup', 'Level up', 1, plus()))),
+      E('div', { class: 'k-pad b-pad' },
+        E('div', { class: 'k-tools', id: 'b-tools' },
+          E('button', { id: 'b-readbtn', type: 'button', class: 'k-btn key', onclick: openReader }, E('i', { 'aria-hidden': 'true' }, P.railIcon('frame')), E('span', {}, 'Read from game')),
+          sign('b-edit', 'gear', 'Edit stats and skills', () => toggle('b-drawer', 'bt.bedit'), { 'aria-controls': 'b-drawer', 'aria-expanded': String(editOpen) }),
+          sign('b-savetoggle', 'save', 'Save build', () => toggle('b-save'), { 'aria-controls': 'b-save', 'aria-expanded': 'false' }),
+          sign('b-new', 'plus', 'New build', newBuild),
+          sign('b-friend', 'plus', "New friend's build", newFriendBuild, { title: "For a build that isn't your character" }),
+          sign('b-browsetoggle', 'book', 'Community builds', () => toggle('b-browse'), { 'aria-controls': 'b-browse', 'aria-expanded': 'false' })),
+        E('div', { id: 'b-picker', class: 'b-picker', ...shut(pickOpen) }, E('div', { id: 'b-tiles', class: 'b-tiles' }), E('div', { id: 'b-paths', class: 'b-paths' })),
+        E('div', { id: 'b-mine', class: 'b-mine' }),
+        E('div', { id: 'b-reader', class: 'b-reader k-card', hidden: '' },
+          E('p', { id: 'b-readnote', class: 'small' }, 'Reads your stat and skill windows, from a shared game window or a screenshot.')),
+        E('div', { id: 'b-drawer', class: 'b-drawer k-card', ...shut(editOpen) }, E('div', { class: 'b-form' })),
         E('div', { id: 'b-big', class: 'b-big' }),
-        E('p', { id: 'b-msg' })),
-      E('div', { id: 'b-reader', class: 'b-reader', hidden: '' },
-        E('p', { id: 'b-readnote', class: 'small' }, 'Reads your stat and skill windows, from a shared game window or a screenshot.')),
-      E('div', { id: 'b-drawer', class: 'b-drawer', ...shut(editOpen) }, E('div', { class: 'b-form' }))),
-    E('section', { id: 'b-guide', hidden: '' },
-      estimatedNote(),
-      E('div', { class: 'b-dtabs', role: 'tablist' }, TABS.map(([id, name]) =>
-        E('button', { type: 'button', role: 'tab', 'data-tab': id, 'aria-controls': id, onclick: () => showTab(id) }, name))),
-      TABS.map(([id]) => E('section', { id, class: 'b-dpanel', role: 'tabpanel' }))),
-    E('section', { id: 'b-save', class: 'b-panel', hidden: '' }),
-    E('section', { id: 'b-browse', hidden: '' }, E('h2', {}, 'Builds'),
-      E('p', { class: 'lead' }, "Other players' characters, their stats and where they train. Load one into the calculator to see its guide."),
-      renderFilters(), E('div', { id: 'b-list' })))));
+        E('p', { id: 'b-msg' }))),
+    E('div', { id: 'b-guide', hidden: '' },
+      E('section', { id: 'b-guidewin', class: 'k-win b-win' },
+        E('div', { class: 'k-bar' }, E('div', { class: 'b-dtabs', role: 'tablist' }, TABS.map(([id, name]) =>
+          E('button', { type: 'button', role: 'tab', 'data-tab': id, 'aria-controls': id, onclick: () => showTab(id) }, name)))),
+        E('div', { class: 'k-pad b-gpad' },
+          TABS.map(([id]) => E('section', { id, class: 'b-dpanel', role: 'tabpanel' })),
+          estimatedNote()))),
+    E('section', { id: 'b-save', class: 'k-win b-win', hidden: '' }, E('div', { class: 'k-bar' }, E('span', { id: 'b-savetitle' }, 'Save this build')), E('div', { id: 'b-savebody', class: 'k-pad b-panel' })),
+    E('section', { id: 'b-browse', class: 'k-win b-win', hidden: '' }, E('div', { class: 'k-bar' }, E('h2', {}, 'Builds')),
+      E('div', { class: 'k-pad b-browsepad' },
+        E('p', { class: 'lead' }, "Other players' characters, their stats and where they train. Load one into the calculator to see its guide."),
+        renderFilters(), E('div', { id: 'b-list' })))));
   showTab(ui.deps.store.get('bt.btab'));
   buildForm();
   renderGuide();
@@ -1958,7 +1962,7 @@ function mount(root, deps) {
       return { canvas: c, at };
     } };
 }
-const estimatedNote = () => E('p', { id: 'b-estimated', class: 'b-badge', hidden: '' }, E('b', {}, 'Estimated. '), "Damage for this weapon comes from meowdb's table and hasn't been checked against a real stat window yet.");
+const estimatedNote = () => E('p', { id: 'b-estimated', class: 'k-foot b-badge', hidden: '' }, E('b', {}, 'Estimated. '), "Damage for this weapon comes from meowdb's table and hasn't been checked against a real stat window yet.");
 
 window.Builds = { comparePaths, PATHS, tuneSeconds, EXP_TABLE, STEP_SEC, expHour, hoursTo, healRange, HEAL, standingText, KILL_GAP, CLASSES, BRANCHES, branchOf, weaponsFor, mastery, physRange, spellRange, weaponAttackFromMax, WEAPONS, CHECKED_WEAPONS, windowRange, levelScale, hitChance, defend, elemMult, makeRng, castsToKill,
   validateStats, rankMobs, buildGuide, pointsPlan, mount, fill, refresh, shrinkImage, take, classOf,

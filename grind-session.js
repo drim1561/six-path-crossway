@@ -2,7 +2,7 @@
 // The EXP rules are Repot Run Live's (exp-tracker/live/index.html takeExp): an implausible jump waits for a second read,
 // a wrap from 80%+ to 20%- is a level up, a confirmed drop is a death. Potion counts change only when two reads agree;
 // down is used, up is bought.
-// window.GrindSession = { create, add, stats, countdown, minuteOf, toRow, fromRow }
+// window.GrindSession = { wholeRows, create, add, stats, countdown, minuteOf, toRow, fromRow }
 (function () {
 'use strict';
 
@@ -358,7 +358,7 @@ function etcOf(s) {
 // Once Equip, Use and Etc are each full since the last set they make a set; the first set and the latest are the ends
 // loot is counted between.
 // Slots come from grind.js as { r, c, n, key, name, price, kind, rank, pot } (pot: the potion ids sharing the picture).
-const BAG_TABS = ['Equip', 'Use', 'Etc'], PAGE_ROWS = 6, PAGE_COLS = 5, EMPTY_ROW = '||||', CLOSE_MS = 5000;
+const BAG_TABS = ['Equip', 'Use', 'Etc'], PAGE_ROWS = 6, PAGE_COLS = 5, EMPTY_ROW = '||||', CLOSE_MS = 5000, BAG_TICKS_MS = 8000;
 function pageOf(bag) {
   const rows = Array.from({ length: PAGE_ROWS }, () => Array(PAGE_COLS).fill('')), items = {};
   const unsure = new Set();
@@ -502,6 +502,20 @@ function between(s, a, now) {
   return { t: a.t, mins: act / 60000, expHr: (now.exp - a.exp) / hrs, costHr: cost / hrs, per1: pct >= 0.3 && cost > 0 ? cost / pct : null };
 }
 
+/* ---------- which map a run belongs to ---------- */
+
+function creditMap(s, exp) {
+  const M = s.mapExp || (s.mapExp = {});
+  M[s.mapNow] = (M[s.mapNow] || 0) + exp;
+  s.mapId = +Object.keys(M).reduce((a, b) => (M[b] > M[a] ? b : a));
+}
+// a pick by hand: the map the reader had was wrong, so what it earned there goes with the pick
+function pickMap(s, id) {
+  const M = s.mapExp;
+  if (M && s.mapNow != null && s.mapNow !== id && M[s.mapNow]) { M[id] = (M[id] || 0) + M[s.mapNow]; delete M[s.mapNow]; }
+  s.mapNow = id; s.mapId = id;
+}
+
 /* ---------- one reading ---------- */
 
 // reading: { t, exp, pct, level, counts: [{ key, id, name, price, value }], party }; any part null when unread
@@ -511,6 +525,8 @@ function add(s, r) {
   if (!('expFrom' in s)) { s.expFrom = s.gainExp || s.gainPct ? 0 : null; s.expTo = s.expFrom == null ? null : s.activeMs; }
   if (r.level && (!s.level || r.level > s.level)) s.level = r.level;   // a stale level read never undoes a level up
   if (s.levelStart == null && s.level) s.levelStart = s.level;
+  // the map the game shows: with no EXP yet the run follows it, after that the run is the map with the most EXP (creditMap)
+  if (r.map != null) { s.mapNow = r.map; if (!s.mapExp) s.mapId = r.map; }
   const b = bucket(s, t);
   if (r.exp != null && r.pct != null) {
     // over 30 seconds since the last EXP read (the share stopped, the page reloaded, the bar out of sight) is a pause:
@@ -527,6 +543,7 @@ function add(s, r) {
       // the EXP clock: where the active clock stood at the first kill and at the latest (a death isn't a kill)
       if (e.dExp > 0 || e.dPct > 0) { if (s.expFrom == null) s.expFrom = s.activeMs; s.expTo = s.activeMs; s.lastKillT = t; }
       if (e.dExp) { b.exp += e.dExp; b.pct += e.dPct; b.idle = false; }
+      if (e.dExp > 0 && s.mapNow != null) creditMap(s, e.dExp);
       if (e.dExp < 0) b.died = true;
     }
   }
@@ -565,6 +582,7 @@ function stats(s, t, avgExpPerKill) {
   o.expMin = rated ? s.gainExp / expMins : null;
   o.pctHr = rated ? s.gainPct / (expMins / 60) : null;
   const size = s.sizes[s.level] || (s.last && s.last.pct >= 5 ? s.last.exp / (s.last.pct / 100) : null);
+  o.expToLevel = size && s.last ? Math.max(0, size - s.last.exp) : null;
   o.hrsToLevel = size && s.last && o.expHr > 0 ? (size - s.last.exp) / o.expHr : null;   // never a time below zero
   // what deaths cost; a session from before this was kept estimates it from the minutes that went backwards
   const back = k => s.minutes.reduce((a, m) => a + (m[k] < 0 ? -m[k] : 0), 0);
@@ -672,11 +690,47 @@ function result(s, t) {
 function inTown(s) {
   return !!s.lastRefill && (!s.bag || !s.bag.last || s.lastRefill > s.bag.last.t) && !(s.lastKillT > s.lastRefill);
 }
+// Count my loot's Equip, Use and Etc list: a to do until the first full flip, three ticks for a moment after a flip, and back
+// only while a later flip is under way (the bag open, or gone for CLOSE_MS or less, with pages read and no set yet this opening)
+function bagListShows(s, t) {
+  const B = s && s.bag;
+  if (!B || !B.sets) return true;
+  if (t - B.last.t < BAG_TICKS_MS) return true;
+  if (B.last.t >= B.openT) return false;
+  if (!B.open && !(B.closedT != null && t - B.closedT <= CLOSE_MS)) return false;
+  return BAG_TABS.some(tab => B.done[tab] || (B.acc[tab] && B.acc[tab].strips.length));
+}
 // the player's usual mesos an hour on a map: earlier saved sessions there, counted the same way, 10 minutes or longer;
 // none until there are 3
 function usualOf(rows, { mapId, mode, exceptId }) {
-  const ok = (rows || []).filter(r => r.id !== exceptId && +r.map_id === +mapId && (r.loot_mode || 'track') === mode && r.result != null && r.result_min >= BEST_MIN_RESULT);
-  return ok.length >= 3 ? ok.reduce((x, r) => x + r.result / (r.result_min / 60), 0) / ok.length : null;
+  return standing(rows, { mapId, exceptId, metric: 'mesosHr', mode }).usual;
+}
+// one saved run's number for a metric, or null when it doesn't count (too short, no result, no potions)
+function rowValue(r, q) {
+  if (q.metric === 'mesosHr') return (r.loot_mode || 'track') === q.mode && r.result != null && r.result_min >= BEST_MIN_RESULT ? r.result / (r.result_min / 60) : null;
+  if (q.metric === 'expHr') { const min = r.exp_min != null ? r.exp_min : r.active_min; return min >= BEST_MIN_RESULT ? r.exp / (min / 60) : null; }
+  if (q.metric === 'potPer1') {
+    if (!(r.active_min >= BEST_MIN_RESULT) || !(r.pct >= 1) || !Array.isArray(r.potions)) return null;
+    const used = r.potions.reduce((a, p) => a + ((q.potIds || []).includes(+p.id) ? p.used || 0 : 0), 0);
+    return used > 0 ? used / r.pct : null;
+  }
+  return null;
+}
+// this run against the player's other runs on the same map: its rank, the best of the others (and when), and their plain
+// average once there are 3. Potions per 1% is better the lower it is
+function standing(rows, q) {
+  const lowerBetter = q.metric === 'potPer1';
+  const others = [];
+  for (const r of rows || []) {
+    if (r.id === q.exceptId || +r.map_id !== +q.mapId) continue;
+    const v = rowValue(r, q);
+    if (v != null && isFinite(v)) others.push({ v, t: Date.parse(r.started_at) });
+  }
+  const has = q.value != null;
+  const better = has ? others.filter(o => lowerBetter ? o.v < q.value : o.v > q.value).length : 0;
+  const best = others.reduce((b, o) => !b || (lowerBetter ? o.v < b.v : o.v > b.v) ? o : b, null);
+  return { value: has ? q.value : null, rank: has ? better + 1 : null, of: others.length + (has ? 1 : 0), best: best && { v: best.v, t: best.t },
+    usual: others.length >= 3 ? others.reduce((a, o) => a + o.v, 0) / others.length : null };
 }
 const BEST_MIN_RESULT = 10;
 
@@ -761,5 +815,12 @@ function olderCard(s, row) {
     mesosOnly: o.mesosEarned - o.potCost, flipped: !!loot && o.mesosEarned - o.potCost < 0 && total >= 0, perPct: row.pct >= 1 ? total / row.pct : null, eat: live.eat, other: live.other };
 }
 
-window.GrindSession = { CFG, create, add, stats, countdown, countdowns, minuteOf, toRow, fromRow, mark, trade, keepMesos, rebase, lootOf, shopOf, learnPrice, result, usualOf, inTown };
+// The whole session as rows of 60 minutes, one row an hour (the strip in This run): each cell is that minute's EXP, a minute
+// with none (or a gap) is 0. Takes the session's minutes (objects with exp) or plain numbers; an empty list is no rows.
+function wholeRows(minutes) {
+  const xs = (minutes || []).map(m => typeof m === 'number' ? m : (m && m.exp > 0 ? m.exp : 0)), rows = [];
+  for (let i = 0; i < xs.length; i += 60) rows.push(xs.slice(i, i + 60));
+  return rows;
+}
+window.GrindSession = { CFG, wholeRows, create, add, stats, countdown, countdowns, minuteOf, toRow, fromRow, mark, trade, keepMesos, rebase, lootOf, shopOf, learnPrice, result, usualOf, standing, inTown, bagListShows, pickMap };
 })();

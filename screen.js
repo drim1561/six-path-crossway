@@ -1066,6 +1066,111 @@ function readShop(src, opts) {
   return r.ok ? r : { ok: false, reason: r.reason, box };
 }
 
-window.MapleScreen = { load, sizeOf, findExpLine, readExp, expGlyphs, measure, readLevel, readCounts, readIcon, readParty, levelArea, slotArea, partyArea,
+/* ---------- which map: the minimap window ---------- */
+
+// The minimap window sits at the top left with its picture's top at y 72, centred across a window as wide as the picture or
+// the map's name, so only x is unknown. It's drawn at the frame's height / 768, or / 720 on the Ideal UI Size (the level boxes'
+// measured stretch doesn't hold for it: 1.81 to 1.96 on frames where the window is at 1.875). The pictures (data/minimaps, half
+// size) are art on a see-through ground with dots drawn over them, so only solid pixels are scored, in colour: in brightness
+// alone a small picture fits inside most bigger ones. Real pictures score 0.79 (a window over part of it) to 0.97, frames with
+// no picture 0.56 at most. All numbers here are half size pixels.
+const MAP_W = 230, MAP_H = 300, MAP_TOP = 36, MAP_WIDEST = 150;   // the area read, the picture's top, the widest window
+const MAP_SURE = 0.72, MAP_GOOD = 0.9, MAP_LEAD = 0.1, MAP_KEEP = 6, MAP_SPLIT = 1.5, MAP_SPLIT_PX = 20;
+let maps = null, mapSpot = null;
+function loadMaps(sheet, index) {
+  const g = ctx2d(sheet.width, sheet.height); g.drawImage(sheet, 0, 0);
+  maps = Object.entries(index).map(([id, [x, y, w, h]]) => {
+    const d = g.getImageData(x, y, w, h).data, solid = [], few = [];
+    for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) {
+      const k = (r * w + c) * 4;
+      if (d[k + 3] > 200) { solid.push(k); if (r % 3 === 0 && c % 3 === 0) few.push(k); }
+    }
+    return { id: +id, w, h, d, solid, few };
+  }).filter(t => t.few.length >= 30);
+  mapSpot = null;
+}
+function mapArea(src, s) {
+  const g = ctx2d(MAP_W, MAP_H); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+  g.drawImage(src, 0, 0, MAP_W * 2 * s, MAP_H * 2 * s, 0, 0, MAP_W, MAP_H);
+  return g.getImageData(0, 0, MAP_W, MAP_H).data;
+}
+function mapScore(f, t, list, ox, oy) {
+  if (ox < 0 || oy < 0 || ox + t.w > MAP_W || oy + t.h > MAP_H) return -1;
+  let n = 0, a = 0, b = 0, aa = 0, bb = 0, ab = 0, g = 0, gg = 0;
+  for (const k of list) {
+    const i = k >> 2, r = (i / t.w) | 0, at = ((r + oy) * MAP_W + i - r * t.w + ox) * 4;
+    for (let c = 0; c < 3; c++) { const A = t.d[k + c], B = f[at + c]; a += A; b += B; aa += A * A; bb += B * B; ab += A * B; }
+    n += 3; g += f[at + 1]; gg += f[at + 1] * f[at + 1];
+  }
+  // a flat box (a window over the picture, a black screen) has only the gaps between its channels to correlate with: not a match
+  const m = n / 3;
+  if (gg / m - (g / m) * (g / m) < 40) return 0;
+  const den = (n * aa - a * a) * (n * bb - b * b);
+  return den > 0 ? (n * ab - a * b) / Math.sqrt(den) : 0;
+}
+// every picture across the row where it could sit, on a ninth of its pixels; the best few again on all of them
+function searchMaps(f) {
+  return maps.map(t => {
+    let v = -1, x = 0;
+    for (let ox = 0, end = Math.max(4, (MAP_WIDEST - t.w) >> 1); ox <= end; ox++) { const u = mapScore(f, t, t.few, ox, MAP_TOP); if (u > v) { v = u; x = ox; } }
+    return { t, v, x };
+  }).sort((a, b) => b.v - a.v).slice(0, MAP_KEEP).map(q => {
+    let v = -1, x = q.x, y = MAP_TOP;
+    for (let oy = MAP_TOP - 1; oy <= MAP_TOP + 1; oy++) for (let ox = q.x - 2; ox <= q.x + 2; ox++) { const u = mapScore(f, q.t, q.t.solid, ox, oy); if (u > v) { v = u; x = ox; y = oy; } }
+    return { t: q.t, v, x, y };
+  }).sort((a, b) => b.v - a.v);
+}
+// two pictures this alike (Line 1 Area 3 and Area 4 differ in 9% of their pixels) are told apart on only those pixels.
+// 1: it's a, -1: it's b, 0: can't tell (the same picture, or too close to call)
+function splitMaps(f, a, b) {
+  const A = a.t, B = b.t;
+  let ea = 0, eb = 0, n = 0;
+  for (const k of A.solid) {
+    if (B.d[k + 3] <= 200 || Math.abs(A.d[k] - B.d[k]) + Math.abs(A.d[k + 1] - B.d[k + 1]) + Math.abs(A.d[k + 2] - B.d[k + 2]) <= 30) continue;
+    const i = k >> 2, r = (i / A.w) | 0, at = ((r + a.y) * MAP_W + i - r * A.w + a.x) * 4;
+    for (let c = 0; c < 3; c++) { ea += Math.abs(f[at + c] - A.d[k + c]); eb += Math.abs(f[at + c] - B.d[k + c]); }
+    n++;
+  }
+  if (n < MAP_SPLIT_PX) return 0;
+  return ea * MAP_SPLIT < eb ? 1 : eb * MAP_SPLIT < ea ? -1 : 0;
+}
+// a picture and its near twins at its spot: which it is, and any it can't be told from
+function settleMap(f, a, twins) {
+  let top = a; const also = [];
+  for (const t of twins) {
+    const b = { t, x: a.x, y: a.y }, w = splitMaps(f, top, b);
+    if (w < 0) top = b; else if (!w) also.push(t.id);
+  }
+  return { top, also };
+}
+// { ok, id, score, also: maps it can't be told from }. Where it last was first, near twins included, since walking from one
+// into the other still scores high at the same spot (a few ms). opts.search false: stop there
+function readMap(src, frameH, opts) {
+  if (!maps) return { ok: false, reason: 'no pictures' };
+  if (mapSpot && mapSpot.h === frameH) {
+    const f = mapArea(src, mapSpot.s), { top, also } = settleMap(f, mapSpot, mapSpot.near), v = mapScore(f, top.t, top.t.solid, top.x, top.y);
+    if (v >= MAP_SURE) {
+      if (top.t !== mapSpot.t) { mapSpot.near = mapSpot.near.filter(t => t !== top.t).concat(mapSpot.t); mapSpot.t = top.t; }
+      return { ok: true, id: top.t.id, score: v, also };
+    }
+  }
+  if (opts && opts.search === false) return { ok: false, reason: 'not there' };
+  mapSpot = null;
+  let at = null;
+  for (const s of [frameH / 768, frameH / 720]) {
+    const f = mapArea(src, s), rows = searchMaps(f);
+    if (!at || rows[0].v > at.rows[0].v) at = { s, f, rows };
+    if (at.rows[0].v >= MAP_GOOD) break;
+  }
+  const a = at.rows[0], near = at.rows.slice(1).filter(c => a.v - c.v < MAP_LEAD);
+  if (a.v < MAP_SURE) return { ok: false, reason: 'no match', score: a.v };
+  if (near.some(c => c.t.w !== a.t.w || c.t.h !== a.t.h)) return { ok: false, reason: 'unsure', score: a.v };
+  const twins = near.map(c => c.t), { top, also } = settleMap(at.f, a, twins);
+  mapSpot = { t: top.t, x: a.x, y: a.y, s: at.s, h: frameH, near: twins.filter(t => t !== top.t).concat(top.t === a.t ? [] : [a.t]) };
+  return { ok: true, id: top.t.id, score: a.v, also };
+}
+function mapHome(spot) { if (arguments.length) mapSpot = spot || null; return mapSpot; }
+
+window.MapleScreen = { loadMaps, readMap, mapHome, load, sizeOf, findExpLine, readExp, expGlyphs, measure, readLevel, readCounts, readIcon, readParty, levelArea, slotArea, partyArea,
   findMesoBox, mesoHome, mesoGlyphs, readMesos, invGeometry, readInventory, loadLoot, readBag, readScroll, readShop, shopHome };
 })();
