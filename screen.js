@@ -225,6 +225,7 @@ const LEVEL = 0.8, DIGIT = 0.85, NEXT = 0.8, ROUGH = 0.45;
 // First guess the window height / 768, then the EXP digit height; find a level box there and fine tune on that spot.
 function measure(src, line, frameH) {
   let top = { s: 0, score: -1 };
+  const tries = [];
   for (const g0 of [frameH / 768, line.digitH / 6.4]) {
     const a = levelArea(line, g0), img = region(src, a.x, a.y, a.w, a.h), set = setAt('level', g0), t0 = set['0'];
     if (!t0) break;
@@ -234,13 +235,34 @@ function measure(src, line, frameH) {
     for (let s = g0 * 0.92; s <= g0 * 1.08; s += 0.0125) {
       const fine = setAt('level', s), f0 = fine['0'], near = region(src, cx - 8, cy - 8, f0.w + 16, f0.h + 16);
       const b = best(near, fine, DIGITS, 0, near.w - f0.w, 0, near.h - f0.h);
-      if (b.score > top.score) top = { s: Math.round(s * 1000) / 1000, score: b.score, x: near.x + b.x, y: near.y + b.y };
+      const one = { s: Math.round(s * 1000) / 1000, score: b.score, x: near.x + b.x, y: near.y + b.y };
+      tries.push(one);
+      if (b.score > top.score) top = one;
     }
     if (top.score >= 0.85) break;
   }
   // lx, ly: where a level digit was found, so readLevel looks there first instead of the whole area
   const out = { s: top.s, sc: top.s, score: Math.max(0, top.score), countScore: 0, lx: top.x, ly: top.y };
   if (out.score >= LEVEL) { const c = fineCounts(src, line, out.s); out.sc = c.sc; out.countScore = c.score; }
+  // The level digits can fit two stretches almost equally (1.72 and 1.81 on Rimmah's 2560x1440, 2026-11-08), and the wrong
+  // one makes the count digits miss (0.77), which drops every slot ("Put the potions you drink on your quickslots"). So when
+  // the counts don't read, the next best level fits are tried and the one whose counts read wins.
+  if (out.score >= LEVEL && out.countScore < COUNTS_OK) {
+    const seen = [out.s], g1 = frameH / 768;
+    for (const t of tries.filter(q => q.score >= top.score - 0.02).sort((p, q) => Math.abs(p.s - g1) - Math.abs(q.s - g1))) {
+      if (seen.length > 4) break;
+      if (seen.some(v => Math.abs(v - t.s) < 0.03)) continue;
+      seen.push(t.s);
+      const c = fineCounts(src, line, t.s);
+      if (c.score <= out.countScore) continue;
+      // a wrong stretch can still score 0.85 on the digits, but it can't place the slots a real pitch apart
+      const probe = { s: t.s, sc: c.sc, countScore: c.score, grid: null };
+      readCounts(src, line, probe);
+      if (probe.grid && (Math.abs(probe.grid.px / (PITCH_X * c.sc) - 1) > 0.05 || Math.abs(probe.grid.py / (PITCH_Y * c.sc) - 1) > 0.05)) continue;
+      Object.assign(out, { s: t.s, sc: c.sc, countScore: c.score, lx: t.x, ly: t.y, score: t.score });
+      if (out.countScore >= COUNTS_OK) break;
+    }
+  }
   return out;
 }
 // The level box never moves, so it reads around the digit found last time (a few digits either side, ~5 ms) and only
