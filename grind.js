@@ -105,6 +105,8 @@ function health(f) {
   if (f.loot && f.loot.on && f.loot.pictures === false) return say('wait', 'Loading the item pictures for Count my loot');
   if (f.loot && f.loot.on && !f.loot.sets) return say('wait', 'Open your bag and flip through Equip, Use and Etc, scrolling to the bottom of each');
   if (f.loot && f.loot.on && f.loot.refillAfter) return say('wait', 'In town? Flip through your bag so your loot counts');
+  // with the pickup lines on, the bag is only asked for again when they can't be trusted (loot.needsFlip)
+  if (f.loot && f.loot.on && f.loot.needsFlip) return say('wait', "Flip through your bag again, the pickup lines can't be trusted for now");
   if (f.meso.unclear) return say('wait', "Can't read your meso total clearly yet. Move the mouse off it");
   if (f.meso.at == null) return say('wait', 'Open your inventory for a moment so mesos count');
   if (mesoStale) return say('wait', 'Mesos last seen ' + ago(f.meso.at) + '. Open your inventory for a moment');
@@ -775,12 +777,49 @@ function mount(root, deps) {
     showDetail();
   }
 
+  /* ----- the pickup lines (behind window.BT_PICKUPS) ----- */
+  // The strip above the quickslots is cropped from the frame already in hand every tick (lines last a few seconds, so a read
+  // every 1.4 s would miss some), fed to the tracker, and each new line is read: an item line for its tab and count (its name
+  // stays unread for now), a mesos line for its amount. Display only: GrindSession keeps them beside the bag, never in the money
+  const PICKUPS = window.BT_PICKUPS === true && !!window.PickupLines;
+  let pickTracker = null, pickCv = null, pickKey = '';
+  // the gap between the frames the tab reads: a median over 1.5 s (half a line's life) means lines can slip by unseen
+  const frameGaps = []; let lastFrameT = 0;
+  function noteFrame(now) {
+    if (lastFrameT) { frameGaps.push(now - lastFrameT); if (frameGaps.length > 20) frameGaps.shift(); }
+    lastFrameT = now;
+    st.pickupSlow = frameGaps.length >= 10 && frameGaps.slice().sort((a, b) => a - b)[frameGaps.length >> 1] > 1500;
+  }
+  function readPickups(src, info) {
+    if (PICKUPS) noteFrame(Date.now());
+    if (!PICKUPS || !session || !lootOn) return;
+    const PL = window.PickupLines, now = Date.now(), a = PL.stripArea(info.w, info.h);
+    // a new window size starts the tracker over (the strip sits by the frame's size alone, so no HUD measurement is needed)
+    const key = info.w + 'x' + info.h;
+    if (!pickTracker || key !== pickKey) { pickTracker = PL.createTracker(); pickKey = key; }
+    if (!st.pickStart) st.pickStart = now;
+    if (!pickCv) pickCv = document.createElement('canvas');
+    pickCv.width = a.w; pickCv.height = a.h;
+    const g = pickCv.getContext('2d', { willReadFrequently: true });
+    g.drawImage(src, a.x, a.y, a.w, a.h, 0, 0, a.w, a.h);
+    const id = g.getImageData(0, 0, a.w, a.h), img = { w: id.width, h: id.height, data: id.data }, rows = PL.rowsOf(img), born = pickTracker.feed(rows, now).births;
+    if (!born.length) return;
+    st.lineT = now;
+    const items = [], mesos = [];
+    for (const i of born) {
+      if (rows[i] === 'I') { const r = PL.readItem(img, i); items.push({ tab: r.tab, qty: r.qty, name: null }); }
+      else if (rows[i] === 'M') mesos.push(PL.readMesos(img, i).amount);
+    }
+    GS().add(session, { t: now, pickup: { items, mesos, lines: items.length + mesos.length } });
+  }
+
   /* ----- one frame from the share ----- */
   // The share ticks every 0.5 s. A full read (EXP, level, potions, mesos) runs when 1.4 s have passed since the last one;
   // the ticks between only look at the bag and the shop while they're open, at the spots they were seen, so a page of the
   // bag shown for a second (Rimmah flips that fast) still reads twice and counts
   function frame(src, info) {
     if (!picturesReady) return;
+    readPickups(src, info);
     if (!st.mapsAsked) { st.mapsAsked = true; loadMaps(); }
     const since = st.lastFull ? Date.now() - st.lastFull : Infinity;   // a clock set back (a replay) reads in full
     if (since >= 0 && since < 1400) {
@@ -892,6 +931,7 @@ function mount(root, deps) {
     if (reading.exp != null || reading.counts.length) {
       if (!session) { session = GS().create({ mapId, t: reading.t, prices, eat: eatCfg() }); session.mode = lootOn ? 'loot' : 'track'; }
       GS().add(session, reading); st.reads++;
+      if (reading.exp != null) { if (st.prevExp != null && reading.exp !== st.prevExp) st.movedT = reading.t; st.prevExp = reading.exp; }
     }
     // the last 10 readings, for a Something off? report (an 84 read as 684 shows up here)
     st.recent.push({ t: reading.t, exp: reading.exp, pct: reading.pct, level: reading.level, mesos,
@@ -1295,7 +1335,8 @@ function mount(root, deps) {
     const h = lastHealth = health({ t: Date.now(), app: !!app, sharing: st.sharing, stopped: !!st.stopped, hasSession: !!s, exp: st.h.exp, level: st.h.level, levelNow: st.level,
       size: st.h.size, counts: st.h.counts, potNone: st.potNone, potCount: st.potCount,
       meso: { at: s && s.meso && s.meso.last ? s.meso.last.t : null, unclear: !!(st.mesoOpen && st.mesoUnclear) },
-      loot: { on: lootOn, pictures: lootReady, sets: s && s.bag ? s.bag.sets : 0, refillAfter: !!s && GS().inTown(s) } });
+      loot: { on: lootOn, pictures: lootReady, sets: s && s.bag ? s.bag.sets : 0, refillAfter: !!s && !PICKUPS && GS().inTown(s),
+        needsFlip: st.needsFlip = PICKUPS && !!s && lootOn && GS().pickNeedsFlip(s, Date.now(), { sinceT: st.lineT, movedT: st.movedT, inTown: GS().inTown(s) }) } });
     // the pill over the buttons goes by what the core numbers need (mesos only ever ask)
     const core = ['exp', 'level', 'potions'].map(k => h.checks[k].state);
     const ps = !st.sharing ? 'idle' : core.includes('bad') ? 'bad' : core.every(x => x === 'ok') ? 'ok' : 'wait';
@@ -1567,6 +1608,28 @@ function mount(root, deps) {
   const tone = n => n == null || n === 0 ? '' : n > 0 ? 'pos' : 'neg';
   const COZY = 'https://cozy.markets/items/', PICKED_SHOWN = 5;
   let lootOpen = false, lootKey = null, potsKey = null, tradeKey = null;
+  // What the pickup lines said, under What you picked up: a list marked "not checked", how it compares with the bag, and (only
+  // while the mesos reading passes its accuracy gate) the mesos it saw. Never part of the total or the verdict
+  function pickBlock(s) {
+    if (!PICKUPS) return { key: '', nodes: [] };
+    const K = GS().pickups(s), cmp = GS().pickupCompare(s), mesosOn = window.PickupLines.mesosOn();
+    if (!K.lines && !cmp) return { key: '', nodes: [] };
+    const key = JSON.stringify([K, cmp, mesosOn, !!st.pickupSlow]);
+    const row = (label, v) => el('div', { class: 'k-row' }, el('span', { class: 'g-nl' }, label), el('span', { class: 'g-nv' }, v));
+    const rows = [];
+    for (const x of K.items) rows.push(row(x.name, '×' + fmt(x.count)));
+    for (const tab of ['Use', 'Etc']) if (K.unnamed[tab]) rows.push(row(tab + ' items', '×' + fmt(K.unnamed[tab])));
+    if (K.equips) rows.push(row('Equipment', '×' + fmt(K.equips)));
+    if (mesosOn && (K.mesos.sum || K.mesos.unsure)) {
+      rows.push(row('Mesos from drops (from lines)', fmt(K.mesos.sum)));
+    }
+    const nodes = [el('div', { class: 'g-res-h' }, 'From pickup lines, not checked')];
+    if (rows.length) nodes.push(el('div', { class: 'k-rows' }, ...rows));
+    if (mesosOn && K.mesos.unsure) nodes.push(el('p', { class: 'g-note' }, K.mesos.unsure + (K.mesos.unsure === 1 ? ' line' : ' lines') + ' unreadable'));
+    if (cmp) nodes.push(el('p', { class: 'g-note' }, cmp.differs ? 'Counted ' + fmt(cmp.fromLines) + ' from the lines, the bag says ' + fmt(cmp.inBag) + '.' : 'The lines and the bag agree on ' + fmt(cmp.inBag) + '.'));
+    if (st.pickupSlow) nodes.push(el('p', { class: 'g-note' }, 'The pickup lines are read too slowly to count every one.'));
+    return { key, nodes };
+  }
   function renderResult(s, R) {
     V.res.hidden = false;
     const has = !!R.window, loot = R.mode === 'loot';
@@ -1596,12 +1659,14 @@ function mount(root, deps) {
     if (loot) {
       const L = R.loot, list = [], after = [];
       let P = null, key = L ? 'empty' : 'wait';
+      const pk = pickBlock(s);
       if (L && L.items.length) {
         const C = drops ? window.GrindNow.dropColumns(mobsOf(s.mapId || mapId).sort((x, y) => y.count - x.count).map(m => m.id), drops, id => (data.mobs[id] || [''])[0], classId, levelNow()) : null;
         P = window.GrindNow.pickedRows(L, C ? window.GrindNow.wantedOf(C) : [], lootIdx || { cells: {} }, lootOpen ? Infinity : PICKED_SHOWN, drops);
         key = JSON.stringify([P.rows, P.more, lootOpen, L.best && L.best.key, !!lootImg, drops && drops.date]);
       }
       // redrawn only when what it shows changes: a frame every second or so would take the focus and the press off its button
+      key += '|' + pk.key;
       if (key !== lootKey) {
         lootKey = key;
         if (!L) after.push(el('p', { class: 'g-note' }, 'Your loot shows once your bag has been looked through twice, a minute or more apart.'));
@@ -1621,7 +1686,7 @@ function mount(root, deps) {
           }
           after.push(el('p', { class: 'g-note' }, 'Flip through Equip, Use and Etc to update it.'));
         }
-        V.resLoot.replaceChildren(el('div', { class: 'g-res-h' }, 'What you picked up'), ...(list.length ? [el('div', { class: 'k-rows' }, ...list)] : []), ...after);
+        V.resLoot.replaceChildren(el('div', { class: 'g-res-h' }, 'What you picked up'), ...(list.length ? [el('div', { class: 'k-rows' }, ...list)] : []), ...after, ...pk.nodes);
       }
     }
     const lines = [];
@@ -1823,7 +1888,7 @@ function mount(root, deps) {
   dataFile('mob-sprites.json').then(S => { mobSprites = S; render(); }, () => {});
   loadSheet().catch(() => {});
   if (session) setStatus('Carrying on your session from ' + timeOfDay(session.t0) + (app ? '. Press Start to carry on.' : '. Share the game window to keep going.'));
-  window.Grind.debug = { session: () => session, state: () => ({ reads: st.reads, ticks: st.ticks, line: st.line, m: st.m, level: st.level }),
+  window.Grind.debug = { noteFrame, session: () => session, state: () => ({ reads: st.reads, ticks: st.ticks, line: st.line, m: st.m, level: st.level }),
     // the overlay, opened as Start opens it (the app's own test); resolves to whether it's open
     overlay: () => (overlay.win() ? Promise.resolve() : popOut()).then(() => !!overlay.win()),
     setCheck, save: () => save(true), load: row => { viewing = GS().fromRow(row, eatCfg()); render(); }, capture: () => capture, mesoLine, lootReady: () => lootReady,
@@ -1838,7 +1903,8 @@ function mount(root, deps) {
       // Count my loot: the switch, how far each tab's flip got, the bag sets, shop visits and prices learned
       loot: { on: lootOn, mode: session ? session.mode : null, pictures: lootReady, sets: session && session.bag ? session.bag.sets : 0,
         acc: session && session.bag ? Object.fromEntries(Object.entries(session.bag.acc).map(([k, a]) => [k, a.strips.map(x => ({ rows: x.rows.length, top: x.top, bottom: x.bottom }))])) : null,
-        shop: session && session.shop ? { open: session.shop.open, visits: session.shop.visits.length } : null, learned: session ? session.learned || [] : [] } }),
+        shop: session && session.shop ? { open: session.shop.open, visits: session.shop.visits.length } : null, learned: session ? session.learned || [] : [],
+        needsFlip: !!st.needsFlip, pickups: PICKUPS && session ? GS().pickups(session) : null } }),
     popout: () => overlay.win() ? overlay.win().document.body : null,
   };
   window.Grind.debug.report = reporter.report;

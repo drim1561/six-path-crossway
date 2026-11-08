@@ -519,8 +519,74 @@ function pickMap(s, id) {
 /* ---------- one reading ---------- */
 
 // reading: { t, exp, pct, level, counts: [{ key, id, name, price, value }], party }; any part null when unread
+/* ---------- Pickup lines (display only) ----------
+   What the game's pickup lines said, kept beside the session and never used for money: result() and lootOf() do not read it.
+   s.pick is live only (not in toRow), the end bag look replaces it. */
+function takePickup(s, t, p) {
+  const K = s.pick || (s.pick = { items: {}, unnamed: { Equip: 0, Use: 0, Etc: 0 }, equips: 0, mesos: { sum: 0, unsure: 0 }, lines: 0, lastLineT: null, cum: [], counted: 0 });
+  for (const it of p.items || []) {
+    const n = it.qty == null ? 1 : it.qty, tab = it.tab;
+    if (tab === 'Equip') { K.equips += n; continue; }
+    if (it.name == null) { if (K.unnamed[tab] != null) { K.unnamed[tab] += n; K.counted += n; } continue; }
+    K.counted += n;
+    const k = tab + '|' + it.name, x = K.items[k] || (K.items[k] = { name: it.name, tab, count: 0 });
+    x.count += n;
+  }
+  for (const m of p.mesos || []) { if (m == null) K.mesos.unsure++; else K.mesos.sum += m; }
+  if (p.lines > 0) { K.lines += p.lines; K.lastLineT = t; }
+  K.cum.push([t, K.counted]);
+}
+// items the lines counted by time t (equips left out)
+function countedBy(s, t) {
+  const c = (s.pick && s.pick.cum) || [];
+  let n = 0;
+  for (const e of c) { if (e[0] <= t) n = e[1]; else break; }
+  return n;
+}
+function pickups(s) {
+  const K = s.pick || { items: {}, unnamed: { Equip: 0, Use: 0, Etc: 0 }, equips: 0, mesos: { sum: 0, unsure: 0 }, lines: 0, lastLineT: null };
+  return { items: Object.values(K.items).map(x => Object.assign({}, x)), unnamed: Object.assign({}, K.unnamed), equips: K.equips, mesos: Object.assign({}, K.mesos), lines: K.lines, lastLineT: K.lastLineT };
+}
+// lines against the bag: items (not equips, not quickslot potions) gained between the first bag look and the latest
+function pickupCompare(s) {
+  const B = s.bag;
+  if (!B || !B.first || !B.last || B.first === B.last) return null;
+  const pots = new Set();
+  for (const sl of Object.values(s.slots).concat(s.retired || [])) if (sl.id) pots.add(+sl.id);
+  let inBag = 0;
+  for (const k of new Set(Object.keys(B.first.items).concat(Object.keys(B.last.items)))) {
+    const a = B.first.items[k], b = B.last.items[k], it = b || a;
+    if (it.kind === 'equip' || (it.pot || []).some(id => pots.has(+id))) continue;
+    inBag += Math.max(0, (b ? b.n : 0) - (a ? a.n : 0));
+  }
+  // sales at an NPC shop between the two looks leave the bag without a line to show for it, so the two can't be compared
+  if (((s.shop && s.shop.visits) || []).some(v => v.t1 >= B.first.t && v.t0 <= B.last.t)) return null;
+  const fromLines = countedBy(s, B.last.t) - countedBy(s, B.first.t);
+  const gap = Math.abs(inBag - fromLines);
+  return { fromLines, inBag, differs: gap > 0, unreliable: gap > 3 && gap > inBag / 4 };
+}
+// Does the bag need a look? Yes with no start look, when the lines can't be trusted (they differ from the bag by more than a
+// quarter and 3, and the last look is over 2 minutes old), or when EXP or mesos moved since the last line and the last look
+// but no line has been seen for 2 minutes (the strip may be covered). o: { sinceT: when a line (of any kind) was last seen,
+// or tracking began; movedT: when EXP or mesos last moved, or null }
+const PICK_QUIET_MS = 120000;
+function pickNeedsFlip(s, t, o) {
+  const B = s.bag;
+  if (!B || !B.sets || !B.last) return true;
+  // a strip that never read a line (covered, or a setup it doesn't fit) can't be told from quiet lines: no nagging
+  // the end look: with only a start look, a trip to town is the usual end of a run, so ask once there
+  if (o && o.inTown && B.sets < 2) return true;
+  const c = pickupCompare(s);
+  if (c && c.unreliable && s.pick && s.pick.lines && t - B.last.t > PICK_QUIET_MS) return true;
+  if (!(o && o.sinceT)) return false;
+  const since = Math.max(o.sinceT, B.last.t);
+  // EXP is stamped a tick or two after the line that came with the kill, so only movement well after the last line counts
+  return !!(o && o.movedT) && o.movedT > since + 5000 && t - since > PICK_QUIET_MS;
+}
+
 function add(s, r) {
   const t = r.t;
+  if (r.pickup) { takePickup(s, t, r.pickup); if (Object.keys(r).every(k => k === 't' || k === 'pickup')) return s; }
   // a running session kept from before the EXP clock (no expFrom at all): the clock covers all of it, as its EXP does
   if (!('expFrom' in s)) { s.expFrom = s.gainExp || s.gainPct ? 0 : null; s.expTo = s.expFrom == null ? null : s.activeMs; }
   if (r.level && (!s.level || r.level > s.level)) s.level = r.level;   // a stale level read never undoes a level up
@@ -822,5 +888,5 @@ function wholeRows(minutes) {
   for (let i = 0; i < xs.length; i += 60) rows.push(xs.slice(i, i + 60));
   return rows;
 }
-window.GrindSession = { CFG, wholeRows, create, add, stats, countdown, countdowns, minuteOf, toRow, fromRow, mark, trade, keepMesos, rebase, lootOf, shopOf, learnPrice, result, usualOf, standing, inTown, bagListShows, pickMap };
+window.GrindSession = { CFG, wholeRows, create, add, stats, countdown, countdowns, minuteOf, toRow, fromRow, mark, trade, keepMesos, rebase, lootOf, shopOf, learnPrice, result, usualOf, standing, inTown, bagListShows, pickMap, pickups, pickupCompare, pickNeedsFlip };
 })();

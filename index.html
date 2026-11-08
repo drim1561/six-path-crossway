@@ -1677,7 +1677,7 @@ const CONFIG = {
   reportUrl: 'https://sixpathcrossway.pages.dev/api/report',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-08a',
+  version: '2026-11-08b',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
@@ -2360,7 +2360,10 @@ function loadGrind() {
   });
   const json = f => fetch('data/' + f).then(r => { if (!r.ok) throw new Error(f); return r.json(); });
   const scripts = (window.Reader ? Promise.resolve() : script('reader.js')).then(() => Promise.all([script('screen.js'), script('grind-session.js'), script('grind-overlay.js'), script('grind-settings.js'), script('grind-now.js'), script('grind-card.js'), script('grind-alltime.js')])).then(() => script('grind.js'));
-  grindLoading = Promise.all([scripts, json('grind.json'), json('grind-pictures.json')]).then(([, data, pictures]) => {
+  // pickup lines (loot from the game's pickup strip): behind a switch like the Timer's, off until Rimmah says so
+  const PICKUPS_ON = window.BT_PICKUPS === true;
+  const pickups = PICKUPS_ON ? Promise.all([script('pickup-lines.js'), json('pickup-templates.json')]).then(([, tpl]) => window.PickupLines.setTemplates(tpl)) : Promise.resolve();
+  grindLoading = Promise.all([scripts, pickups, json('grind.json'), json('grind-pictures.json')]).then(([, , data, pictures]) => {
     reporters.grind = window.Grind.mount($('grind-root'), { api, store, el, data, pictures, session: () => state.session, signIn: () => signIn(),
       signOut: () => api.signOut().catch(() => {}).then(() => setSession(null)), app: APP, appDownload: CONFIG.appDownload });
   }).catch(() => {
