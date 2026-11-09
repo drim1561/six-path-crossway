@@ -271,16 +271,14 @@ body.appraiser-off #tab-appraiser .soon::after { right: 5px; }
 .b-paths-label { font: 700 var(--fs-sm) var(--font-body); color: var(--muted); margin-right: 2px; }
 @media (max-width: 560px) { .b-paths { padding-left: 0; border-left: 0; } }
 .b-mine:empty { display: none; }
-.b-mine h3 { margin: 0 0 8px; font: 400 var(--tt-s) var(--font-title); }
 .b-mine-list { display: flex; flex-wrap: wrap; gap: 8px; }
 .b-mine-card { color: var(--ink); font: 600 var(--fs-md) var(--font-body); text-align: left; cursor: pointer; }
-.b-mine-card:hover, .b-mine-card:focus-visible { border-color: var(--focus); }
+.b-mine-card:hover, .b-mine-card:focus-visible, .b-mine-card[aria-pressed="true"] { border-color: var(--focus); }
 #b-msg { order: 8; margin: 0; padding: 0 4px; color: var(--ink); font: 600 var(--fs-sm) var(--font-body); }
 #b-msg:empty { display: none; }
 #b-msg.error { color: var(--bad); }
 #b-msg.note { color: var(--muted); }
-.b-mine.quiet { order: 9; padding: 0 4px; }
-.b-mine.quiet .small { margin: 0; }
+.b-mine .small { margin: 0; }
 /* the numbers as Cards: Heal first for a Cleric, the attacks big side by side, then the small ones in a row */
 .b-big { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--gap); }
 .b-big:empty { display: none; }
@@ -295,13 +293,22 @@ body.appraiser-off #tab-appraiser .soon::after { right: 5px; }
 .b-bigone .v.guess { color: var(--muted); }
 .b-bigone .s { font: 600 var(--fs-sm) var(--font-body); color: var(--muted); }
 @media (max-width: 559px) { .b-big:has(.sk + .sk) .sk { grid-column: span 6; } }
-/* Edit stats and skills, in place under the button row */
-.b-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: var(--gap); margin: 4px 0; }
-.b-form label, .b-row label { display: grid; gap: 4px; font: 700 var(--fs-sm) var(--font-body); color: var(--ink); }
-.b-form input, .b-form select, .b-row input, .b-row select { width: 100%; min-width: 0; font: 600 var(--n-s) var(--font-num); color: var(--ink); }
-.b-form input.b-read { background: var(--up-bg); border-color: var(--up-dot); }
-.b-form .wide { grid-column: span 2; }
-.b-sub { grid-column: 1 / -1; margin: 6px 0 0; font: 700 var(--fs-sm) var(--font-body); color: var(--muted); }
+/* The Points tab's stat table and skill rows: a one row table of boxes under its labels, then the skills as rows with the row line */
+.b-stats { display: grid; gap: var(--gap); min-width: 0; margin-bottom: var(--gap); }
+.b-stats > * { margin: 0; min-width: 0; }
+.b-tablewrap { overflow-x: auto; }
+.b-stable { border-collapse: collapse; width: 100%; background: var(--card); border: 2px solid var(--card-o); }
+.b-stable th { padding: 6px 8px 2px; text-align: center; white-space: nowrap; font: 700 var(--fs-sm) var(--font-body); color: var(--muted); }
+.b-stable td { padding: 2px 6px 8px; text-align: center; }
+.b-stable input { width: 100%; min-width: 56px; max-width: 96px; height: 28px; padding: 0 4px; text-align: center; font: 700 var(--n-s) var(--font-num); color: var(--ink); }
+.b-weapon, .b-row label { display: grid; gap: 4px; font: 700 var(--fs-sm) var(--font-body); color: var(--ink); }
+.b-weapon select, .b-row input, .b-row select { width: 100%; min-width: 0; font: 600 var(--n-s) var(--font-num); color: var(--ink); }
+.b-stats input.b-read { background: var(--up-bg); border-color: var(--up-dot); }
+.b-skills { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr)); gap: 0 var(--gap); }
+.b-skill { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 0; background: var(--art-dots) left bottom / 8px 2px repeat-x; font: 600 var(--fs-md) var(--font-body); color: var(--ink); }
+.b-skill input { width: 64px; height: 26px; padding: 0 4px; text-align: center; font: 700 var(--n-s) var(--font-num); color: var(--ink); }
+.b-more-details > summary { cursor: pointer; font: 700 var(--fs-sm) var(--font-body); color: var(--muted); padding: 4px 0; }
+.b-more-details[open] > summary { margin-bottom: var(--gap); }
 /* Read from game, opening under the button row (reader.js draws .r-bar and .r-drop) */
 .b-reader { display: grid; gap: 8px; }
 .b-reader p { margin: 0; }
@@ -1720,7 +1727,7 @@ const CONFIG = {
   reportUrl: 'https://sixpathcrossway.pages.dev/api/report',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-09c',
+  version: '2026-11-09d',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };

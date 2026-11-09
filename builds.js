@@ -1179,12 +1179,13 @@ const edited = () => { if (ui.form.from) ui.form.edited = true; };
 const saveForm = () => ui.deps.store.set('bt.calc', JSON.stringify(ui.form));
 const rawStats = () => ({ ...ui.form.v, skills: { ...ui.form.s } });
 
-// The drawer's boxes (everything but the level, which sits on the character card) and the card's name and level.
+// The Points tab's stat table and skill rows (everything but the level, which sits on the character card) and the card's name and level.
 function buildForm() {
-  const cls = CLASSES[ui.form.cls], box = ui.root.querySelector('.b-form');
-  const input = (id, label, value, on, key) => E('label', {}, label, E('input', { id, inputmode: 'numeric', autocomplete: 'off', value: value == null ? '' : String(value),
-    ...(ui.read.has(key) ? { class: 'b-read' } : {}), oninput: e => { ui.read.delete(key); e.target.classList.remove('b-read'); on(e); typedIn(key); } }));
-  const kids = [];
+  const cls = CLASSES[ui.form.cls], box = ui.root.querySelector('#b-stats');
+  const cell = (id, label, value, on, key) => E('input', { id, 'aria-label': label, inputmode: 'numeric', autocomplete: 'off', value: value == null ? '' : String(value),
+    ...(ui.read.has(key) ? { class: 'b-read' } : {}), oninput: e => { ui.read.delete(key); e.target.classList.remove('b-read'); on(e); typedIn(key); } });
+  const heads = [], cells = [];
+  let weapon = null;
   ui.root.querySelector('#b-name').textContent = cls.name;
   ui.root.querySelector('#b-branch').textContent = BRANCHES[branchOf(cls.id)].name;
   const lvBox = ui.root.querySelector('#b-f-level'), lv = ui.form.v.level == null ? '' : String(ui.form.v.level);
@@ -1194,7 +1195,7 @@ function buildForm() {
     if (k === 'level') continue;
     if (k === 'weapon') {
       const w = formWeapon(cls);
-      kids.push(E('label', { class: 'wide' }, label, E('select', { id: 'b-f-weapon', onchange: e => {
+      weapon = E('label', { class: 'b-weapon' }, label, E('select', { id: 'b-f-weapon', onchange: e => {
         const g = ui.data.gear.find(x => x.id === Number(e.target.value));
         ui.form.v.weapon = e.target.value; ui.form.v.wat = g ? String(g.inc.wat || 0) : '';
         const wat = ui.root.querySelector('#b-f-wat'); if (wat) wat.value = ui.form.v.wat;
@@ -1202,17 +1203,24 @@ function buildForm() {
       } }, weaponsFor(cls.id, Math.max(formLevel(), 10)).map(g => {
         const o = E('option', { value: String(g.id) }, g.name + ' (' + g.slot + ', ' + (g.inc.wat || 0) + ' attack, level ' + g.level + ')');
         if (w && g.id === w.id) o.selected = true; return o;
-      }))));
+      })));
     } else if (k === 'wat') {
       const w = formWeapon(cls), shown = blank(ui.form.v.wat) ? (w ? w.inc.wat || 0 : '') : ui.form.v.wat;
-      kids.push(input('b-f-wat', label, shown, e => { ui.form.v.wat = e.target.value; changed(); }, 'v:wat'));
-    } else kids.push(input('b-f-' + k, label, ui.form.v[k], e => { ui.form.v[k] = e.target.value; changed(); }, 'v:' + k));
+      heads.push(label); cells.push(cell('b-f-wat', label, shown, e => { ui.form.v.wat = e.target.value; changed(); }, 'v:wat'));
+    } else { heads.push(label); cells.push(cell('b-f-' + k, label, ui.form.v[k], e => { ui.form.v[k] = e.target.value; changed(); }, 'v:' + k)); }
   }
   ui.formPhase = phaseOf(cls, formLevel()).phase;
   const ids = skillsFor(cls, formLevel()).filter(id => ui.data.skills[id]);
-  if (ids.length) kids.push(E('p', { class: 'b-sub' }, ui.formPhase === 1 ? BRANCHES[branchOf(cls.id)].name + ' skill levels' : 'Skill levels'));
-  for (const id of ids) kids.push(input('b-s-' + id, ui.data.skills[id].name, ui.form.s[id], e => { ui.form.s[id] = e.target.value; changed(); }, 's:' + id));
-  box.replaceChildren(...kids);
+  const kids = [E('h4', { class: 'b-sec' }, 'Your numbers'),
+    E('p', { class: 'small' }, 'Type what your character window says. A blank box is guessed from your level.'),
+    weapon,
+    E('div', { class: 'b-tablewrap' }, E('table', { class: 'b-stable' },
+      E('thead', {}, E('tr', {}, heads.map(h => E('th', { scope: 'col' }, h)))),
+      E('tbody', {}, E('tr', {}, cells.map(c => E('td', {}, c))))))];
+  if (ids.length) kids.push(E('h4', { class: 'b-sec' }, ui.formPhase === 1 ? BRANCHES[branchOf(cls.id)].name + ' skill levels' : 'Skill levels'),
+    E('div', { class: 'b-skills' }, ids.map(id => E('label', { class: 'b-skill' }, E('span', {}, ui.data.skills[id].name),
+      cell('b-s-' + id, ui.data.skills[id].name, ui.form.s[id], e => { ui.form.s[id] = e.target.value; changed(); }, 's:' + id)))));
+  box.replaceChildren(...kids.filter(Boolean));
   // every way the class changes (tiles, the select, a loaded card, Read from game) redraws the form, so the tiles follow here
   renderTiles();
 }
@@ -1258,12 +1266,11 @@ function renderTiles() {
   ui.root.querySelector('#b-paths').replaceChildren(E('span', { class: 'b-paths-label' }, lv < ADVANCE ? "Where you're heading" : 'Your 2nd job'),
     ...BRANCHES[br].paths.map(id => E('button', { type: 'button', class: 'k-btn sm', 'data-path': id, 'aria-pressed': String(id === ui.form.cls), onclick: () => pickClass(id) }, CLASSES[id].name)));
 }
-// The signed in player's own builds, one tap to open each; signed out, a nudge to sign in.
+// The signed in player's own builds (the My builds tab), one tap to open each; signed out, a nudge to sign in.
 async function renderMine() {
   const box = ui.root.querySelector('#b-mine'), s = me(), gen = ui.mineGen = (ui.mineGen || 0) + 1;
-  // signed out it is a quiet line at the character window's foot (CSS order), signed in My builds sit under the button row
-  box.classList.toggle('quiet', !s);
   if (!s) {
+    ui.mineRows = [];
     box.replaceChildren(E('p', { class: 'small' }, 'Sign in with Discord to keep your characters here. ',
       E('button', { type: 'button', class: 'linkish', onclick: () => ui.deps.signIn && ui.deps.signIn() }, 'Sign in')));
     return;
@@ -1271,12 +1278,20 @@ async function renderMine() {
   try {
     const rows = await ui.deps.api.listBuilds({ userId: s.user_id, sort: 'new' });
     if (gen !== ui.mineGen) return;
-    const mine = rows.filter(b => b.user_id === s.user_id);
-    box.replaceChildren(E('h3', {}, 'My builds'), mine.length
-      ? E('div', { class: 'b-mine-list' }, mine.map(b => E('button', { type: 'button', class: 'b-mine-card k-card', onclick: () => fill(b.stats, b.class, 'mine') },
+    const mine = ui.mineRows = rows.filter(b => b.user_id === s.user_id);
+    box.replaceChildren(mine.length
+      ? E('div', { class: 'b-mine-list' }, mine.map(b => E('button', { type: 'button', class: 'b-mine-card k-card', 'aria-pressed': String(!!ui.loaded && ui.loaded.id === b.id), onclick: () => load(b, true) },
         E('b', {}, b.ign), ' Lv ' + b.level + ' ' + (CLASSES[b.class] ? CLASSES[b.class].name : b.class))))
       : E('p', { class: 'small' }, 'Builds you save show up here.'));
   } catch (e) { if (gen === ui.mineGen) box.replaceChildren(E('p', { class: 'small' }, "Couldn't load your builds: " + e.message)); }
+}
+// Opens a saved build in the calculator; one of yours is remembered as the build Save writes back to.
+function load(b, mine) {
+  if (ui.editing && ui.editing.id !== b.id) ui.editing = null;
+  fill(b.stats, b.class, mine ? 'mine' : 'community');
+  ui.loaded = mine ? b : null;
+  if (mine) ui.lastIgn = b.ign;
+  renderSave(); renderMine();
 }
 function changed() { edited(); saveForm(); clearTimeout(ui.timer); ui.timer = setTimeout(renderGuide, 150); }
 
@@ -1579,7 +1594,7 @@ function renderPanels(g) {
   const row = e => E('li', { class: 'b-ev', 'data-from': String(e.from) }, E('span', { class: 'num' }, e.now ? 'Now' : range(e.from, e.to)),
     E('span', {}, E('b', {}, e.text), e.note ? E('span', { class: 'small' }, ' ' + e.note) : null, ' ', E('span', { class: 'k-tag' + (e.kind === 'sp' ? ' y' : '') }, chip[e.kind])));
   const now = Object.keys(g.skills.now).map(id => ui.data.skills[id].name + ' ' + g.skills.now[id]).join(', ');
-  const points = ui.root.querySelector('#points');
+  const points = ui.root.querySelector('#b-pointsplan');
   points.replaceChildren(E('ul', { class: 'b-time' }, pts.shown.map(row), pts.rest.map(e => extra(row(e), 1, 0))),
     E('p', { class: 'small b-foot' }, 'Skills now: ' + now + '.' + (g.skills.spare ? ' ' + g.skills.spare + ' SP left over by level ' + g.skills.until + '.' : '')));
   moreButton(points, 'Show the plan to ' + pts.until);
@@ -1893,14 +1908,23 @@ function renderQuests(g, cls) {
   return plan;
 }
 
-const TABS = [['overview', 'Overview'], ['train', 'Train'], ['quests', 'Quests'], ['paths', 'Skill paths'], ['points', 'Points'], ['gear', 'Gear'], ['scrolls', 'Scrolls']];
-function showTab(t) {
+const TABS = [['overview', 'Overview'], ['train', 'Train'], ['quests', 'Quests'], ['paths', 'Skill paths'], ['points', 'Points'], ['gear', 'Gear'], ['scrolls', 'Scrolls'], ['mybuilds', 'My builds']];
+// The Points tab holds the stat table, so its plan lives in a box of its own that a redraw can replace without losing the typing.
+const panelBox = id => ui.root.querySelector(id === 'points' ? '#b-pointsplan' : '#' + id);
+// persist false: a tab shown for a moment (the stat table, while a typed number is being turned down) isn't the tab the player chose
+function showTab(t, persist = true) {
   if (!TABS.some(([id]) => id === t)) t = 'overview';
   for (const [id] of TABS) {
     ui.root.querySelector('#' + id).hidden = id !== t;
     ui.root.querySelector('[data-tab="' + id + '"]').setAttribute('aria-selected', String(id === t));
   }
-  ui.deps.store.set('bt.btab', t);
+  if (persist) ui.deps.store.set('bt.btab', t);
+}
+// Add them, and Read from game: the Points tab, on the first box still empty.
+function goStats() {
+  showTab('points');
+  const first = [...ui.root.querySelectorAll('#b-stats input')].find(i => !i.value) || ui.root.querySelector('#b-stats input');
+  if (first) first.focus();
 }
 
 function renderGuide() {
@@ -1908,20 +1932,31 @@ function renderGuide() {
   const g = buildGuide(rawStats(), ui.form.cls, ui.data, roadsFor(ui.form.cls));
   msg.className = '';
   if (!g.ok) {
-    out.hidden = true;
+    // no guide yet (a beginner, no level, a number turned down): the window stays up with just the two tabs that still work, the stat
+    // table to fix a box where it is and My builds to load a saved one
+    ui.limited = true; out.hidden = false;
     ui.root.querySelector('#b-big').replaceChildren();
-    for (const [id] of TABS) ui.root.querySelector('#' + id).replaceChildren();
+    for (const [id] of TABS) if (id !== 'mybuilds') panelBox(id).replaceChildren();
+    for (const [id] of TABS) ui.root.querySelector('[data-tab="' + id + '"]').hidden = id !== 'points' && id !== 'mybuilds';
+    const cur = ui.root.querySelector('.b-dtabs [aria-selected="true"]');
+    if (!cur || cur.hidden) showTab('points', false);
+    ui.root.querySelector('#b-estimated').hidden = true;
     if (g.beginner) { msg.className = 'note'; msg.textContent = 'Your 1st job starts at level ' + g.advance + '. Talk to ' + g.npc + ' then come back for a guide.'; }
     else { msg.className = 'error'; msg.textContent = g.errors.join(' '); }
     return g;
   }
   out.hidden = false;
+  if (ui.limited) {
+    ui.limited = false;
+    for (const [id] of TABS) ui.root.querySelector('[data-tab="' + id + '"]').hidden = false;
+    showTab(ui.deps.store.get('bt.btab'));
+  }
   applyTune(g, tuneFor(g));
   const guessed = [...new Set(g.assumed.map(k => ASSUMED_LABEL[k]))];
   if (guessed.length) {
     msg.className = 'note';
     msg.replaceChildren('Guessed from your level: ' + guessed.join(', ') + '. ',
-      E('button', { type: 'button', class: 'linkish', onclick: () => setOpen('b-drawer', true, 'bt.bedit') }, 'Add them'), ' for a sharper guide.');
+      E('button', { type: 'button', class: 'linkish', onclick: goStats }, 'Add them'), ' for a sharper guide.');
   } else msg.replaceChildren();
   out.querySelector('#b-estimated').hidden = !g.estimated;
   renderBig(g, cls); renderPanels(g); renderPaths(g, cls);
@@ -1934,14 +1969,14 @@ function renderGuide() {
 // New build: a blank form in the same class for another character. Saved builds stay as they are, and Save makes a new one.
 function newBuild() {
   ui.form = { cls: ui.form.cls, v: {}, s: {} };
-  ui.read.clear(); ui.editing = null; ui.lastIgn = '';
+  ui.read.clear(); ui.editing = null; ui.loaded = null; ui.lastIgn = ''; ui.deps.store.set('bt.ign', '');
   saveForm(); buildForm(); renderGuide(); renderSave();
 }
 
 // New friend's build: the same blank form, marked as someone else's character (EXP an hour isn't tuned from your sessions).
 function newFriendBuild() {
   ui.form = { cls: ui.form.cls, v: {}, s: {}, from: 'friend' };
-  ui.read.clear(); ui.editing = null; ui.lastIgn = '';
+  ui.read.clear(); ui.editing = null; ui.loaded = null; ui.lastIgn = ''; ui.deps.store.set('bt.ign', '');
   saveForm(); buildForm(); renderGuide(); renderSave();
 }
 
@@ -2127,8 +2162,8 @@ function tuckReader(tuck) {
 function openReader() {
   const panel = ui.root.querySelector('#b-reader'), btn = ui.root.querySelector('#b-readbtn'), note = panel.querySelector('#b-readnote');
   // read again: the panel is already built, so open it back up for a fresh read
-  if (ui.capture) { rd = newSession(); rd.status = ''; renderReader(); tuckReader(false); setOpen('b-drawer', true); return; }
-  panel.hidden = false; setOpen('b-drawer', true);
+  if (ui.capture) { rd = newSession(); rd.status = ''; renderReader(); tuckReader(false); showTab('points'); return; }
+  panel.hidden = false; showTab('points');
   btn.disabled = true; note.textContent = 'Loading the reader...';
   loadReader().then(() => {
     btn.hidden = true; note.textContent = "Open your Character Stat window with DETAIL, then your Skill window, and click through your 1st and 2nd job tabs. Every box it fills is marked so you can check it. Reading happens on your computer, and your game pictures stay there unless you send one with a Something off? report.";
@@ -2184,55 +2219,77 @@ function typedStats() {
   return stats;
 }
 
+// What a Save would write to: the build being edited, the one loaded from My builds, or a saved build of yours with the same character name.
+function saveTarget(ign) {
+  if (ui.editing) return ui.editing;
+  if (ui.loaded && (!ign || ui.loaded.ign.toLowerCase() === ign.toLowerCase())) return ui.loaded;
+  return ign ? (ui.mineRows || []).find(b => b.ign.toLowerCase() === ign.toLowerCase()) || null : null;
+}
 function renderSave() {
-  const box = ui.root.querySelector('#b-savebody'), s = me(), ed = ui.editing;
-  ui.root.querySelector('#b-savetitle').textContent = s && ed ? 'Edit ' + ed.ign : 'Save this build';
+  const box = ui.root.querySelector('#b-savebody'), s = me(), ed = ui.editing, target = ed || ui.loaded;
   if (!s) {
     box.replaceChildren(E('p', {}, 'Sign in with Discord to save this build. Saved builds show the character name you type, never your Discord name.'),
       E('button', { type: 'button', class: 'k-btn', onclick: () => ui.deps.signIn && ui.deps.signIn() }, 'Sign in with Discord'));
     return;
   }
   const field = (id, label, value, max, cls) => E('label', cls ? { class: cls } : {}, label, E('input', { id, maxlength: String(max), value: value || '', autocomplete: 'off' }));
-  box.replaceChildren(E('p', { class: 'small' }, 'Saves the stats in the calculator above. Anyone can see saved builds.'),
+  box.replaceChildren(E('p', { class: 'small' }, target ? 'Saves the numbers above back to ' + target.ign + '. Anyone can see saved builds.'
+      : 'Saves the numbers above to your profile. Type the name once and it is remembered. Anyone can see saved builds.'),
     E('div', { class: 'b-row' },
-      field('b-ign', 'Character name', ed ? ed.ign : ui.lastIgn, 12),
-      field('b-trains', 'Where you train', ed ? ed.trains_at : '', 80, 'grow')),
-    E('div', { class: 'b-row' },
-      field('b-note', 'Note (gear, scrolls, anything)', ed ? ed.note : '', 280, 'grow'),
-      E('label', {}, ed && ed.shot_path ? 'Replace equip screenshot' : 'Equip screenshot (optional)', E('input', { id: 'b-shot', type: 'file', accept: 'image/*' }))),
-    E('div', { class: 'b-row' },
-      E('button', { id: 'b-savebtn', type: 'button', class: 'k-btn key', onclick: save }, ed ? 'Save changes' : 'Save this build'),
+      field('b-ign', 'Character name', target ? target.ign : ui.lastIgn, 12),
+      E('button', { id: 'b-savebtn', type: 'button', class: 'k-btn key', onclick: () => save() }, ed ? 'Save changes' : target ? 'Save to ' + target.ign : 'Save build'),
       ed ? E('button', { type: 'button', class: 'k-btn', onclick: () => { ui.editing = null; renderSave(); } }, 'Cancel') : null),
+    E('details', { class: 'b-more-details', ...(ed ? { open: '' } : {}) }, E('summary', {}, 'Where you train, a note, a screenshot (optional)'),
+      E('div', { class: 'b-row' },
+        field('b-trains', 'Where you train', target ? target.trains_at : '', 80, 'grow'),
+        field('b-note', 'Note (gear, scrolls, anything)', target ? target.note : '', 280, 'grow'),
+        E('label', {}, target && target.shot_path ? 'Replace equip screenshot' : 'Equip screenshot (optional)', E('input', { id: 'b-shot', type: 'file', accept: 'image/*' })))),
     E('p', { id: 'b-savemsg' }));
 }
 
-async function save() {
-  const say = t => { ui.root.querySelector('#b-savemsg').textContent = t; };
-  const btn = ui.root.querySelector('#b-savebtn'), val = id => ui.root.querySelector(id).value.trim();
-  const ign = val('#b-ign');
+// The toolbar's Save build: one click for a signed in player who has a name to save under. Otherwise the My builds tab opens on the name.
+function quickSave() {
+  const s = me(), name = (ui.loaded && ui.loaded.ign) || (ui.editing && ui.editing.ign) || ui.lastIgn;
+  if (!s || !name) {
+    showTab('mybuilds'); renderSave();
+    const box = ui.root.querySelector('#b-ign');
+    if (box) { box.focus(); const m = ui.root.querySelector('#b-savemsg'); if (m) m.textContent = 'Type your character name once, then Save.'; }
+    return;
+  }
+  save(name, true);
+}
+
+async function save(quickName, quiet) {
+  const say = t => { const m = ui.root.querySelector('#b-savemsg'); if (m) m.textContent = t; if (quiet) { const g = ui.root.querySelector('#b-msg'); g.className = 'note'; g.textContent = t; } };
+  const btn = ui.root.querySelector('#b-savebtn'), val = id => { const e = ui.root.querySelector(id); return e ? e.value.trim() : ''; };
+  const ign = quickName || val('#b-ign');
   if (!ign) return say('Type your character name first.');
   const v = validateStats(rawStats(), ui.form.cls);
   if (v.errors.length) return say(v.errors.join(' '));
-  const ed = ui.editing, file = ui.root.querySelector('#b-shot').files[0];
-  btn.disabled = true; say('Saving...');
-  let shot = ed ? ed.shot_path || null : null, note = '';
+  const target = saveTarget(ign), fileBox = ui.root.querySelector('#b-shot'), file = fileBox && fileBox.files[0];
+  // a quick save keeps what the saved build already says; the form's boxes are only read when it is on screen
+  const typed = !quiet && ui.root.querySelector('#b-trains');
+  if (btn) btn.disabled = true; say('Saving...');
+  let shot = target ? target.shot_path || null : null, note = '';
   try {
     if (file) {
       try { shot = await ui.deps.api.uploadShot(await shrinkImage(file)); }
       catch (e) { note = 'Saved without the picture: ' + e.message; }
     }
-    const row = { ign, class: ui.form.cls, level: v.stats.level, stats: typedStats(), trains_at: val('#b-trains'), note: val('#b-note'), shot_path: shot };
-    if (ed) row.id = ed.id;
-    await ui.deps.api.saveBuild(row);
+    const row = { ign, class: ui.form.cls, level: v.stats.level, stats: typedStats(),
+      trains_at: typed ? val('#b-trains') : target ? target.trains_at || '' : '', note: typed ? val('#b-note') : target ? target.note || '' : '', shot_path: shot };
+    if (target) row.id = target.id;
+    const saved = await ui.deps.api.saveBuild(row);
     // A replaced picture is no longer used by anything.
-    if (ed && ed.shot_path && shot !== ed.shot_path) ui.deps.api.removeShot(ed.shot_path).catch(() => {});
-    ui.lastIgn = ign; ui.editing = null;
-    renderSave(); say(note || 'Saved.');
+    if (target && target.shot_path && shot !== target.shot_path) ui.deps.api.removeShot(target.shot_path).catch(() => {});
+    ui.lastIgn = ign; ui.editing = null; ui.loaded = { ...row, id: (saved && saved.id) || row.id, user_id: me() && me().user_id };
+    ui.deps.store.set('bt.ign', ign);
+    renderSave(); say(note || 'Saved ' + ign + '.');
     loadList(); renderMine();
   } catch (e) {
-    if (shot && (!ed || shot !== ed.shot_path)) ui.deps.api.removeShot(shot).catch(() => {});
+    if (shot && (!target || shot !== target.shot_path)) ui.deps.api.removeShot(shot).catch(() => {});
     say("Couldn't save: " + e.message);
-  } finally { btn.disabled = false; }
+  } finally { const b2 = ui.root.querySelector('#b-savebtn'); if (b2) b2.disabled = false; }
 }
 
 function renderFilters() {
@@ -2257,11 +2314,8 @@ function card(b) {
     b.note ? E('p', { class: 'muted' }, b.note) : null,
     b.shot_path ? E('img', { src: ui.deps.api.shotUrl(b.shot_path), alt: b.ign + "'s equipment", loading: 'lazy' }) : null,
     E('div', { class: 'b-actions' },
-      E('button', { type: 'button', class: 'k-btn sm', onclick: () => {
-        if (ui.editing && ui.editing.id !== b.id) { ui.editing = null; renderSave(); }
-        fill(b.stats, b.class, mine ? 'mine' : 'community'); ui.root.scrollIntoView({ behavior: 'smooth' });
-      } }, 'Load into calculator'),
-      mine ? E('button', { type: 'button', class: 'k-btn sm', onclick: () => { ui.editing = b; fill(b.stats, b.class, 'mine'); renderSave(); setOpen('b-save', true); ui.root.querySelector('#b-save').scrollIntoView({ behavior: 'smooth' }); } }, 'Edit') : null,
+      E('button', { type: 'button', class: 'k-btn sm', onclick: () => { load(b, !!mine); ui.root.scrollIntoView({ behavior: 'smooth' }); } }, 'Load into calculator'),
+      mine ? E('button', { type: 'button', class: 'k-btn sm', onclick: () => { ui.editing = b; fill(b.stats, b.class, 'mine'); ui.loaded = b; renderSave(); ui.root.querySelector('#b-savebody').scrollIntoView({ behavior: 'smooth' }); } }, 'Edit') : null,
       mine ? E('button', { type: 'button', class: 'k-btn sm', onclick: () => remove(b) }, 'Delete') : null,
       admin && !mine ? E('button', { type: 'button', class: 'k-btn sm', onclick: () => ui.deps.api.hideBuild(b.id).then(loadList, e => alert(e.message)) }, 'Hide') : null));
 }
@@ -2271,8 +2325,9 @@ async function remove(b) {
   try {
     await ui.deps.api.deleteBuild(b.id);
     if (b.shot_path) await ui.deps.api.removeShot(b.shot_path).catch(() => {});
-    if (ui.editing && ui.editing.id === b.id) { ui.editing = null; renderSave(); }
-    loadList();
+    if (ui.editing && ui.editing.id === b.id) ui.editing = null;
+    if (ui.loaded && ui.loaded.id === b.id) ui.loaded = null;
+    renderSave(); loadList(); renderMine();
   } catch (e) { alert("Couldn't delete: " + e.message); }
 }
 
@@ -2300,9 +2355,8 @@ function refresh() {
 
 function mount(root, deps) {
   ui.root = root; ui.deps = deps; ui.data = deps.data; DATA = deps.data;
-  ui.editing = null; ui.lastIgn = ''; ui.listGen = 0; ui.who = null; ui.filter = { cls: '', minLv: '', maxLv: '', sort: 'level' };
+  ui.editing = null; ui.loaded = null; ui.mineRows = []; ui.limited = false; ui.lastIgn = ''; try { ui.lastIgn = ui.deps.store.get('bt.ign') || ''; } catch { /* no saved name */ } ui.listGen = 0; ui.who = null; ui.filter = { cls: '', minLv: '', maxLv: '', sort: 'level' };
   loadForm(); loadRoads();
-  const editOpen = !!ui.deps.store.get('bt.bedit');
   const shut = open => open ? {} : { hidden: '' };
   const P = window.PixelIcons;
   // a wood sign button with its pixel picture (the Grind page's buttons); the minus is built from the same bitmap tool
@@ -2325,30 +2379,28 @@ function mount(root, deps) {
       E('div', { class: 'k-pad b-pad' },
         E('div', { class: 'k-tools', id: 'b-tools' },
           E('button', { id: 'b-readbtn', type: 'button', class: 'k-btn key', onclick: openReader }, E('i', { 'aria-hidden': 'true' }, P.railIcon('frame')), E('span', {}, 'Read from game')),
-          sign('b-edit', 'gear', 'Edit stats and skills', () => toggle('b-drawer', 'bt.bedit'), { 'aria-controls': 'b-drawer', 'aria-expanded': String(editOpen) }),
-          sign('b-savetoggle', 'save', 'Save build', () => toggle('b-save'), { 'aria-controls': 'b-save', 'aria-expanded': 'false' }),
+          sign('b-savetoggle', 'save', 'Save build', quickSave, { title: 'Save to your profile' }),
           sign('b-new', 'plus', 'New build', newBuild),
-          sign('b-friend', 'plus', "New friend's build", newFriendBuild, { title: "For a build that isn't your character" }),
-          sign('b-browsetoggle', 'book', 'Community builds', () => toggle('b-browse'), { 'aria-controls': 'b-browse', 'aria-expanded': 'false' })),
+          sign('b-friend', 'plus', "New friend's build", newFriendBuild, { title: "For a build that isn't your character" })),
         E('div', { id: 'b-picker', class: 'b-picker', ...shut(pickOpen) }, E('div', { id: 'b-tiles', class: 'b-tiles' }), E('div', { id: 'b-paths', class: 'b-paths' })),
-        E('div', { id: 'b-mine', class: 'b-mine' }),
         E('div', { id: 'b-reader', class: 'b-reader k-card', hidden: '' },
           E('p', { id: 'b-readnote', class: 'small' }, 'Reads your stat and skill windows, from a shared game window or a screenshot.')),
-        E('div', { id: 'b-drawer', class: 'b-drawer k-card', ...shut(editOpen) }, E('div', { class: 'b-form' })),
         E('div', { id: 'b-big', class: 'b-big' }),
         E('p', { id: 'b-msg' }))),
     E('div', { id: 'b-guide', hidden: '' },
       E('section', { id: 'b-guidewin', class: 'k-win b-win' },
-        E('div', { class: 'k-bar' }, E('div', { class: 'b-dtabs', role: 'tablist' }, TABS.map(([id, name]) =>
+        E('div', { class: 'k-bar k-grass' }, E('div', { class: 'b-dtabs', role: 'tablist' }, TABS.map(([id, name]) =>
           E('button', { type: 'button', role: 'tab', 'data-tab': id, 'aria-controls': id, onclick: () => showTab(id) }, name)))),
         E('div', { class: 'k-pad b-gpad' },
-          TABS.map(([id]) => E('section', { id, class: 'b-dpanel', role: 'tabpanel' })),
-          estimatedNote()))),
-    E('section', { id: 'b-save', class: 'k-win b-win', hidden: '' }, E('div', { class: 'k-bar' }, E('span', { id: 'b-savetitle' }, 'Save this build')), E('div', { id: 'b-savebody', class: 'k-pad b-panel' })),
-    E('section', { id: 'b-browse', class: 'k-win b-win', hidden: '' }, E('div', { class: 'k-bar' }, E('h2', {}, 'Builds')),
-      E('div', { class: 'k-pad b-browsepad' },
-        E('p', { class: 'lead' }, "Other players' characters, their stats and where they train. Load one into the calculator to see its guide."),
-        renderFilters(), E('div', { id: 'b-list' })))));
+          TABS.map(([id]) => E('section', { id, class: 'b-dpanel', role: 'tabpanel' },
+            // the Points tab carries the stat table above its plan; My builds holds the saved characters, the save form and Community builds
+            ...(id === 'points' ? [E('div', { id: 'b-stats', class: 'b-stats' }), E('div', { id: 'b-pointsplan' })]
+              : id === 'mybuilds' ? [E('h4', { class: 'b-sec' }, 'My builds'), E('div', { id: 'b-mine', class: 'b-mine' }),
+                E('h4', { class: 'b-sec' }, 'Save this build'), E('div', { id: 'b-savebody', class: 'b-panel' }),
+                E('h4', { class: 'b-sec' }, 'Community builds'),
+                E('p', { class: 'small' }, "Other players' characters, their stats and where they train. Load one into the calculator to see its guide."),
+                renderFilters(), E('div', { id: 'b-list' })] : []))),
+          estimatedNote())))));
   showTab(ui.deps.store.get('bt.btab'));
   buildForm();
   renderGuide();
