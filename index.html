@@ -1040,6 +1040,15 @@ body.g-ov .g-strip.g-moving { cursor: grabbing; }
 .g-alert button { padding: 0 .6em; border: var(--u) solid var(--wood-o); border-radius: var(--corner); background-color: var(--btn); box-shadow: inset 0 var(--u) 0 var(--btn-hi), inset 0 calc(-1 * var(--u)) 0 var(--btn-lo); color: var(--btn-ink); font-family: inherit; font-size: 1em; font-weight: 700; line-height: inherit; cursor: pointer; }
 .g-l3b { display: flex; gap: .4em; }
 .g-l3b button { float: none; margin-left: 0; }
+/* flipping the bag: the three tabs with the same ticks as the main card's checklist, so progress shows instead of one
+   stuck looking sentence. One line where that's all there's room for (Bar, Hero); Column and Corner have the height
+   to stack them */
+.g-flip { display: flex; gap: .7em; }
+.g-flip b { font-weight: 700; }
+.g-flip b::before { content: '… '; color: var(--muted); font-weight: 700; }
+.g-flip b.fix::before { content: '! '; color: var(--over-fg); }
+.g-flip b.done::before { content: '✓ '; color: var(--up-fg); }
+.g-strip[data-layout="column"] .g-flip, .g-strip[data-layout="corner"] .g-flip { flex-direction: column; gap: .1em; }
 /* while it shows, the window stays as it is and so does the size of the text (fit() measures the panel without it). Its room
    comes from the small lines under the numbers, which step aside in Hero, Column and Corner; Bar's is further down */
 .g-strip:is([data-layout="hero"], [data-layout="column"], [data-layout="corner"]):has(> .g-l3:not([hidden])) .g-ks { display: none; }
@@ -1706,7 +1715,7 @@ const CONFIG = {
   reportUrl: 'https://sixpathcrossway.pages.dev/api/report',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-09a',
+  version: '2026-11-09b',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };

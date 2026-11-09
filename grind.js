@@ -89,7 +89,7 @@ function health(f) {
   C.mesos = f.meso.unclear ? { state: 'wait', text: "can't read clearly" } : f.meso.at == null ? { state: 'wait', text: 'waiting' } : { state: mesoStale ? 'wait' : 'ok', text: ago(f.meso.at) };
 
   const stuck = ['exp', 'potions', 'level'].some(k => C[k].state === 'bad');
-  const say = (state, text) => ({ checks: C, nudge: { state, text }, stuck });
+  const say = (state, text, extra) => ({ checks: C, nudge: Object.assign({ state, text }, extra), stuck });
   const app = !!f.app;   // the Windows app has no share step: Start picks the game
   // f.stopped: the player pressed Stop, so in the app the game wasn't lost
   if (!f.sharing) return say('idle', app ? (!f.hasSession ? 'Press Start to begin' : f.stopped ? 'Stopped. Press Start to carry on' : 'Lost the game window. Press Start to carry on')
@@ -103,10 +103,11 @@ function health(f) {
   // Count my loot (f.loot: { on, pictures, sets, refillAfter }): a flip through the bag also reads the mesos, so it comes
   // first, once the item pictures are in (a flip before then reads nothing)
   if (f.loot && f.loot.on && f.loot.pictures === false) return say('wait', 'Loading the item pictures for Count my loot');
-  if (f.loot && f.loot.on && !f.loot.sets) return say('wait', 'Open your bag and flip through Equip, Use and Etc, scrolling to the bottom of each');
-  if (f.loot && f.loot.on && f.loot.refillAfter) return say('wait', 'In town? Flip through your bag so your loot counts');
+  // flip: the pop out shows the three tabs' own checkmarks (bagTabStates in renderHealth) instead of this sentence
+  if (f.loot && f.loot.on && !f.loot.sets) return say('wait', 'Open your bag and flip through Equip, Use and Etc, scrolling to the bottom of each', { flip: true });
+  if (f.loot && f.loot.on && f.loot.refillAfter) return say('wait', 'In town? Flip through your bag so your loot counts', { flip: true });
   // with the pickup lines on, the bag is only asked for again when they can't be trusted (loot.needsFlip)
-  if (f.loot && f.loot.on && f.loot.needsFlip) return say('wait', "Flip through your bag again, the pickup lines can't be trusted for now");
+  if (f.loot && f.loot.on && f.loot.needsFlip) return say('wait', "Flip through your bag again, the pickup lines can't be trusted for now", { flip: true });
   if (f.meso.unclear) return say('wait', "Can't read your meso total clearly yet. Move the mouse off it");
   if (f.meso.at == null) return say('wait', 'Open your inventory for a moment so mesos count');
   if (mesoStale) return say('wait', 'Mesos last seen ' + ago(f.meso.at) + '. Open your inventory for a moment');
@@ -1372,6 +1373,12 @@ function mount(root, deps) {
     }
     SP.l3.hidden = savedRun || h.nudge.state === 'ok';
     SP.l3.className = 'g-l3 g-alert ' + h.nudge.state;
+    // flipping the bag: the three tabs' own checkmarks instead of the sentence, so it reads as progress, not as stuck
+    if (h.nudge.flip) {
+      const tabs = bagTabStates(s && s.bag);
+      alertSays('flip ' + tabs.map(x => x.tab + x.state).join(), () => SP.l3.replaceChildren(el('span', { class: 'g-flip' }, tabs.map(({ tab, state }) => el('b', { class: state }, tab)))));
+      return;
+    }
     alertSays([h.nudge.state, h.nudge.text, h.stuck].join(), () => SP.l3.replaceChildren(h.nudge.text, h.stuck ? el('button', { type: 'button', onclick: () => refind() }, railIcon('reset'), ' Find my game again') : ''));
   }
 
@@ -1710,6 +1717,16 @@ function mount(root, deps) {
     V.resLines.replaceChildren(...lines); V.resLines.hidden = !lines.length;
     V.resNudge.hidden = loot || !!viewing;
   }
+  // the three tabs' state during a flip-through: seen in full (with when), part way (needs a slower scroll), or not
+  // yet. Shared by the main card's checklist (renderBag) and the pop out's chips (renderHealth).
+  function bagTabStates(B) {
+    return ['Equip', 'Use', 'Etc'].map(tab => {
+      const A = B && B.acc[tab], full = B && B.done[tab] ? B.done[tab].t : B && B.last ? B.last.t : null;
+      // pages of a tab not finished in this opening, unless this opening already made a set (they're left from it)
+      const part = !!(A && A.strips.length) && !(B && B.done[tab]) && !(B && B.last && B.last.t >= B.openT);
+      return { tab, state: part ? 'fix' : full ? 'done' : '', full };
+    });
+  }
   // the bag's three tabs under the switch: seen in full (when), part of it (scroll on), or not yet
   function renderBag() {
     const B = session && session.bag;
@@ -1717,12 +1734,10 @@ function mount(root, deps) {
     if (!lootOn) return;
     // the list goes once a flip is done, so its time stays in Notices
     if (B && B.last && st.bagNoted !== B.last.t) { st.bagNoted = B.last.t; st.noted.bag = null; noteOf('bag', 'done', 'Bag counted: Equip, Use and Etc', B.last.t); }
-    for (const tab of ['Equip', 'Use', 'Etc']) {
-      const li = bagCheck.querySelector('[data-k="bag-' + tab + '"]'), A = B && B.acc[tab], full = B && B.done[tab] ? B.done[tab].t : B && B.last ? B.last.t : null;
-      // pages of a tab not finished in this opening, unless this opening already made a set (they're left from it)
-      const part = !!(A && A.strips.length) && !(B.done[tab]) && !(B.last && B.last.t >= B.openT);
-      li.className = part ? 'fix' : full ? 'done' : '';
-      li.lastChild.textContent = part ? 'Scroll to its top and bottom, slowly' : full ? 'Seen at ' + timeOfDay(full) : 'Open it in your bag';
+    for (const { tab, state, full } of bagTabStates(B)) {
+      const li = bagCheck.querySelector('[data-k="bag-' + tab + '"]');
+      li.className = state;
+      li.lastChild.textContent = state === 'fix' ? 'Scroll to its top and bottom, slowly' : state === 'done' ? 'Seen at ' + timeOfDay(full) : 'Open it in your bag';
     }
   }
   // the pop out's potion clocks and session length tick every second between frames
