@@ -444,7 +444,7 @@ function mount(root, deps) {
         el('div', { class: 'g-kh' }, el('span', { class: 'g-kl' }, 'EXP an hour'), SP.seg = el('span', { class: 'g-seg', role: 'group', 'aria-label': 'EXP an hour over' }, SP.segs)),
         el('div', { class: 'g-kv' }, SP.exp = el('span', { class: 'g-kn' }, '·'),
           SP.expUs = el('span', { class: 'g-us', hidden: '' }, SP.expUn = el('span', {}), SP.expUw = el('span', { class: 'g-uw' })), SP.expD = el('span', { class: 'g-d' }))),
-      SP.grid = el('div', { class: 'g-grid' }, kTile('meso', 'Mesos'), kTile('gain', 'EXP gained'), perTile(), kTile('lv', 'Lv in')),
+      SP.grid = el('div', { class: 'g-grid' }, kTile('meso', 'Mesos'), kTile('gain', 'EXP gained'), perTile(), kTile('pace', 'Pace'), kTile('lv', 'Lv in')),
       SP.tilesBox = el('div', { class: 'g-tiles' }, SP.pots[0].box, SP.quip = el('div', { class: 'g-quip', hidden: '' }, SP.quipB = el('b', {}), SP.quipS = el('span', {})))),
     SP.l3 = el('div', { class: 'g-l3 g-alert', hidden: '' }),
     // ornaments: grass along the frame's top edge and a mushroom in the bottom right corner, art that takes no clicks (the CSS places them)
@@ -1421,6 +1421,7 @@ function mount(root, deps) {
     put(SP.gainSub, !s ? '' : minus(o.pct) + Math.abs(o.pct).toFixed(1) + '%' + (o.deaths ? ' · ' + o.deaths + ' death' + (o.deaths > 1 ? 's' : '') : s.level ? ' of Lv ' + s.level : ''));
     hoverText(SP.gainBox, o.deaths ? deathText(o) : '');
     renderPer(s, o, saved);
+    renderPace(s, o, saved);
     // the next level, live only
     show(SP.lvBox, !saved);
     put(SP.lvL, s && s.level ? 'Lv ' + (s.level + 1) + ' in' : 'Next level in');
@@ -1474,6 +1475,20 @@ function mount(root, deps) {
     show(SP.perUs, usual != null);
     put(SP.perUs, usual != null ? '/ ' + perFmt(usual) : '');
     put(SP.perSub, o.per1 != null ? fmt(o.per1) + ' mesos' : '');
+  }
+  // Pace: the card's Last 5 min comparison against your usual, surfaced as a KPI tile in Bar only (Hero, Column and
+  // Corner keep their four tiles and fixed window sizes). Rewritten only when it changes, so a redraw with nothing new
+  // never restarts an animation
+  function renderPace(s, o, saved) {
+    show(SP.paceBox, !saved && layout === 'bar');
+    if (saved || layout !== 'bar') return;
+    const p = paceParts(o)[0], key = p.value + '|' + (p.vs || '');
+    if (SP.pace.dataset.t !== key) {
+      SP.pace.dataset.t = key;
+      arrowed(SP.pace, p.value + (p.vs ? ' ' : ''));
+      if (p.vs) { const a = el('span', { class: 'g-nvs ' + (p.up ? 'up' : 'down') }); arrowed(a, p.vs); SP.pace.append(a); }
+    }
+    put(SP.paceSub, p.value !== '·' ? 'last 5 min' : '');
   }
   // every frame and every second between: the timer tiles (each a little glass that drains), the map and how long
   function renderClocks(now) {

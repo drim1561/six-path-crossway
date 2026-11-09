@@ -40,6 +40,8 @@ const CLASSES = {
     skillOrder: [[2101003, 30], [2101001, 20], [2100000, 1], [2101000, 20], [2101004, 30], [2101002, 20]] },
   ilwizard: { id: 'ilwizard', name: 'Ice/Lightning Wizard', family: 'spell', jobMask: 2, job2: 220, mainStat: 'int', reqStat: 'luk',
     weapons: ['Wand', 'Staff'], weaponSlot: 'Wand', attack: 2201003, attack1: 2001003, element: 'I',
+    // the 2nd job attacks a build may lead with: Cold Beam, or Thunder Bolt with no points in Cold Beam (Bolt first)
+    attacks: [2201003, 2201004],
     skillOrder: [[2201003, 30], [2201004, 30], [2201001, 20], [2201000, 20], [2200000, 1], [2201002, 20]] },
   hunter: { id: 'hunter', name: 'Hunter', family: 'phys', jobMask: 4, job2: 310, mainStat: 'dex', reqStat: 'str',
     weapons: ['Bow'], attack: 3001002, attack1: 3001002, mastery: { Bow: 3100000 },
@@ -67,16 +69,36 @@ const BRANCHES = {
 // Skill paths: ways to spend SP side by side, from the character's points now (my calls, as data). order1 and order2
 // replace the 1st and 2nd job orders; early plays the 1st job as another class (Lucky Seven with a claw for a Bandit),
 // and reset says an SP Reset Scroll (Cash Shop, 5051001) moves those points into the class's own 1st job order later.
+// skill is the one a road maxes first (its picture, and what "never cast" checks); good says what kind of grind it suits.
 const PATHS = {
   bandit: [
-    { id: 'l7reset', name: 'Lucky Seven now, SP Reset into Bandit', early: 'assassin', order1: BRANCHES.thief.skillOrder, reset: true,
-      how: 'Lucky Seven with a claw through 1st job, Savage Blow with a dagger once it overtakes, then an SP Reset Scroll.' },
-    { id: 'dstab', name: 'Double Stab all the way', how: 'Double Stab with a dagger now, then Savage Blow.' }],
+    { id: 'l7reset', name: 'Lucky Seven then SP Reset', early: 'assassin', order1: BRANCHES.thief.skillOrder, reset: true, skill: 4001003,
+      how: 'Lucky Seven with a claw through 1st job, Savage Blow with a dagger once it overtakes, then an SP Reset Scroll.',
+      good: "Hitting from a distance with stars until 30, if you don't mind buying the scroll." },
+    { id: 'dstab', name: 'Double Stab all the way', skill: 4001002, how: 'Double Stab with a dagger now, then Savage Blow.',
+      good: 'Fighting up close the whole way, with nothing to buy.' }],
   cleric: [
-    { id: 'heal', name: 'Heal first', order2: [[2301001, 30], [2301004, 30], [2301002, 20], [2301003, 20], [2301000, 20]],
-      how: 'Max Heal, then Holy Arrow. Heal hits up to 5 undead at once.' },
-    { id: 'arrow', name: 'Holy Arrow first', how: 'Max Holy Arrow, then Heal.' }],
+    { id: 'heal', name: 'Heal first', skill: 2301001, order2: [[2301001, 30], [2301004, 30], [2301002, 20], [2301003, 20], [2301000, 20]],
+      how: 'Max Heal, then Holy Arrow. Heal hits up to 5 undead at once.',
+      good: 'Groups of undead only, and the most EXP when you can pull 3 or more together.' },
+    { id: 'arrow', name: 'Holy Arrow first', skill: 2301004, how: 'Max Holy Arrow, then Heal.', good: 'Any monster one at a time, bosses like Mushmom too.' }],
+  // both run on to the 121 points a fresh 30 has by 70, so Next SP and the Points tab never run out of order
+  ilwizard: [
+    { id: 'bolt', name: 'Bolt first', skill: 2201004,
+      order2: [[2201004, 1], [2201001, 1], [2201004, 30], [2200000, 3], [2201000, 20], [2201001, 20], [2201003, 30], [2200000, 20], [2201002, 1]],
+      how: 'Max Thunder Bolt, then MP Eater, Meditation and Teleport, then Cold Beam.', good: 'Packs of monsters close together.' },
+    { id: 'beam', name: 'Beam first', skill: 2201003,
+      order2: [[2201003, 1], [2201001, 1], [2201003, 30], [2201004, 30], [2200000, 3], [2201000, 20], [2201001, 20], [2200000, 20], [2201002, 1]],
+      how: 'Max Cold Beam, then Thunder Bolt.', good: 'One at a time, and ice weak monsters like Fire Boars hardest.' }],
 };
+// The Skill paths switch, "Monsters a Bolt really hits": the skill it's about and where it starts. A Wizard starts at 2 (most
+// casts don't hit 2 or more when monsters are spread out), a Cleric at 3 (Rimmah groups undead for Heal). Classes without
+// one run their roads uncapped.
+const REACH = { ilwizard: { skill: 2201004, start: 2 }, cleric: { skill: 2301001, start: 3 } };
+// A road stays on a spot while it's within 15% of the best one at that level; 40 simulated kills a level keeps a road
+// within about an hour of 150 at a quarter of the time. Roads look 20 levels ahead (40 at the least, 70 at the most).
+const HOLD = 0.85, ROAD_KILLS = 40;
+const roadTarget = lv => Math.min(70, Math.max(40, lv + 20));
 for (const c of Object.values(CLASSES)) if (!c.fields) c.fields = c.family === 'spell' ? CLASSES.cleric.fields : ['level', 'str', 'dex', 'int', 'luk', 'weapon', 'atk', 'acc', 'crit'];
 const branchOf = clsId => { const b = Object.values(BRANCHES).find(b => b.paths.includes(clsId)); return b ? b.id : undefined; };
 const ADVANCE = 30, NEXT_ADVANCE = 70;
@@ -109,6 +131,10 @@ const WEAPONS = {
 };
 // Weapon types whose multiplier a real stat window has matched (Claw: 808s and JPark; sword and polearm: Ohmohnah).
 const CHECKED_WEAPONS = new Set(['Claw', 'One-Handed Sword', 'Polearm']);
+// What a real build has confirmed for a class's Skill paths roads: the class, the level, and which number matched. Each one
+// is a fixture in tests/builds-logic.test.js (Rimmah's level 46 Cleric MAGIC is CLERIC there). A road says it by name;
+// without an entry it says Estimated.
+const CHECKED = [{ cls: 'cleric', level: 46, what: 'MAGIC' }];
 const windowMults = slot => { const w = WEAPONS[slot]; return w.shoot ? [w.shoot, w.shoot] : [Math.min(w.swing, w.stab), Math.max(w.swing, w.stab)]; };
 // The stat window's ATTACK range for a weapon type: S 1, floored like the game shows it.
 function windowRange({ W, P, sec, slot, M, ap = 0 }) {
@@ -195,6 +221,12 @@ function phaseOf(cls, lv) {
     order: cls.order1 || (br.byPath && br.byPath[cls.id]) || br.skillOrder, branch: br };
   return { phase: 2, job: cls.job2, until: NEXT_ADVANCE, attack: cls.attack, order: cls.skillOrder, branch: br };
 }
+// The attack a build leads with: the phase's own, unless it has no points in 2nd job and another of the class's 2nd job
+// attacks does (a Bolt first Wizard: Thunder Bolt with no Cold Beam).
+function mainAttack(cls, P, skills) {
+  if (P.phase !== 2 || (skills[P.attack] || 0) >= 1 || !cls.attacks) return P.attack;
+  return cls.attacks.find(id => (skills[id] || 0) >= 1) || P.attack;
+}
 // A physical class's skill order names its mastery, booster and final attack as 'M', 'B', 'F': the ids for its weapon type.
 function orderFor(cls, P, slot) {
   if (!cls.byType) return P.order;
@@ -241,13 +273,19 @@ function validateStats(raw, clsId) {
     Object.assign(stats.skills, typicalSkills(cls, lv, w ? w.slot : cls.weaponSlot || cls.weapons[0]));
     assumed.push('skills');
   }
-  if (cls && !noneTyped) for (const id of skillsFor(cls, lv)) {
-    const max = DATA && DATA.skills[id] ? DATA.skills[id].max : 30;
-    // A blank attack skill: as high as the points spent in this job allow (3 a level), up to its max.
-    const typical = Math.max(1, Math.min(max, 1 + 3 * (lv - (P.phase === 1 ? ADV1(cls.id) : ADVANCE))));
-    if (blank(sk[id])) { stats.skills[id] = id === P.attack ? (cls.skills && P.phase === 2 ? max : typical) : 0; if (id === P.attack) assumed.push('skills'); }
-    else stats.skills[id] = Math.max(0, Math.min(max, Math.floor(Number(sk[id]) || 0)));
-    if (id === P.attack && stats.skills[id] < 1) errors.push('Put at least 1 point in ' + (DATA && DATA.skills[id] ? DATA.skills[id].name : 'your attack skill') + ' for a guide.');
+  if (cls && !noneTyped) {
+    const ids = skillsFor(cls, lv);
+    for (const id of ids) {
+      const max = DATA && DATA.skills[id] ? DATA.skills[id].max : 30;
+      // A blank attack skill: as high as the points spent in this job allow (3 a level), up to its max.
+      const typical = Math.max(1, Math.min(max, 1 + 3 * (lv - (P.phase === 1 ? ADV1(cls.id) : ADVANCE))));
+      if (blank(sk[id])) { stats.skills[id] = id === P.attack ? (cls.skills && P.phase === 2 ? max : typical) : 0; if (id === P.attack) assumed.push('skills'); }
+      else stats.skills[id] = Math.max(0, Math.min(max, Math.floor(Number(sk[id]) || 0)));
+    }
+    // a guide needs a point in an attack: the phase's own, or for I/L either 2nd job attack (Bolt first is a real build)
+    const need = (P.phase === 2 && cls.attacks ? cls.attacks : [P.attack]).filter(id => ids.includes(id));
+    if (need.length && !need.some(id => stats.skills[id] >= 1))
+      errors.push('Put at least 1 point in ' + need.map(id => DATA && DATA.skills[id] ? DATA.skills[id].name : 'your attack skill').join(' or ') + ' for a guide.');
   }
   if (cls && cls.family === 'spell') {
     take('magic', () => Math.floor(stats.int / 2) + bestWeapon(cls.weaponSlot, lv, 'mad'));
@@ -310,7 +348,8 @@ const SKILL_ELEMENT = { 2201004: 'L' };
 // Monsters one cast reaches: about one for every 8 the map spawns, up to what the skill can hit. Gathering them costs
 // a cast of walking for each one past the first, so a crowd only wins when its monsters are worth the trip.
 const CROWD = 8;
-const crowdHits = (count, mobCount) => Math.min(mobCount, Math.max(1, Math.floor(count / CROWD)));
+// cap: what the player says a cast really hits (the Skill paths switch); a thin map still gives what it spawns.
+const crowdHits = (count, mobCount, cap = Infinity) => Math.min(mobCount, cap, Math.max(1, Math.floor(count / CROWD)));
 const groupGap = k => KILL_GAP + (k - 1);
 
 // Heal (Clerics): hurts undead monsters only. HEAL_SOURCE: meowdb.com/msclassic/formulas/damage, the Heal section, which
@@ -334,7 +373,7 @@ function attackModel(s, cls, Wover, skillId) {
     return { range: physRange({ S: (l7.damage || 0) / 100, W, P: s.luk, sec, mult: 3, M: 0.5, ap }), hits: l7.bulletCount || 2,
       crit: { rate: s.critRate / 100, dmg: s.critDmg / 100 - 1 }, def: 'pdd', element: null, W, skill: cls.attack, targets: 1 };
   }
-  const P = phaseOf(cls, s.level), id = skillId || P.attack, targets = Math.max(1, num(sk(id).mobCount));
+  const P = phaseOf(cls, s.level), id = skillId || mainAttack(cls, P, s.skills), targets = Math.max(1, num(sk(id).mobCount));
   if (id === HEAL) {
     const h = sk(HEAL), heal = n => healRange({ int: s.int, luk: s.luk, magic: s.magic, x: num(h.x), targets: n });
     return { range: heal(1), rangeFor: heal, hits: 1, crit: { rate: 0, dmg: 0 }, def: 'mdd', element: null, skill: HEAL,
@@ -349,7 +388,8 @@ function attackModel(s, cls, Wover, skillId) {
       hits: Math.max(1, num(a.attackCount)) * Math.max(1, num(a.bulletCount)),
       crit: { rate: s.critRate / 100, dmg: s.critDmg / 100 - 1 }, def: 'pdd', element: null, W, slot, skill: id, targets };
   }
-  const ha = sk(id), el = SKILL_ELEMENT[id] || (P.phase === 2 ? cls.element : null);
+  // the class element is its own 2nd job attack's (Cold Beam's Ice); Magic Claw and other 1st job spells have none
+  const ha = sk(id), el = SKILL_ELEMENT[id] || (P.phase === 2 && id === cls.attack ? cls.element : null);
   return { range: spellRange({ S: (ha.mad || 0) / 100, magic: s.magic, int: s.int, M: mastery(num(ha.mastery)) }), hits: num(ha.attackCount) || 1,
     crit: { rate: 0, dmg: 0 }, def: 'mdd', element: el, skill: id, targets };
 }
@@ -358,17 +398,23 @@ function attackModel(s, cls, Wover, skillId) {
 const KILL_GAP = 2;
 // Each monster is fought with whichever skill the character has points in gives the best pace: the attack, or a
 // multi-target skill that kills a group (every monster in reach takes the same casts) for one walk.
-function rankWith(s, cls, data, n, seed) {
-  const P = phaseOf(cls, s.level), out = [];
+// road (Skill paths only; Train leaves it out): reach caps the monsters a cast of every skill, and first also tries the
+// class's 1st job attack in 2nd job (Magic Claw until Thunder Bolt overtakes it).
+function rankWith(s, cls, data, n, seed, road) {
+  const out = [], cap = road && road.reach || Infinity, P = phaseOf(cls, s.level);
   if (seed === undefined) seed = hash(JSON.stringify(s));
-  const models = [attackModel(s, cls)].concat(MULTI.filter(id => id !== P.attack && s.skills[id] >= 1 && DATA.skills[id]).map(id => attackModel(s, cls, undefined, id)),
-    hasHeal(s, cls) ? [attackModel(s, cls, undefined, HEAL)] : []);
+  // the lead attack first; a multi target skill that is the lead (Bolt first) isn't ranked twice
+  const lead = attackModel(s, cls);
+  const multi = MULTI.filter(id => id !== lead.skill && s.skills[id] >= 1 && DATA.skills[id]).map(id => attackModel(s, cls, undefined, id));
+  const one = road && road.first && P.phase === 2 && cls.attack1 && s.skills[cls.attack1] >= 1 && DATA.skills[cls.attack1]
+    && ![lead, ...multi].some(m => m.skill === cls.attack1) ? [attackModel(s, cls, undefined, cls.attack1)] : [];
+  const models = [lead].concat(multi, one, hasHeal(s, cls) ? [attackModel(s, cls, undefined, HEAL)] : []);
   for (const mob of data.mobs) {
     let best = null;
     // A skill whose pace on average damage is well behind another's isn't worth simulating.
     const fights = models.filter(am => !am.undeadOnly || mob.undead).map(am => {
       const hit = hitChance(s.acc, s.level, mob), mult = defend(1, mob[am.def]) * elemMult(mob, am.element) * levelScale(mob.level, s.level);
-      const k = crowdHits(mob.maps[0][1], am.targets), range = am.rangeFor ? am.rangeFor(k) : am.range;
+      const k = crowdHits(mob.maps[0][1], am.targets, cap), range = am.rangeFor ? am.rangeFor(k) : am.range;
       const avg = am.hits * hit * mult * (range[0] + range[1]) / 2 * (1 + am.crit.rate * am.crit.dmg);
       return { am, hit, mult, k, range, guess: avg > 0 ? k * mob.exp / (Math.max(1, mob.hp / avg) + groupGap(k)) : 0 };
     });
@@ -437,89 +483,162 @@ function tuneSeconds(s, cls, rows) {
 const ONE_PATH = ['assassin'];
 // A class with a path's skill orders in place of its own.
 const pathClass = (cls, path) => ({ ...cls, ...(path.order1 ? { order1: path.order1 } : {}), ...(path.order2 ? { skillOrder: path.order2 } : {}) });
-// The top spot at each level along one path: { level, pace, skill, mob, t, cls } (pace 0 when nothing can be killed).
-function pathLevels(raw, clsId, path, levels) {
+// One road's levels: { level, t, cls, held, top, switched? }, where held is every ranking row within HOLD of the level's best
+// (none when nothing can be killed), each with the MP it would cost to gain that level there. Keeps the early class switch:
+// a road that plays 1st job as another class (Lucky Seven with a claw for a Bandit) stays on that class's 1st job attack
+// past 30, with only 1st job points, until the class's own attack overtakes it; from then on the class's own (the reset
+// has moved those points).
+function roadLevels(raw, clsId, path, levels, reach) {
   const base = { level: raw.level, str: raw.str, dex: raw.dex, int: raw.int, luk: raw.luk, skills: { ...(raw.skills || {}) } };
-  const top = (t, c) => { const r = rankWith(t, c, DATA, 40)[0]; return r ? { pace: r.pace, skill: r.skill, mob: r, t, cls: c } : { pace: 0, t, cls: c }; };
+  const opt = { reach, first: true };
+  // MP to gain the level at a spot: groups to kill (the level's EXP over a group's) x casts a group x the skill's MP a cast
+  const at = (lv, t, c) => {
+    const r = rankWith(t, c, DATA, ROAD_KILLS, undefined, opt), top = r.length ? r[0].pace : 0;
+    const held = r.filter(x => x.pace >= HOLD * top).map(x => ({ ...x,
+      mp: EXP_TABLE[lv] * x.casts * num((level(DATA.skills[x.skill], t.skills[x.skill]) || {}).mpCon) / (x.hits * x.exp) }));
+    return { level: lv, t, cls: c, held, top };
+  };
   const own = pathClass(CLASSES[clsId], path), s0 = validateStats(path.early ? base : raw, clsId).stats, ap0 = planAP(s0, own);
+  const mine = lv => at(lv, roadStats(s0, own, lv, ap0), own);
   let early = null;
   if (path.early) {
     const ce = { ...CLASSES[path.early], order1: path.order1 }, se = validateStats(base, path.early).stats;
     early = { cls: ce, s: se, ap: planAP(se, ce), skills29: skillsAt(se, ce, ADVANCE - 1, slotOf(se, ce)) };
   }
+  // after the reset: the Lucky Seven points moved into the class's own 1st job (Double Stab 20 for a Bandit), as the reset
+  // line says. The road's how: Savage Blow with a dagger once it overtakes, then the scroll, so the reset counts from the
+  // level after the switch (Rimmah, 2026-11-08: without it, Double Stab in 2nd job tied the two roads)
+  const reset = lv => { const t = roadStats(s0, own, lv, ap0); t.skills = { ...t.skills, ...firstJobSkills(CLASSES[clsId], slotOf(s0, own)) }; return at(lv, t, own); };
   let switched = false;
   return levels.map(lv => {
-    const mine = top(lv === s0.level ? s0 : statsAt(s0, own, lv, ap0), own);
-    if (!early) return { level: lv, ...mine };
-    // the early class's 1st job attack, kept past 30 with only 1st job points, until the class's own attack overtakes
-    // it; from then on the class's own (the reset has moved those points)
-    if (!switched && lv >= ADVANCE) {
-      const t = { ...statsAt(early.s, early.cls, lv, early.ap), skills: early.skills29 };
-      if (mine.pace < top(t, early.cls).pace) return { level: lv, ...top(t, early.cls) };
+    if (!early) return mine(lv);
+    if (switched) return reset(lv);
+    if (lv >= ADVANCE) {
+      const m = mine(lv), e = at(lv, { ...statsAt(early.s, early.cls, lv, early.ap), skills: early.skills29 }, early.cls);
+      if (m.top < e.top) return e;
       switched = true;
-      return { level: lv, ...mine, switched: true };
+      return { ...m, switched: true };
     }
-    if (switched) return { level: lv, ...mine };
-    return { level: lv, ...top(lv === early.s.level ? early.s : statsAt(early.s, early.cls, lv, early.ap), early.cls) };
+    return at(lv, lv === early.s.level ? early.s : statsAt(early.s, early.cls, lv, early.ap), early.cls);
   });
 }
-// Every path for the class side by side, or null when it has none. Hours are grinding hours to target at the default clock.
-// Kept for the last few forms: the guide reruns on every keystroke, and paths are the slow part.
-const pathMemo = new Map();
-function comparePaths(raw, clsId, data) {
-  if (data) DATA = data;
-  const key = clsId + JSON.stringify(raw);
-  if (!pathMemo.has(key)) { pathMemo.set(key, comparePathsNow(raw, clsId)); if (pathMemo.size > 20) pathMemo.delete(pathMemo.keys().next().value); }
-  return pathMemo.get(key);
+// A road's levels folded into stops: from the current level, the held spot (monster and skill) that stays held for the
+// longest run of levels, the first in rank order winning a tie, then the next stop from where it ends. A level with
+// nothing held is skipped (gap). Hours and MP add up each stop's own spot at each of its levels, so the totals match the
+// rows shown, not the best spot each level.
+function foldStops(runs) {
+  const stops = [];
+  let i = 0, gap = false, hours = 0, mp = 0;
+  while (i < runs.length) {
+    if (!runs[i].held.length) { gap = true; i++; continue; }
+    let best = null;
+    for (const c of runs[i].held) {
+      const hit = [];
+      for (let j = i; j < runs.length; j++) { const m = runs[j].held.find(x => x.id === c.id && x.skill === c.skill); if (!m) break; hit.push(m); }
+      if (!best || hit.length > best.hit.length) best = { c, hit };
+    }
+    const { c, hit } = best;
+    hit.forEach((m, k) => { hours += EXP_TABLE[runs[i + k].level] / expHour(m.pace); mp += m.mp; });
+    stops.push({ id: c.id, name: c.name, mobLevel: c.level, map: c.map, mapId: c.mapId, skill: c.skill, hits: c.hits,
+      from: runs[i].level, to: runs[i + hit.length - 1].level, paces: hit.map(m => m.pace) });
+    i += hit.length;
+  }
+  return { stops, gap, hours, mp };
 }
-function comparePathsNow(raw, clsId) {
+// Every road for the class side by side, or null when it has none. opts.reach is the switch (monsters a cast, 1 to 4, else
+// the class's start). Hours are grinding hours to the target at the default clock. Kept for the last few forms and switch
+// values: the guide reruns on every keystroke, and roads are the slow part.
+const pathMemo = new Map();
+function comparePaths(raw, clsId, data, opts) {
+  if (data) DATA = data;
+  const R = REACH[clsId], want = opts && opts.reach;
+  const reach = R ? (Number.isInteger(want) && want >= 1 && want <= 4 ? want : R.start) : null;
+  const key = clsId + JSON.stringify(raw) + '|' + reach;
+  if (!pathMemo.has(key)) { pathMemo.set(key, comparePathsNow(raw, clsId, reach)); if (pathMemo.size > 20) pathMemo.delete(pathMemo.keys().next().value); }
+  // the player's pick (Go this way) goes on a copy, so the memo stays the same for every pick; a pick for a road that
+  // doesn't show (the Lucky Seven road after 30, or a fork already taken) falls back to the faster road
+  const cp = pathMemo.get(key), pick = opts && opts.pick;
+  if (!cp) return null;
+  const picked = cp.paths.some(x => x.id === pick) ? pick : null;
+  return { ...cp, picked, best: picked || cp.fastest };
+}
+// What a road's numbers rest on: what a real build of the class confirmed (CHECKED), else Estimated, then Heal's damage
+// on a road that maxes Heal or stops on it (Heal's estimate picks which spots a Heal first road holds even when Holy Arrow
+// wins every stop), then the weapon types no stat window has checked yet.
+function roadCheck(clsId, road) {
+  const cls = CLASSES[clsId], mine = CHECKED.filter(c => c.cls === clsId);
+  const unchecked = cls.family === 'phys' ? cls.weapons.filter(w => !CHECKED_WEAPONS.has(w)) : [];
+  const notes = [road.skill === HEAL || road.stops.some(s => s.skill === HEAL) ? "Heal's damage is an estimate until it's checked against a real hit." : '',
+    unchecked.length ? unchecked.join(' and ') + " damage comes from meowdb's table and hasn't been checked against a real stat window yet." : ''].filter(Boolean);
+  // with nothing checked and no note to follow, Estimated says what it means
+  const head = mine.length ? mine.map(c => c.what + ' checked on a real level ' + c.level + ' ' + cls.name + '.').join(' ')
+    : notes.length ? 'Estimated.' : "Estimated. Nothing's been checked on a real " + cls.name + ' yet.';
+  return [head, ...notes].join(' ');
+}
+// The verdict: which road is faster and by how much, in hours and in Lemons, then that either way works. scale puts the
+// hours on the player's own clock (g.sec / STEP_SEC), as the tiles under it are; Lemons don't depend on the clock.
+function verdict(out, fast, taken, target, scale = 1) {
+  if (taken) return "This fork is behind you, so there's one road from here.";
+  if (!isFinite(fast.hours)) return 'Neither road has a monster to beat at every level to ' + target + ' yet.';
+  const rest = out.filter(x => x !== fast);
+  if (rest.every(x => !isFinite(x.hours))) return fast.name + ' is the only road with a monster to beat at every level to ' + target + '.';
+  const other = rest.reduce((b, x) => x.hours < b.hours ? x : b), gap = (other.hours - fast.hours) * scale;
+  // the hours the tiles show apart: each tile rounds its own road (58 and 60 say 2, not the 2.5 gap rounded to 3)
+  const h = Math.round(other.hours * scale) - Math.round(fast.hours * scale), soon = h >= 2 ? 'about ' + h + ' hours sooner' : h === 1 ? 'about an hour sooner' : 'a little sooner';
+  const L = DATA.lemon, d = L && fast.lemons !== null && other.lemons !== null ? fast.lemons - other.lemons : null;
+  const mana = d === null ? '' : Math.abs(d) < 0.05 * Math.max(fast.lemons, other.lemons) ? ', for about the same Lemons'
+    : d > 0 ? ', for about ' + money(d) + ' more Lemons (' + money(d * L.price) + ' mesos)'
+    : ' and saves about ' + money(-d) + ' Lemons (' + money(-d * L.price) + ' mesos)';
+  return fast.name + (gap > 0.05 ? ' gets you to ' + target + ' ' + soon : ' is just as quick to ' + target) + mana +
+    (fast.needsReset ? ', but needs an SP Reset Scroll from the Cash Shop' : '') + ". Either way works, so it's up to you.";
+}
+function comparePathsNow(raw, clsId, reach) {
   const lv0 = Number(raw && raw.level);
   // a path that plays 1st job as another class only makes sense while still in 1st job
   const paths = PATHS[clsId] && PATHS[clsId].filter(x => !x.early || lv0 < ADVANCE);
-  if (!paths || !CLASSES[clsId] || !(lv0 >= 1)) return null;
-  const target = Math.min(NEXT_ADVANCE, Math.max(40, lv0 + 10));
-  const show = [...new Set([lv0, lv0 + 5, lv0 + 10, lv0 < ADVANCE ? ADVANCE : 0, 35, 40, target].filter(x => x >= lv0 && x <= target))].sort((a, b) => a - b);
-  // every fourth level plus the shown ones and the level before the advance; hours use the nearest sampled level below
-  const all = [...new Set([...Array.from({ length: target - lv0 + 1 }, (_, i) => lv0 + i).filter(x => (x - lv0) % 4 === 0), ...show, ADVANCE - 1, ADVANCE].filter(x => x >= lv0 && x <= target))].sort((a, b) => a - b);
+  // from 70 there are no 2nd job points left to plan (the roads would read 0 hours to 70)
+  if (!paths || !CLASSES[clsId] || !(lv0 >= 1) || lv0 >= NEXT_ADVANCE) return null;
+  const target = roadTarget(lv0), levels = Array.from({ length: Math.max(0, target - lv0) }, (_, i) => lv0 + i);
+  const L = DATA.lemon, sigs = [];
   const out = paths.map(path => {
-    const runs = pathLevels(raw, clsId, path, all);
-    let hours = 0;
-    for (let lv = lv0; lv < target; lv++) {
-      const r = runs.filter(x => x.level <= lv).pop();
-      hours += r.pace > 0 && EXP_TABLE[lv] ? EXP_TABLE[lv] / expHour(r.pace) : Infinity;
-    }
+    const runs = roadLevels(raw, clsId, path, levels, reach), { stops, gap, hours, mp } = foldStops(runs);
+    // every level's skills, to tell a fork already taken (both roads spend every point the same way)
+    sigs.push(runs.map(r => JSON.stringify(r.t.skills)).join('|'));
     const sw = path.reset ? runs.find(r => r.switched) : null;
-    const rows = runs.filter(r => show.includes(r.level)).map(r => {
-      const am = r.skill ? attackModel(r.t, r.cls, undefined, r.skill) : null, range = am ? (am.rangeFor ? am.rangeFor(r.mob.hits) : am.range) : null;
-      return { level: r.level, pace: r.pace, expHour: r.pace ? expHour(r.pace) : 0, skill: r.skill || null, spot: r.mob ? r.mob.name : null,
-        map: r.mob ? r.mob.map : null, attack: range ? { min: Math.round(range[0]), max: Math.round(range[1]) } : null };
-    });
+    let reset = null;
     if (sw) {
-      const n = pathLevels(raw, clsId, path, [ADVANCE - 1])[0], l7 = (n.t.skills || {})[CLASSES[path.early].attack1] || 0;
-      rows.push({ level: sw.level, reset: true, text: 'Use an SP Reset Scroll, then put your ' + l7 + ' ' + DATA.skills[CLASSES[path.early].attack1].name +
-        ' points into ' + DATA.skills[CLASSES[clsId].attack1].name + ' and the rest of your 1st job skills' });
-      rows.sort((a, b) => a.level - b.level || (a.reset ? 1 : 0) - (b.reset ? 1 : 0));
+      const r29 = runs.find(r => r.level === ADVANCE - 1), l7 = ((r29 && r29.t.skills) || {})[CLASSES[path.early].attack1] || 0;
+      reset = { level: sw.level, text: 'Use an SP Reset Scroll, then put your ' + l7 + ' ' + DATA.skills[CLASSES[path.early].attack1].name +
+        ' points into ' + DATA.skills[CLASSES[clsId].attack1].name + ' and the rest of your 1st job skills' };
     }
-    return { id: path.id, name: path.name, how: path.how, rows, hours: Math.round(hours * 10) / 10, needsReset: !!sw, resetAt: sw ? sw.level : null };
+    const sizes = runs.map(r => r.held.length), lemons = gap || !L ? null : Math.round(mp / L.mp);
+    return { id: path.id, name: path.name, how: path.how, good: path.good, skill: path.skill,
+      hours: gap ? Infinity : Math.round(hours * 10) / 10, lemons, mesos: lemons === null ? null : lemons * L.price,
+      needsReset: !!sw, resetAt: sw ? sw.level : null, reset, stops, spots: sizes.length ? [Math.min(...sizes), Math.max(...sizes)] : [0, 0],
+      neverCast: stops.length > 0 && !stops.some(s => s.skill === path.skill) };
   });
-  // a path that needs the Cash Shop scroll has to win by half an hour or more
-  const cost = x => x.hours + (x.needsReset ? 0.5 : 0);
-  const best = out.reduce((b, x) => cost(x) < cost(b) ? x : b), rest = out.filter(x => x !== best), gap = rest.length ? Math.min(...rest.map(x => x.hours)) - best.hours : 0;
-  const h = Math.round(gap), soon = h >= 2 ? 'about ' + h + ' hours sooner' : h === 1 ? 'about an hour sooner' : 'a little sooner';
-  const why = !rest.length ? best.name + ' is the way to go from here.'
-    : best.name + (gap > 0.05 ? ' gets you to ' + target + ' ' + soon : ' is just as quick to ' + target) + (best.needsReset ? ', but needs an SP Reset Scroll from the Cash Shop' : '') + '.';
+  // Faster is the fewest hours; a road that needs the Cash Shop scroll has to win by half an hour or more. A fork already
+  // taken (one road shows, or every road spends every point the same way) shows just the faster road.
+  const cost = x => x.hours + (x.needsReset ? 0.5 : 0), taken = out.length === 1 || sigs.every(s => s === sigs[0]);
+  // a taken fork's roads tie, so the one shown is the road the player went down: its skill has the most points now
+  const had = x => Number((raw.skills || {})[x.skill]) || 0;
+  const fast = taken ? out.reduce((b, x) => had(x) > had(b) ? x : b) : out.reduce((b, x) => cost(x) < cost(b) ? x : b);
+  const shown = taken ? [fast] : out;
+  for (const x of shown) x.check = roadCheck(clsId, x);
+  // why is on the default clock; whyAt(scale) on the player's, for the page
+  const why = verdict(out, fast, taken, target), whyAt = scale => verdict(out, fast, taken, target, scale);
   // what rests on formulas nobody has checked against the game yet
-  const uses = new Set(out.flatMap(x => x.rows.map(r => r.skill))), cls = CLASSES[clsId];
+  const uses = new Set(out.flatMap(x => x.stops.map(s => s.skill))), cls = CLASSES[clsId];
   const unchecked = cls.family === 'phys' ? cls.weapons.filter(w => !CHECKED_WEAPONS.has(w)) : [];
   const estimated = [uses.has(HEAL) ? "Heal's damage is an estimate until it's checked against a real hit." : '',
     unchecked.length ? unchecked.join(' and ') + " damage comes from meowdb's table and hasn't been checked against a real stat window yet." : ''].filter(Boolean).join(' ');
-  return { paths: out, best: best.id, why, target, estimated };
+  return { target, reach, reachSkill: REACH[clsId] ? REACH[clsId].skill : null, paths: shown, fastest: fast.id, taken, why, whyAt, estimated };
 }
 
 // The Overview's where to train: a Cleric with Heal gets its best Heal spot and its best Holy Arrow spot, anyone else the
 // two best spots; then the attack maxed (what the points still to come change), when it isn't yet.
 function overviewSpots(s, cls, rank) {
-  const name = id => DATA.skills[id] ? DATA.skills[id].name : '', atk = phaseOf(cls, s.level).attack;
+  const name = id => DATA.skills[id] ? DATA.skills[id].name : '', atk = mainAttack(cls, phaseOf(cls, s.level), s.skills);
   const spots = (hasHeal(s, cls) ? [rank.find(r => r.skill === HEAL), rank.find(r => r.skill === atk)].filter(Boolean) : rank.slice(0, 2))
     .map(r => ({ label: name(r.skill) || name(atk), row: r }));
   const sk = DATA.skills[atk], cur = s.skills[atk] || 0;
@@ -663,7 +782,7 @@ function planGear(s, cls) {
       if (!best[g.level] || score(g) > score(best[g.level])) best[g.level] = g;
     }
     const rows = Object.values(best).sort((a, b) => a.level - b.level).slice(0, 4)
-      .map(g => ({ id: g.id, level: g.level, name: g.name, inc: g.inc, craft: g.craft, slots: g.slots }));
+      .map(g => ({ id: g.id, level: g.level, name: g.name, inc: g.inc, craft: g.craft, slots: g.slots, cozy: g.cozy || null }));
     if (rows.length) out.push({ slot, rows });
   }
   return out;
@@ -734,15 +853,46 @@ function planScrolls(s, cls, gear, spot) {
     const tiers = f.tiers.map(t => {
       const expect = Math.round(cur.slots * t.rate / 100 * t.gain * 10) / 10, dmg = gainPct(s, cls, { [f.stat]: expect });
       const cost = t.price ? cur.slots * t.price : null;
-      return { tier: t.tier, rate: t.rate, cozy: t.cozy, price: t.price, sales: t.sales, expect, dmg, exp: spot.gain({ [f.stat]: expect }),
+      const range = gainRange(cur.slots, t.rate, t.gain);
+      return { tier: t.tier, rate: t.rate, cozy: t.cozy, price: t.price, sales: t.sales, src: t.src, expect, lo: range.lo, hi: range.hi, trusted: trusted(t), dmg, exp: spot.gain({ [f.stat]: expect }),
         cost, per1: cost && dmg > 0 ? Math.round(cost / dmg) : null };
     });
-    const priced = tiers.filter(t => t.per1 !== null);
-    out.push({ slot: f.slot, family: f.family, stat: f.stat, slots: cur.slots, item: cur.name, itemId: cur.id, tiers,
-      best: priced.length ? Math.min(...priced.map(t => t.per1)) : null, top: Math.max(...tiers.map(t => t.dmg)) });
+    // The deal and the sort rest on trusted prices only; per1 stays on every priced tier for the Compare table.
+    const good = tiers.filter(t => t.trusted && t.per1 !== null);
+    const deal = good.length ? good.reduce((a, b) => b.per1 < a.per1 ? b : a) : null;
+    const show = deal || tiers.reduce((a, b) => b.dmg > a.dmg ? b : a);
+    out.push({ slot: f.slot, family: f.family, stat: f.stat, slots: cur.slots, item: cur.name, itemId: cur.id, itemCozy: cur.cozy || null, tiers, deal, show,
+      best: deal ? deal.per1 : null, top: Math.max(...tiers.map(t => t.dmg)) });
   }
   return out.sort((a, b) => (a.best === null) - (b.best === null) || (a.best - b.best) || b.top - a.top);
 }
+
+// The most likely outcomes of `slots` tries at rate% (each gaining `gain`), taken from likeliest down until they cover 85%.
+function gainRange(slots, rate, gain) {
+  const p = rate / 100, pm = [];
+  let c = 1;
+  for (let k = 0; k <= slots; k++) {
+    pm.push(c * Math.pow(p, k) * Math.pow(1 - p, slots - k));
+    c = c * (slots - k) / (k + 1);
+  }
+  const order = pm.map((q, k) => ({ q, k })).filter(x => x.q > 0).sort((a, b) => b.q - a.q || a.k - b.k);
+  let cover = 0, lo = Infinity, hi = -Infinity;
+  for (const x of order) {
+    cover += x.q; lo = Math.min(lo, x.k); hi = Math.max(hi, x.k);
+    if (cover >= 0.85 - 1e-9) break;
+  }
+  return { lo: lo * gain, hi: hi * gain, avg: Math.round(slots * p * gain * 10) / 10 };
+}
+const FEW_SALES = 5;
+const trusted = t => t.price != null && (t.src !== 'sold3d' || t.sales >= FEW_SALES);
+const bestScroll = scrolls => scrolls.find(c => c.deal) || scrolls.reduce((a, b) => !a || b.top > a.top ? b : a, null);
+const money = n => n >= 999500 ? +(n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? Math.round(n / 1e3) + 'K' : String(n);
+const plural = n => /y$/.test(n) ? n.slice(0, -1) + 'ies' : /(ch|sh|x)$/.test(n) ? n + 'es' : /s$/.test(n) ? n : n + 's';
+// "7 Lessers on a Fairy Wand" and "+0 to +6 INT, average +3" (or "+14 magic attack" when the range is one number):
+// shared by the Best scroll tile and the Scrolls tab row so they can't drift apart.
+const aItem = name => (/^[aeiou]/i.test(name) ? 'an ' : 'a ') + name;
+const dealName = (c, t) => plain(c.slots, t.tier) + ' on ' + aItem(c.item);
+const gainText = (c, t) => t.lo === t.hi ? '+' + t.lo + ' ' + STAT_NAME[c.stat] : '+' + t.lo + ' to +' + t.hi + ' ' + STAT_NAME[c.stat] + ', average +' + t.expect;
 
 // What +1, +5 and +10 of each stat is worth to you in damage, and +10 in EXP an hour at your spot.
 function worthTable(s, cls, spot) {
@@ -772,7 +922,8 @@ function planNext(s, cls, P, skills, W) {
   return out.sort((a, b) => a.level - b.level);
 }
 
-function buildGuide(raw, clsId, data) {
+// roads: the Skill paths switch and pick ({ reach, pick }); the road it follows drives Next SP, the Points tab and the forecast.
+function buildGuide(raw, clsId, data, roads) {
   DATA = data;
   const cls = CLASSES[clsId];
   if (!cls) return { ok: false, errors: ['Pick your class.'] };
@@ -781,8 +932,8 @@ function buildGuide(raw, clsId, data) {
   const v = validateStats(raw, clsId);
   if (v.errors.length) return { ok: false, errors: v.errors };
   const s = v.stats, P = phaseOf(cls, s.level), am = attackModel(s, cls), sum = am.range[0] + am.range[1];
-  const paths = comparePaths(raw, clsId), bestPath = paths && PATHS[clsId].find(x => x.id === paths.best);
-  // the recommended path's orders drive Next SP and the Points tab
+  const paths = comparePaths(raw, clsId, undefined, roads), bestPath = paths && PATHS[clsId].find(x => x.id === paths.best);
+  // the followed road's orders (the player's pick, else the faster one) drive Next SP and the Points tab
   const planCls = bestPath ? pathClass(cls, bestPath) : cls;
   // a path within the class (Heal first) also drives the forecast; one that plays 1st job as another class doesn't
   const gear = planGear(s, cls), skills = planSkills(s, planCls), slot = slotOf(s, cls), rank = rankWith(s, cls, data), ap = planAP(s, cls), spot = spotModel(s, cls, rank);
@@ -791,7 +942,7 @@ function buildGuide(raw, clsId, data) {
   const weapon = physical(cls) ? { id: held ? held.id : null, slot, name: held ? held.name : null, wat: held ? held.inc.wat || 0 : null, W: am.W } : null;
   for (const r of rank) r.expHour = expHour(r.pace);
   return { ok: true, sec: STEP_SEC, phase: P.phase, estimated: cls.family === 'phys' && !CHECKED_WEAPONS.has(slot), weapon, assumed: v.assumed, stats: s,
-    attack: { min: Math.round(am.range[0]), max: Math.round(am.range[1]), avg: Math.round(sum / 2 * am.hits) },
+    attack: { min: Math.round(am.range[0]), max: Math.round(am.range[1]), avg: Math.round(sum / 2 * am.hits), skill: am.skill },
     heal: hasHeal(s, cls) ? (h => ({ min: h.range[0], max: h.range[1], level: s.skills[HEAL], targets: h.targets }))(attackModel(s, cls, undefined, HEAL)) : null,
     paths, overview: overviewSpots(s, cls, rank), ranked: rank, train: rank.slice(0, 10), here: rank[0] || null, tryNext: worthTry(rank, s.level, rank[0] && rank[0].id), stages,
     stageHours: stageHours(s, stages),
@@ -873,7 +1024,8 @@ function skillsAt(s, cls, lv, slot) {
     const plan = {};
     for (const id of Object.keys(DATA.skills).map(Number)) if (DATA.skills[id].job === P.job) plan[id] = out[id] || 0;
     if (P.attack !== undefined && plan[P.attack] === undefined) plan[P.attack] = out[P.attack] || 0;
-    spend([[P.attack, 1]].concat(orderFor(cls, P, slot)), plan, points);
+    // the leading point goes to the attack the build leads with (Thunder Bolt for a Bolt first Wizard, not Cold Beam)
+    spend([[mainAttack(cls, P, out), 1]].concat(orderFor(cls, P, slot)), plan, points);
     Object.assign(out, plan);
   };
   const P0 = phaseOf(cls, s.level);
@@ -899,6 +1051,25 @@ function statsAt(s, cls, lv, ap) {
   } else {
     t.magic = s.magic + Math.floor(d.int / 2) + gain;
     t.acc = s.acc + (lv - s.level);
+  }
+  return t;
+}
+// The guide's 1st job at 29 (Magic Claw 20 and Energy Bolt 1 for a mage), for a 2nd job form, which has no 1st job boxes.
+function firstJobSkills(cls, slot) {
+  const job1 = BRANCHES[branchOf(cls.id)].job1, all = typicalSkills(cls, ADVANCE - 1, slot), out = {};
+  for (const [id, n] of Object.entries(all)) if (DATA.skills[id] && DATA.skills[id].job === job1) out[id] = n;
+  return out;
+}
+// The Magic skills add on their own (Meditation), summed at each skill's level.
+const indieMagic = skills => Object.entries(skills || {}).reduce((t, [id, n]) => t + num((level(DATA.skills[id], n) || {}).indieMad), 0);
+// A Skill paths road at a level: the build as typed at its own level, else the plan played forward (statsAt). From 30 the
+// guide's 1st job sits under the points (typed ones win), and a mage gains the Meditation Magic the road adds beyond what's
+// typed now, so Magic read with Meditation running is never counted twice. Always a copy, never s0 itself.
+function roadStats(s0, cls, lv, ap) {
+  const t = lv === s0.level ? { ...s0, skills: { ...s0.skills } } : statsAt(s0, cls, lv, ap);
+  if (lv >= ADVANCE) {
+    t.skills = { ...firstJobSkills(cls, slotOf(s0, cls)), ...t.skills };
+    if (cls.family === 'spell') t.magic += indieMagic(t.skills) - indieMagic(s0.skills);
   }
   return t;
 }
@@ -956,7 +1127,7 @@ function pointsPlan(g) {
   const events = [
     ...g.ap.map(a => ({ kind: 'ap', from: a.from, to: a.to, now: a.now, text: a.put, note: a.wear ? 'so you can wear a ' + a.wear.name + ' at ' + a.wear.level + ' (needs ' + a.wear.need + ')' : 'your main stat' })),
     ...g.skills.steps.map(st => ({ kind: 'sp', from: st.from, to: st.to, text: st.text })),
-    ...(g.paths ? g.paths.paths.find(x => x.id === g.paths.best).rows.filter(r => r.reset).map(r => ({ kind: 'sp', from: r.level, to: r.level, text: r.text })) : []),
+    ...(g.paths ? [g.paths.paths.find(x => x.id === g.paths.best).reset].filter(Boolean).map(r => ({ kind: 'sp', from: r.level, to: r.level, text: r.text })) : []),
     ...g.next.filter(n => n.kind !== 'skill').map(n => ({ kind: n.kind === 'gear' ? 'up' : 'job', from: n.level, to: n.level, text: n.kind === 'gear' ? 'Equip ' + n.name : n.text })),
   ].sort((a, b) => a.from - b.from || order[a.kind] - order[b.kind]);
   const marks = [...g.ap.filter(a => a.wear).map(a => a.wear.level), ...g.next.filter(n => n.kind !== 'skill').map(n => n.level)].filter(x => x > lv);
@@ -992,6 +1163,17 @@ function loadForm() {
     if (f && CLASSES[f.cls]) { ui.form = { cls: f.cls, v: f.v || {}, s: f.s || {}, ...(FROM.includes(f.from) ? { from: f.from } : {}), ...(f.edited === true ? { edited: true } : {}) }; ui.fresh = false; }
   } catch { /* nothing saved yet */ }
 }
+// The Skill paths switch and pick, per class on the device (bt.roads): { reach: { cls: n }, pick: { cls: roadId } }.
+// Broken or odd values are left to comparePaths, which falls back to the class's start and the faster road.
+function loadRoads() {
+  ui.roads = { reach: {}, pick: {} };
+  try {
+    const r = JSON.parse(ui.deps.store.get('bt.roads'));
+    for (const k of ['reach', 'pick']) if (r && r[k] && typeof r[k] === 'object' && !Array.isArray(r[k])) ui.roads[k] = r[k];
+  } catch { /* nothing saved yet, or broken */ }
+}
+const roadsFor = clsId => ({ reach: ui.roads.reach[clsId], pick: ui.roads.pick[clsId] });
+function setRoad(kind, clsId, v) { ui.roads[kind][clsId] = v; ui.deps.store.set('bt.roads', JSON.stringify(ui.roads)); renderGuide(); }
 // The player changed the form by hand after it was loaded or read.
 const edited = () => { if (ui.form.from) ui.form.edited = true; };
 const saveForm = () => ui.deps.store.set('bt.calc', JSON.stringify(ui.form));
@@ -1113,13 +1295,28 @@ function moreButton(box, label) {
 }
 const castsText = m => m.casts.toFixed(1) === '1.0' ? '1 cast a kill' : m.casts.toFixed(1) + ' casts a kill';
 const tile = (k, label, v, s) => E('div', { class: 'b-nowt k-card', 'data-k': k }, E('div', { class: 'k' }, label), E('div', { class: 'v' }, v), E('div', { class: 's' }, s || ''));
+// A linkish button that shows or hides the block beside it: Compare the scrolls, What a stat is worth.
+function fold(label, node) {
+  node.hidden = true;
+  const btn = E('button', { type: 'button', class: 'linkish b-go', 'aria-expanded': 'false', onclick: () => {
+    node.hidden = !node.hidden;
+    btn.setAttribute('aria-expanded', String(!node.hidden));
+  } }, label);
+  return btn;
+}
+// Cozy Market's credit line under the Scrolls tab, naming whether its prices are what sold or just the usual asking price.
+function priceWhen(prices) { return prices && new Date(prices.date + 'T00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
+function priceCredit(prices) {
+  if (!prices) return '';
+  return 'Prices from Cozy Market, ' + priceWhen(prices) + ': ' + (prices.sold3d ? 'the middle price of what sold in the past 3 days.' : "Cozy's usual price.");
+}
 
 // The card's big numbers: the two stats this class cares about, magic or weapon attack, the attack per hit, and what a point is worth.
 function renderBig(g, cls) {
   const guess = k => g.assumed.includes(k);
   const big = (k, v, sub, guessed) => E('div', { class: 'b-bigone k-card' }, E('div', { class: 'k' }, k), E('div', { class: 'v' + (guessed ? ' guess' : '') }, v),
     guessed || sub ? E('div', { class: 's' }, guessed ? 'guessed' : sub) : null);
-  const atk = ui.data.skills[g.phase === 1 ? cls.attack1 : cls.attack].name;
+  const atk = ui.data.skills[g.attack.skill].name;
   // the attacks first and big (Heal ahead of Holy Arrow for a Cleric with points in it), then the stats: a six column
   // grid (CSS) where the attacks share one row and the three stats the next, so every row is full
   const skills = (g.heal ? [['heal', 'Heal, Lv ' + g.heal.level, fmt(g.heal.min) + ' to ' + fmt(g.heal.max), 'per undead hit, up to ' + g.heal.targets + ' at once. Estimated']] : [])
@@ -1138,37 +1335,53 @@ function overviewTiles(g, cls) {
   const st = g.skills.steps[0], sk = g.skills;
   const up = g.next.find(n => n.kind === 'gear') || g.next.find(n => n.kind === 'job');
   const upSub = !up ? '' : up.kind === 'job' ? up.text : [up.gain > 0 ? '+' + up.gain + ' ' + up.stat : '', up.needs ? 'needs ' + up.needs : ''].filter(Boolean).join(', ');
-  const c = g.scrolls[0], mid = c && c.tiers[1];
+  const c = bestScroll(g.scrolls), t = c && (c.deal || c.show);
+  const scrollSub = !c ? '' : c.deal
+    ? [dealName(c, t) + ', about ' + money(t.cost) + '.', t.exp > 0 ? ' About +' + t.exp + '% EXP an hour.' : '',
+      c.itemCozy ? ' ' : null, c.itemCozy ? E('a', { href: 'https://cozy.markets/items/' + c.itemCozy, target: '_blank', rel: 'noopener' }, 'Or buy one scrolled') : null]
+    : ['On ' + aItem(c.item) + ', no recent price.', ' ', E('a', { href: 'https://cozy.markets/items/' + t.cozy, target: '_blank', rel: 'noopener' }, 'See it on Cozy')];
   return [
     tile('ap', 'Next AP', a ? a.put : '5 ' + STAT_NAME[cls.mainStat], apSub),
     st ? tile('sp', 'Next SP', ui.data.skills[st.id].name, 'from ' + st.from + ', up to ' + st.target)
       : tile('sp', 'Next SP', sk.spare ? sk.spare + ' spare' : 'All planned', sk.spare ? 'points left by level ' + sk.until : ''),
     tile('up', 'Next upgrade', !up ? 'Nothing soon' : up.kind === 'job' ? '2nd job at ' + up.level : up.name + ' at ' + up.level, upSub),
-    tile('scroll', 'Best scroll', c ? c.family : 'Nothing yet', c ? (mid.exp > 0 ? 'about +' + mid.exp + '% EXP an hour with 60% scrolls' : 'on your ' + c.item) : 'no damage scrolls for your gear yet')];
+    tile('scroll', 'Best scroll', c ? c.family : 'Nothing yet', scrollSub)];
 }
-// The Overview: where to train with EXP an hour, the four tiles, the next levels in a sentence and the recommended skill
-// path, each pointing at its own tab.
+// The Overview: what to do next, leading with the tiles and tab links, then the next levels, the recommended skill
+// path, where to train with EXP an hour (a monster picture on every row), and the best quest to chase, each block
+// pointing at its own tab.
 function renderOverview(g, cls) {
   const box = ui.root.querySelector('#overview'), o = g.overview, sk = id => ui.data.skills[id] ? ui.data.skills[id].name : '';
   const go = (tab, text) => E('button', { type: 'button', class: 'linkish b-go', 'data-go': tab, onclick: () => showTab(tab) }, text);
   const sec = text => E('h4', { class: 'b-sec' }, text);
   const rows = o.spots.map(x => ({ ...x, tag: x.row.skill === HEAL ? 'your skills now, estimated' : '' })).concat(o.maxed ? [{ ...o.maxed, tag: 'with ' + o.maxed.more + ' more points' }] : []);
   const row = x => E('div', { class: 'b-ovrow k-row' },
-    E('div', {}, E('div', {}, E('b', {}, x.label), ' at ', E('b', { class: 'b-name' }, x.row.name), x.tag ? [' ', E('span', { class: 'k-tag y' }, x.tag[0].toUpperCase() + x.tag.slice(1))] : null),
+    mobPic(x.row.id),
+    E('div', {}, E('div', { class: 'b-ovt' }, E('b', {}, x.label), ' at ', E('b', { class: 'b-name' }, x.row.name), x.tag ? [' ', E('span', { class: 'k-tag y' }, x.tag[0].toUpperCase() + x.tag.slice(1))] : null),
       E('div', { class: 'small' }, [x.row.map.replace(/^.*? : /, ''), castsText(x.row), x.row.hits > 1 ? x.row.hits + ' at a time' : ''].filter(Boolean).join(', '))),
     E('div', { class: 'num b-hr' }, perHour(expHour(x.row.pace, g.sec))));
   const st = g.stages, end = st.length ? st[st.length - 1].to : g.stats.level, hrs = Math.round(g.stageHours * g.sec / STEP_SEC);
   const stageText = st.map(x => x.picks[0].name + ' with ' + (sk(x.picks[0].skill) || 'your attack') + (x.from === x.to ? ' at ' + x.from : ' from ' + x.from + ' to ' + x.to)).join(', then ');
   const best = g.paths && g.paths.paths.find(x => x.id === g.paths.best);
+
+  const levelsBlock = E('div', { class: 'b-block' }, sec(end > g.stats.level ? 'Your next ' + (end - g.stats.level) + ' levels' : 'From here'),
+    E('p', {}, stageText + '.' + (end > g.stats.level ? ' About ' + Math.max(1, hrs) + ' hours of grinding to ' + end + '.' : '')), go('train', 'The stages on the Train tab'));
+  // replaceChildren writes a null as the text "null", so a class without paths leaves this block out
+  const pathsBlock = best ? E('div', { class: 'b-block' }, sec('Skill paths'), E('p', {}, g.paths.whyAt(g.sec / STEP_SEC), g.paths.estimated ? E('span', { class: 'small' }, ' ' + g.paths.estimated) : null), go('paths', 'Compare them on the Skill paths tab')) : null;
+  const trainBlock = E('div', { class: 'b-block' }, sec('Where to train'), ...(rows.length ? rows.map(row) : [E('p', { class: 'small' }, 'Nothing you can kill yet.')]), go('train', 'More spots on the Train tab'));
+
+  const plan = g.questPlan, fromOpen = plan && plan.open[0], qrow = plan && (fromOpen || plan.soon[0]);
+  const qmore = qrow ? (fromOpen ? plan.open.length - 1 : plan.soon.length - 1) : 0;
+  const questBlock = qrow ? E('div', { class: 'b-block' }, sec('Best quest for you'), questRow(qrow),
+    go('quests', qmore > 0 ? qmore + ' more on the Quests tab' : 'The Quests tab')) : null;
+
+  const pw = priceWhen(g.prices);
   box.replaceChildren(
-    sec('Where to train'), ...(rows.length ? rows.map(row) : [E('p', { class: 'small' }, 'Nothing you can kill yet.')]), go('train', 'More spots on the Train tab'),
     E('div', { class: 'b-now' }, ...overviewTiles(g, cls)),
     E('div', { class: 'b-ovgo' }, go('points', 'Points tab'), go('gear', 'Gear tab'), go('scrolls', 'Scrolls tab')),
-    sec(end > g.stats.level ? 'Your next ' + (end - g.stats.level) + ' levels' : 'From here'),
-    E('p', {}, stageText + '.' + (end > g.stats.level ? ' About ' + Math.max(1, hrs) + ' hours of grinding to ' + end + '.' : '')), go('train', 'The stages on the Train tab'),
-    // replaceChildren writes a null as the text "null", so a class without paths leaves the three out
-    ...(best ? [sec('Skill paths'), E('p', {}, g.paths.why, g.paths.estimated ? E('span', { class: 'small' }, ' ' + g.paths.estimated) : null), go('paths', 'Compare them on the Skill paths tab')] : []),
-    E('p', { class: 'small b-foot' }, 'EXP an hour: ' + tuneText(g.tune)));
+    levelsBlock, ...(pathsBlock ? [pathsBlock] : []), trainBlock, ...(questBlock ? [questBlock] : []),
+    E('p', { class: 'small b-foot' }, 'EXP an hour: ' + tuneText(g.tune) + (pw ? ' Prices from Cozy Market, ' + pw + '.' : '')));
+  loadMobPics(); loadPics();
 }
 
 // EXP an hour in short: 118K/hr.
@@ -1327,6 +1540,9 @@ function renderPanels(g) {
   };
   // The finder stays first and is never taken out of the page (taking it out, even to put it straight back, drops its
   // focus), so everything after it is cleared and redrawn.
+  const why = E('span', { class: 'b-why' }, 'Casts to kill, from a few thousand simulated kills with your damage range, crits, monster defense and hit chance, plus about 2 casts of walking between kills. So a monster you one shot only wins if its EXP holds up. ',
+    'Skills that hit several monsters get credit for about one monster in reach for every ' + CROWD + ' the map spawns, and each extra one costs a cast of walking to gather. ',
+    'Only "Train here now" and "Worth a try" use your numbers. The next levels assume you follow this guide: its AP, skill points and the best weapon you can wear.');
   const finder = findBox();
   for (const c of [...train.childNodes]) if (c !== finder) c.remove();
   if (train.firstChild !== finder) train.prepend(finder);
@@ -1353,9 +1569,8 @@ function renderPanels(g) {
       E('div', {}, E('div', {}, E('b', { class: 'b-name' }, m.name), ' ', E('span', { class: 'small' }, 'lv ' + m.level)),
         E('div', { class: 'small' }, [m.map, castsText(m), m.hit + '% hit', fmt(m.hp) + ' HP', crowd(m)].filter(Boolean).join(', '))),
       E('div', { class: 'num' }, E('div', { class: 'n b-hr' }, perHour(m.expHour)), E('div', { class: 'small' }, fmt(m.exp) + ' EXP a kill'))), i, 0)),
-    E('p', { class: 'small b-foot' }, 'Ranked by EXP over time: casts to kill, from a few thousand simulated kills with your damage range, crits, monster defense and hit chance, plus about 2 casts of walking between kills. So a monster you one shot only wins if its EXP holds up. ',
-      'Skills that hit several monsters get credit for about one monster in reach for every ' + CROWD + ' the map spawns, and each extra one costs a cast of walking to gather. ',
-      'Only "Train here now" and "Worth a try" use your numbers. The next levels assume you follow this guide: its AP, skill points and the best weapon you can wear.'));
+    E('p', { class: 'small b-foot' }, 'Ranked by EXP over time, using your damage, crits and hit chance. ',
+      fold("How it's ranked", why), ' ', why));
   moreButton(train, 'Show all ' + g.train.length + ' maps');
   train.append(train.querySelector('.b-foot'));
   renderFind(g);
@@ -1378,46 +1593,76 @@ function renderPanels(g) {
       E('div', { class: 'b-item' }, cur ? item(cur) : E('span', { class: 'small' }, 'Nothing for your level yet')),
       nxt ? E('div', { class: 'small' }, 'Next: ', E('b', {}, nxt.name), ' at ' + nxt.level) : null,
       extra(E('ul', { class: 'b-ladder' }, s.rows.map(r => E('li', {}, item(r)))), 1, 0));
-  })), E('p', { class: 'small b-foot' }, 'Gear and scrolls come from the game files. They have no drop tables, so check in game where the items drop.'));
+  })), E('p', { class: 'small b-foot' }, 'Gear comes from the game files. Type an item on the Train tab to see who drops it.'));
   moreButton(gear, 'Show every item by level');
   gear.append(gear.querySelector('.b-foot'));
 
   renderScrolls(g);
 }
 
-// Mesos the short way: 179k, 1.25m.
-const meso = n => n >= 1e6 ? +(n / 1e6).toFixed(2) + 'm' : n >= 1e3 ? Math.round(n / 1e3) + 'k' : String(n);
-const SHORT = { mad: 'MA', wat: 'ATT' };
-const plural = n => /y$/.test(n) ? n.slice(0, -1) + 'ies' : /s$/.test(n) ? n : n + 's';
-
 // The Where you stand sentences: where more attack starts helping, where it tops out, or that nothing moves this spot.
-// Skill paths: each way to spend SP as a column, the recommended one marked, with why on top. A class without paths
-// shows its one plan.
+// Skill paths, Two roads: the verdict on top, the switch for how many monsters a multi target skill really hits, then each
+// road side by side (hours and Lemons, where you'd grind, am I stuck, what it's good for, what was checked). A class without
+// roads shows its one plan.
+const SHORT = { 2201004: 'Bolt', 2201003: 'Beam', 2001003: 'Magic Claw', 2301001: 'Heal', 2301004: 'Holy Arrow' };
+const shortName = id => SHORT[id] || (ui.data.skills[id] ? ui.data.skills[id].name : '');
+// Am I stuck on this road: the moves over the levels shown, how many spots stay close to the best, and a main skill never cast.
+function stuckText(x, lv0, target) {
+  if (!x.stops.length) return "There's no monster to beat at every level yet.";
+  const moves = x.stops.length - 1, [lo, hi] = x.spots, uses = {};
+  for (const s of x.stops) uses[s.skill] = (uses[s.skill] || 0) + 1;
+  const most = Object.keys(uses).sort((a, b) => uses[b] - uses[a])[0];
+  return [lo >= 2 ? 'No.' : 'At times.',
+    moves === 0 ? "You'd stay on one spot from " + lv0 + ' to ' + target + '.' : "You'd move " + (moves === 1 ? 'once' : moves + ' times') + ' from ' + lv0 + ' to ' + target + '.',
+    (lo === hi ? lo : lo + ' to ' + hi) + (hi === 1 ? ' spot stays' : ' spots stay') + ' close to the best at each level.',
+    x.neverCast ? "You'd never cast " + shortName(x.skill) + ' here; ' + ui.data.skills[most].name + ' stays your best.' : ''].filter(Boolean).join(' ');
+}
 function renderPaths(g, cls) {
   const box = ui.root.querySelector('#paths'), name = id => ui.data.skills[id] ? ui.data.skills[id].name : '';
   if (!g.paths) {
     const P = phaseOf(cls, g.stats.level), order = orderFor(cls, P, slotOf(g.stats, cls)).filter(([id]) => name(id));
     box.replaceChildren(E('h4', { class: 'b-sec' }, 'Your plan'),
       E('p', {}, order.map(([id, n]) => name(id) + ' to ' + Math.min(n, ui.data.skills[id].max)).join(', then ') + '.'),
-      E('p', { class: 'small' }, ONE_PATH.includes(cls.id) ? 'This is the one way to go for ' + plural(cls.name) + ': its attack is the only one worth points.' : 'Comparisons for this class are coming.'));
+      E('p', { class: 'small' }, ONE_PATH.includes(cls.id) ? 'This is the one way to go for ' + plural(cls.name) + ': its attack is the only one worth points.'
+        : PATHS[cls.id] && g.stats.level >= NEXT_ADVANCE ? 'Skill paths compare ways to spend 2nd job points, up to level 70.' : 'Comparisons for this class are coming.'));
     return;
   }
-  const scale = g.sec / STEP_SEC, hrs = h => isFinite(h) ? Math.round(h * scale) + ' hours' : 'a long time';
-  const col = x => E('div', { class: 'b-pcol k-card' + (x.id === g.paths.best ? ' best' : '') },
-    E('div', { class: 'top' }, E('b', {}, x.name), x.id === g.paths.best ? E('span', { class: 'k-tag' }, 'Recommended') : null),
-    E('p', { class: 'small' }, x.how),
-    E('p', {}, 'About ', E('b', { class: 'num' }, hrs(x.hours)), ' of grinding to ' + g.paths.target + (x.needsReset ? '. Needs an SP Reset Scroll from the Cash Shop.' : '.')),
-    E('table', { class: 'b-table' },
-      E('thead', {}, E('tr', {}, ['Lv', 'Skill', 'Per hit', 'Spot', 'EXP an hour'].map((h, j) => E('th', { class: j === 0 || j > 1 && j !== 3 ? 'n' : '' }, h)))),
-      E('tbody', {}, x.rows.map(r => r.reset
-        ? E('tr', { class: 'reset' }, E('td', { class: 'n' }, String(r.level)), E('td', { colspan: '4' }, r.text + '.'))
-        : E('tr', {}, E('td', { class: 'n' }, String(r.level)), E('td', {}, r.skill ? name(r.skill) : ''),
-          E('td', { class: 'n' }, r.attack ? r.attack.min + ' to ' + r.attack.max : ''), E('td', {}, r.spot || 'nothing yet'),
-          E('td', { class: 'n b-hr' }, r.pace ? perHour(expHour(r.pace, g.sec)) : '0/hr'))))));
-  box.replaceChildren(E('h4', { class: 'b-sec' }, 'Ways to spend your skill points'), E('div', { class: 'b-here k-card' }, g.paths.why),
-    E('div', { class: 'b-pcols' }, g.paths.paths.map(col)),
-    E('p', { class: 'small b-foot' }, 'Each path starts from the points you have now and puts every new point where it says. EXP an hour is at the best spot for that level. ' +
-      'Next SP and the Points tab follow the recommended path. ' + (g.paths.estimated ? g.paths.estimated + ' ' : '') + tuneText(g.tune)));
+  const P = g.paths, lv0 = g.stats.level, scale = g.sec / STEP_SEC, L = ui.data.lemon;
+  // the switch: only while the fork is still ahead and a road's main skill hits several monsters
+  const reach = P.reachSkill && !P.taken ? E('div', { class: 'b-reach' },
+    E('span', { class: 'b-rlab' }, 'Monsters a ' + shortName(P.reachSkill) + ' really hits'),
+    E('span', { class: 'b-rbtns' }, [1, 2, 3, 4].map(n => E('button', { type: 'button', class: 'k-btn sm', 'data-reach': String(n), 'aria-pressed': String(n === P.reach),
+      onclick: () => setRoad('reach', cls.id, n) }, String(n)))),
+    E('span', { class: 'small' }, 'Set it to what you see in game.')) : null;
+  const road = x => {
+    const hours = isFinite(x.hours) ? String(Math.round(x.hours * scale)) : 'A long time';
+    const stop = s => E('div', { class: 'b-stop k-row' }, mobPic(s.id),
+      E('div', {}, E('div', { class: 'b-ovt' }, E('b', { class: 'b-name' }, s.name), ' ', E('span', { class: 'k-tag' }, shortName(s.skill) + (s.hits > 1 ? ', ' + s.hits + ' a cast' : ''))),
+        // the place after the region never breaks inside ("Line 2 <Area 1>"), so a long map wraps after its region
+        E('div', { class: 'small' }, 'Level ' + range(s.from, s.to) + ', ', ...(i => i < 0 ? [s.map] : [s.map.slice(0, i) + ': ', E('span', { class: 'b-place' }, s.map.slice(i + 3))])(s.map.indexOf(' : ')))),
+      E('div', { class: 'num b-hr' }, range(money(expHour(s.paces[0], g.sec)), money(expHour(s.paces[s.paces.length - 1], g.sec)))));
+    return E('div', { class: 'b-road', 'data-road': x.id },
+      E('div', { class: 'b-rhead' }, skillPic(x.skill),
+        E('div', {}, E('div', { class: 'b-rname' }, E('b', {}, x.name), !P.taken && x.id === P.fastest ? E('span', { class: 'k-tag b-faster' }, 'Faster') : null),
+          E('div', { class: 'small' }, x.how)),
+        P.taken ? null : E('button', { type: 'button', class: 'k-btn sm b-goroad', 'aria-pressed': String(x.id === P.best), onclick: () => setRoad('pick', cls.id, x.id) }, 'Go this way')),
+      // the body under the head: the roads share the head's row, so their bodies start level
+      E('div', { class: 'b-rbody' },
+      E('div', { class: 'b-rtiles' },
+        E('div', { class: 'b-rtile k-card' }, E('div', { class: 'k' }, 'Hours to ' + P.target), E('div', { class: 'v' }, hours)),
+        x.lemons === null ? null : E('div', { class: 'b-rtile k-card lemon' }, E('div', { class: 'k' }, 'Lemons to ' + P.target + ', ' + money(x.mesos) + ' mesos'),
+          E('div', { class: 'v' }, itemPic(L.id), money(x.lemons)))),
+      x.stops.length ? E('div', { class: 'b-grind' }, E('div', { class: 'b-rgh small' }, E('span', {}, "Where you'd grind"), E('span', {}, 'EXP an hour')),
+        E('div', { class: 'k-rows' }, x.stops.map(stop))) : null,
+      E('div', { class: 'b-stuck k-card' }, E('b', {}, 'Stuck?'), E('p', {}, stuckText(x, lv0, P.target)), E('p', {}, E('b', {}, 'Good for: '), x.good)),
+      E('p', { class: 'small b-check' }, x.check)));
+  };
+  box.replaceChildren(E('h4', { class: 'b-sec' }, 'Ways to spend your skill points'), E('div', { class: 'b-verdict k-card' }, P.whyAt(scale)),
+    ...(reach ? [reach] : []), E('div', { class: 'b-roads' }, P.paths.map(road)),
+    E('p', { class: 'small b-foot' }, "Model numbers, starting from the points you have now and the guide's 1st job skills. A stop lasts until its monster falls more than 15% behind the best spot. " +
+      'Hours run optimistic (about 138K an hour predicted against 84K and 101K on two real Cleric runs), but Lemons came within 10% of those runs. ' +
+      "MP Eater and Teleport aren't counted, and a Lemon is " + L.mp + ' MP for ' + L.price + ' mesos. ' + tuneText(g.tune)));
+  loadMobPics(); loadSkillPics(); loadPics();
 }
 
 function standingText(st) {
@@ -1450,48 +1695,205 @@ function loadPics() {
   fetch('data/loot-icons.json').then(r => r.json()).then(L => { ui.pics = L; ui.root.querySelectorAll('.b-icon').forEach(paintPic); }, () => {});
 }
 
+// Monster pictures for the Overview's Where to train rows: the client's own walk sprite, scaled down to fit the
+// 38 pixel cell (never scaled up). Sizes come from data/mob-sprites.json ([w, h, frames] per client mob id),
+// loaded lazily like loadPics; with no entry for an id the ring stays empty.
+function mobFit([w, h, frames]) {
+  const scale = Math.min(1, 38 / Math.max(w, h));
+  return { w: w * scale, h: h * scale, sheet: w * frames * scale };
+}
+function mobPic(id) { const e = E('div', { class: 'b-icon', 'data-mob': String(id || ''), 'aria-hidden': 'true' }); paintMob(e); return E('span', { class: 'k-ring', 'aria-hidden': 'true' }, e); }
+function paintMob(e) {
+  const M = ui.mobs, s = M && M[e.dataset.mob];
+  if (!s) return;
+  const { w, h, sheet } = mobFit(s);
+  e.style.backgroundImage = 'url(sprites/mobs/' + e.dataset.mob + '.png)';
+  e.style.backgroundSize = sheet + 'px ' + h + 'px';
+  e.style.backgroundPosition = '0 0';
+  e.style.width = w + 'px';
+  e.style.height = h + 'px';
+}
+function loadMobPics() {
+  if (ui.mobs !== undefined) return;
+  ui.mobs = null;
+  fetch('data/mob-sprites.json').then(r => r.json()).then(M => { ui.mobs = M; ui.root.querySelectorAll('[data-mob]').forEach(paintMob); }, () => {});
+}
+// Skill pictures for the Skill paths roads: the client's own icons (data/skill-icons.*, npm run boss:icons, the sheet the
+// reader matches against), { size, icons: { id: { x, y } } } in pixels, loaded lazily like loadMobPics.
+function skillPic(id) { const e = E('div', { class: 'b-icon', 'data-skill': String(id || ''), 'aria-hidden': 'true' }); paintSkill(e); return E('span', { class: 'k-ring', 'aria-hidden': 'true' }, e); }
+function paintSkill(e) {
+  const S = ui.skillPics, c = S && S.icons[e.dataset.skill];
+  if (!c) return;
+  e.style.backgroundImage = 'url(data/skill-icons.png)';
+  e.style.backgroundPosition = -c.x + 'px ' + -c.y + 'px';
+  e.style.width = e.style.height = S.size + 'px';
+}
+function loadSkillPics() {
+  if (ui.skillPics !== undefined) return;
+  ui.skillPics = null;
+  fetch('data/skill-icons.json').then(r => r.json()).then(S => { ui.skillPics = S; ui.root.querySelectorAll('[data-skill]').forEach(paintSkill); }, () => {});
+}
+
+// A tier's Each cell when it isn't the shown deal: a price (maybe thin on sales), or none seen at all.
+function tierEach(t) {
+  if (t.price == null) return t.src === 'sold3d' ? 'none in 3 days' : 'no price';
+  return money(t.price) + ' each' + (trusted(t) ? '' : ', few sales');
+}
+// The Compare table's compact You'd expect cell: a range or a flat number, the stat, then the damage it's worth.
+function compactGain(c, t) {
+  return (t.lo === t.hi ? '+' + t.lo : '+' + t.lo + ' to +' + t.hi + ', avg +' + t.expect) + ' ' + STAT_NAME[c.stat] + ' · ' + t.dmg + '%';
+}
+function compareCard(c) {
+  const row = t => E('tr', { class: c.deal && t === c.deal ? 'best' : '' },
+    E('td', {}, t.cozy ? E('a', { href: 'https://cozy.markets/items/' + t.cozy, target: '_blank', rel: 'noopener' }, t.tier) : t.tier),
+    E('td', { class: 'n' }, t.rate + '%'),
+    E('td', { class: 'n', title: t.sales + ' sales on Cozy' }, tierEach(t)),
+    E('td', { class: 'n' }, compactGain(c, t)),
+    E('td', { class: 'n' }, t.exp > 0 ? '+' + t.exp + '%' : 'no change'),
+    E('td', { class: 'n' }, t.cost ? money(t.cost) : ''),
+    E('td', { class: 'n' }, t.per1 !== null ? money(t.per1) : ''));
+  return E('div', { class: 'b-scard k-card' },
+    E('div', { class: 'top' }, itemPic(c.itemId), E('div', {}, E('b', {}, c.family))),
+    E('div', { class: 'small' }, plain(c.slots, 'slot') + ' on ' + aItem(c.item) + '.'),
+    E('table', { class: 'b-table' }, E('thead', {}, E('tr', {}, ...['Scroll', 'Odds', 'Each', "You'd expect", 'EXP an hour', 'Cost', 'Per 1%']
+      .map((h, j) => E('th', { class: j ? 'n' : '' }, h)))), E('tbody', {}, c.tiers.map(row))));
+}
+// Scrolls tab: where you stand, one row a family (the best per meso deal first), compare and what a stat is worth
+// folded away. Item pictures from the client, the same sheet Count my loot uses (data/loot-icons.*, npm run
+// boss:grind), loaded the first time the tab draws; a row drawn before then gets its picture when the sheet arrives.
 function renderScrolls(g) {
   const box = ui.root.querySelector('#scrolls'), st = g.standing;
-  const mobs = st ? plural(st.mob) : '', expAt = x => x > 0 ? '+' + x + '%' : 'no change';
+  const mobs = st ? plural(st.mob) : '';
   const say = st ? E('div', { class: 'b-here k-card' }, 'You train best at ', E('b', {}, mobs), ': ' + (ui.data.skills[st.skill] ? ui.data.skills[st.skill].name : 'your attack') + ' takes about ',
     E('b', { class: 'num' }, st.casts.toFixed(1)), ' casts each.', E('div', { class: 'small', style: 'margin-top:6px' }, ...standingText(st))) : null;
-  const cheapest = Math.min(...g.scrolls.flatMap(c => c.tiers.map(t => t.per1).filter(x => x !== null)));
-  const most = Math.max(...g.scrolls.map(c => c.top));
-  const cards = g.scrolls.map((c, i) => {
-    const mid = c.tiers[1], name = STAT_NAME[c.stat];
-    const pill = i === 0 && c.best !== null ? E('span', { class: 'k-tag' }, 'best per meso') : c.top === most ? E('span', { class: 'k-tag y' }, 'most damage') : null;
-    const row = t => E('tr', { class: t.per1 !== null && t.per1 === cheapest ? 'best' : '' },
-      E('td', {}, t.cozy ? E('a', { href: 'https://cozy.markets/items/' + t.cozy, target: '_blank', rel: 'noopener' }, t.tier) : t.tier),
-      E('td', { class: 'n' }, t.rate + '%'),
-      E('td', { class: 'n', title: t.sales + ' sales on Cozy' }, t.price ? meso(t.price) + (t.sales < 5 ? ' few sales' : '') : 'no sales'),
-      E('td', { class: 'n' }, '+' + t.expect + ' ' + (SHORT[c.stat] || name) + ' · ' + t.dmg + '%'),
-      E('td', { class: 'n' }, expAt(t.exp)),
-      E('td', { class: 'n' }, t.cost ? meso(t.cost) : ''),
-      E('td', { class: 'n' }, t.per1 !== null ? meso(t.per1) : ''));
-    return E('div', { class: 'b-scard k-card' },
-      E('div', { class: 'top' }, itemPic(c.itemId), E('div', {}, E('b', { class: 'b-slot' }, c.slot), ' ', E('span', {}, c.family.startsWith(c.slot + ' ') ? c.family.slice(c.slot.length + 1) : c.family)), pill),
-      E('div', { class: 'small' }, c.slots + ' slots on your ' + c.item + '. Intermediates (60%) should add +' + mid.expect + ' ' + name +
-        (st ? ', about ' + (mid.exp > 0 ? mid.exp + '% more EXP an hour at ' + mobs : 'no change at ' + mobs) : '') + '.'),
-      E('table', { class: 'b-table' }, E('thead', {}, E('tr', {}, ...['Scroll', 'Odds', 'Each', "You'd expect", 'EXP an hour', 'Cost', 'Per 1%']
-        .map((h, j) => E('th', { class: j ? 'n' : '' }, h)))), E('tbody', {}, c.tiers.map(row))));
-  });
-  const when = g.prices && new Date(g.prices.date + 'T00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  const foot = E('p', { class: 'small b-foot' }, "You'd expect is the average for filling every slot. A 60% scroll fails about 4 in 10 and a 10% about 9 in 10, so if you want a clean item, plan on rebuying it.",
-    when ? ' Prices from Cozy Market, ' + when + ': the usual Free Market price. Each scroll links to its page on ' : ' Each scroll links to its page on ',
-    E('a', { href: 'https://cozy.markets', target: '_blank', rel: 'noopener' }, 'Cozy Market'), ', which also shows who drops it.');
+
+  const row = (c, i) => {
+    const t = c.deal || c.show;
+    const right = c.deal
+      ? E('a', { href: 'https://cozy.markets/items/' + t.cozy, target: '_blank', rel: 'noopener' }, money(t.cost))
+      : tierEach(t);
+    return E('div', { class: 'k-row b-srow' },
+      itemPic(c.itemId),
+      E('div', {},
+        i === 0 && c.deal ? [E('span', { class: 'k-tag' }, 'Best per meso'), ' '] : null,
+        E('b', {}, c.family), ' ',
+        dealName(c, t) + ': ' + gainText(c, t) + ', ' + t.dmg + '% more damage.',
+        c.deal && c.itemCozy ? [' ', E('a', { href: 'https://cozy.markets/items/' + c.itemCozy, target: '_blank', rel: 'noopener' }, 'Or buy one scrolled')] : null),
+      right);
+  };
+
+  const compareBox = E('div', { id: 'b-compare' }, ...(g.scrolls.length ? g.scrolls.map(compareCard) : [E('p', { class: 'small' }, 'No damage scrolls for your gear yet.')]));
   const used = g.worth.filter(w => w.d[2] > 0), idle = g.worth.filter(w => w.d[2] === 0);
   const worth = E('table', { class: 'b-table b-worth' },
     E('thead', {}, E('tr', {}, E('th', {}, ''), E('th', { class: 'n' }, '+1'), E('th', { class: 'n' }, '+5'), E('th', { class: 'n' }, '+10'),
       E('th', { class: 'n' }, st ? 'EXP an hour at ' + mobs + ', +10' : 'EXP an hour, +10'))),
-    E('tbody', {}, used.map(w => E('tr', {}, E('td', {}, w.what), ...w.d.map(x => E('td', { class: 'n' }, x + '%')), E('td', { class: 'n' }, w.exp10 === null ? '' : expAt(w.exp10)))),
+    E('tbody', {}, used.map(w => E('tr', {}, E('td', {}, w.what), ...w.d.map(x => E('td', { class: 'n' }, x + '%')), E('td', { class: 'n' }, w.exp10 === null ? '' : (w.exp10 > 0 ? '+' + w.exp10 + '%' : 'no change')))),
       idle.length ? E('tr', {}, E('td', {}, idle.map(w => w.what).join(', ')), E('td', { class: 'n' }, '0%'), E('td', { class: 'n' }, '0%'), E('td', { class: 'n' }, '0%'), E('td', { class: 'n' }, 'only for gear')) : null));
-  box.replaceChildren(E('h4', { class: 'b-sec' }, 'Where you stand'), say || E('p', { class: 'small' }, 'Nothing to train on yet.'),
-    E('h4', { class: 'b-sec' }, 'Start here: cheapest first'), ...(cards.length ? cards : [E('p', { class: 'small' }, 'No damage scrolls for your gear yet.')]));
+  // One line on which point is worth more, from the +10 column (a smoother read than +1's rounding).
+  const ranked = used.slice().sort((a, b) => b.d[2] - a.d[2]), per = w => (w.d[2] / 10).toFixed(2) + '%';
+  const verdict = ranked.length < 2 ? null : E('p', { class: 'small' }, 'Per point: ' + ranked.slice(0, 3).map(w => w.what + ' ' + per(w)).join(', ') + '. ' +
+    (ranked[0].d[2] - ranked[1].d[2] <= ranked[0].d[2] * 0.05 ? ranked[0].what + ' and ' + ranked[1].what + ' are about even.' : ranked[0].what + ' is worth the most.'));
+  const worthBox = E('div', { id: 'b-worthbox' }, worth, verdict);
+
+  const credit = priceCredit(g.prices), footKids = ['A 60% scroll fails about 4 in 10, so if you want a clean item, plan on rebuying it. '];
+  if (credit) {
+    const idx = credit.indexOf('Cozy Market');
+    footKids.push(credit.slice(0, idx), E('a', { href: 'https://cozy.markets', target: '_blank', rel: 'noopener' }, 'Cozy Market'), credit.slice(idx + 'Cozy Market'.length));
+  }
+
+  box.replaceChildren(
+    E('div', { class: 'b-block' }, E('h4', { class: 'b-sec' }, 'Where you stand'), say || E('p', { class: 'small' }, 'Nothing to train on yet.')),
+    E('div', { class: 'b-block' }, E('h4', { class: 'b-sec' }, 'Start here: cheapest first'),
+      ...(g.scrolls.length ? g.scrolls.map(row) : [E('p', { class: 'small' }, 'No damage scrolls for your gear yet.')])),
+    E('div', { class: 'b-ovgo' }, fold('Compare Lesser, 60% and 10%', compareBox), fold('What a stat is worth', worthBox)),
+    compareBox, worthBox,
+    E('p', { class: 'small b-foot' }, ...footKids));
   loadPics();
-  box.append(foot, E('h4', { class: 'b-sec' }, 'What a stat is worth to you'), worth);
 }
 
-const TABS = [['overview', 'Overview'], ['train', 'Train'], ['paths', 'Skill paths'], ['points', 'Points'], ['gear', 'Gear'], ['scrolls', 'Scrolls']];
+// Quests tab: the script plus data/quests.json, loaded once and lazily like reader.js. Flips ui.quests between
+// undefined (not asked), null (loading), false (failed) and the data, re-rendering the guide at each step.
+let questsLoading = null;
+function loadQuests() {
+  if (questsLoading) return questsLoading;
+  ui.quests = null;
+  const script = window.Quests ? Promise.resolve() : new Promise((resolve, reject) => {
+    document.head.append(E('script', { src: 'quests.js', onload: resolve, onerror: () => reject(new Error('quests.js')) }));
+  });
+  questsLoading = script.then(() => fetch('data/quests.json')).then(r => { if (!r.ok) throw new Error('quests.json'); return r.json(); })
+    .then(data => { if (!window.Quests) throw new Error('Quests'); ui.quests = data; renderGuide(); })
+    .catch(() => { ui.quests = false; renderGuide(); });
+  return questsLoading;
+}
+
+// Cozy Market's listing date, named only in the Quests foot's gear note, since freezeQuests never fakes it in tests.
+const listWhen = prices => prices && prices.listDate && new Date(prices.listDate + 'T00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+// questsFor(g, cls) -> { plan, look, parties, gearPriced }, the pure shaping of ui.quests for this character.
+// me matches quests.js's shape: level, the job for rewards keyed by job, the class's reqJob bit, and its weapon stem.
+function questsFor(g, cls) {
+  const Q = ui.quests;
+  const me = { level: g.stats.level, job: phaseOf(cls, g.stats.level).job, mask: cls.jobMask, weapon: slotOf(g.stats, cls) };
+  const plan = window.Quests.plan(Q, me, window.Quests.stamp(new Date()));
+  const mobs = [...g.overview.spots.map(x => x.row), ...g.stages.map(st => st.picks[0])];
+  const look = window.Quests.lookOut(plan.wanting, Q, mobs, (ui.data.drops && ui.data.drops.mobs) || {});
+  const parties = (Q.parties || []).filter(pt => me.level >= pt.from);
+  const gearPriced = [...plan.open, ...plan.soon].some(r => r.gearPriced);
+  return { plan, look, parties, gearPriced };
+}
+
+// A quest row: the item's picture, a title (with an optional tag, At 48) and small say line, and the right side
+// value, linked to Cozy when the row names one priced item.
+function questRow(row, tag) {
+  return E('div', { class: 'k-row b-qrow' },
+    itemPic(row.pic),
+    E('div', {},
+      E('div', { class: 'b-ovt' }, row.title, tag ? [' ', E('span', { class: 'k-tag' }, tag)] : null),
+      E('div', { class: 'small' }, row.say)),
+    row.link
+      ? E('a', { class: 'b-hr', href: 'https://cozy.markets/items/' + row.link, target: '_blank', rel: 'noopener' }, row.right)
+      : E('div', { class: 'b-hr' }, row.right));
+}
+
+// Quests tab: what's open now, what's coming up, what to look out for towards it, and parties for a change of pace.
+// Returns the plan (for Task 8) or null while loading, failed, or before the level is known.
+function renderQuests(g, cls) {
+  const box = ui.root.querySelector('#quests');
+  if (ui.quests === null) { box.replaceChildren(E('p', { class: 'small' }, 'Loading the quests.')); return null; }
+  if (ui.quests === false) { box.replaceChildren(E('p', { class: 'small' }, "Quests didn't load. Try reloading the page.")); return null; }
+
+  const { plan, look, parties, gearPriced } = questsFor(g, cls);
+  const sec = text => E('h4', { class: 'b-sec' }, text);
+  const partyRow = pt => questRow({ pic: pt.pic, title: pt.name, say: pt.say, right: pt.right, link: null });
+
+  let openBlock = null;
+  if (plan.open.length) {
+    openBlock = E('div', { class: 'b-block b-qopen' }, sec('Quests open at level ' + g.stats.level),
+      ...plan.open.map((r, i) => extra(questRow(r), i, 5)));
+    moreButton(openBlock, 'Show ' + (plan.open.length - 5) + ' more');
+  }
+  const soonBlock = plan.soon.length
+    ? E('div', { class: 'b-block b-qsoon' }, sec('Coming up by level ' + (g.stats.level + 5)), ...plan.soon.map(r => questRow(r, 'At ' + r.at)))
+    : null;
+  const nothing = (!plan.open.length && !plan.soon.length)
+    ? E('div', { class: 'b-block' }, E('p', { class: 'small' }, 'Nothing worth chasing yet.')) : null;
+  const lookBlock = look.length ? E('div', { class: 'b-block b-qlook' }, sec('Look out for these'), ...look.map(r => questRow(r))) : null;
+  const boredBlock = parties.length ? E('div', { class: 'b-block b-qbored' }, sec('Bored of grinding?'), ...parties.map(partyRow)) : null;
+
+  const credit = priceCredit(g.prices), footKids = [];
+  if (credit) {
+    const idx = credit.indexOf('Cozy Market');
+    footKids.push(credit.slice(0, idx), E('a', { href: 'https://cozy.markets', target: '_blank', rel: 'noopener' }, 'Cozy Market'), credit.slice(idx + 'Cozy Market'.length));
+  }
+  if (gearPriced) { const w = listWhen(g.prices); if (w) footKids.push(" Gear is Cozy's usual price, " + w + '.'); }
+  footKids.push(" We don't keep track of what you've done, so skip what you've finished.");
+
+  box.replaceChildren(...[openBlock, soonBlock, nothing, lookBlock, boredBlock].filter(Boolean), E('p', { class: 'small b-foot' }, ...footKids));
+  loadPics();
+  return plan;
+}
+
+const TABS = [['overview', 'Overview'], ['train', 'Train'], ['quests', 'Quests'], ['paths', 'Skill paths'], ['points', 'Points'], ['gear', 'Gear'], ['scrolls', 'Scrolls']];
 function showTab(t) {
   if (!TABS.some(([id]) => id === t)) t = 'overview';
   for (const [id] of TABS) {
@@ -1503,7 +1905,7 @@ function showTab(t) {
 
 function renderGuide() {
   const cls = CLASSES[ui.form.cls], msg = ui.root.querySelector('#b-msg'), out = ui.root.querySelector('#b-guide');
-  const g = buildGuide(rawStats(), ui.form.cls, ui.data);
+  const g = buildGuide(rawStats(), ui.form.cls, ui.data, roadsFor(ui.form.cls));
   msg.className = '';
   if (!g.ok) {
     out.hidden = true;
@@ -1522,7 +1924,10 @@ function renderGuide() {
       E('button', { type: 'button', class: 'linkish', onclick: () => setOpen('b-drawer', true, 'bt.bedit') }, 'Add them'), ' for a sharper guide.');
   } else msg.replaceChildren();
   out.querySelector('#b-estimated').hidden = !g.estimated;
-  renderBig(g, cls); renderOverview(g, cls); renderPanels(g); renderPaths(g, cls);
+  renderBig(g, cls); renderPanels(g); renderPaths(g, cls);
+  if (ui.quests === undefined) loadQuests();
+  g.questPlan = renderQuests(g, cls);
+  renderOverview(g, cls);
   return g;
 }
 
@@ -1896,7 +2301,7 @@ function refresh() {
 function mount(root, deps) {
   ui.root = root; ui.deps = deps; ui.data = deps.data; DATA = deps.data;
   ui.editing = null; ui.lastIgn = ''; ui.listGen = 0; ui.who = null; ui.filter = { cls: '', minLv: '', maxLv: '', sort: 'level' };
-  loadForm();
+  loadForm(); loadRoads();
   const editOpen = !!ui.deps.store.get('bt.bedit');
   const shut = open => open ? {} : { hidden: '' };
   const P = window.PixelIcons;
@@ -1964,7 +2369,7 @@ function mount(root, deps) {
 }
 const estimatedNote = () => E('p', { id: 'b-estimated', class: 'k-foot b-badge', hidden: '' }, E('b', {}, 'Estimated. '), "Damage for this weapon comes from meowdb's table and hasn't been checked against a real stat window yet.");
 
-window.Builds = { comparePaths, PATHS, tuneSeconds, EXP_TABLE, STEP_SEC, expHour, hoursTo, healRange, HEAL, standingText, KILL_GAP, CLASSES, BRANCHES, branchOf, weaponsFor, mastery, physRange, spellRange, weaponAttackFromMax, WEAPONS, CHECKED_WEAPONS, windowRange, levelScale, hitChance, defend, elemMult, makeRng, castsToKill,
+window.Builds = { comparePaths, PATHS, CHECKED, REACH, HOLD, ROAD_KILLS, roadTarget, mainAttack, crowdHits, rankWith, attackModel, statsAt, planAP, pathClass, firstJobSkills, indieMagic, roadStats, tuneSeconds, EXP_TABLE, STEP_SEC, expHour, hoursTo, healRange, HEAL, standingText, KILL_GAP, CLASSES, BRANCHES, branchOf, weaponsFor, mastery, physRange, spellRange, weaponAttackFromMax, WEAPONS, CHECKED_WEAPONS, windowRange, levelScale, hitChance, defend, elemMult, makeRng, castsToKill,
   validateStats, rankMobs, buildGuide, pointsPlan, mount, fill, refresh, shrinkImage, take, classOf,
-  dropGroups, findItems, droppers, meowMap, wearers, kindOf };
+  dropGroups, findItems, droppers, meowMap, wearers, kindOf, gainRange, trusted, bestScroll, money, plural, mobFit };
 })();

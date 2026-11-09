@@ -221,12 +221,14 @@ body.appraiser-off #tab-appraiser .soon::after { right: 5px; }
 .auth { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 20px; }
 .auth [hidden] { display: none; }
 .auth #who { padding: 2px 10px; background: var(--wood); box-shadow: 0 0 0 2px var(--wood-o); color: var(--bar-ink); font-size: var(--fs-sm); }
-#theme { margin: 0 0 20px -10px; }
+/* the theme button floats above Something off? in the corner of every tab, so it never needs a scroll up */
+#theme { position: fixed; right: 15px; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); z-index: 50; margin: 0; gap: 12px; padding: 8px 15px 13px; box-shadow: 3px 3px 0 var(--win-shadow); }
+#theme .theme-ico { display: inline-flex; }
+@media (max-width: 1559px) { #theme { padding-inline: 12px; } #theme .theme-txt { display: none; } }
 @media (max-width: 759px) {
   .topbar .in { align-items: center; gap: 12px; min-height: 0; padding: 16px 16px 8px; }
   .logo { margin: 0 auto 0 0; padding: 6px 12px 12px; font-size: var(--tt-m); }
-  .auth, #theme { margin: 0; }
-  #theme { margin-left: 0; }
+  .auth { margin: 0; }
   .tabs { order: 3; width: 100%; margin-left: 0; padding-top: 12px; gap: 12px 10px; }
   body.appraiser-off .tabs { row-gap: 32px; }
   .tabs button { margin: 0; }
@@ -329,15 +331,22 @@ body.appraiser-off #tab-appraiser .soon::after { right: 5px; }
 .b-sec { margin: var(--gap) 0 4px; font: 400 var(--tt-s) var(--font-title); color: var(--ink); }
 .b-sec:first-child { margin-top: 0; }
 .b-foot { margin: var(--gap) 0 0; color: var(--muted); font: 600 var(--fs-xs) var(--font-body); line-height: 1.4; }
-.b-foot a, .b-scard a { color: var(--focus); text-decoration: underline dotted; }
+.b-foot a, .b-scard a, .b-srow a, .b-qrow a, .b-nowt a { color: var(--focus); text-decoration: underline dotted; }
 .b-go { display: inline-block; margin: 10px 0 0; font-weight: 700; }
 .b-ovgo { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+/* a panel stacked as blocks (Scrolls and Quests, and now Overview): even gaps, no doubled margin on its own foot */
+#scrolls, #quests, #overview, #paths { display: flex; flex-direction: column; gap: var(--gap); }
+#scrolls > .b-foot, #quests > .b-foot, #overview > .b-foot, #paths > .b-foot, #paths > .b-sec, #paths > p { margin: 0; }
+.b-block { min-width: 0; }
+.b-ovt { font: 700 var(--fs-md) var(--font-body); }
+/* a ring row about 62 tall: Scrolls, Quests and the Overview's rows share it; the money stays on one line, never squeezed by long text beside it */
+.k-row.b-srow, .k-row.b-qrow, .b-ovrow.k-row, .b-stop.k-row { padding: 4px 0 6px; }
+.k-row.b-srow > :last-child:not(:first-child), .k-row.b-qrow > :last-child:not(:first-child), .b-stop.k-row > :last-child:not(:first-child) { flex-shrink: 0; }
 .b-more, .b-dmore { display: block; background: none; border: 0; padding: 8px 0 0; color: var(--focus); font: 700 var(--fs-sm) var(--font-body); text-align: left; text-decoration: underline; cursor: pointer; }
 .b-seeall { font-weight: 700; }
-/* a row title reads in one size; the rows start at the heading's left edge and sit a row pitch of about 54 apart */
-.b-ovrow.k-row { padding: 6px 0 7px; }
-.b-ovrow .b-name, .b-mob .b-name { font: inherit; }
-.b-ovrow > :first-child > :first-child, .b-mob > :first-child > :first-child { font: 700 var(--fs-md) var(--font-body); }
+/* a row title reads in one size; the rows start at the heading's left edge */
+.b-ovrow .b-name, .b-mob .b-name, .b-stop .b-name { font: inherit; }
+.b-mob > :first-child > :first-child { font: 700 var(--fs-md) var(--font-body); }
 @media (max-width: 559px) {
   .b-ovrow.k-row { flex-direction: column; align-items: stretch; gap: 0; }
   .b-ovrow.k-row > .b-hr:last-child { margin-left: 0; align-self: flex-end; }
@@ -346,6 +355,7 @@ body.appraiser-off #tab-appraiser .soon::after { right: 5px; }
 .b-now { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--gap); margin: var(--gap) 0; }
 @media (max-width: 899px) { .b-now { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 559px) { .b-now { grid-template-columns: minmax(0, 1fr); } }
+#overview .b-now { margin: 0; }
 .b-nowt { min-width: 0; }
 .b-nowt .v { margin: 2px 0; font: 400 var(--tt-m)/1.2 var(--font-title); overflow-wrap: anywhere; }
 .b-nowt .s { font: 600 var(--fs-sm) var(--font-body); color: var(--muted); overflow-wrap: anywhere; }
@@ -396,12 +406,31 @@ body.appraiser-off #tab-appraiser .soon::after { right: 5px; }
 .b-icon { flex: none; width: 38px; height: 38px; background-repeat: no-repeat; image-rendering: pixelated; }
 .b-slot { font: 400 var(--tt-s) var(--font-title); }
 /* Skill paths, Points, Gear and Scrolls */
-.b-pcols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(440px, 100%), 1fr)); gap: var(--gap); margin-top: var(--gap); }
-.b-pcol { min-width: 0; overflow-x: auto; }
-.b-pcol .top { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
-.b-pcol p { margin: 6px 0; }
-.b-pcol tr.reset td { background: var(--soon-bg); color: var(--soon-fg); font-weight: 700; }
-.b-pcol .b-hr { font-size: var(--fs-md); }
+/* Skill paths, Two roads: the switch, then two roads side by side, each a column of head, tiles, stops, Stuck? and its check */
+.b-reach { display: flex; flex-wrap: wrap; align-items: center; gap: 8px var(--gap); }
+.b-rlab { font: 700 var(--fs-md) var(--font-body); }
+.b-rbtns { display: inline-flex; gap: 6px; }
+.b-rbtns .k-btn { min-width: 40px; }
+.b-reach .k-btn[aria-pressed="true"], .b-goroad[aria-pressed="true"] { --face: var(--accent); --face-hi: var(--key-hi); --face-lo: var(--key-lo); color: var(--key-ink); }
+.b-roads { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(440px, 100%), 1fr)); gap: var(--gap); }
+/* the roads share two rows (subgrid): a head and a body, so names and tiles line up and the spare room sits under the shorter description */
+.b-road { display: grid; grid-row: span 2; grid-template-rows: subgrid; gap: var(--gap); min-width: 0; }
+.b-rbody { display: flex; flex-direction: column; gap: var(--gap); min-width: 0; }
+.b-rhead { display: flex; align-items: flex-start; gap: var(--gap); }
+.b-rhead > div { flex: 1 1 auto; min-width: 0; }
+.b-rname { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.b-rname > b { font: 400 var(--tt-m) var(--font-title); }
+.b-rtiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gap); }
+.b-place { white-space: nowrap; }
+.b-rtile { min-width: 0; }
+.b-rtile .k { font: 600 var(--fs-sm) var(--font-body); }
+.b-rtile .v { display: flex; align-items: center; gap: 6px; margin-top: 2px; font: 700 var(--n-l)/1.1 var(--font-num); color: var(--num-big); }
+.b-rtile.lemon .v { color: var(--lemon-ink); }
+/* the Lemon sits beside the number without its ring */
+.b-rtile .k-ring { width: auto; height: auto; background: none; }
+.b-rgh { display: flex; justify-content: space-between; gap: var(--gap); padding: 0 4px; font-weight: 700; }
+.b-stuck > p { margin: 4px 0 0; }
+.b-check { margin: 0; color: var(--muted); }
 .b-gear { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(210px, 100%), 1fr)); gap: var(--gap); }
 .b-item { margin: 2px 0 4px; }
 .b-craft { color: var(--good); font: 700 var(--fs-sm) var(--font-body); }
@@ -1072,7 +1101,7 @@ body.g-ov .g-strip.g-moving { cursor: grabbing; }
 .g-strip[data-layout="bar"] .g-us { grid-row: 2; font-family: var(--font-body); font-size: 1em; font-weight: 700; }
 .g-strip[data-layout="bar"] .g-d { grid-row: 2; font-size: 1em; }
 .g-strip[data-layout="bar"] :is(.g-grid, .g-tiles) { align-self: stretch; padding-left: .6em; border-left: var(--u) solid var(--div); }
-.g-strip[data-layout="bar"] .g-grid { justify-content: flex-start; align-items: center; gap: .6em; }
+.g-strip[data-layout="bar"] .g-grid { flex: 1 1 auto; align-items: center; gap: .6em; }
 .g-strip[data-layout="bar"] .g-tiles { display: flex; gap: .6em; }
 .g-strip[data-layout="bar"] .g-k .g-kn { font-size: 1.15em; }
 .g-strip[data-layout="bar"] .g-ppr .g-us { font-size: .8em; }
@@ -1358,7 +1387,7 @@ b.t { font-family: var(--font-num); }
 
 /* Something off? (flag.js): the kit's main button with its grass, fixed in the corner of every tab, a flag then the words (under 1560 wide just the
    flag, its name kept for screen readers). Its panel is a Window and the thank you note a Card. Every page keeps its foot clear of the button. */
-body { padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
+body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
 .k-btn.flag { position: fixed; right: 15px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 50; margin-top: 0; gap: 12px; padding: 8px 15px 13px; box-shadow: 3px 3px 0 var(--win-shadow); }
 .flag[hidden] { display: none; }
 .flag-ico { display: inline-flex; }
@@ -1383,7 +1412,7 @@ body { padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
 #flag-msg { color: var(--bad); font-weight: 700; font-size: var(--fs-sm); margin: 0; }
 #flag-msg:empty { display: none; }
 .flag-row { display: flex; gap: 8px; justify-content: flex-end; }
-#flag-toast { position: fixed; right: 16px; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); z-index: 51; max-width: calc(100vw - 32px); background: var(--card); color: var(--ink); border: 2px solid var(--card-o); box-shadow: 4px 4px 0 var(--win-shadow); border-radius: var(--corner); padding: 10px 14px; font-weight: 700; }
+#flag-toast { position: fixed; right: 16px; bottom: calc(120px + env(safe-area-inset-bottom, 0px)); z-index: 51; max-width: calc(100vw - 32px); background: var(--card); color: var(--ink); border: 2px solid var(--card-o); box-shadow: 4px 4px 0 var(--win-shadow); border-radius: var(--corner); padding: 10px 14px; font-weight: 700; }
 #flag-toast a { color: var(--focus); margin-left: 8px; }
 
 /* phone: shorter stage with the stats under the name, board keeps CH, STATUS and the time */
@@ -1406,6 +1435,7 @@ body { padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
   .row .when { font-size: var(--fs-md); }
   .postlist { margin-left: 0; }
   .k-btn.flag { right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+  #theme { right: 12px; bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
   #flag-panel { right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); width: calc(100vw - 24px); }
 }
 
@@ -1537,8 +1567,7 @@ body { padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
     <button id="signout" class="k-btn sm" type="button" hidden>Sign out</button>
     <button id="signin" class="k-btn sm" type="button">Sign in with Discord</button>
   </span>
-  <button id="theme" class="k-sq" type="button" aria-label="Switch to dark theme" title="Switch to dark theme">
-</button>
+  <button id="theme" class="k-btn key" type="button" aria-label="Switch to dark theme" title="Switch to dark theme"><span class="theme-ico" aria-hidden="true"></span><span class="theme-txt">Dark mode</span></button>
 </div></header>
 <main id="view-timer" role="tabpanel" aria-labelledby="tab-timer" hidden>
   <section id="stage" aria-label="Selected boss">
@@ -1677,7 +1706,7 @@ const CONFIG = {
   reportUrl: 'https://sixpathcrossway.pages.dev/api/report',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-08b',
+  version: '2026-11-09a',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
@@ -2409,7 +2438,8 @@ showView();
 // the button shows what the click goes to: the sun in the dark theme, the moon in the light (the game's pixel icons, pixel-icons.js)
 function labelTheme() {
   const dark = document.documentElement.dataset.theme === 'dark', label = dark ? 'Switch to light theme' : 'Switch to dark theme';
-  if (window.PixelIcons) $('theme').replaceChildren(window.PixelIcons.railIcon(dark ? 'sun' : 'moon'));
+  if (window.PixelIcons) document.querySelector('#theme .theme-ico').replaceChildren(window.PixelIcons.railIcon(dark ? 'sun' : 'moon'));
+  document.querySelector('#theme .theme-txt').textContent = dark ? 'Light mode' : 'Dark mode';
   $('theme').setAttribute('aria-label', label);
   $('theme').title = label;
 }
