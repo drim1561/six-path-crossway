@@ -189,7 +189,9 @@ h1 { font-size: var(--tt-m); margin: 0; }
    grass, the tabs are signposts (a plank with an arrow tip, a post and grass), Sign in and the theme button are wood
    sign buttons. Words sit on wood here, never on the scene. */
 .topbar { color: var(--bar-ink); }
-.topbar .in { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0 18px; min-height: 122px; padding: 14px 22px 8px; }
+.topbar .in { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0 18px; min-height: 122px; padding: 14px 22px 4px; }
+/* the rail: a full-width plank under the signs, so the header has a floor instead of open sky above the panel */
+.topbar .rail { flex: 0 0 100%; height: 8px; margin-top: 2px; background: var(--art-plank, var(--wood)) 0 0 / 64px 8px repeat-x; image-rendering: pixelated; box-shadow: 0 2px 0 var(--wood-o); position: relative; z-index: 1; }
 .logo { position: relative; isolation: isolate; margin: 0 0 14px; padding: 8px 18px 14px; font: 400 var(--tt-logo)/1 var(--font-title); color: var(--logo); text-shadow: 2px 2px 0 var(--logo-e); white-space: nowrap; }
 .logo::after { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--btn);
   clip-path: polygon(2px 0, calc(100% - 2px) 0, calc(100% - 2px) 2px, 100% 2px, 100% calc(100% - 2px), calc(100% - 2px) calc(100% - 2px), calc(100% - 2px) 100%, 2px 100%, 2px calc(100% - 2px), 0 calc(100% - 2px), 0 2px, 2px 2px);
@@ -197,11 +199,12 @@ h1 { font-size: var(--tt-m); margin: 0; }
 .logo::before { content: ""; position: absolute; left: -4px; right: -4px; top: -6px; height: 10px; background: var(--art-grass) 0 0 / 32px 10px repeat-x; image-rendering: pixelated; pointer-events: none; }
 .logo b { font-weight: inherit; }
 .tabs { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin-left: auto; isolation: isolate; }
-.tabs button { position: relative; display: flex; align-items: center; height: 34px; margin: 0 0 18px; padding: 0 4px 2px; background: none; border-style: solid; border-color: transparent; border-width: 8px 16px 8px 8px; border-image: var(--art-sign) 4 8 4 4 fill / 8px 16px 8px 8px stretch; border-radius: var(--corner); color: var(--bar-ink); font: 400 var(--tt-s)/1 var(--font-title); white-space: nowrap; image-rendering: pixelated; cursor: pointer; }
+.tabs button { position: relative; display: flex; align-items: center; height: 34px; margin: 0 0 10px; padding: 0 4px 2px; background: none; border-style: solid; border-color: transparent; border-width: 8px 16px 8px 8px; border-image: var(--art-sign) 4 8 4 4 fill / 8px 16px 8px 8px stretch; border-radius: var(--corner); color: var(--bar-ink); font: 400 var(--tt-s)/1 var(--font-title); white-space: nowrap; image-rendering: pixelated; cursor: pointer; }
 .tabs button::before { content: ""; position: absolute; z-index: 1; left: -8px; right: -14px; top: -10px; height: 10px; background: var(--art-grass) 0 0 / 32px 10px repeat-x; image-rendering: pixelated; pointer-events: none; }
 .tabs button::after { content: ""; position: absolute; z-index: -1; left: 12px; top: 26px; width: 8px; height: 24px; background: var(--wood); border-left: 2px solid var(--wood-o); border-right: 2px solid var(--wood-o); }
 .tabs button[aria-selected="true"] { border-image-source: var(--art-sign-on); color: var(--key-ink); }
-.tabs button[aria-selected="true"]::after { background: var(--accent); }
+/* the active sign's post runs on past the rail, so it reads as this sign's own post holding the panel up, not a separate button pointing at it */
+.tabs button[aria-selected="true"]::after { top: 26px; height: 34px; background: var(--accent); z-index: 2; }
 /* the art file missing: words on wood stay on wood (a color taken from an image variable is invalid, so it is transparent whenever the art is there) */
 .tabs button { background-color: var(--art-sign, var(--wood)); }
 .tabs button[aria-selected="true"] { background-color: var(--art-sign-on, var(--accent)); }
@@ -227,6 +230,7 @@ body.appraiser-off #tab-appraiser .soon::after { right: 5px; }
 @media (max-width: 1559px) { #theme { padding-inline: 12px; } #theme .theme-txt { display: none; } }
 @media (max-width: 759px) {
   .topbar .in { align-items: center; gap: 12px; min-height: 0; padding: 16px 16px 8px; }
+  .topbar .rail { display: none; }
   .logo { margin: 0 auto 0 0; padding: 6px 12px 12px; font-size: var(--tt-m); }
   .auth { margin: 0; }
   .tabs { order: 3; width: 100%; margin-left: 0; padding-top: 12px; gap: 12px 10px; }
@@ -1577,6 +1581,7 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
     <button id="signin" class="k-btn sm" type="button">Sign in with Discord</button>
   </span>
   <button id="theme" class="k-btn key" type="button" aria-label="Switch to dark theme" title="Switch to dark theme"><span class="theme-ico" aria-hidden="true"></span><span class="theme-txt">Dark mode</span></button>
+  <div class="rail" aria-hidden="true"></div>
 </div></header>
 <main id="view-timer" role="tabpanel" aria-labelledby="tab-timer" hidden>
   <section id="stage" aria-label="Selected boss">
@@ -1715,7 +1720,7 @@ const CONFIG = {
   reportUrl: 'https://sixpathcrossway.pages.dev/api/report',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-09b',
+  version: '2026-11-09c',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
