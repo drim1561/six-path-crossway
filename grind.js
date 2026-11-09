@@ -933,6 +933,8 @@ function mount(root, deps) {
       if (!session) { session = GS().create({ mapId, t: reading.t, prices, eat: eatCfg() }); session.mode = lootOn ? 'loot' : 'track'; }
       GS().add(session, reading); st.reads++;
       if (reading.exp != null) { if (st.prevExp != null && reading.exp !== st.prevExp) st.movedT = reading.t; st.prevExp = reading.exp; }
+      // once the EXP number has named the level, that's the level everywhere, and digits it no longer needs can't turn the lantern red
+      if (session.levelByExp) { st.level = session.level; mark('level', true); setCheck('level', 'done', 'Level ' + st.level); }
     }
     // the last 10 readings, for a Something off? report (an 84 read as 684 shows up here)
     st.recent.push({ t: reading.t, exp: reading.exp, pct: reading.pct, level: reading.level, mesos,

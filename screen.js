@@ -263,6 +263,9 @@ function measure(src, line, frameH) {
       if (out.countScore >= COUNTS_OK) break;
     }
   }
+  // a thin 1 matches at almost any size, so the fine tune above can settle too small and miss the digit beside it (level 51
+  // read as 1). The counts are many digits and a truer measure, so when they read well the level uses their stretch too
+  if (out.score >= LEVEL && out.countScore >= COUNTS_OK) out.s = out.sc;
   return out;
 }
 // The level box never moves, so it reads around the digit found last time (a few digits either side, ~5 ms) and only

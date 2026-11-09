@@ -7,6 +7,11 @@
 'use strict';
 
 const CFG = { jumpFrac: 0.04, sizeTol: 0.06, maxGapMs: 30000, rateWindow: 600000, minUse: 120000, low: 300 };
+// EXP to the next level, by level: a copy of builds.js's, kept here so the Grind tab doesn't load Builds (a test checks they match)
+const EXP_TABLE = [0, 15, 34, 57, 92, 135, 372, 560, 840, 1242, 1716, 2360, 3216, 4200, 5460, 7050, 8840, 11040, 13716, 16680, 20216,
+  24402, 28980, 34320, 40512, 47216, 54900, 63666, 73080, 83720, 95700, 108480, 122760, 138666, 155540, 174216, 194832, 216600, 240550,
+  266682, 294216, 324240, 356916, 391160, 428280, 468450, 510420, 555680, 604416, 655200, 709716, 748608, 789631, 832902, 878545, 926689,
+  977471, 1031036, 1087536, 1147132, 1209994, 1276301, 1346242, 1420016, 1497832, 1579913, 1666492, 1757815, 1854143, 1955750, 2062925];
 
 function uuid() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
@@ -34,7 +39,32 @@ function bucket(s, t) {
 
 /* ---------- EXP ---------- */
 
+// which level this EXP and percent belong to: EXP over percent is the level's size. Null under 0.2% (the percent's rounding
+// is 2.5% there, and neighbouring levels are 5.48% apart from level 8 up) or when no entry is within 2.5%
+function levelOfExp(exp, pct) {
+  if (!(exp > 0) || !(pct >= 0.2)) return null;
+  const size = exp / (pct / 100);
+  let best = 1;
+  for (let L = 2; L < EXP_TABLE.length; L++) if (Math.abs(EXP_TABLE[L] - size) < Math.abs(EXP_TABLE[best] - size)) best = L;
+  return Math.abs(EXP_TABLE[best] - size) / EXP_TABLE[best] < 0.025 ? best : null;
+}
+// the level follows the EXP number once two reads running agree, and from then on the digits don't count. It only goes up,
+// and a rise after a pause is a level up missed in the gap
+function syncLevel(s, exp, pct) {
+  const L = levelOfExp(exp, pct);
+  if (L == null) { s.levelPend = null; return; }
+  if (L !== s.levelPend) { s.levelPend = L; return; }
+  if (!s.levelByExp) { s.levelByExp = true; s.level = L; if (!s.levels) s.levelStart = L; }
+  else if (L > s.level) { s.levels += L - s.level; s.level = L; }
+  // the table agrees with the read: take its exact size, so a level up adds the exact amount. At 20% or more the percent's
+  // rounding is at most 0.025%, so a right entry always passes 0.03%, and one that passes is at most 0.055% off, which can't
+  // trip consistent's 0.06 points even at 100%. Any entry further off keeps learning the size, as a session always has
+  if (s.level === L && pct >= 20 && Math.abs(exp / (pct / 100) - EXP_TABLE[L]) / EXP_TABLE[L] < 0.0003) {
+    (s.exact = s.exact || {})[L] = true; s.sizes[L] = EXP_TABLE[L];
+  }
+}
 function learnSize(s, exp, pct) {
+  if (s.exact && s.exact[s.level]) return;
   if (pct >= 5 && exp > 0 && s.level) { const sz = exp / (pct / 100); s.sizes[s.level] = s.sizes[s.level] ? (s.sizes[s.level] * 3 + sz) / 4 : sz; }
 }
 // does the EXP number agree with the percent? (catches misread digits)
@@ -56,7 +86,7 @@ function takeExp(s, t, exp, pct) {
   const confirmed = s.pend && s.pend.exp === exp && s.pend.pct === pct;
   if (!plausible && !confirmed) { s.pend = { exp, pct }; return { ok: false }; }
   s.pend = null;
-  let gExp, gPct;
+  let gExp, gPct, died = false;
   if (wrap) {
     const oldSize = s.sizes[s.level] || (prev.pct >= 5 ? prev.exp / (prev.pct / 100) : null);
     gPct = (100 - prev.pct) + pct; gExp = oldSize ? (oldSize - prev.exp) + exp : 0;
@@ -64,12 +94,16 @@ function takeExp(s, t, exp, pct) {
   } else {
     if (!consistent(s, exp, pct)) return { ok: false };
     gExp = dExp; gPct = pct - prev.pct;
-    // a death still counts against the session (the rates include it), and what it cost is kept to show
-    if (dExp < 0) { s.deaths++; s.lostExp = (s.lostExp || 0) - gExp; s.lostPct = (s.lostPct || 0) - gPct; }
+    // a death still counts against the session (the rates include it), and what it cost is kept to show. It needs the
+    // percent to fall too: EXP and percent are read apart, so a misread digit leaves the percent where it was, and that
+    // drop is only a correction (the arithmetic above still keeps the total right). Just over 0.01 so a death right
+    // after a level up, with almost nothing to lose, still counts
+    died = dExp < 0 && prev.pct - pct > 0.01;
+    if (died) { s.deaths++; s.lostExp = (s.lostExp || 0) - gExp; s.lostPct = (s.lostPct || 0) - gPct; }
   }
   s.gainExp += gExp; s.gainPct += gPct;
   s.last = { t, exp, pct }; learnSize(s, exp, pct);
-  return { ok: true, dExp: gExp, dPct: gPct };
+  return { ok: true, dExp: gExp, dPct: gPct, died };
 }
 
 /* ---------- potions ---------- */
@@ -109,6 +143,9 @@ function takeCounts(s, t, counts) {
       const t0 = sl.big.t; sl.big = null; sl.pend = null; moved(s, sl, t, d, t0); continue;
     }
     sl.big = null;
+    // still falling confirms the read before it: drinking one or two every read never gives two equal reads, and the gap
+    // used to pile up past BIG and book as moved out. Misreads don't keep falling read after read
+    if (sl.pend != null && c.value < sl.pend && sl.pend < sl.count) { change(s, sl, t, sl.pend - sl.count); sl.pend = c.value; continue; }
     if (sl.pend !== c.value) { sl.pend = c.value; continue; }   // wait for a second read
     sl.pend = null;
     change(s, sl, t, d);
@@ -589,7 +626,7 @@ function add(s, r) {
   if (r.pickup) { takePickup(s, t, r.pickup); if (Object.keys(r).every(k => k === 't' || k === 'pickup')) return s; }
   // a running session kept from before the EXP clock (no expFrom at all): the clock covers all of it, as its EXP does
   if (!('expFrom' in s)) { s.expFrom = s.gainExp || s.gainPct ? 0 : null; s.expTo = s.expFrom == null ? null : s.activeMs; }
-  if (r.level && (!s.level || r.level > s.level)) s.level = r.level;   // a stale level read never undoes a level up
+  if (r.level && !s.levelByExp && (!s.level || r.level > s.level)) s.level = r.level;   // a stale level read never undoes a level up
   if (s.levelStart == null && s.level) s.levelStart = s.level;
   // the map the game shows: with no EXP yet the run follows it, after that the run is the map with the most EXP (creditMap)
   if (r.map != null) { s.mapNow = r.map; if (!s.mapExp) s.mapId = r.map; }
@@ -603,14 +640,16 @@ function add(s, r) {
       for (const sl of Object.values(s.slots)) sl.paused = true;
     }
     const e = takeExp(s, t, r.exp, r.pct);
+    // !s.last is the first read after a pause: a level up in the gap makes the old size refuse the new EXP, so EXP answers anyway
+    if (e.ok || !s.last) syncLevel(s, r.exp, r.pct);
     if (e.ok) {
       if (s.lastValidT != null) { const dt = t - s.lastValidT; if (dt > 0 && dt <= CFG.maxGapMs) s.activeMs += dt; }
       s.lastValidT = t;
       // the EXP clock: where the active clock stood at the first kill and at the latest (a death isn't a kill)
-      if (e.dExp > 0 || e.dPct > 0) { if (s.expFrom == null) s.expFrom = s.activeMs; s.expTo = s.activeMs; s.lastKillT = t; }
+      if (e.dExp > 0 || e.dPct > 0) { if (s.expFrom == null) { s.expFrom = s.activeMs; s.expFirst = e.dExp; } s.expTo = s.activeMs; s.lastKillT = t; }
       if (e.dExp) { b.exp += e.dExp; b.pct += e.dPct; b.idle = false; }
       if (e.dExp > 0 && s.mapNow != null) creditMap(s, e.dExp);
-      if (e.dExp < 0) b.died = true;
+      if (e.died) b.died = true;
     }
   }
   if (r.counts) takeCounts(s, t, r.counts);   // a reading without counts (mesos only) leaves the slots alone
@@ -638,8 +677,14 @@ function add(s, r) {
 /* ---------- numbers ---------- */
 
 // EXP an hour runs from the first kill to the latest (Rimmah, 2026-11-02): town before the first and after the last isn't
-// grinding, a repot trip in between still is. Pauses stay out, since they never reach the active clock
-const expMsOf = s => s.expFrom != null ? s.expTo - s.expFrom : 0;
+// grinding, a repot trip in between still is. Pauses stay out, since they never reach the active clock. N kills span N minus
+// 1 gaps, so the first kill's EXP came with no time spent earning it (the fence post): the clock stretches by that share,
+// only while the first gain is at most half of all of it, so one kill or a death soon after can't blow it up. Sessions
+// from before expFirst keep the plain clock
+const expMsOf = s => {
+  const raw = s.expFrom != null ? s.expTo - s.expFrom : 0;
+  return s.expFirst > 0 && s.expFirst * 2 <= s.gainExp ? raw * s.gainExp / (s.gainExp - s.expFirst) : raw;
+};
 // avgExpPerKill: the map's average EXP a kill, for kills a minute (an estimate; a party shares EXP)
 function stats(s, t, avgExpPerKill) {
   const mins = s.activeMs / 60000, hrs = mins / 60, o = { exp: s.gainExp, pct: s.gainPct, mins, pausedMins: (s.pausedMs || 0) / 60000, deaths: s.deaths, levels: s.levels };
@@ -888,5 +933,5 @@ function wholeRows(minutes) {
   for (let i = 0; i < xs.length; i += 60) rows.push(xs.slice(i, i + 60));
   return rows;
 }
-window.GrindSession = { CFG, wholeRows, create, add, stats, countdown, countdowns, minuteOf, toRow, fromRow, mark, trade, keepMesos, rebase, lootOf, shopOf, learnPrice, result, usualOf, standing, inTown, bagListShows, pickMap, pickups, pickupCompare, pickNeedsFlip };
+window.GrindSession = { CFG, EXP_TABLE, levelOfExp, wholeRows, create, add, stats, countdown, countdowns, minuteOf, toRow, fromRow, mark, trade, keepMesos, rebase, lootOf, shopOf, learnPrice, result, usualOf, standing, inTown, bagListShows, pickMap, pickups, pickupCompare, pickNeedsFlip };
 })();
