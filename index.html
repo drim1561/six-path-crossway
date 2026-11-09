@@ -1319,6 +1319,35 @@ body:not(.timer-off) #view-how .timer-only, body:not(.appraiser-off) #view-how .
 .examples li { display: grid; grid-template-columns: 150px 1fr; gap: 12px; align-items: baseline; }
 .examples code { justify-self: start; }
 .smallprint { padding-top: var(--gap); background: var(--art-dots) left top / 8px 2px repeat-x; }
+/* How it works: a hero stage, example cards drawn from the site's own pictures, and the Good to know note */
+.how-hero { display: grid; gap: var(--gap); min-width: 0; }
+.how-stage { position: relative; height: 70px; overflow: hidden; display: flex; align-items: flex-end; gap: 28px; padding: 0 var(--gap); background: var(--stage-sky); border: 2px solid var(--card-o); border-radius: var(--corner); image-rendering: pixelated; }
+.how-mob { display: block; flex: none; background-repeat: no-repeat; image-rendering: pixelated; animation: how-walk .7s steps(3) infinite; }
+.how-mob-pig { width: 68px; height: 46px; background-image: url(sprites/mobs/8.png); background-size: 204px 46px; --how-sheet: -204px; }
+.how-mob-ribbon { width: 68px; height: 50px; background-image: url(sprites/mobs/10.png); background-size: 204px 50px; --how-sheet: -204px; }
+@keyframes how-walk { to { background-position: var(--how-sheet) 0; } }
+.how-lemon { display: inline-block; flex: none; width: 38px; height: 38px; background: url(data/loot-icons.png) -190px -722px no-repeat; image-rendering: pixelated; }
+.how-stage .how-lemon { align-self: flex-end; margin-bottom: 2px; }
+.how-mock { display: grid; gap: var(--gap); padding: var(--gap); background: var(--card); border: 2px solid var(--card-o); border-radius: var(--corner); max-width: 420px; min-width: 0; }
+.how-row { display: flex; align-items: center; gap: var(--gap); min-width: 0; padding-bottom: 8px; background: var(--art-dots) left bottom / 8px 2px repeat-x; }
+.how-row:last-child { padding-bottom: 0; background: none; }
+.how-name { flex: 1; min-width: 0; display: grid; font: 600 var(--fs-md) var(--font-body); color: var(--ink); }
+.how-name small, .how-num small { font: 400 var(--fs-xs) var(--font-body); color: var(--muted); }
+.how-num { display: grid; justify-items: end; font: 700 var(--n-s) var(--font-num); color: var(--num); white-space: nowrap; }
+.how-num.how-big { font-size: var(--tt-l); color: var(--num-big); }
+.how-ring { display: inline-grid; place-items: center; flex: none; width: 52px; height: 52px; background: var(--art-ring) 0 0 / 52px 52px no-repeat; image-rendering: pixelated; }
+.how-ring .how-mob { transform: scale(.55); transform-origin: center; animation: none; }
+.how-ring .how-lemon { width: 38px; height: 38px; margin: 6px 0 0 4px; }
+.how-skill { width: 32px; height: 32px; background: url(data/skill-icons.png) -384px -192px no-repeat; image-rendering: pixelated; }
+.how-seg { display: flex; gap: 0; }
+.how-seg span { flex: 1; text-align: center; padding: 4px 0; font: 700 var(--fs-sm) var(--font-body); color: var(--btn-ink); background: var(--btn); border: 2px solid var(--btn-lo); }
+.how-seg span.on { background: var(--accent); color: var(--key-ink); border-color: var(--key-lo); }
+.how-list { margin: 0; padding: 0 0 0 20px; display: grid; gap: 8px; }
+.how-note { display: flex; gap: var(--gap); align-items: flex-start; padding: var(--gap); background: var(--lemon); color: var(--lemon-ink); border: 2px solid var(--key-lo); border-radius: var(--corner); }
+.how-note p, .how-note strong { color: var(--lemon-ink) !important; }
+.how-note > div { display: grid; gap: 8px; min-width: 0; }
+.how-note-ico { flex: none; }
+@media (prefers-reduced-motion: reduce) { .how-mob { animation: none; } }
 .pill { font: 700 var(--fs-sm) var(--font-body); padding: 3px 9px; border-radius: var(--corner); justify-self: start; white-space: nowrap; }
 .pill-due { background: var(--due-bg); color: var(--due-fg); }
 .pill-soon { background: var(--soon-bg); color: var(--soon-fg); }
@@ -1641,12 +1670,26 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
   <div class="k-bar"><h2>How it works</h2></div>
   <div class="k-pad">
 
-  <section class="how-first">
+  <div class="how-hero">
+    <p class="lead">Six Path Crossway is a fan made helper for MapleStory Classic players. It watches your game window while you train and turns your level into a plan.</p>
+    <div class="how-stage" aria-hidden="true"><span class="how-mob how-mob-pig"></span><span class="how-mob how-mob-ribbon"></span><span class="how-lemon"></span><span class="how-lemon"></span></div>
+  </div>
+
+  <section>
   <h3>Grind</h3>
   <p class="lead">The Grind tab keeps score while you train. Press Share game window, pick MapleStory and go. There's nothing to type: it reads your EXP bar, your level and the potions on your quickslots straight off the screen, so every potion you drink needs a quickslot.</p>
-  <p>EXP an hour runs from your first kill to your latest, so the walk out of town and the wait at the end don't drag it down, while a repot trip in the middle still counts. The Lemon glass drains as you drink and says Squeeze time! when you're down to 5 minutes. Once you're sharing, Pop out over the game floats the live numbers in a small window over MapleStory, and on the Grind tab, All time counts the Lemons and Meat you've eaten, while Your record lower down keeps your hours, levels and best sessions.</p>
-  <p>Open your inventory now and then and it counts your mesos too. Want to know if a session made or lost mesos? Turn on Count my loot and flip through your Equip, Use and Etc tabs at the start and again at the end. It counts the mesos you picked up and sold for, adds what your bags gained or lost (priced at what an NPC pays), takes off the potions you drank, and calls the session Profitable or Losing. The reading happens on your computer, and your game pictures stay there unless you send one with a Something off? report. Signed in, your sessions save to your account and nobody else can see them. Signed out, they stay on this device.</p>
-
+  <div class="how-mock" role="img" aria-label="Example of the pop-out: EXP an hour with a 5m, 10m and run switch, and a Lemon count">
+    <div class="how-row"><span class="how-name">EXP an hour<small>Example numbers</small></span><span class="how-num how-big">118K</span></div>
+    <div class="how-seg"><span>5m</span><span>10m</span><span class="on">run</span></div>
+    <div class="how-row"><span class="how-ring"><span class="how-lemon"></span></span><span class="how-name">Lemons<small>this run</small></span><span class="how-num">240</span></div>
+  </div>
+  <ul class="how-list">
+    <li><strong>Pop out over the game</strong> floats the live numbers in a small window over MapleStory.</li>
+    <li><strong>EXP an hour</strong> counts from your first kill to your latest, so walking out of town doesn't drag it down.</li>
+    <li><strong>All time</strong> counts the Lemons and Meat you've eaten, and Your record keeps your hours, levels and best sessions.</li>
+    <li><strong>Count my loot</strong> is optional. Flip through your Equip, Use and Etc tabs at the start and the end, and it tells you if the session was Profitable or Losing in mesos.</li>
+  </ul>
+  <p>Signed in, your sessions save to your account and nobody else can see them. Signed out, they stay on this device. The reading happens on your computer.</p>
   </section>
   <div class="timer-only">
   <section>
@@ -1687,11 +1730,13 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
 
   <section>
   <h3>Builds</h3>
-  <p>The Builds tab turns your stat window into a leveling guide: where to train, where your skill and ability points go, and what to wear and scroll. Monster, skill and item numbers come from the game's own files, and the damage math is meowdb's Classic formulas. Where to train is ranked by EXP per cast, from a few thousand simulated kills with your damage range, crits, monster defense and hit chance.</p>
-  <p>Tired of typing your stats? The Read from game button on the Builds tab reads them off your screen. Press it, share your game window or paste a screenshot, then open your Character Stat window with DETAIL and your Skill window and click through your 1st and 2nd job tabs. It fills in your level, stats, attack or magic, accuracy, crits and skill levels, marks every box it filled so you can check it, and stops by itself once it has everything. If it isn't sure about a number it leaves the box empty and tells you which one to type. The reading happens on your computer, and your game pictures stay there unless you send one with a Something off? report. Saving a build is separate. It stores the numbers in the form and the name and note you type, and uploads only the equip screenshot you pick yourself.</p>
-  <p>Pick your 1st job from the class buttons (Change class opens them again), then where you're heading or your 2nd job, and type just your level to get a guide. Every other box makes it sharper. Physical classes also pick their weapon, since damage depends on it. Each weapon type has its own damage multiplier from meowdb's Classic table. Claws, one handed swords and polearms have been matched to real stat windows, and a guide for any other weapon carries an Estimated note until one is. Want yours checked? Send Rimmah a screenshot of your stat window with DETAIL open and say what weapon you're holding.</p>
-  <p>Saving needs Discord, and a build shows the character name you type, never your Discord name. Screenshots are shown as they are and the numbers are what each player typed, so take other people's builds as their word.</p>
-
+  <p class="lead">Pick your class and type just your level to get a leveling guide: where to train, where your skill and ability points go, and what to wear and scroll. The Quests tab lists what to do next, from quests open now to ones coming up.</p>
+  <div class="how-mock how-mock-b" role="img" aria-label="Example of a guide row: a monster, where to train, and EXP an hour">
+    <div class="how-row"><span class="how-ring"><span class="how-mob how-mob-pig"></span></span><span class="how-name">Train here now<small>Example row</small></span><span class="how-num">112K<small>EXP an hour</small></span></div>
+    <div class="how-row"><span class="how-ring"><span class="how-skill"></span></span><span class="how-name">Next skill point<small>Example row</small></span><span class="how-num">Heal<small>level 3</small></span></div>
+  </div>
+  <p>Tired of typing your stats? Read from game reads them off your screen: share your game window or paste a screenshot, with your Character Stat window (DETAIL on) and Skill window open. It marks every box it filled, and leaves a box empty when it isn't sure. The reading happens on your computer.</p>
+  <p>Numbers come from the game's own files and meowdb's Classic damage formulas. Claws, one handed swords and polearms have been matched to real stat windows, and other weapons carry an Estimated note until one is. Saving a build needs Discord and shows the character name you type, never your Discord name.</p>
   </section>
   <div class="appraiser-only">
   <section>
@@ -1702,6 +1747,16 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
   </section>
   </div>
 
+  <section class="how-good">
+  <h3>Good to know</h3>
+  <div class="how-note">
+    <span class="how-note-ico" aria-hidden="true"><span class="how-lemon"></span></span>
+    <div>
+      <p><strong>EXP an hour covers your whole run by default.</strong> That's the steadiest number, but it moves slowly once you're deep into a run.</p>
+      <p>Whenever something changes your pace, press <strong>5m</strong> or <strong>10m</strong> on the EXP an hour switch to see just the last few minutes. Good times to do it: someone joins or leaves your party, you go solo, or you're an hour in.</p>
+    </div>
+  </div>
+  </section>
   <section>
   <h3>Discord</h3>
   <p>Something look off, or have an idea? Press Something off? in the bottom corner of any page (on a small screen it shrinks to just its flag) and it comes straight to Rimmah, with a picture of what you saw. Fixes and news go up in our Discord. <a id="how-discord" href="https://discord.gg/sHupB2U7tD" target="_blank" rel="noopener">Join our Discord</a></p>
@@ -1727,7 +1782,7 @@ const CONFIG = {
   reportUrl: 'https://sixpathcrossway.pages.dev/api/report',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-09e',
+  version: '2026-11-09f',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
