@@ -114,7 +114,7 @@ function takeExp(s, t, exp, pct) {
 const BIG = 30, HOLD_MS = 15000, PICKUP = 5, AWAY_MS = 5 * 60000;
 // every slot starts over from its next read (grind.js calls this when the HUD changed size)
 function rebase(s) { for (const sl of Object.values(s.slots)) { sl.rebase = true; sl.pend = null; sl.big = null; sl.away = null; } }
-function takeCounts(s, t, counts) {
+function takeCounts(s, t, counts, held) {
   const seen = {};
   for (const c of counts || []) {
     if (!c || !c.key || c.value == null) continue;
@@ -153,6 +153,8 @@ function takeCounts(s, t, counts) {
   // a slot not read: covered (a tooltip, the cursor) keeps its count; one that showed 3 or less and stays gone ran out
   for (const sl of Object.values(s.slots)) {
     if (seen[sl.key]) continue;
+    // its count can't be read but its picture is still in the slot: still there, nothing happened to it
+    if (held && held.includes(sl.key)) { sl.missing = 0; continue; }
     sl.missing++;
     if (sl.missing >= 2 && sl.count > 0 && sl.count <= 3) change(s, sl, t, -sl.count);
   }
@@ -658,7 +660,7 @@ function add(s, r) {
       if (e.died) b.died = true;
     }
   }
-  if (r.counts) takeCounts(s, t, r.counts);   // a reading without counts (mesos only) leaves the slots alone
+  if (r.counts) takeCounts(s, t, r.counts, r.held);   // a reading without counts (mesos only) leaves the slots alone
   if (r.mesos != null) takeMesos(s, t, r.mesos);
   if (r.shop != null || r.shopOpen === false) takeShop(s, t, r);
   else if (s.shop && s.shop.open && t - s.shop.seen > SHOP_GONE_MS) closeVisit(s, s.shop.visits[s.shop.visits.length - 1]);

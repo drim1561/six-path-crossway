@@ -947,9 +947,17 @@ function mount(root, deps) {
             if (changed && known.id && !id) continue;
             known = st.slots[c.key] = { id, at: changed && known.id === id ? known.at : st.ticks + ICON_EVERY + nth * 3 };
           }
-          known.v = c.value;
+          known.v = c.value; known.x = c.x; known.y = c.y;
           const pot = known.id ? data.potions[known.id] : null;
           reading.counts.push({ key: c.key, id: known.id, name: pot ? pot[0] : 'Unknown item', price: known.id && prices[known.id] != null ? prices[known.id] : (pot ? pot[1] : 0), value: c.value });
+        }
+        // a slot seen before whose count isn't read this time: is its picture still there? (a lone 1 over a bright icon can go
+        // unread for a long while, and a count of 3 or less that stays unread is booked as ran out)
+        const got = new Set(reading.counts.map(c => c.key));
+        for (const [key, k] of Object.entries(st.slots)) {
+          if (got.has(key) || !k.id || !k.x) continue;
+          const ic = S.readIcon(src, { x: k.x, y: k.y }, st.m);
+          if (ic.diff < 75 && +ic.id === k.id) (reading.held = reading.held || []).push(key);
         }
         const named = reading.counts.filter(c => c.id);
         st.potNone = !named.length; st.potCount = named.length;
