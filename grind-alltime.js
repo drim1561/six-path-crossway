@@ -1,14 +1,16 @@
-// All time on the Grind tab: every Lemon and Meat eaten since you started tracking, in one window that swaps between two views.
+// All time on the Grind tab: every Lemon and Meat eaten since you started tracking, and three more all time numbers, in one window that
+// steps through five views with one Next button (2026-11-09, always opens on the Orchard).
 // The Orchard: a tree for every 100 Lemons and a ghost Ribbon Pig for every 50 Meat, and ten little ones turn into one big one (a run
 // eats about 440 Lemons an hour, so a regular outgrows any stage of little trees within weeks). The Tab: a shop receipt of what was
 // bought, eaten and spent, and a stamp card that gets you nothing. Bought is only what a run saw, so Eaten can pass it: a run that
-// starts with a full bag buys nothing. First the words and sums, as pure functions; then build, which draws it.
+// starts with a full bag buys nothing. Then Monsters felled (an estimate), Potions per level and Maps visited, small cards of numbers
+// from lifetime(). First the words and sums, as pure functions; then build, which draws it.
 // window.GrindAllTime = { SWAP_MS, tiers, treeWords, pigWords, stampsOf, stampKinds, build }
 (function () {
 'use strict';
 
 const TREE = 100, GHOST = 50, STAMP = 200, CARD = 10;
-const SWAP_MS = 15000, KEY_FACE = 'grind.allTimeFace';
+const SWAP_MS = 15000;
 // past what the stage can hold the art stops growing, and the number on the sign carries on
 const BIG_TREES_MAX = 35, BIG_GHOSTS_MAX = 12;
 // Ribbon Pig's first walking frame (data/mob-sprites.json)
@@ -138,12 +140,14 @@ const TORN = (() => {
 
 // build({ el, store, pics: { lemon, meat }, mapName }): the window, hidden until something has been eaten. update(L, { since }): L is
 // lifetime()'s, since the bar's small line. Called every few seconds through a run, so each part draws again only when it changes
-function build({ el, store, pics, mapName }) {
+function build({ el, pics, mapName, mobName }) {
   const put = (node, text) => { if (node.textContent !== text) node.textContent = text; };
 
-  const buttons = ['Orchard', 'Tab'].map(label => el('button', { type: 'button', 'aria-pressed': 'false' }, label));
+  const FACES = ['orchard', 'tab', 'kills', 'potions', 'maps'];
+  const dots = el('span', { class: 'g-at-dots', 'aria-hidden': 'true' }, FACES.map(() => el('i', {})));
+  const nextBtn = el('button', { type: 'button', class: 'g-at-go' }, 'Next');
   const note = el('small', {});
-  const bar = el('div', { class: 'k-bar' }, el('h2', {}, 'All time'), note, el('div', { class: 'push g-at-sw', role: 'group', 'aria-label': 'What All time shows' }, buttons));
+  const bar = el('div', { class: 'k-bar' }, el('h2', {}, 'All time'), note, el('div', { class: 'push g-at-sw', role: 'group', 'aria-label': 'What All time shows' }, dots, nextBtn));
 
   // The Orchard: a sign and its picture for each, the picture left out of what a screen reader says since the sign says it all
   const sign = (kind, label, key) => {
@@ -175,24 +179,31 @@ function build({ el, store, pics, mapName }) {
   const cardName = el('h3', {}), stamps = el('div', { class: 'g-at-stamps' }), toGo = el('span', { class: 'g-at-togo' }), toWhat = el('span', {}), joke = el('small', {});
   const card = el('div', { class: 'k-card g-at-card' }, cardName, stamps, el('div', { class: 'g-at-next' }, toGo, toWhat), joke);
 
+  // Monsters felled, Potions per level and Maps visited: a label, a big number and two small lines each
+  const statFace = kind => {
+    const s = { label: el('div', { class: 'g-tl' }), n: el('div', { class: 'g-tn' }), a: el('div', { class: 'g-ts' }), b: el('div', { class: 'g-ts' }) };
+    s.el = el('div', { class: 'g-at-face', 'data-face': kind }, el('div', { class: 'k-pad g-at-stat' }, s.label, s.n, s.a, s.b));
+    return s;
+  };
+  const killsFace = statFace('kills'), potionsFace = statFace('potions'), mapsFace = statFace('maps');
   const faces = [
     el('div', { class: 'g-at-face', 'data-face': 'orchard' }, stage),
     el('div', { class: 'g-at-face', 'data-face': 'tab' }, el('div', { class: 'k-pad g-at-tab' }, el('div', { class: 'g-at-recw' }, receipt), card)),
+    killsFace.el, potionsFace.el, mapsFace.el,
   ];
   const root = el('section', { class: 'k-win', id: 'g-alltime', hidden: '' }, bar, el('div', { class: 'g-at-faces' }, faces));
 
-  // the swap: a different view each visit, then every SWAP_MS while it's there to be seen. It holds under the mouse or the keyboard, stops
-  // once you pick one, and never swaps by itself for someone who asked for less motion. Both views share a grid cell, so nothing below moves
+  // the swap: always opens on the Orchard, then steps on every SWAP_MS while it's there to be seen. It holds under the mouse or the keyboard,
+  // stops for good once you press Next, and never swaps by itself for someone who asked for less motion. All five views share a grid cell,
+  // so nothing below moves
   let at = 0, held = false, picked = false;
   const show = i => {
     at = i;
     faces.forEach((f, n) => { f.classList.toggle('on', n === i); f.inert = n !== i; });
-    buttons.forEach((b, n) => b.setAttribute('aria-pressed', String(n === i)));
+    [...dots.children].forEach((d, n) => d.classList.toggle('on', n === i));
   };
-  const last = parseInt(store.get(KEY_FACE), 10);
-  show(isNaN(last) ? 0 : (last + 1) % faces.length);
-  store.set(KEY_FACE, String(at));
-  buttons.forEach((b, n) => b.addEventListener('click', () => { picked = true; show(n); }));
+  show(0);
+  nextBtn.addEventListener('click', () => { picked = true; show((at + 1) % faces.length); });
   for (const [on, off] of [['mouseenter', 'mouseleave'], ['focusin', 'focusout']]) {
     root.addEventListener(on, () => { held = true; });
     root.addEventListener(off, () => { held = false; });
@@ -249,11 +260,21 @@ function build({ el, store, pics, mapName }) {
     toWhat.textContent = ' more to your ' + (S.first ? 'first' : 'next') + ' stamp';
     joke.textContent = S.cards ? 'You filled ' + S.cards + (S.cards === 1 ? ' card' : ' cards') + '. That got you absolutely nothing.' : 'One stamp for every ' + STAMP + ' Lemons or Meat. Ten stamps gets you absolutely nothing.';
   }
+  const first = n => 'about ' + fmt(n >= 1000 ? Math.round(n / 100) * 100 : Math.max(10, Math.round(n / 10) * 10));
+  function drawStats(L) {
+    const K = L.kills, P = L.potionsPer, V = L.visited, put2 = (f, label, n, a, b) => { put(f.label, label); put(f.n, n); put(f.a, a); put(f.b, b); };
+    if (K && K.n > 0) put2(killsFace, 'Monsters felled', first(K.n), K.top ? 'Mostly ' + mobName(K.top.id) + ', ' + first(K.top.n) : '', K.skipped ? K.skipped + (K.skipped === 1 ? ' run' : ' runs') + ' with no map left out' : 'An estimate from your EXP');
+    else put2(killsFace, 'Monsters felled', '·', 'Shows up after a run on a map the game can name', K && K.skipped ? K.skipped + (K.skipped === 1 ? ' run' : ' runs') + ' with no map left out' : '');
+    if (P) put2(potionsFace, 'Potions per level', fmt(P.n), 'on average, every kind of potion', 'Best run ' + fmt(P.best.v) + ' at ' + mapName(P.best.row.map_id) + '. Worst run ' + fmt(P.worst.v) + ' at ' + mapName(P.worst.row.map_id) + '.');
+    else put2(potionsFace, 'Potions per level', '·', 'Shows up after runs of 10 minutes or more', '');
+    if (V && V.n) put2(mapsFace, 'Maps visited', fmt(V.n), 'Favorite: ' + mapName(V.fav.id) + ' (' + Math.round(V.fav.share * 100) + '% of your hours)', V.newest ? 'Newest: ' + mapName(V.newest.id) : '');
+    else put2(mapsFace, 'Maps visited', '·', 'Shows up after a run on a map the game can name', '');
+  }
   function update(L, o) {
     put(note, (o && o.since) || '');
     put(lemonSign.n, fmt(L.lemon.used)); put(lemonSign.words, treeWords(L.lemon.used));
     put(meatSign.n, fmt(L.meat.used)); put(meatSign.words, pigWords(L.meat.used));
-    drawGrove(L.lemon.used); drawPen(L.meat.used); drawTab(L);
+    drawGrove(L.lemon.used); drawPen(L.meat.used); drawTab(L); drawStats(L);
   }
   return { el: root, update };
 }

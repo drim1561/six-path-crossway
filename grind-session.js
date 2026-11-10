@@ -541,15 +541,21 @@ function between(s, a, now) {
 
 /* ---------- which map a run belongs to ---------- */
 
+// EXP earned with no map known (the page starts blank, and a map the reader can't name stays blank, Rimmah 2026-11-09) is kept under
+// NO_MAP, a place like any other: a map read for a few kills doesn't take the run, and NO_MAP on top leaves the run on no map
+const NO_MAP = '';
+// where EXP earned now counts: the map the game shows, else the map the run started on (picked or read), else nowhere known
+const hereOf = s => (s.mapNow != null ? s.mapNow : s.mapId != null ? s.mapId : NO_MAP);
 function creditMap(s, exp) {
-  const M = s.mapExp || (s.mapExp = {});
-  M[s.mapNow] = (M[s.mapNow] || 0) + exp;
-  s.mapId = +Object.keys(M).reduce((a, b) => (M[b] > M[a] ? b : a));
+  const M = s.mapExp || (s.mapExp = {}), here = hereOf(s);
+  M[here] = (M[here] || 0) + exp;
+  const top = Object.keys(M).reduce((a, b) => (M[b] > M[a] ? b : a));
+  s.mapId = top === NO_MAP ? null : +top;
 }
-// a pick by hand: the map the reader had was wrong, so what it earned there goes with the pick
+// a pick by hand: the map the reader had was wrong (or there wasn't one), so what was earned there goes with the pick
 function pickMap(s, id) {
-  const M = s.mapExp;
-  if (M && s.mapNow != null && s.mapNow !== id && M[s.mapNow]) { M[id] = (M[id] || 0) + M[s.mapNow]; delete M[s.mapNow]; }
+  const M = s.mapExp, from = hereOf(s);
+  if (M && String(from) !== String(id) && M[from]) { M[id] = (M[id] || 0) + M[from]; delete M[from]; }
   s.mapNow = id; s.mapId = id;
 }
 
@@ -648,7 +654,7 @@ function add(s, r) {
       // the EXP clock: where the active clock stood at the first kill and at the latest (a death isn't a kill)
       if (e.dExp > 0 || e.dPct > 0) { if (s.expFrom == null) { s.expFrom = s.activeMs; s.expFirst = e.dExp; } s.expTo = s.activeMs; s.lastKillT = t; }
       if (e.dExp) { b.exp += e.dExp; b.pct += e.dPct; b.idle = false; }
-      if (e.dExp > 0 && s.mapNow != null) creditMap(s, e.dExp);
+      if (e.dExp > 0) creditMap(s, e.dExp);
       if (e.died) b.died = true;
     }
   }
@@ -828,11 +834,11 @@ function rowValue(r, q) {
   return null;
 }
 // this run against the player's other runs on the same map: its rank, the best of the others (and when), and their plain
-// average once there are 3. Potions per 1% is better the lower it is
+// average once there are 3. Potions per 1% is better the lower it is. A run with no map has no one to stand against
 function standing(rows, q) {
   const lowerBetter = q.metric === 'potPer1';
   const others = [];
-  for (const r of rows || []) {
+  for (const r of q.mapId == null ? [] : rows || []) {
     if (r.id === q.exceptId || +r.map_id !== +q.mapId) continue;
     const v = rowValue(r, q);
     if (v != null && isFinite(v)) others.push({ v, t: Date.parse(r.started_at) });

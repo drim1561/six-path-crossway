@@ -10,7 +10,7 @@
 
 const MS = () => window.MapleScreen, GS = () => window.GrindSession;
 const MAP_SEARCH_MS = 5000;
-const KEY_OPEN = 'grind.open', KEY_LOCAL = 'grind.local', KEY_PRICES = 'grind.prices', KEY_MAP = 'grind.map', KEY_HOME = 'grind.mesoHome';
+const KEY_OPEN = 'grind.open', KEY_LOCAL = 'grind.local', KEY_PRICES = 'grind.prices', KEY_HOME = 'grind.mesoHome';
 // (layoutSizes3: the Trail Signs panel is bigger (frame, bar and bigger numbers), so window sizes dragged before it start over)
 const KEY_LAYOUT = 'grind.layout', KEY_SIZES = 'grind.layoutSizes3', KEY_DETAIL = 'grind.detail', KEY_LOOT = 'grind.loot', KEY_WINDOW = 'grind.expWindow', KEY_CLASS = 'grind.class';
 // the app's overlay: See-through (25 to 100%, in fives) and Size (60 to 160%, in tens), kept on this device
@@ -210,6 +210,10 @@ function lifetime(rows, o) {
   const L = { sessions: rows.length, mins: 0, exp: 0, deaths: 0, levelFrom: null, levelTo: null, mesos: null, profit: null,
     lemon: { used: 0, cost: 0, pct: 0, bought: 0, spent: 0 }, meat: { used: 0, cost: 0, pct: 0, bought: 0, spent: 0 }, other: { used: 0, cost: 0, bought: 0, spent: 0 }, maps: [], thirst: null, first: null,
     best: { expHr: null, longest: null, lemons: null, cheap1: null }, days: 0, streak: 0, daysList: [] };
+  // Monsters felled (an estimate: a run's EXP over what one monster on its map gives on average, weighted by spawn count), Potions per
+  // level (potions drunk over the levels' worth of EXP, runs of BEST_MIN or more) and Maps visited
+  const kill = { n: 0, skipped: 0, by: {} }, per = { used: 0, pct: 0 };
+  let perBest = null, perWorst = null;
   const maps = {}, byDay = {}, drank = {}, top = (k, v, row, low) => { const b = L.best[k]; if (!b || (low ? v < b.v : v > b.v)) L.best[k] = { v, row }; };
   for (const r of rows) {
     // EXP an hour on the EXP clock (first kill to latest), hours on the session clock; a row from before it: all of it
@@ -231,13 +235,25 @@ function lifetime(rows, o) {
     // a session with a result (its counted window, loot and all) adds that; an older one, mesos earned less its potions
     if (r.result != null) L.profit = (L.profit || 0) + r.result;
     else if (r.mesos_earned != null) L.profit = (L.profit || 0) + r.mesos_earned - cost;
-    const m = maps[r.map_id] || (maps[r.map_id] = { id: r.map_id, mins: 0, exp: 0, expMins: 0 });
-    m.mins += mins; m.exp += exp; m.expMins += expMins;
+    // a run saved with no map counts everywhere else, but it isn't a map
+    if (r.map_id != null) { const m = maps[r.map_id] || (maps[r.map_id] = { id: r.map_id, mins: 0, exp: 0, expMins: 0 }); m.mins += mins; m.exp += exp; m.expMins += expMins; }
     if (expMins >= BEST_MIN) top('expHr', exp / (expMins / 60), r);
     if (mins > 0) top('longest', mins, r);
     if (lemons) top('lemons', lemons, r);
     if (lemons && r.map_id != null) drank[r.map_id] = (drank[r.map_id] || 0) + lemons;
     if (pct >= 0.3 && cost > 0) top('cheap1', cost / pct, r, true);   // the same 0.3% floor as the sessions list
+    if (exp > 0) {
+      const ms = r.map_id != null && o.maps && o.maps[r.map_id], spawns = ms ? ms.s : [];
+      let cnt = 0, tot = 0;
+      for (const [mob, c] of spawns) { const x = o.mobs && o.mobs[mob]; if (x && x[2] > 0) { cnt += c; tot += c * x[2]; } }
+      if (cnt && tot) { const per1 = exp / (tot / cnt); kill.n += per1; for (const [mob, c] of spawns) { const x = o.mobs[mob]; if (x && x[2] > 0) kill.by[mob] = (kill.by[mob] || 0) + per1 * c / cnt; } }
+      else kill.skipped++;
+    }
+    let used = 0; for (const p of r.potions || []) used += p.used || 0;
+    if (mins >= BEST_MIN && pct > 0) {
+      per.used += used; per.pct += pct;
+      if (pct >= 0.3 && used > 0) { const v = used / (pct / 100); if (!perBest || v < perBest.v) perBest = { v, row: r }; if (!perWorst || v > perWorst.v) perWorst = { v, row: r }; }
+    }
     const began = Date.parse(r.started_at), k = dayKey(began);
     if (L.first == null || began < L.first) L.first = began;
     byDay[k] = (byDay[k] || 0) + mins;
@@ -245,6 +261,13 @@ function lifetime(rows, o) {
   for (const g of [L.lemon, L.meat]) { g.per1 = g.pct ? g.used / g.pct : null; delete g.pct; }
   for (const id of Object.keys(drank)) if (!L.thirst || drank[id] > L.thirst.n) L.thirst = { id: +id, n: drank[id] };
   L.maps = Object.values(maps).map(m => Object.assign(m, { expHr: m.expMins ? m.exp / (m.expMins / 60) : null })).sort((a, b) => b.mins - a.mins);
+  const killTop = Object.keys(kill.by).sort((a, b) => kill.by[b] - kill.by[a])[0];
+  L.kills = { n: kill.n, skipped: kill.skipped, top: killTop != null ? { id: +killTop, n: kill.by[killTop] } : null };
+  L.potionsPer = per.pct > 0 && perBest ? { n: per.used / (per.pct / 100), best: perBest, worst: perWorst } : null;
+  const totMins = L.maps.reduce((a, m) => a + m.mins, 0);
+  let newest = null;
+  for (const r of rows) if (r.map_id != null) { const t = Date.parse(r.started_at); if (!newest || t > newest.t) newest = { id: r.map_id, t }; }
+  L.visited = { n: L.maps.length, fav: L.maps[0] ? { id: L.maps[0].id, share: totMins ? L.maps[0].mins / totMins : 0 } : null, newest };
   const keys = Object.keys(byDay).sort();
   L.days = keys.length;
   for (let i = 0, run = 0; i < keys.length; i++) {
@@ -287,11 +310,13 @@ function mount(root, deps) {
   const jget = (k, d) => { try { const v = store.get(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } };
   const jset = (k, v) => store.set(k, JSON.stringify(v));
   const prices = jget(KEY_PRICES, {});
-  let mapId = +store.get(KEY_MAP) || 10004134;
+  // This map: none until the game shows it or one is picked (Rimmah, 2026-11-09: it used to start on the last map, or Remains <Tomb> I).
+  // A run carried on after a reload keeps its own
+  let mapId = null;
   let session = null, viewing = null, editing = false, picturesReady = false;
   let lastHealth = null, lastRows = [], lifeAt = 0;   // the checks as last drawn, the saved sessions as last listed, when all time was drawn
   const open = jget(KEY_OPEN, null);
-  if (open && open.tLast && Date.now() - open.tLast < RESUME_MS) session = open;   // carry on after a reload or a dropped share
+  if (open && open.tLast && Date.now() - open.tLast < RESUME_MS) { session = open; mapId = open.mapId || null; }   // carry on after a reload or a dropped share
   // per share: where the EXP line is, the measured stretch, and what each reader last saw
   const st = { line: null, m: null, fw: 0, fh: 0, reads: 0, ticks: 0, expMiss: 0, measureAt: 0, levelAt: 0, level: null, party: null, slots: {}, lastSave: 0,
     sharing: false, stopped: false, potNone: false, potCount: 0, h: null, recent: [] };
@@ -583,10 +608,12 @@ function mount(root, deps) {
     if (!regions.has(reg)) regions.set(reg, []);
     regions.get(reg).push([shortCount[shortMap(id)] > 1 ? n : shortMap(id), id]);
   }
+  // the blank first option is the pick before a map is known: it shows as nothing and can't be picked from the list
   const mapSel = el('select', { id: 'g-map', 'aria-label': 'Map', onchange: () => setMap(mapSel.value) },
+    el('option', { value: '', hidden: '', disabled: '' }, ''),
     [...regions.entries()].sort((x, y) => x[0].localeCompare(y[0])).map(([reg, list]) =>
       el('optgroup', { label: reg }, list.sort((x, y) => x[0].localeCompare(y[0])).map(([text, id]) => el('option', { value: id }, text)))));
-  mapSel.value = String(mapId);
+  mapSel.value = mapId ? String(mapId) : '';
   // the map's name is the picker: the select in words, with a dotted underline and a pixel arrow (the class pick is the same under the drops)
   const pickWords = (sel, words, cls) => {
     const t = el('span', { class: 'g-pickt' }), wrap = el('span', { class: 'g-pickw ' + (cls || '') }, t, sel);
@@ -596,8 +623,9 @@ function mount(root, deps) {
     return wrap;
   };
   const mapPick = pickWords(mapSel, sel => (sel.selectedOptions[0] || {}).text || '');
-  // This map, picked here (Settings has none since 2026-11-04): one pick, kept on the device and given to the running session
-  function putMap(id) { mapId = +id; mapSel.value = String(mapId); mapPick.sync(); store.set(KEY_MAP, String(mapId)); st.mapHere = mapId; showMap(); }
+  // This map, picked here or read off the minimap (Settings has none since 2026-11-04), given to the running session. Not kept on the
+  // device: the next visit starts blank again
+  function putMap(id) { mapId = +id; mapSel.value = String(mapId); mapPick.sync(); st.mapHere = mapId; showMap(); }
   function setMap(id) { putMap(id); if (session) GS().pickMap(session, mapId); render(); }
   // Your class, for the card's For you row: a small pick under the map's, filled when the drops arrive. Kept on the device once
   // picked; until then it follows the Builds tab's class (the app has no Builds tab in its storage, so there it starts unset)
@@ -725,7 +753,7 @@ function mount(root, deps) {
   if (lootOn) loadLoot();
   // All time (grind-alltime.js): Lemons and Meat in a window of their own at the top, shown once something has been eaten; the rest of it is
   // Your runs and Your record, further down
-  const alltime = window.GrindAllTime.build({ el, store, pics: { lemon: picOf(LEMON_IDS), meat: picOf(MEAT_IDS) }, mapName: id => shortMap(id) });
+  const alltime = window.GrindAllTime.build({ el, store, pics: { lemon: picOf(LEMON_IDS), meat: picOf(MEAT_IDS) }, mapName: id => shortMap(id), mobName: id => (data.mobs[id] || ['a monster'])[0] });
   // Your runs, then Your record: two Windows. Runs are rows (five, then show more); the record is the five totals in a band, the most
   // trained maps as rows with their hours, Personal bests, then the days
   const runsWin = el('section', { class: 'k-win g-win', id: 'g-runs', hidden: '' }, el('div', { class: 'k-bar' }, el('h2', {}, 'Your runs')),
@@ -1294,7 +1322,7 @@ function mount(root, deps) {
     const potUsed = main ? used(potIds) : 0;
     const gs = GS();
     sCard.update(gs ? window.GrindCard.model({
-      live: !viewing, map: panelMap(mapOf), mins: o.mins, gained: o.exp, levelFrom: s.levelStart, levelTo: s.level,
+      live: !viewing, map: mapOf ? panelMap(mapOf) : '', mins: o.mins, gained: o.exp, levelFrom: s.levelStart, levelTo: s.level,
       exp: gs.standing(lastRows, Object.assign({ metric: 'expHr', value: o.expMins >= 10 && o.expHr > 0 ? o.expHr : null }, base)),
       mesos: gs.standing(lastRows, Object.assign({ metric: 'mesosHr', mode: R.mode, value: R.window && R.window.mins >= 10 && R.perHr != null ? R.perHr : null }, base)),
       verdict: R.verdict || null,
@@ -1514,8 +1542,10 @@ function mount(root, deps) {
       // Bar and two potion Corner have no room for these: they stay in the hover title
       hoverText(P.box, [x.left, x.cap].filter(Boolean).join(' · '));
     });
-    put(SP.elMap, panelMap(s ? s.mapId || mapId : mapId));
-    put(SP.elTime, ' · ' + fmtDur(s ? elapsedSecs(s, now, !saved && st.sharing) / 60 : 0));
+    // no map known: the spot stays empty, and how long runs on its own
+    const pm = s ? s.mapId || mapId : mapId;
+    put(SP.elMap, pm ? panelMap(pm) : '');
+    put(SP.elTime, (pm ? ' · ' : '') + fmtDur(s ? elapsedSecs(s, now, !saved && st.sharing) / 60 : 0));
   }
   // a layout picked (from ⇆ Layout's row, or its picture in Settings): the panel fades out, takes the new layout at its
   // own window size for the tiles shown (the overlay resizes its window when the browser lets it), fades back in, and is
@@ -1560,7 +1590,7 @@ function mount(root, deps) {
   // average EXP a minute solo against partied on this map, from this session and the sessions kept on this device
   function compareParty(s) {
     const map = s.mapId || mapId, pools = { 1: [], more: {} };
-    const minutesOf = [s.minutes].concat(jget(KEY_LOCAL, []).filter(r => r.map_id === map && r.id !== s.id && r.minutes).map(r => GS().fromRow(r).minutes));
+    const minutesOf = [s.minutes].concat(jget(KEY_LOCAL, []).filter(r => map != null && r.map_id === map && r.id !== s.id && r.minutes).map(r => GS().fromRow(r).minutes));
     for (const list of minutesOf) for (const m of list) {
       if (!(m.exp > 0) || !m.party) continue;
       if (m.party === 1) pools[1].push(m.exp); else (pools.more[m.party] = pools.more[m.party] || []).push(m.exp);
@@ -1833,7 +1863,8 @@ function mount(root, deps) {
   // a saved run being viewed folds the card to its title bar and button row
   function renderCard() {
     nowCard.update({ fold: !!viewing, nums: !!(session || st.sharing), sharing: st.sharing, session: !!session, label: session && st.sharing && st.h.exp.ok != null ? 'Now grinding' : 'This map',
-      mobs: mapMobs, mobIds: mapMobs.map(m => m.id), D: drops, sprites: mobSprites, L: lootIdx, cls: classId, level: levelNow() });
+      mobs: mapMobs, mobIds: mapMobs.map(m => m.id), D: drops, sprites: mobSprites, L: lootIdx, cls: classId, level: levelNow(),
+      noMap: !mapId, lemon: pictures.Icons[LEMON_IDS[0]] || null });
   }
 
   /* ----- saved sessions, and all time from them ----- */
@@ -1884,7 +1915,7 @@ function mount(root, deps) {
     if (session) {
       try { const r = GS().toRow(session); rows = rows.filter(x => x.id !== r.id).concat(r.active_min > 0 ? [r] : []); } catch (e) { /* not started yet */ }
     }
-    const L = lifetime(rows, { now: Date.now(), lemon: LEMON_IDS, meat: MEAT_IDS });
+    const L = lifetime(rows, { now: Date.now(), lemon: LEMON_IDS, meat: MEAT_IDS, mobs: data.mobs, maps: data.maps });
     alltime.update(L, { since: 'since you started tracking' + (signedIn() ? '' : ', on this device') + ' · ' + L.sessions + ' run' + (L.sessions === 1 ? '' : 's') });
     record.hidden = !L.sessions; life.hidden = runsWin.hidden && record.hidden;
     alltime.el.hidden = !(L.lemon.used || L.meat.used);   // a new player with nothing eaten doesn't see it
