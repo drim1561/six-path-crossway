@@ -66,31 +66,150 @@ const BRANCHES = {
     skillOrder: [[4001003, 20], [4000000, 20], [4000001, 8], [4001001, 1]],
     byPath: { bandit: [[4001002, 20], [4000000, 20], [4001001, 1], [4000001, 8]] } },
 };
-// Skill paths: ways to spend SP side by side, from the character's points now (my calls, as data). order1 and order2
-// replace the 1st and 2nd job orders; early plays the 1st job as another class (Lucky Seven with a claw for a Bandit),
-// and reset says an SP Reset Scroll (Cash Shop, 5051001) moves those points into the class's own 1st job order later.
-// skill is the one a road maxes first (its picture, and what "never cast" checks); good says what kind of grind it suits.
-const PATHS = {
-  bandit: [
-    { id: 'l7reset', name: 'Lucky Seven then SP Reset', early: 'assassin', order1: BRANCHES.thief.skillOrder, reset: true, skill: 4001003,
-      how: 'Lucky Seven with a claw through 1st job, Savage Blow with a dagger once it overtakes, then an SP Reset Scroll.',
-      good: "Hitting from a distance with stars until 30, if you don't mind buying the scroll." },
-    { id: 'dstab', name: 'Double Stab all the way', skill: 4001002, how: 'Double Stab with a dagger now, then Savage Blow.',
-      good: 'Fighting up close the whole way, with nothing to buy.' }],
+// Community roads (2026-11-10): the roads the community's guides wrote down, per class, in the order a card list shows them. order2 is the
+// 2nd job order (M, B and F are a warrior's weapon type, as skillOrder writes them); reset says an SP Reset Scroll at that level puts every
+// 2nd job point back down reset.order2. early and order1 play the 1st job another way (a Bandit's claw), aim says what a guide saves.
+// The Discord guides have no link (a visitor can't open the server without joining), so they carry a place line only. A step that
+// raises a prerequisite (MP Eater 3 before Meditation, Mastery 5 before Booster) is written out so each order reads in game order.
+const WIKI = 'https://meowdb.com/msclassic/forum/guides/';
+const SP_GUIDE = { title: 'Cleric SP Guide', place: 'Pinned in the Classic World Discord' };
+const FAQ = { title: 'Bowman FAQ', link: 'https://docs.google.com/document/d/e/2PACX-1vTN014YxKEIWW93XAFKQHjbzFd6LRjYUfq49t9MPRiLrbZCYbiqXpkO8ZGPHRfj8shlf-kXTEiq2pM2/pub', place: 'The Bowman FAQ on Google Docs' };
+const NEOLAKIA = { by: 'Neolakia', title: 'Complete Warrior Progression Guide', link: WIKI + 'Neolakia/complete-warrior-1-30-progression-guide', place: "Neolakia's guide on meowdb" };
+const MRSHINY = { by: 'MrShiny', title: 'Bandit guide', link: 'https://shinybanditguide.pages.dev/', place: "MrShiny's guide site" };
+const QCHAOS = { by: 'Qchaos', title: 'wizard guide', place: "In the Classic World Discord's guide threads" };
+const ROADS = {
   cleric: [
-    { id: 'heal', name: 'Heal first', skill: 2301001, order2: [[2301001, 30], [2301004, 30], [2301002, 20], [2301003, 20], [2301000, 20]],
-      how: 'Max Heal, then Holy Arrow. Heal hits up to 5 undead at once.',
-      good: 'Groups of undead only, and the most EXP when you can pull 3 or more together.' },
-    { id: 'arrow', name: 'Holy Arrow first', skill: 2301004, how: 'Max Holy Arrow, then Heal.', good: 'Any monster one at a time, bosses like Mushmom too.' }],
-  // both run on to the 121 points a fresh 30 has by 70, so Next SP and the Points tab never run out of order
+    { id: 'teleport', name: 'Teleport first', guides: [SP_GUIDE], aim: 'hours',
+      order2: [[2300000, 1], [2301001, 1], [2301000, 20], [2301004, 30], [2301001, 30], [2301002, 20], [2301003, 20], [2300000, 20]] },
+    { id: 'heal', name: 'Heal first', guides: [SP_GUIDE], aim: 'hours',
+      order2: [[2300000, 1], [2301001, 30], [2301000, 20], [2301004, 30], [2301002, 20], [2301003, 20], [2300000, 20]] },
+    { id: 'arrow', name: 'Holy Arrow first', guides: [{ by: 'Rimmah', title: "Rimmah's road", place: 'From the Cleric who runs this site' }], aim: 'hours', from: "Rimmah's road",
+      order2: [[2300000, 1], [2301004, 30], [2301001, 5], [2301000, 20], [2301001, 30], [2301002, 20], [2301003, 20]] },
+    { id: 'meso', name: 'Meso saver', aim: 'mesos', note: "Aims to save mesos: Heal and MP Eater cut potions, which our numbers don't count.",
+      guides: [{ by: 'Grummash', title: 'Cleric Meso Management Guide', link: WIKI + 'Grummash/cleric-meso-management-guide', place: "Grummash's guide on meowdb" }],
+      order2: [[2300000, 1], [2301000, 1], [2301001, 5], [2301002, 5], [2301003, 1], [2300000, 10]],
+      reset: { at: 38, order2: [[2300000, 1], [2301000, 1], [2301001, 2], [2301004, 21], [2301001, 5], [2301002, 5], [2301003, 1], [2300000, 20], [2301001, 7],
+        [2301004, 30], [2301001, 15], [2301003, 20], [2301002, 20], [2301001, 30], [2301000, 20]] } }],
   ilwizard: [
-    { id: 'bolt', name: 'Bolt first', skill: 2201004,
-      order2: [[2201004, 1], [2201001, 1], [2201004, 30], [2200000, 3], [2201000, 20], [2201001, 20], [2201003, 30], [2200000, 20], [2201002, 1]],
-      how: 'Max Thunder Bolt, then MP Eater, Meditation and Teleport, then Cold Beam.', good: 'Packs of monsters close together.' },
-    { id: 'beam', name: 'Beam first', skill: 2201003,
-      order2: [[2201003, 1], [2201001, 1], [2201003, 30], [2201004, 30], [2200000, 3], [2201000, 20], [2201001, 20], [2200000, 20], [2201002, 1]],
-      how: 'Max Cold Beam, then Thunder Bolt.', good: 'One at a time, and ice weak monsters like Fire Boars hardest.' }],
+    { id: 'beam', name: 'Beam first', aim: 'hours', guides: [{ by: 'Polly', title: 'I/L build', link: 'https://meowdb.com/msclassic/character-builder/gNpM60Rowd', place: "Polly's build on meowdb" }],
+      order2: [[2201004, 1], [2201003, 30], [2201004, 30], [2200000, 3], [2201000, 20], [2201001, 20], [2200000, 20], [2201002, 1]] },
+    { id: 'qchaos', name: 'Beam, then Teleport', aim: 'hours', guides: [QCHAOS],
+      order2: [[2201001, 1], [2200000, 1], [2201003, 30], [2201001, 20], [2200000, 3], [2201000, 20], [2200000, 20], [2201004, 30], [2201002, 1]] }],
+  fpwizard: [
+    { id: 'qchaos', name: 'Fire Arrow, then Teleport', aim: 'hours', guides: [QCHAOS],
+      order2: [[2101001, 1], [2100000, 1], [2101003, 30], [2101001, 20], [2100000, 3], [2101000, 20], [2100000, 20], [2101004, 30], [2101002, 1]] }],
+  hunter: [
+    { id: 'bomb', name: 'Mastery, then Arrow Bomb', aim: 'hours',
+      guides: [FAQ, { by: 'Kiwi', title: "Simple Bowman's Guide", link: WIKI + 'Kiwi/simple-bowmans-guide', place: "Kiwi's guide on meowdb" }],
+      order2: [[3101004, 1], [3100000, 5], [3101001, 1], [3100000, 20], [3101001, 5], [3101003, 1], [3100001, 1], [3101004, 30], [3100001, 20], [3101003, 7],
+        [3101000, 30], [3101003, 11], [3101001, 10]] },
+    { id: 'judge', name: 'Mastery, then Judgement', aim: 'hours', guides: [{ by: 'Cyhlen', title: 'Hunter guide', place: "In the Classic World Discord's guide threads" }],
+      order2: [[3100000, 20], [3100001, 20], [3101000, 30], [3101001, 10], [3101003, 11], [3101004, 30]] }],
+  crossbowman: [
+    { id: 'iron', name: 'Mastery, then Iron Arrow', aim: 'hours', guides: [FAQ],
+      order2: [[3201004, 1], [3200000, 5], [3201001, 1], [3200000, 20], [3201001, 5], [3201003, 1], [3200001, 1], [3201004, 30], [3200001, 20], [3201003, 11],
+        [3201001, 10], [3201000, 30]] }],
+  fighter: [
+    { id: 'neolakia', name: 'Mastery, then Rush', aim: 'hours', guides: [NEOLAKIA],
+      order2: [['M', 5], ['B', 1], ['F', 1], ['M', 20], [1101004, 1], [1101005, 20], ['F', 30], [1101004, 30], ['B', 20]] }],
+  page: [
+    { id: 'neolakia', name: 'Mastery, then Rush', aim: 'hours', guides: [NEOLAKIA],
+      order2: [['M', 5], ['B', 1], ['F', 1], ['M', 20], [1201004, 1], [1201005, 20], ['F', 30], ['B', 20], [1201004, 30]] }],
+  spearman: [
+    { id: 'neolakia', name: 'Mastery, then Rush', aim: 'hours', guides: [NEOLAKIA],
+      order2: [['M', 5], ['B', 1], ['F', 1], ['M', 20], [1301005, 20], ['F', 30], ['B', 20], [1301004, 30]] }],
+  bandit: [
+    { id: 'sindit', name: 'Sindit', aim: 'hours', early: 'assassin', order1: BRANCHES.thief.skillOrder, note: "MrShiny's guide resets at 45 instead.",
+      guides: [{ by: 'RandomStylez', title: 'Sindit guide', link: 'https://docs.google.com/document/d/e/2PACX-1vR--dHIW3EhK8lQp-3sq7uJ175lh_CZbdk8vJ5gKoNC6uMflRYVenKvnYWcV5MGP9ueijcTairAnbUi/pub', place: "RandomStylez's guide on Google Docs" }, MRSHINY],
+      order2: [[4201001, 20], [4200001, 20]],
+      reset: { at: 42, order2: [[4201003, 21], [4200000, 15], [4201000, 1], [4201001, 1], [4200000, 20], [4201003, 30], [4201001, 20], [4200001, 20], [4201002, 30]] } },
+    { id: 'dstab', name: 'Double Stab', aim: 'hours',
+      guides: [{ by: 'Allog', title: 'Path of the Ruffian', link: WIKI + 'Allog/path-of-the-ruffian-guide-to-strength-bandit-8', place: "Allog's guide on meowdb" }, { ...MRSHINY, title: 'Purist build' }],
+      order2: [[4200000, 5], [4201000, 1], [4201001, 1], [4200000, 20], [4201003, 30], [4201001, 5], [4201002, 30], [4201001, 20], [4200001, 20]] }],
 };
+// The class's 2nd job skill ids; a warrior keeps only the mastery, booster and final attack of the held weapon type.
+function roadIds(clsId, slot) {
+  const cls = CLASSES[clsId], other = new Set();
+  if (cls.byType) for (const [t, ids] of Object.entries(cls.byType)) if (t !== cls.typeOf(slot)) ids.forEach(id => other.add(id));
+  return Object.keys(DATA.skills).map(Number).filter(id => DATA.skills[id].job === cls.job2 && DATA.skills[id].name && !other.has(id));
+}
+// What someone who followed the road holds after n 2nd job points from zero (the order after the reset once the level is at it).
+function roadState(road, clsId, n, level, slot) {
+  const cls = CLASSES[clsId], plan = {};
+  for (const id of roadIds(clsId, slot)) plan[id] = 0;
+  const o = road.reset && level >= road.reset.at ? road.reset.order2 : road.order2;
+  spend(cls.byType ? orderFor(cls, { order: o }, slot) : o, plan, n);
+  return plan;
+}
+// Which road a build is on: the typed 2nd job points against what each road holds after the same number of points. off is half
+// the sum of the differences (points in the wrong place), and a road fits when it's within max(2, n / 5) of the typed build.
+function recognize(raw, clsId, data) {
+  if (data) DATA = data;
+  const cls = CLASSES[clsId], roads = ROADS[clsId], lv = Number(raw.level);
+  if (!roads || !cls || lv >= NEXT_ADVANCE) return null;
+  const v = validateStats(raw, clsId);
+  const w = cls.family === 'phys' && DATA ? weaponOf(cls, lv, raw.weapon) : null;
+  const slot = w ? w.slot : cls.weaponSlot || (cls.weapons && cls.weapons[0]);
+  const ids = roadIds(clsId, slot), sk = v.stats.skills || {};
+  const typed = {};
+  for (const id of ids) typed[id] = Number(sk[id]) || 0;
+  const n = ids.reduce((t, id) => t + typed[id], 0);
+  const order = (cls.skills || []).concat(ids).filter((id, i, a) => ids.includes(id) && a.indexOf(id) === i);
+  const points = order.filter(id => typed[id] > 0).map(id => ({ id, n: typed[id] })).sort((a, b) => b.n - a.n);
+  const threshold = Math.max(2, Math.floor(n / 5));
+  const out = { kind: 'fresh', road: null, fits: [], off: {}, n, threshold, top: points.slice(0, 2).map(p => p.id), points };
+  if (v.levelOnly) return { ...out, kind: 'levelonly' };
+  if (n === 0) return out;
+  for (const r of roads) {
+    const st = roadState(r, clsId, n, lv, slot);
+    out.off[r.id] = ids.reduce((t, id) => t + Math.abs(typed[id] - (st[id] || 0)), 0) / 2;
+  }
+  out.fits = roads.map(r => r.id).filter(id => out.off[id] <= threshold)
+    .sort((a, b) => out.off[a] - out.off[b]);
+  const best = out.fits.filter(id => out.off[id] === out.off[out.fits[0]]);
+  out.kind = !out.fits.length ? 'own' : best.length === 1 ? 'on' : 'several';
+  if (out.kind === 'on') out.road = best[0];
+  // our own roads (Cleric and I/L only) join after the guide roads: on one only when the points fit it and sit strictly closer
+  // to it than to every guide road
+  const base = MODEL_ATTACKS[clsId] ? closestRoad(clsId, out.off) : null, gmin = base ? out.off[base.id] : 0, mine = [];
+  for (const m of base ? modelRoads(clsId, base) : []) {
+    const st = roadState(m, clsId, n, lv, slot);
+    out.off[m.id] = ids.reduce((t, id) => t + Math.abs(typed[id] - (st[id] || 0)), 0) / 2;
+    if (out.off[m.id] <= threshold && out.off[m.id] < gmin) mine.push(m.id);
+  }
+  if (mine.length) {
+    mine.sort((a, b) => out.off[a] - out.off[b]);
+    out.fits = mine.concat(out.fits); out.kind = 'on'; out.road = mine[0];
+  }
+  return out;
+}
+// The guide road with the fewest points off (the first listed on a tie), from a recognize off map.
+const closestRoad = (clsId, off) => ROADS[clsId].reduce((b, r) => off[r.id] < off[b.id] ? r : b);
+// Our own roads: the base road with one 2nd job attack's steps first among the attack steps (they keep their places in the
+// order, and that attack fills them first). Only the Cleric and I/L Wizard have two 2nd job attacks the model prices.
+const MODEL_ATTACKS = { cleric: [2301004, 2301001], ilwizard: [2201003, 2201004] };
+const modelId = a => a === 2201004 ? 'bolt' : 'ours-' + a;
+// "Clearly faster" means saving at least a tenth of the hours it is measured against, or 5 hours.
+const roadBar = h => Math.max(0.1 * h, 5);
+function modelRoads(clsId, base) {
+  const atks = MODEL_ATTACKS[clsId], out = [];
+  if (!atks || !base) return out;
+  const put = (order, a) => {
+    const fill = order.filter(x => x[0] === a).concat(order.filter(x => atks.includes(x[0]) && x[0] !== a));
+    let k = 0;
+    return order.map(x => atks.includes(x[0]) ? fill[k++] : x);
+  };
+  for (const a of atks) {
+    const order2 = put(base.order2, a), reset = base.reset ? { ...base.reset, order2: put(base.reset.order2, a) } : null;
+    // a 1 point attack step only unlocks the skill, so moving it isn't another order (Cold Beam first on Beam first is Beam first)
+    const key = o => JSON.stringify((o || []).filter(x => !atks.includes(x[0]) || x[1] > 1));
+    if (key(order2) === key(base.order2) && (!reset || key(reset.order2) === key(base.reset.order2))) continue;
+    const nm = SHORT[a] + ' first';
+    out.push({ ...base, id: modelId(a), name: ROADS[clsId].some(r => r.name === nm) ? nm + ', ours' : nm, model: true, guides: base.guides,
+      note: null, from: undefined, attack: a, order2, ...(reset ? { reset } : {}) });
+  }
+  return out;
+}
 // The Skill paths switch, "Monsters a Bolt really hits": the skill it's about and where it starts. A Wizard starts at 2 (most
 // casts don't hit 2 or more when monsters are spread out), a Cleric at 3 (Rimmah groups undead for Heal). Classes without
 // one run their roads uncapped.
@@ -131,10 +250,6 @@ const WEAPONS = {
 };
 // Weapon types whose multiplier a real stat window has matched (Claw: 808s and JPark; sword and polearm: Ohmohnah).
 const CHECKED_WEAPONS = new Set(['Claw', 'One-Handed Sword', 'Polearm']);
-// What a real build has confirmed for a class's Skill paths roads: the class, the level, and which number matched. Each one
-// is a fixture in tests/builds-logic.test.js (Rimmah's level 46 Cleric MAGIC is CLERIC there). A road says it by name;
-// without an entry it says Estimated.
-const CHECKED = [{ cls: 'cleric', level: 46, what: 'MAGIC' }];
 const windowMults = slot => { const w = WEAPONS[slot]; return w.shoot ? [w.shoot, w.shoot] : [Math.min(w.swing, w.stab), Math.max(w.swing, w.stab)]; };
 // The stat window's ATTACK range for a weapon type: S 1, floored like the game shows it.
 function windowRange({ W, P, sec, slot, M, ap = 0 }) {
@@ -223,9 +338,16 @@ function phaseOf(cls, lv) {
 }
 // The attack a build leads with: the phase's own, unless it has no points in 2nd job and another of the class's 2nd job
 // attacks does (a Bolt first Wizard: Thunder Bolt with no Cold Beam).
+// A 2nd job class with roads may have no points in any 2nd job attack (a Cleric on Teleport, Heal and Mastery): it fights with its 1st job attack.
+const ZERO_OK = clsId => ['cleric', 'fpwizard', 'ilwizard', 'bandit'].includes(clsId);
 function mainAttack(cls, P, skills) {
-  if (P.phase !== 2 || (skills[P.attack] || 0) >= 1 || !cls.attacks) return P.attack;
-  return cls.attacks.find(id => (skills[id] || 0) >= 1) || P.attack;
+  if (P.phase !== 2) return P.attack;
+  const own = cls.attacks || [P.attack], has = id => (skills[id] || 0) >= 1;
+  if (has(P.attack)) return P.attack;
+  const other = own.find(has);
+  if (other) return other;
+  // outside ZERO_OK a class's attack1 is its attack (phase 2's P.attack), so only a ZERO_OK class falls back to its 1st job attack
+  return cls.attack1 || P.attack;
 }
 // A physical class's skill order names its mastery, booster and final attack as 'M', 'B', 'F': the ids for its weapon type.
 function orderFor(cls, P, slot) {
@@ -248,7 +370,7 @@ function validateStats(raw, clsId) {
   const lv = Number(raw.level);
   if (blank(raw.level) || !Number.isInteger(lv) || lv < 1 || lv > 200) {
     errors.push('Type your level, a whole number from 1 to 200.');
-    return { stats, assumed, errors };
+    return { stats, assumed, errors, levelOnly: false };
   }
   stats.level = lv;
   const take = (k, dflt) => {
@@ -273,18 +395,21 @@ function validateStats(raw, clsId) {
     Object.assign(stats.skills, typicalSkills(cls, lv, w ? w.slot : cls.weaponSlot || cls.weapons[0]));
     assumed.push('skills');
   }
+  const zeroOk = !!cls && !noneTyped && P.phase === 2 && ZERO_OK(cls.id);
   if (cls && !noneTyped) {
     const ids = skillsFor(cls, lv);
     for (const id of ids) {
       const max = DATA && DATA.skills[id] ? DATA.skills[id].max : 30;
       // A blank attack skill: as high as the points spent in this job allow (3 a level), up to its max.
       const typical = Math.max(1, Math.min(max, 1 + 3 * (lv - (P.phase === 1 ? ADV1(cls.id) : ADVANCE))));
-      if (blank(sk[id])) { stats.skills[id] = id === P.attack ? (cls.skills && P.phase === 2 ? max : typical) : 0; if (id === P.attack) assumed.push('skills'); }
+      if (blank(sk[id])) { stats.skills[id] = zeroOk ? 0 : id === P.attack ? (cls.skills && P.phase === 2 ? max : typical) : 0; if (id === P.attack && !zeroOk) assumed.push('skills'); }
       else stats.skills[id] = Math.max(0, Math.min(max, Math.floor(Number(sk[id]) || 0)));
     }
     // a guide needs a point in an attack: the phase's own, or for I/L either 2nd job attack (Bolt first is a real build)
     const need = (P.phase === 2 && cls.attacks ? cls.attacks : [P.attack]).filter(id => ids.includes(id));
-    if (need.length && !need.some(id => stats.skills[id] >= 1))
+    if (DATA && zeroOk && !need.some(id => stats.skills[id] >= 1))
+      stats.skills = { ...firstJobSkills(cls, cls.weaponSlot || cls.weapons[0]), ...stats.skills };
+    if (!zeroOk && need.length && !need.some(id => stats.skills[id] >= 1))
       errors.push('Put at least 1 point in ' + need.map(id => DATA && DATA.skills[id] ? DATA.skills[id].name : 'your attack skill').join(' or ') + ' for a guide.');
   }
   if (cls && cls.family === 'spell') {
@@ -326,7 +451,7 @@ function validateStats(raw, clsId) {
     take('critDmg', () => 120 + num(c.crdX));
     if (!errors.length && stats.atkMax < stats.atkMin) errors.push('The attack range looks backwards.');
   }
-  return { stats, assumed, errors };
+  return { stats, assumed, errors, levelOnly: !!noneTyped };
 }
 // Main stat, secondary, mastery and attack power for a physical class holding a weapon type.
 function physShape(s, cls, slot) {
@@ -479,47 +604,58 @@ function tuneSeconds(s, cls, rows) {
 }
 /* ---------- Skill paths ---------- */
 
-// Classes with nothing to compare: their attack is the only one worth points (my call).
-const ONE_PATH = ['assassin'];
-// A class with a path's skill orders in place of its own.
-const pathClass = (cls, path) => ({ ...cls, ...(path.order1 ? { order1: path.order1 } : {}), ...(path.order2 ? { skillOrder: path.order2 } : {}) });
-// One road's levels: { level, t, cls, held, top, switched? }, where held is every ranking row within HOLD of the level's best
-// (none when nothing can be killed), each with the MP it would cost to gain that level there. Keeps the early class switch:
-// a road that plays 1st job as another class (Lucky Seven with a claw for a Bandit) stays on that class's 1st job attack
-// past 30, with only 1st job points, until the class's own attack overtakes it; from then on the class's own (the reset
-// has moved those points).
-function roadLevels(raw, clsId, path, levels, reach) {
+// A class with a road's skill orders in place of its own.
+const pathClass = (cls, path) => ({ ...cls, ...(path.order1 ? { order1: path.order1 } : {}), ...(path.order2 ? { skillOrder: path.order2 } : {}),
+  ...(path.reset ? { reset: path.reset } : {}), ...(path.early ? { early: path.early } : {}) });
+// A road's SP Reset ({ at, order2 }) on a class from pathClass, or null.
+const resetOf = cls => cls.reset && typeof cls.reset === 'object' ? cls.reset : null;
+// One road's levels: { level, t, cls, held, top, sig }, where held is every ranking row within HOLD of the level's best (none
+// when nothing can be killed), each with the MP it would cost to gain that level there, and sig is the road's 2nd job points at
+// that level (two roads that match at every level fold into one card). An early road (Sindit) plays its 1st job class (Lucky
+// Seven with a claw) below its reset, with only 1st job points past 30, and the class's own from the reset, which skillsAt plays.
+// A level only build has no points of its own, so each level holds what the road would hold by then (roadState). cache keeps
+// rankWith's rows for a class and stats seen already, since roads that spend the same way rank the same.
+function roadLevels(raw, clsId, road, levels, reach, levelOnly, cache) {
   const base = { level: raw.level, str: raw.str, dex: raw.dex, int: raw.int, luk: raw.luk, skills: { ...(raw.skills || {}) } };
   const opt = { reach, first: true };
   // MP to gain the level at a spot: groups to kill (the level's EXP over a group's) x casts a group x the skill's MP a cast
   const at = (lv, t, c) => {
-    const r = rankWith(t, c, DATA, ROAD_KILLS, undefined, opt), top = r.length ? r[0].pace : 0;
+    const key = c.id + '|' + JSON.stringify(t);
+    let r = cache && cache.get(key);
+    if (!r) { r = rankWith(t, c, DATA, ROAD_KILLS, undefined, opt); if (cache) cache.set(key, r); }
+    const top = r.length ? r[0].pace : 0;
     const held = r.filter(x => x.pace >= HOLD * top).map(x => ({ ...x,
       mp: EXP_TABLE[lv] * x.casts * num((level(DATA.skills[x.skill], t.skills[x.skill]) || {}).mpCon) / (x.hits * x.exp) }));
     return { level: lv, t, cls: c, held, top };
   };
-  const own = pathClass(CLASSES[clsId], path), s0 = validateStats(path.early ? base : raw, clsId).stats, ap0 = planAP(s0, own);
-  const mine = lv => at(lv, roadStats(s0, own, lv, ap0), own);
-  let early = null;
-  if (path.early) {
-    const ce = { ...CLASSES[path.early], order1: path.order1 }, se = validateStats(base, path.early).stats;
-    early = { cls: ce, s: se, ap: planAP(se, ce), skills29: skillsAt(se, ce, ADVANCE - 1, slotOf(se, ce)) };
+  const own = pathClass(CLASSES[clsId], road), s0 = validateStats(road.early ? base : raw, clsId).stats, ap0 = planAP(s0, own);
+  const slot = slotOf(s0, own), ids = roadIds(clsId, slot);
+  const sigOf = skills => ids.map(id => Number(skills[id]) || 0).join();
+  const hold = (lv, skills) => levelOnly && lv >= ADVANCE ? { ...skills, ...roadState(road, clsId, 1 + 3 * (lv - ADVANCE), lv, slot) } : skills;
+  let E = null;
+  if (road.early && road.reset) {
+    // the 1st job class with the road's 1st job order; from 30 a 2nd job form has no 1st job boxes, so the road's own 1st job at 29
+    const ce = { ...CLASSES[road.early], order1: road.order1 }, se = validateStats(base, road.early).stats;
+    E = { ce, se, ape: planAP(se, ce),
+      job1: s0.level < ADVANCE ? skillsAt(se, ce, ADVANCE - 1, slotOf(se, ce)) : firstJobSkills(ce, ce.weaponSlot || ce.weapons[0]) };
   }
-  // after the reset: the Lucky Seven points moved into the class's own 1st job (Double Stab 20 for a Bandit), as the reset
-  // line says. The road's how: Savage Blow with a dagger once it overtakes, then the scroll, so the reset counts from the
-  // level after the switch (Rimmah, 2026-11-08: without it, Double Stab in 2nd job tied the two roads)
-  const reset = lv => { const t = roadStats(s0, own, lv, ap0); t.skills = { ...t.skills, ...firstJobSkills(CLASSES[clsId], slotOf(s0, own)) }; return at(lv, t, own); };
-  let switched = false;
   return levels.map(lv => {
-    if (!early) return mine(lv);
-    if (switched) return reset(lv);
-    if (lv >= ADVANCE) {
-      const m = mine(lv), e = at(lv, { ...statsAt(early.s, early.cls, lv, early.ap), skills: early.skills29 }, early.cls);
-      if (m.top < e.top) return e;
-      switched = true;
-      return { ...m, switched: true };
+    let r;
+    if (E && lv < road.reset.at) {
+      const t = lv === E.se.level ? { ...E.se } : statsAt(E.se, E.ce, lv, E.ape);
+      r = at(lv, lv >= ADVANCE ? { ...t, skills: E.job1 } : t, E.ce);
+      r.sig = sigOf(hold(lv, skillsAt(s0, own, lv, slot)));
+    } else {
+      const t = roadStats(s0, own, lv, ap0);
+      if (levelOnly && lv >= ADVANCE) {
+        const before = t.skills;
+        t.skills = hold(lv, t.skills);
+        if (own.family === 'spell') t.magic += indieMagic(t.skills) - indieMagic(before);
+      }
+      r = at(lv, t, own);
+      r.sig = sigOf(t.skills);
     }
-    return at(lv, lv === early.s.level ? early.s : statsAt(early.s, early.cls, lv, early.ap), early.cls);
+    return r;
   });
 }
 // A road's levels folded into stops: from the current level, the held spot (monster and skill) that stays held for the
@@ -545,94 +681,144 @@ function foldStops(runs) {
   }
   return { stops, gap, hours, mp };
 }
-// Every road for the class side by side, or null when it has none. opts.reach is the switch (monsters a cast, 1 to 4, else
-// the class's start). Hours are grinding hours to the target at the default clock. Kept for the last few forms and switch
-// values: the guide reruns on every keystroke, and roads are the slow part.
+// Every road for the class as cards, or null when it has none. opts.reach is the switch (monsters a cast, 1 to 4, else the
+// class's start), opts.pick the road the player picked (pressing a card's head), opts.full the full pass. Hours are grinding hours to the
+// target at the default clock. Kept for the last few forms and switch values: the guide reruns on every keystroke, and roads
+// are the slow part. The first pass times the guide roads; the full pass starts from it and adds our own roads and the SP
+// Reset line.
 const pathMemo = new Map();
+const setups = new WeakMap();
 function comparePaths(raw, clsId, data, opts) {
   if (data) DATA = data;
-  const R = REACH[clsId], want = opts && opts.reach;
+  const R = REACH[clsId], want = opts && opts.reach, full = !!(opts && opts.full), pick = opts && opts.pick;
   const reach = R ? (Number.isInteger(want) && want >= 1 && want <= 4 ? want : R.start) : null;
   const key = clsId + JSON.stringify(raw) + '|' + reach;
-  if (!pathMemo.has(key)) { pathMemo.set(key, comparePathsNow(raw, clsId, reach)); if (pathMemo.size > 20) pathMemo.delete(pathMemo.keys().next().value); }
-  // the player's pick (Go this way) goes on a copy, so the memo stays the same for every pick; a pick for a road that
-  // doesn't show (the Lucky Seven road after 30, or a fork already taken) falls back to the faster road
-  const cp = pathMemo.get(key), pick = opts && opts.pick;
+  const memo = (k, make) => {
+    if (!pathMemo.has(k)) { pathMemo.set(k, make()); if (pathMemo.size > 20) pathMemo.delete(pathMemo.keys().next().value); }
+    return pathMemo.get(k);
+  };
+  // our own roads wait for the full pass, unless the player is on one or picked one: Next SP reads the first pass, so the
+  // road it follows has to be the same in both
+  const mids = (MODEL_ATTACKS[clsId] || []).map(modelId), rc0 = raw && typeof raw === 'object' ? recognize(raw, clsId) : null;
+  const early = !!(rc0 && (mids.includes(rc0.road) || mids.includes(pick)));
+  const first = memo(key + '|first', () => comparePathsNow(raw, clsId, reach));
+  const withM = () => memo(key + '|models', () => first && withModels(first));
+  const cp = full ? memo(key + '|full', () => first && { ...withM(), full: true, ...resetCands(withM(), first) }) : early ? withM() : first;
   if (!cp) return null;
-  const picked = cp.paths.some(x => x.id === pick) ? pick : null;
-  return { ...cp, picked, best: picked || cp.fastest };
+  // the pick goes on a copy, so the memo stays the same for every pick. A pick that doesn't show (a road gone from the
+  // table) falls back quietly; a pick folded into another card follows that card.
+  const rc = cp.recog, holds = (c, id) => c.id === id || c.same.some(x => x.id === id);
+  const pc = pick ? cp.cards.find(c => holds(c, pick)) || null : null;
+  const offOf = c => Math.min(...[c.id, ...c.same.map(x => x.id)].map(id => rc && rc.off[id] != null ? rc.off[id] : Infinity));
+  const follow = pc || (rc && rc.kind === 'levelonly' ? cp.cards[0] : null) || (rc && rc.road && cp.cards.find(c => holds(c, rc.road)))
+    || cp.cards.filter(c => !c.model).reduce((b, c) => offOf(c) < offOf(b) ? c : b);
+  return { ...cp, resetLine: full ? pickReset(cp, roadBar) : null, picked: pc ? pick : null, followed: follow.id };
 }
-// What a road's numbers rest on: what a real build of the class confirmed (CHECKED), else Estimated, then Heal's damage
-// on a road that maxes Heal or stops on it (Heal's estimate picks which spots a Heal first road holds even when Holy Arrow
-// wins every stop), then the weapon types no stat window has checked yet.
-function roadCheck(clsId, road) {
-  const cls = CLASSES[clsId], mine = CHECKED.filter(c => c.cls === clsId);
-  const unchecked = cls.family === 'phys' ? cls.weapons.filter(w => !CHECKED_WEAPONS.has(w)) : [];
-  const notes = [road.skill === HEAL || road.stops.some(s => s.skill === HEAL) ? "Heal's damage is an estimate until it's checked against a real hit." : '',
-    unchecked.length ? unchecked.join(' and ') + " damage comes from meowdb's table and hasn't been checked against a real stat window yet." : ''].filter(Boolean);
-  // with nothing checked and no note to follow, Estimated says what it means
-  const head = mine.length ? mine.map(c => c.what + ' checked on a real level ' + c.level + ' ' + cls.name + '.').join(' ')
-    : notes.length ? 'Estimated.' : "Estimated. Nothing's been checked on a real " + cls.name + ' yet.';
-  return [head, ...notes].join(' ');
+// The SP Reset line's candidates, timed once in the full pass: every road on a shown card (folded ones too) that the points are
+// not on, as a build with that road's points laid over the player's own stats at their level, to the same target as the cards.
+// Never for a fresh or level only build. pickReset applies a bar to them, so a different bar doesn't time anything again.
+function resetCands(cp, first) {
+  const st = setups.get(first), rc = cp.recog, out = [];
+  if (!st || !rc || rc.kind === 'fresh' || rc.kind === 'levelonly') return { resetCands: out };
+  const have = [...ROADS[st.clsId], ...modelRoads(st.clsId, closestRoad(st.clsId, rc.off))];
+  for (const c of cp.cards) for (const id of [c.id, ...c.same.map(x => x.id)]) {
+    const road = have.find(r => r.id === id);
+    if (road && rc.off[id] > rc.threshold && !out.some(o => o.road === id)) out.push({ road: id, name: road.name, hours: st.time(road) });
+  }
+  return { resetCands: out };
 }
-// The verdict: which road is faster and by how much, in hours and in Lemons, then that either way works. scale puts the
-// hours on the player's own clock (g.sec / STEP_SEC), as the tiles under it are; Lemons don't depend on the clock.
-function verdict(out, fast, taken, target, scale = 1) {
-  if (taken) return "This fork is behind you, so there's one road from here.";
-  if (!isFinite(fast.hours)) return 'Neither road has a monster to beat at every level to ' + target + ' yet.';
-  const rest = out.filter(x => x !== fast);
-  if (rest.every(x => !isFinite(x.hours))) return fast.name + ' is the only road with a monster to beat at every level to ' + target + '.';
-  const other = rest.reduce((b, x) => x.hours < b.hours ? x : b), gap = (other.hours - fast.hours) * scale;
-  // the hours the tiles show apart: each tile rounds its own road (58 and 60 say 2, not the 2.5 gap rounded to 3)
-  const h = Math.round(other.hours * scale) - Math.round(fast.hours * scale), soon = h >= 2 ? 'about ' + h + ' hours sooner' : h === 1 ? 'about an hour sooner' : 'a little sooner';
-  const L = DATA.lemon, d = L && fast.lemons !== null && other.lemons !== null ? fast.lemons - other.lemons : null;
-  const mana = d === null ? '' : Math.abs(d) < 0.05 * Math.max(fast.lemons, other.lemons) ? ', for about the same Lemons'
-    : d > 0 ? ', for about ' + money(d) + ' more Lemons (' + money(d * L.price) + ' mesos)'
-    : ' and saves about ' + money(-d) + ' Lemons (' + money(-d * L.price) + ' mesos)';
-  return fast.name + (gap > 0.05 ? ' gets you to ' + target + ' ' + soon : ' is just as quick to ' + target) + mana +
-    (fast.needsReset ? ', but needs an SP Reset Scroll from the Cash Shop' : '') + ". Either way works, so it's up to you.";
+// The biggest saver among the candidates when it beats the fastest shown card by the bar, else null.
+function pickReset(cp, bar) {
+  const hrs = cp.cards.map(c => c.hours).filter(isFinite);
+  if (!hrs.length || !cp.resetCands) return null;
+  const best = Math.min(...hrs);
+  const top = cp.resetCands.filter(o => isFinite(o.hours)).reduce((b, o) => !b || o.hours < b.hours ? o : b, null);
+  const saves = top ? Math.round((best - top.hours) * 10) / 10 : 0;
+  return top && saves >= bar(best) ? { road: top.road, name: top.name, hours: top.hours, saves } : null;
+}
+// Where a player's reset onto a road would land: null, or { road, name, hours, saves }. opts.reach is the switch, opts.bar the
+// bar to beat (the full pass's own is roadBar).
+function resetLine(raw, clsId, data, opts) {
+  const cp = comparePaths(raw, clsId, data, { reach: opts && opts.reach, full: true });
+  return cp ? pickReset(cp, (opts && opts.bar) || roadBar) : null;
 }
 function comparePathsNow(raw, clsId, reach) {
-  const lv0 = Number(raw && raw.level);
-  // a path that plays 1st job as another class only makes sense while still in 1st job
-  const paths = PATHS[clsId] && PATHS[clsId].filter(x => !x.early || lv0 < ADVANCE);
+  const lv0 = Number(raw && raw.level), roads = ROADS[clsId];
   // from 70 there are no 2nd job points left to plan (the roads would read 0 hours to 70)
-  if (!paths || !CLASSES[clsId] || !(lv0 >= 1) || lv0 >= NEXT_ADVANCE) return null;
-  const target = roadTarget(lv0), levels = Array.from({ length: Math.max(0, target - lv0) }, (_, i) => lv0 + i);
-  const L = DATA.lemon, sigs = [];
-  const out = paths.map(path => {
-    const runs = roadLevels(raw, clsId, path, levels, reach), { stops, gap, hours, mp } = foldStops(runs);
-    // every level's skills, to tell a fork already taken (both roads spend every point the same way)
-    sigs.push(runs.map(r => JSON.stringify(r.t.skills)).join('|'));
-    const sw = path.reset ? runs.find(r => r.switched) : null;
-    let reset = null;
-    if (sw) {
-      const r29 = runs.find(r => r.level === ADVANCE - 1), l7 = ((r29 && r29.t.skills) || {})[CLASSES[path.early].attack1] || 0;
-      reset = { level: sw.level, text: 'Use an SP Reset Scroll, then put your ' + l7 + ' ' + DATA.skills[CLASSES[path.early].attack1].name +
-        ' points into ' + DATA.skills[CLASSES[clsId].attack1].name + ' and the rest of your 1st job skills' };
-    }
-    const sizes = runs.map(r => r.held.length), lemons = gap || !L ? null : Math.round(mp / L.mp);
-    return { id: path.id, name: path.name, how: path.how, good: path.good, skill: path.skill,
-      hours: gap ? Infinity : Math.round(hours * 10) / 10, lemons, mesos: lemons === null ? null : lemons * L.price,
-      needsReset: !!sw, resetAt: sw ? sw.level : null, reset, stops, spots: sizes.length ? [Math.min(...sizes), Math.max(...sizes)] : [0, 0],
-      neverCast: stops.length > 0 && !stops.some(s => s.skill === path.skill) };
-  });
-  // Faster is the fewest hours; a road that needs the Cash Shop scroll has to win by half an hour or more. A fork already
-  // taken (one road shows, or every road spends every point the same way) shows just the faster road.
-  const cost = x => x.hours + (x.needsReset ? 0.5 : 0), taken = out.length === 1 || sigs.every(s => s === sigs[0]);
-  // a taken fork's roads tie, so the one shown is the road the player went down: its skill has the most points now
-  const had = x => Number((raw.skills || {})[x.skill]) || 0;
-  const fast = taken ? out.reduce((b, x) => had(x) > had(b) ? x : b) : out.reduce((b, x) => cost(x) < cost(b) ? x : b);
-  const shown = taken ? [fast] : out;
-  for (const x of shown) x.check = roadCheck(clsId, x);
-  // why is on the default clock; whyAt(scale) on the player's, for the page
-  const why = verdict(out, fast, taken, target), whyAt = scale => verdict(out, fast, taken, target, scale);
-  // what rests on formulas nobody has checked against the game yet
-  const uses = new Set(out.flatMap(x => x.stops.map(s => s.skill))), cls = CLASSES[clsId];
-  const unchecked = cls.family === 'phys' ? cls.weapons.filter(w => !CHECKED_WEAPONS.has(w)) : [];
-  const estimated = [uses.has(HEAL) ? "Heal's damage is an estimate until it's checked against a real hit." : '',
-    unchecked.length ? unchecked.join(' and ') + " damage comes from meowdb's table and hasn't been checked against a real stat window yet." : ''].filter(Boolean).join(' ');
-  return { target, reach, reachSkill: REACH[clsId] ? REACH[clsId].skill : null, paths: shown, fastest: fast.id, taken, why, whyAt, estimated };
+  if (!roads || !CLASSES[clsId] || !(lv0 >= 1) || lv0 >= NEXT_ADVANCE) return null;
+  const cls = CLASSES[clsId], target = roadTarget(lv0), levels = Array.from({ length: Math.max(0, target - lv0) }, (_, i) => lv0 + i);
+  const L = DATA.lemon, recog = recognize(raw, clsId), v = validateStats(raw, clsId), cache = new Map();
+  const levelOnly = !!v.levelOnly, slot = slotOf(v.stats, cls);
+  const run = road => {
+    const runs = roadLevels(raw, clsId, road, levels, reach, levelOnly, cache), { stops, gap, hours, mp } = foldStops(runs);
+    const lemons = gap || !L ? null : Math.round(mp / L.mp);
+    // the road's next two skills: a level only build has the road's own points by now
+    const sN = levelOnly && lv0 >= ADVANCE ? { ...v.stats, skills: { ...v.stats.skills, ...roadState(road, clsId, 1 + 3 * (lv0 - ADVANCE), lv0, slot) } } : v.stats;
+    const next = [];
+    for (const x of planSkills(sN, pathClass(cls, road)).steps)
+      if (x.id && x.target > 1 && next.length < 2 && !next.some(n => n.id === x.id)) next.push({ id: x.id, target: x.target });
+    return { sig: runs.map(r => r.sig).join('|'), card: { id: road.id, name: road.name, guides: road.guides || [], note: road.note || null,
+      aim: road.aim, model: false, hours: gap ? Infinity : Math.round(hours * 10) / 10, lemons, mesos: lemons === null ? null : lemons * L.price,
+      stops, next, same: [], resetAt: road.reset && lv0 < road.reset.at ? road.reset.at : null,
+      off: recog && recog.off[road.id] != null ? recog.off[road.id] : null } };
+  };
+  const made = roads.map(run);
+  // the road the points are on first, then the table's order; a later road that spends every point the same way at every
+  // level from here folds into the first card that does
+  const on = recog && recog.kind === 'on' ? made.find(m => m.card.id === recog.road) : null;
+  const cards = [], sigs = [];
+  for (const m of on ? [on, ...made.filter(x => x !== on)] : made) {
+    const i = sigs.indexOf(m.sig);
+    if (i >= 0) cards[i].same.push({ id: m.card.id, name: m.card.name });
+    else { cards.push(m.card); sigs.push(m.sig); }
+  }
+  const res = { target, reach, reachSkill: REACH[clsId] ? REACH[clsId].skill : null, recog, cards, full: false, resetLine: null };
+  // hours to the target if the player reset onto a road now: its points laid over their own skills at their level
+  const time = road => {
+    const rawX = { ...raw, skills: { ...(raw.skills || {}), ...roadState(road, clsId, recog.n, lv0, slot) } };
+    const { gap, hours } = foldStops(roadLevels(rawX, clsId, road, levels, reach, false, cache));
+    return gap ? Infinity : Math.round(hours * 10) / 10;
+  };
+  setups.set(res, { run, sigs, clsId, time });
+  return res;
+}
+// The pass with our own roads in: each shows when its hours beat the fastest guide card's by the bar, or when the player is on
+// it (first in the cards then); a copy that spends every point like a shown card is dropped, or folds into it when it's the
+// road the points are on (and that card goes first). They come after the guide cards.
+function withModels(cp) {
+  const st = setups.get(cp), rc = cp.recog;
+  if (!st || !MODEL_ATTACKS[st.clsId] || !rc || rc.kind === 'levelonly') return { ...cp };
+  // sigs stays in step with cards: a sig is kept only for a card that is shown
+  const cards = cp.cards.map(c => ({ ...c, same: [...c.same] })), sigs = [...st.sigs];
+  const hrs = cards.map(c => c.hours).filter(isFinite), fastest = hrs.length ? Math.min(...hrs) : null;
+  for (const m of modelRoads(st.clsId, closestRoad(st.clsId, rc.off))) {
+    const { sig, card } = st.run(m), on = rc.road === m.id, beat = fastest !== null && card.hours <= fastest - roadBar(fastest), i = sigs.indexOf(sig);
+    if (i >= 0) { if (on) { cards[i].same.push({ id: m.id, name: m.name }); cards.unshift(...cards.splice(i, 1)); sigs.unshift(...sigs.splice(i, 1)); } continue; }
+    if (!on && !beat) continue;
+    const g = (m.guides || [])[0] || {};
+    card.model = true; card.beat = beat;
+    card.credit = 'Not from a guide. ' + (g.by ? g.by + "'s order" : 'the ' + g.title + "'s order") + ' with ' + SHORT[m.attack] + ' maxed first' + (beat ? '; faster on our numbers' : '') + '.';
+    if (on) { cards.unshift(card); sigs.unshift(sig); } else { cards.push(card); sigs.push(sig); }
+  }
+  return { ...cp, cards };
+}
+// The Overview's line about roads: which one the points are on and the next skill on it (or on the road it follows).
+function roadLine(cp) {
+  const rc = cp.recog, find = id => cp.cards.find(c => c.id === id || c.same.some(x => x.id === id));
+  const nameOf = id => { const c = find(id); return !c ? '' : c.id === id ? c.name : c.same.find(x => x.id === id).name; };
+  const skill = c => c && c.next[0] && DATA.skills[c.next[0].id] ? DATA.skills[c.next[0].id].name : null;
+  if (rc && rc.kind === 'levelonly') return "Put in your skill points to see which road you're on.";
+  if (rc && rc.kind === 'on') {
+    // a pick of another card says whose next skill it is, so the line never names one Next SP doesn't follow
+    const on = find(rc.road), f = find(cp.followed), away = !!cp.picked && !!f && f !== on, c = away ? f : on;
+    return "Looks like you're on " + nameOf(rc.road) + '.' + (skill(c) ? (away ? ' Next on ' + c.name + ': ' : ' Next: ') + skill(c) + '.' : '');
+  }
+  if (rc && rc.kind === 'several') {
+    const c = find(rc.fits[0]);
+    return 'So far your points fit several roads.' + (skill(c) ? ' Next on ' + nameOf(rc.fits[0]) + ': ' + skill(c) + '.' : '');
+  }
+  const c = find(cp.followed);
+  return (rc && rc.kind === 'own' ? 'Your own road so far.' : 'Every road starts here.') + (skill(c) ? ' Next on ' + c.name + ': ' + skill(c) + '.' : '');
 }
 
 // The Overview's where to train: a Cleric with Heal gets its best Heal spot and its best Holy Arrow spot, anyone else the
@@ -688,15 +874,27 @@ function avgCast(s, cls, d) {
 }
 const gainPct = (s, cls, d) => Math.round((avgCast(s, cls, d) / avgCast(s, cls) - 1) * 10000) / 100;
 
-// 3 SP a level until the next job advancement, spent down the phase's skill order (prerequisites first).
+// 3 SP a level until the next job advancement, spent down the phase's skill order (prerequisites first). A road with an SP
+// Reset Scroll plays its own order to the level before the reset, then puts every 2nd job point back down reset.order2 from zero:
+// 1 + 3 * (at - 30) points at the reset level, then 3 a level (that row has no id).
 function planSkills(s, cls) {
-  const P = phaseOf(cls, s.level), order = orderFor(cls, P, slotOf(s, cls));
-  const ids = skillsFor(cls, s.level).filter(id => DATA.skills[id] && DATA.skills[id].job === P.job);
+  let P = phaseOf(cls, s.level);
+  const R = P.phase === 2 ? resetOf(cls) : null, slot = slotOf(s, cls), before = R && s.level < R.at, steps = [];
+  if (R && !before) P = { ...P, order: R.order2 };
+  const order = orderFor(cls, P, slot), ids = skillsFor(cls, s.level).filter(id => DATA.skills[id] && DATA.skills[id].job === P.job);
   const now = {}, plan = {};
   for (const id of ids) now[id] = plan[id] = s.skills[id] || 0;
-  const atLevel = i => s.level + 1 + Math.floor(i / 3), steps = [];
-  const spare = spend(order, plan, 3 * (P.until - s.level), (id, from, add) => steps.push({ from: atLevel(from), to: atLevel(from + add - 1), id,
-    target: plan[id], text: DATA.skills[id].name + ' to ' + plan[id] + ' (' + add + (add === 1 ? ' point)' : ' points)') }));
+  const atLevel = i => s.level + 1 + Math.floor(i / 3), add = (lvl, id, n) => ({ from: lvl.from, to: lvl.to, id, target: plan[id],
+    text: DATA.skills[id].name + ' to ' + plan[id] + ' (' + n + (n === 1 ? ' point)' : ' points)') });
+  let spare = spend(order, plan, 3 * ((before ? R.at - 1 : P.until) - s.level), (id, from, n) => steps.push(add({ from: atLevel(from), to: atLevel(from + n - 1) }, id, n)));
+  if (before) {
+    steps.push({ kind: 'sp', from: R.at, to: R.at, id: null, target: null,
+      text: 'SP Reset Scroll at ' + R.at + ": your 2nd job points come back and go down this road's next order" });
+    for (const id of ids) plan[id] = 0;
+    const first = 1 + 3 * (R.at - 30), lvlOf = i => i < first ? R.at : R.at + 1 + Math.floor((i - first) / 3);
+    spare = spend(orderFor(cls, { ...P, order: R.order2 }, slot), plan, first + 3 * (P.until - R.at),
+      (id, from, n) => steps.push(add({ from: lvlOf(from), to: lvlOf(from + n - 1) }, id, n)));
+  }
   return { now, plan, steps, spare, until: P.until };
 }
 // Spends points down a skill order into plan (only the ids it holds), prerequisites first; onAdd(id, pointsUsedBefore, added).
@@ -917,7 +1115,7 @@ function planNext(s, cls, P, skills, W) {
       text: up.name + ' (' + (up.inc[key] || 0) + ' ' + STAT_NAME[key] + ')' + (needs ? ', it needs ' + needs : '') + '.' });
   }
   if (P.phase === 1) out.push({ kind: 'job', level: ADVANCE, text: '2nd job advancement: talk to ' + P.branch.npc + ' and become a ' + cls.name + '.' });
-  const step = skills.steps[0];
+  const step = skills.steps.find(x => x.id);
   if (step) out.push({ kind: 'skill', level: step.from, text: 'Start ' + step.text + '.' });
   return out.sort((a, b) => a.level - b.level);
 }
@@ -932,12 +1130,16 @@ function buildGuide(raw, clsId, data, roads) {
   const v = validateStats(raw, clsId);
   if (v.errors.length) return { ok: false, errors: v.errors };
   const s = v.stats, P = phaseOf(cls, s.level), am = attackModel(s, cls), sum = am.range[0] + am.range[1];
-  const paths = comparePaths(raw, clsId, undefined, roads), bestPath = paths && PATHS[clsId].find(x => x.id === paths.best);
-  // the followed road's orders (the player's pick, else the faster one) drive Next SP and the Points tab
-  const planCls = bestPath ? pathClass(cls, bestPath) : cls;
-  // a path within the class (Heal first) also drives the forecast; one that plays 1st job as another class doesn't
-  const gear = planGear(s, cls), skills = planSkills(s, planCls), slot = slotOf(s, cls), rank = rankWith(s, cls, data), ap = planAP(s, cls), spot = spotModel(s, cls, rank);
-  const stages = forecast(s, bestPath && !bestPath.early ? planCls : cls, ap);
+  const paths = comparePaths(raw, clsId, undefined, roads);
+  const followed = paths && (ROADS[clsId].find(x => x.id === paths.followed) || modelRoads(clsId, closestRoad(clsId, paths.recog.off)).find(x => x.id === paths.followed));
+  // the followed road's orders (the player's pick, else the road the points are on, else the closest) drive Next SP, the
+  // Points tab and the forecast (an early road's too, since skillsAt plays its reset)
+  const planCls = followed ? pathClass(cls, followed) : cls;
+  // a level only build has no points of its own, so the plan starts from what the followed road holds by now (as its card does)
+  const sp = v.levelOnly && followed && s.level >= ADVANCE ? { ...s, skills: { ...s.skills, ...roadState(followed, clsId, 1 + 3 * (s.level - ADVANCE), s.level, slotOf(s, cls)) } } : s;
+  if (sp !== s && cls.family === 'spell') sp.magic += indieMagic(sp.skills) - indieMagic(s.skills);
+  const gear = planGear(s, cls), skills = planSkills(sp, planCls), slot = slotOf(s, cls), rank = rankWith(s, cls, data), ap = planAP(s, cls), spot = spotModel(s, cls, rank);
+  const stages = forecast(sp, planCls, ap);
   const held = cls.family === 'phys' && DATA.gear.find(x => x.id === s.weapon);
   const weapon = physical(cls) ? { id: held ? held.id : null, slot, name: held ? held.name : null, wat: held ? held.inc.wat || 0 : null, W: am.W } : null;
   for (const r of rank) r.expHour = expHour(r.pace);
@@ -1018,17 +1220,38 @@ function bestGearAt(cls, slot, lv) {
   return DATA.gear.filter(g => g.slot === slot && fits(g, cls) && g.level <= lv).reduce((b, g) => !b || (g.inc[key] || 0) > (b.inc[key] || 0) ? g : b, null);
 }
 // Skills at a later level for someone who follows the guide: the 1st job's order to 29, then 1 point at 30 and 3 a level.
+// A road with an SP Reset: its own order to the level before the reset, then every 2nd job point back down reset.order2 from zero
+// (an early road, Lucky Seven with a claw, also puts its 1st job attack back and lays the class's own 1st job over it).
 function skillsAt(s, cls, lv, slot) {
   const out = { ...s.skills };
-  const run = (P, points) => {
+  // lead: the leading point goes to the attack the build leads with (Thunder Bolt for a Bolt first Wizard, not Cold Beam);
+  // a reset road writes its order out in full, so it leads with nothing
+  const run = (P, points, lead = true) => {
     const plan = {};
     for (const id of Object.keys(DATA.skills).map(Number)) if (DATA.skills[id].job === P.job) plan[id] = out[id] || 0;
     if (P.attack !== undefined && plan[P.attack] === undefined) plan[P.attack] = out[P.attack] || 0;
-    // the leading point goes to the attack the build leads with (Thunder Bolt for a Bolt first Wizard, not Cold Beam)
-    spend([[mainAttack(cls, P, out), 1]].concat(orderFor(cls, P, slot)), plan, points);
+    spend((lead ? [[mainAttack(cls, P, out), 1]] : []).concat(orderFor(cls, P, slot)), plan, points);
     Object.assign(out, plan);
   };
-  const P0 = phaseOf(cls, s.level);
+  const P0 = phaseOf(cls, s.level), R = resetOf(cls);
+  if (R) {
+    const P2 = phaseOf(cls, Math.max(lv, ADVANCE)), after = { ...P2, order: R.order2 };
+    if (P0.phase === 2 && s.level >= R.at) run(after, 3 * (lv - s.level), false);
+    else {
+      // before the reset: the road's own order, 1st job to 29 (when still under 30) then 2nd job
+      const to = Math.min(lv, R.at - 1);
+      if (P0.phase === 1) {
+        run(P0, 3 * (Math.min(to, ADVANCE - 1) - s.level), false);
+        if (to >= ADVANCE) run(P2, 1 + 3 * (to - ADVANCE), false);
+      } else run(P0, 3 * (to - s.level), false);
+      if (lv >= R.at) {
+        for (const id of Object.keys(DATA.skills).map(Number)) if (DATA.skills[id].job === P2.job) out[id] = 0;
+        if (cls.early) { out[CLASSES[cls.early].attack1] = 0; Object.assign(out, firstJobSkills(CLASSES[cls.id], slot)); }
+        run(after, 1 + 3 * (lv - 30), false);
+      }
+    }
+    return out;
+  }
   if (P0.phase === 2) run(P0, 3 * (lv - s.level));
   else {
     run(P0, 3 * (Math.min(lv, ADVANCE - 1) - s.level));
@@ -1127,7 +1350,6 @@ function pointsPlan(g) {
   const events = [
     ...g.ap.map(a => ({ kind: 'ap', from: a.from, to: a.to, now: a.now, text: a.put, note: a.wear ? 'so you can wear a ' + a.wear.name + ' at ' + a.wear.level + ' (needs ' + a.wear.need + ')' : 'your main stat' })),
     ...g.skills.steps.map(st => ({ kind: 'sp', from: st.from, to: st.to, text: st.text })),
-    ...(g.paths ? [g.paths.paths.find(x => x.id === g.paths.best).reset].filter(Boolean).map(r => ({ kind: 'sp', from: r.level, to: r.level, text: r.text })) : []),
     ...g.next.filter(n => n.kind !== 'skill').map(n => ({ kind: n.kind === 'gear' ? 'up' : 'job', from: n.level, to: n.level, text: n.kind === 'gear' ? 'Equip ' + n.name : n.text })),
   ].sort((a, b) => a.from - b.from || order[a.kind] - order[b.kind]);
   const marks = [...g.ap.filter(a => a.wear).map(a => a.wear.level), ...g.next.filter(n => n.kind !== 'skill').map(n => n.level)].filter(x => x > lv);
@@ -1164,7 +1386,7 @@ function loadForm() {
   } catch { /* nothing saved yet */ }
 }
 // The Skill paths switch and pick, per class on the device (bt.roads): { reach: { cls: n }, pick: { cls: roadId } }.
-// Broken or odd values are left to comparePaths, which falls back to the class's start and the faster road.
+// Broken or odd values are left to comparePaths, which falls back to the class's start and the road the points are on.
 function loadRoads() {
   ui.roads = { reach: {}, pick: {} };
   try {
@@ -1347,7 +1569,7 @@ function renderBig(g, cls) {
 function overviewTiles(g, cls) {
   const a = g.ap[0], wear = g.ap.find(r => r.wear);
   const apSub = !a ? 'each level' : a.wear ? 'for a ' + a.wear.name + ' at ' + a.wear.level : wear ? wear.put.split(',')[0] + ' at ' + wear.from + ', for a ' + wear.wear.name : 'your main stat';
-  const st = g.skills.steps[0], sk = g.skills;
+  const st = g.skills.steps.find(x => x.id), sk = g.skills;
   const up = g.next.find(n => n.kind === 'gear') || g.next.find(n => n.kind === 'job');
   const upSub = !up ? '' : up.kind === 'job' ? up.text : [up.gain > 0 ? '+' + up.gain + ' ' + up.stat : '', up.needs ? 'needs ' + up.needs : ''].filter(Boolean).join(', ');
   const c = bestScroll(g.scrolls), t = c && (c.deal || c.show);
@@ -1377,12 +1599,11 @@ function renderOverview(g, cls) {
     E('div', { class: 'num b-hr' }, perHour(expHour(x.row.pace, g.sec))));
   const st = g.stages, end = st.length ? st[st.length - 1].to : g.stats.level, hrs = Math.round(g.stageHours * g.sec / STEP_SEC);
   const stageText = st.map(x => x.picks[0].name + ' with ' + (sk(x.picks[0].skill) || 'your attack') + (x.from === x.to ? ' at ' + x.from : ' from ' + x.from + ' to ' + x.to)).join(', then ');
-  const best = g.paths && g.paths.paths.find(x => x.id === g.paths.best);
 
   const levelsBlock = E('div', { class: 'b-block' }, sec(end > g.stats.level ? 'Your next ' + (end - g.stats.level) + ' levels' : 'From here'),
     E('p', {}, stageText + '.' + (end > g.stats.level ? ' About ' + Math.max(1, hrs) + ' hours of grinding to ' + end + '.' : '')), go('train', 'The stages on the Train tab'));
   // replaceChildren writes a null as the text "null", so a class without paths leaves this block out
-  const pathsBlock = best ? E('div', { class: 'b-block' }, sec('Skill paths'), E('p', {}, g.paths.whyAt(g.sec / STEP_SEC), g.paths.estimated ? E('span', { class: 'small' }, ' ' + g.paths.estimated) : null), go('paths', 'Compare them on the Skill paths tab')) : null;
+  const pathsBlock = g.paths ? E('div', { class: 'b-block' }, sec('Skill paths'), E('p', {}, roadLine(g.paths)), go('paths', 'Compare them on the Skill paths tab')) : null;
   const trainBlock = E('div', { class: 'b-block' }, sec('Where to train'), ...(rows.length ? rows.map(row) : [E('p', { class: 'small' }, 'Nothing you can kill yet.')]), go('train', 'More spots on the Train tab'));
 
   const plan = g.questPlan, fromOpen = plan && plan.open[0], qrow = plan && (fromOpen || plan.soon[0]);
@@ -1616,35 +1837,108 @@ function renderPanels(g) {
 }
 
 // The Where you stand sentences: where more attack starts helping, where it tops out, or that nothing moves this spot.
-// Skill paths, Two roads: the verdict on top, the switch for how many monsters a multi target skill really hits, then each
-// road side by side (hours and Lemons, where you'd grind, am I stuck, what it's good for, what was checked). A class without
-// roads shows its one plan.
+// Skill paths on the guide roads (Community roads, 2026-11-10): a sign saying which road the points look like, the switch for
+// how many monsters a multi target skill really hits, then the roads two across (the followed one tagged and outlined when
+// there's more than one, its head
+// the button that follows it), one reset line when a reset clearly pays, and the foot. A class without roads shows its one
+// plan. The first pass draws at once; the full pass is asked for after it and redraws.
 const SHORT = { 2201004: 'Bolt', 2201003: 'Beam', 2001003: 'Magic Claw', 2301001: 'Heal', 2301004: 'Holy Arrow' };
 const shortName = id => SHORT[id] || (ui.data.skills[id] ? ui.data.skills[id].name : '');
-// Am I stuck on this road: the moves over the levels shown, how many spots stay close to the best, and a main skill never cast.
-function stuckText(x, lv0, target) {
-  if (!x.stops.length) return "There's no monster to beat at every level yet.";
-  const moves = x.stops.length - 1, [lo, hi] = x.spots, uses = {};
-  for (const s of x.stops) uses[s.skill] = (uses[s.skill] || 0) + 1;
-  const most = Object.keys(uses).sort((a, b) => uses[b] - uses[a])[0];
-  return [lo >= 2 ? 'No.' : 'At times.',
-    moves === 0 ? "You'd stay on one spot from " + lv0 + ' to ' + target + '.' : "You'd move " + (moves === 1 ? 'once' : moves + ' times') + ' from ' + lv0 + ' to ' + target + '.',
-    (lo === hi ? lo : lo + ' to ' + hi) + (hi === 1 ? ' spot stays' : ' spots stay') + ' close to the best at each level.',
-    x.neverCast ? "You'd never cast " + shortName(x.skill) + ' here; ' + ui.data.skills[most].name + ' stays your best.' : ''].filter(Boolean).join(' ');
+// "Three roads": the count in words up to six, digits past that
+const COUNT_WORDS = ['One', 'Two', 'Three', 'Four', 'Five', 'Six'];
+const roadsWord = n => (COUNT_WORDS[n - 1] || String(n)) + (n === 1 ? ' road' : ' roads');
+// "A", "A and B", "A, B and C"
+const andJoin = list => list.length < 2 ? list.join('') : list.slice(0, -1).join(', ') + ' and ' + list[list.length - 1];
+// a guide's place mid sentence: its first letter lowered, unless it starts with someone's name ("MrShiny's guide site")
+const lowerPlace = s => /^\S+'s\b/.test(s) ? s : s.charAt(0).toLowerCase() + s.slice(1);
+// who a guide road comes from: its own from line, else the guides' authors, else the guides by title
+// ("from RandomStylez's and MrShiny's guides", "from the Cleric SP Guide", "from the Bowman FAQ and Kiwi's guide")
+function roadFrom(road) {
+  if (road.from) return 'from ' + road.from;
+  const gs = road.guides || [];
+  if (!gs.length) return '';
+  if (gs.every(x => x.by)) return 'from ' + andJoin(gs.map(x => x.by + "'s")) + (gs.length > 1 ? ' guides' : ' guide');
+  return 'from ' + andJoin(gs.map(x => x.by ? x.by + "'s guide" : 'the ' + x.title));
 }
+// A card's credit, one part per guide joined with " and ": a guide by its author and title ("Grummash's Cleric Meso Management
+// Guide", the author left out when the title starts with it), linked when it has a link, else followed by its place ("Cleric SP
+// Guide, pinned in the Classic World Discord", "Qchaos's wizard guide, in the Classic World Discord's guide threads"); our own
+// model road keeps the credit comparePaths wrote. same is one sentence naming every road folded into this one.
+function creditOf(card) {
+  const folded = card.same.map(s => s.name);
+  const same = folded.length ? 'Same as the ' + andJoin(folded) + (folded.length > 1 ? ' roads' : ' road') + ' from here.' : '';
+  if (card.model) return { parts: [{ text: card.credit }], same };
+  const parts = (card.guides || []).map(x => {
+    const text = x.by && !x.title.startsWith(x.by) ? x.by + "'s " + x.title : x.title;
+    return x.link ? { text, link: x.link } : { text: text + (x.place ? ', ' + lowerPlace(x.place) : '') };
+  });
+  return { parts, same };
+}
+// a list of { text, link? } as text and links that open in a new tab, joined with " and "
+const linkParts = parts => parts.flatMap((x, i) => [i ? ' and ' : null,
+  x.link ? E('a', { href: x.link, target: '_blank', rel: 'noopener' }, x.text) : x.text]).filter(Boolean);
+// The sign at the top of Skill paths, the six cases of the spec: on a guide road, on our model road, an own road, fits several,
+// fresh (no 2nd job points) and level only (no skills typed). under is the line under the big one, as text and links (a guide's
+// place links to the guide when it has one); points is the "Your points" line, or null.
+function signOf(cp, clsId, level) {
+  const rc = cp.recog || { kind: 'fresh', points: [] }, sk = id => ui.data.skills[id] ? ui.data.skills[id].name : '';
+  const guide = id => (ROADS[clsId] || []).find(r => r.id === id);
+  const nameOf = id => {
+    const r = guide(id), c = cp.cards.find(x => x.id === id || x.same.some(s => s.id === id)), m = /^ours-(\d+)$/.exec(id);
+    return r ? r.name : c ? (c.id === id ? c.name : c.same.find(s => s.id === id).name) : id === 'bolt' ? 'Bolt first' : m ? shortName(+m[1]) + ' first' : '';
+  };
+  const have = (rc.points || []).filter(p => sk(p.id)), points = have.length ? 'Your points: ' + have.map(p => sk(p.id) + ' ' + p.n).join(', ') + '.' : null;
+  if (rc.kind === 'on') {
+    const r = guide(rc.road);
+    const places = r ? (r.guides || []).filter(x => x.place) : [];
+    if (r) return { small: "Looks like you're on", big: r.name + ', ' + roadFrom(r), points,
+      under: places.length ? [...linkParts(places.map((x, i) => ({ text: i ? lowerPlace(x.place) : x.place, link: x.link }))), '.'] : [] };
+    return { small: "Looks like you're on", big: nameOf(rc.road).replace(/, ours$/, '') + ', our own road', under: ['Not from a guide; our numbers found it.'], points };
+  }
+  if (rc.kind === 'own') {
+    const top = (rc.top || []).map(sk).filter(Boolean);
+    return { small: 'Your own road so far', big: top.length ? andJoin(top) + ' first' : 'Your own road', points,
+      under: ['No guide we know goes this way. ' + (cp.cards.length === 1 ? 'This road still works from here.' : 'These roads still work from here.')] };
+  }
+  if (rc.kind === 'several') return { small: 'So far your points fit', big: andJoin(rc.fits.map(nameOf).filter(Boolean)), under: ['Your next points decide which.'], points };
+  if (rc.kind === 'levelonly') return { small: 'Which road are you on?', big: 'Put in your skill points', under: ["Until then, each road below runs as if you'd followed it from 30."], points: null };
+  // counts: the big line already counts the roads, so the "Three roads from here" label under it would say it twice
+  return { small: 'Every road starts here', big: roadsWord(cp.cards.length) + ' from ' + Math.max(ADVANCE, level), under: ['Tap one to follow it in Next SP and Points.'], points: null, counts: true };
+}
+// What each class's roads spend points on that the numbers give no worth to (the spec's Non-goals), named in the foot, so a
+// Fighter never reads Teleport; a class missing here has none and its foot leaves the sentence out
+const UNPRICED = { cleric: 'Teleport and MP Eater', ilwizard: 'Teleport and MP Eater', fpwizard: 'Teleport and MP Eater', bandit: 'Haste and Dagger Booster' };
+for (const c of ['fighter', 'page', 'spearman', 'hunter', 'crossbowman']) UNPRICED[c] = 'the booster and Final Attack';
 function renderPaths(g, cls) {
   const box = ui.root.querySelector('#paths'), name = id => ui.data.skills[id] ? ui.data.skills[id].name : '';
+  // every draw drops an older draw's full pass, roads or not, so a class switched right after a Cleric draw keeps its own box
+  ui.pathsPass = null;
   if (!g.paths) {
     const P = phaseOf(cls, g.stats.level), order = orderFor(cls, P, slotOf(g.stats, cls)).filter(([id]) => name(id));
     box.replaceChildren(E('h4', { class: 'b-sec' }, 'Your plan'),
       E('p', {}, order.map(([id, n]) => name(id) + ' to ' + Math.min(n, ui.data.skills[id].max)).join(', then ') + '.'),
-      E('p', { class: 'small' }, ONE_PATH.includes(cls.id) ? 'This is the one way to go for ' + plural(cls.name) + ': its attack is the only one worth points.'
-        : PATHS[cls.id] && g.stats.level >= NEXT_ADVANCE ? 'Skill paths compare ways to spend 2nd job points, up to level 70.' : 'Comparisons for this class are coming.'));
+      E('p', { class: 'small' }, cls.id === 'assassin' ? 'This is the one way to go for ' + plural(cls.name) + ': its attack is the only one worth points.'
+        : ROADS[cls.id] && g.stats.level >= NEXT_ADVANCE ? 'Skill paths compare ways to spend 2nd job points, up to level 70.' : 'Comparisons for this class are coming.'));
     return;
   }
-  const P = g.paths, lv0 = g.stats.level, scale = g.sec / STEP_SEC, L = ui.data.lemon;
-  // the switch: only while the fork is still ahead and a road's main skill hits several monsters
-  const reach = P.reachSkill && !P.taken ? E('div', { class: 'b-reach' },
+  const P = g.paths, rc = P.recog, scale = g.sec / STEP_SEC, L = ui.data.lemon;
+  // the full pass, after the first one is on screen, on the form and roads this draw had (the first pass's memo key and the g
+  // it draws over), never on whatever the form holds when the timer fires; a newer draw drops an older one's
+  if (!P.full) {
+    const token = ui.pathsPass = {}, raw = rawStats(), roads = roadsFor(cls.id);
+    setTimeout(() => {
+      if (ui.pathsPass !== token) return;
+      const F = comparePaths(raw, cls.id, ui.data, { ...roads, full: true });
+      if (F) { g.paths = F; renderPaths(g, cls); }
+    }, 0);
+  }
+  // the sign: which road the points look like
+  const S = signOf(P, cls.id, g.stats.level);
+  const sign = E('div', { class: 'b-sign k-card' }, E('div', { class: 'small b-sign-small' }, S.small), E('div', { class: 'b-sign-big' }, S.big),
+    E('p', { class: 'small' }, E('span', { class: 'b-sign-under' }, S.under), S.points ? [' ', E('span', { class: 'b-sign-points' }, S.points)] : null));
+  // the switch: only for a class whose main skill hits several monsters, and only while there's more than one road to weigh,
+  // or while it's off its start, so a setting that left one road can always be set back
+  const reach = P.reachSkill && (P.cards.length > 1 || P.reach !== REACH[cls.id].start) ? E('div', { class: 'b-reach' },
     E('span', { class: 'b-rlab' }, 'Monsters a ' + shortName(P.reachSkill) + ' really hits'),
     E('span', { class: 'b-rbtns' }, [1, 2, 3, 4].map(n => E('button', { type: 'button', class: 'k-btn sm', 'data-reach': String(n), 'aria-pressed': String(n === P.reach),
       onclick: () => setRoad('reach', cls.id, n) }, String(n)))),
@@ -1656,27 +1950,37 @@ function renderPaths(g, cls) {
         // the place after the region never breaks inside ("Line 2 <Area 1>"), so a long map wraps after its region
         E('div', { class: 'small' }, 'Level ' + range(s.from, s.to) + ', ', ...(i => i < 0 ? [s.map] : [s.map.slice(0, i) + ': ', E('span', { class: 'b-place' }, s.map.slice(i + 3))])(s.map.indexOf(' : ')))),
       E('div', { class: 'num b-hr' }, range(money(expHour(s.paces[0], g.sec)), money(expHour(s.paces[s.paces.length - 1], g.sec)))));
-    return E('div', { class: 'b-road', 'data-road': x.id },
-      E('div', { class: 'b-rhead' }, skillPic(x.skill),
-        E('div', {}, E('div', { class: 'b-rname' }, E('b', {}, x.name), !P.taken && x.id === P.fastest ? E('span', { class: 'k-tag b-faster' }, 'Faster') : null),
-          E('div', { class: 'small' }, x.how)),
-        P.taken ? null : E('button', { type: 'button', class: 'k-btn sm b-goroad', 'aria-pressed': String(x.id === P.best), onclick: () => setRoad('pick', cls.id, x.id) }, 'Go this way')),
-      // the body under the head: the roads share the head's row, so their bodies start level
-      E('div', { class: 'b-rbody' },
+    // a lone card has nothing to pick between, so it goes without the tag and the outline (its head still says it's followed)
+    const followed = x.id === P.followed && P.cards.length > 1, cr = creditOf(x), note = [x.note, cr.same].filter(Boolean).join(' ');
+    const nx = x.next.filter(n => name(n.id));
+    const next = nx.length ? 'Next for you: ' + name(nx[0].id) + ' to ' + nx[0].target + (nx[1] ? ', then ' + name(nx[1].id) : '') + '.' : '';
+    // the tag says so when the followed road is the guide road the points are on
+    const onGuide = rc && rc.kind === 'on' && (ROADS[cls.id] || []).some(r => r.id === rc.road) && (x.id === rc.road || x.same.some(s => s.id === rc.road));
+    // five rows shared across a row of roads (tag, head, credit, tiles, stops), so names and tiles line up
+    return E('div', { class: 'b-road' + (followed ? ' followed' : ''), 'data-road': x.id },
+      followed ? E('span', { class: 'k-tag y b-rtag' }, onGuide ? "The guide's next step" : 'Following') : null,
+      E('button', { type: 'button', class: 'b-rhead', 'aria-pressed': String(x.id === P.followed), onclick: () => setRoad('pick', cls.id, x.id) },
+        skillPic(nx[0] ? nx[0].id : x.stops[0] && x.stops[0].skill),
+        E('span', { class: 'b-rtext' }, E('span', { class: 'b-rname' }, x.name), next ? E('span', { class: 'small b-rnext' }, next) : null)),
+      E('div', { class: 'b-rabout' }, E('p', { class: 'small b-credit' }, linkParts(cr.parts)),
+        note ? E('p', { class: 'small b-rnote' }, note) : null,
+        x.resetAt ? E('p', { class: 'small b-rreset' }, 'This road uses an SP Reset Scroll at ' + x.resetAt + ', as the guide does.') : null),
       E('div', { class: 'b-rtiles' },
         E('div', { class: 'b-rtile k-card' }, E('div', { class: 'k' }, 'Hours to ' + P.target), E('div', { class: 'v' }, hours)),
         x.lemons === null ? null : E('div', { class: 'b-rtile k-card lemon' }, E('div', { class: 'k' }, 'Lemons to ' + P.target + ', ' + money(x.mesos) + ' mesos'),
           E('div', { class: 'v' }, itemPic(L.id), money(x.lemons)))),
       x.stops.length ? E('div', { class: 'b-grind' }, E('div', { class: 'b-rgh small' }, E('span', {}, "Where you'd grind"), E('span', {}, 'EXP an hour')),
-        E('div', { class: 'k-rows' }, x.stops.map(stop))) : null,
-      E('div', { class: 'b-stuck k-card' }, E('b', {}, 'Stuck?'), E('p', {}, stuckText(x, lv0, P.target)), E('p', {}, E('b', {}, 'Good for: '), x.good)),
-      E('p', { class: 'small b-check' }, x.check)));
+        E('div', { class: 'k-rows' }, x.stops.map(stop))) : null);
   };
-  box.replaceChildren(E('h4', { class: 'b-sec' }, 'Ways to spend your skill points'), E('div', { class: 'b-verdict k-card' }, P.whyAt(scale)),
-    ...(reach ? [reach] : []), E('div', { class: 'b-roads' }, P.paths.map(road)),
-    E('p', { class: 'small b-foot' }, "Model numbers, starting from the points you have now and the guide's 1st job skills. A stop lasts until its monster falls more than 15% behind the best spot. " +
-      'Hours run optimistic (about 138K an hour predicted against 84K and 101K on two real Cleric runs), but Lemons came within 10% of those runs. ' +
-      "MP Eater and Teleport aren't counted, and a Lemon is " + L.mp + ' MP for ' + L.price + ' mesos. ' + tuneText(g.tune)));
+  // one reset line at most, and only when it saves at least an hour on the clock the tiles use
+  const RL = P.resetLine, saved = RL ? Math.round(RL.saves * scale) : 0;
+  const resetBox = saved >= 1 ? E('p', { class: 'small b-resetline' }, 'An SP Reset Scroll onto ' + RL.name + ' could get you to ' + P.target
+    + (saved === 1 ? ' about an hour sooner.' : ' about ' + saved + ' hours sooner.')) : null;
+  const leave = UNPRICED[cls.id] ? ' They leave out what ' + UNPRICED[cls.id] + ' are worth, so roads that take those early do better than shown.' : '';
+  const foot = (g.tune && g.tune.why === 'tuned' ? "Estimates from the game's numbers. " + tuneText(g.tune)
+    : "Estimates from the game's numbers, at a typical pace until a saved Grind run tunes them to yours.") + leave;
+  box.replaceChildren(...[sign, reach, S.counts ? null : E('p', { class: 'small b-roadlabel' }, roadsWord(P.cards.length) + ' from here'),
+    E('div', { class: 'b-roads' }, P.cards.map(road)), resetBox, E('p', { class: 'small b-foot' }, foot)].filter(Boolean));
   loadMobPics(); loadSkillPics(); loadPics();
 }
 
@@ -1934,7 +2238,7 @@ function renderGuide() {
   if (!g.ok) {
     // no guide yet (a beginner, no level, a number turned down): the window stays up with just the two tabs that still work, the stat
     // table to fix a box where it is and My builds to load a saved one
-    ui.limited = true; out.hidden = false;
+    ui.limited = true; out.hidden = false; ui.pathsPass = null;
     ui.root.querySelector('#b-big').replaceChildren();
     for (const [id] of TABS) if (id !== 'mybuilds') panelBox(id).replaceChildren();
     for (const [id] of TABS) ui.root.querySelector('[data-tab="' + id + '"]').hidden = id !== 'points' && id !== 'mybuilds';
@@ -2370,7 +2674,7 @@ function mount(root, deps) {
   // builds as windows of their own when open
   root.replaceChildren(E('div', { class: 'k-col b-col' },
     E('section', { id: 'b-char', class: 'k-win b-win' },
-      E('div', { class: 'k-bar k-grass' }, E('h2', { id: 'b-name' }), E('small', { id: 'b-branch' }),
+      E('div', { class: 'k-bar' }, E('h2', { id: 'b-name' }), E('small', { id: 'b-branch' }),
         E('button', { id: 'b-chgclass', type: 'button', class: 'b-chg', 'aria-controls': 'b-picker', 'aria-expanded': String(pickOpen), onclick: () => toggle('b-picker') }, 'Change class'),
         E('span', { class: 'push b-lv' }, E('span', { class: 'b-lvl' }, 'Level'),
           step('b-lvdown', 'Level down', -1, minus()),
@@ -2389,7 +2693,7 @@ function mount(root, deps) {
         E('p', { id: 'b-msg' }))),
     E('div', { id: 'b-guide', hidden: '' },
       E('section', { id: 'b-guidewin', class: 'k-win b-win' },
-        E('div', { class: 'k-bar k-grass' }, E('div', { class: 'b-dtabs', role: 'tablist' }, TABS.map(([id, name]) =>
+        E('div', { class: 'k-bar' }, E('div', { class: 'b-dtabs', role: 'tablist' }, TABS.map(([id, name]) =>
           E('button', { type: 'button', role: 'tab', 'data-tab': id, 'aria-controls': id, onclick: () => showTab(id) }, name)))),
         E('div', { class: 'k-pad b-gpad' },
           TABS.map(([id]) => E('section', { id, class: 'b-dpanel', role: 'tabpanel' },
@@ -2421,7 +2725,7 @@ function mount(root, deps) {
 }
 const estimatedNote = () => E('p', { id: 'b-estimated', class: 'k-foot b-badge', hidden: '' }, E('b', {}, 'Estimated. '), "Damage for this weapon comes from meowdb's table and hasn't been checked against a real stat window yet.");
 
-window.Builds = { comparePaths, PATHS, CHECKED, REACH, HOLD, ROAD_KILLS, roadTarget, mainAttack, crowdHits, rankWith, attackModel, statsAt, planAP, pathClass, firstJobSkills, indieMagic, roadStats, tuneSeconds, EXP_TABLE, STEP_SEC, expHour, hoursTo, healRange, HEAL, standingText, KILL_GAP, CLASSES, BRANCHES, branchOf, weaponsFor, mastery, physRange, spellRange, weaponAttackFromMax, WEAPONS, CHECKED_WEAPONS, windowRange, levelScale, hitChance, defend, elemMult, makeRng, castsToKill,
+window.Builds = { planSkills, skillsAt, comparePaths, resetLine, roadBar, modelRoads, MODEL_ATTACKS, roadLine, ROADS, roadIds, roadState, recognize, ZERO_OK, REACH, HOLD, ROAD_KILLS, roadTarget, mainAttack, crowdHits, rankWith, attackModel, statsAt, planAP, pathClass, firstJobSkills, indieMagic, roadStats, tuneSeconds, EXP_TABLE, STEP_SEC, expHour, hoursTo, healRange, HEAL, standingText, KILL_GAP, CLASSES, BRANCHES, branchOf, weaponsFor, mastery, physRange, spellRange, weaponAttackFromMax, WEAPONS, CHECKED_WEAPONS, windowRange, levelScale, hitChance, defend, elemMult, makeRng, castsToKill,
   validateStats, rankMobs, buildGuide, pointsPlan, mount, fill, refresh, shrinkImage, take, classOf,
   dropGroups, findItems, droppers, meowMap, wearers, kindOf, gainRange, trusted, bestScroll, money, plural, mobFit };
 })();

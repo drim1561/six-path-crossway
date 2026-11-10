@@ -342,7 +342,7 @@ body.appraiser-off #tab-appraiser .soon::after { right: 5px; }
 .b-sec { margin: var(--gap) 0 4px; font: 400 var(--tt-s) var(--font-title); color: var(--ink); }
 .b-sec:first-child { margin-top: 0; }
 .b-foot { margin: var(--gap) 0 0; color: var(--muted); font: 600 var(--fs-xs) var(--font-body); line-height: 1.4; }
-.b-foot a, .b-scard a, .b-srow a, .b-qrow a, .b-nowt a { color: var(--focus); text-decoration: underline dotted; }
+.b-foot a, .b-scard a, .b-srow a, .b-qrow a, .b-nowt a, .b-sign a, .b-road a { color: var(--focus); text-decoration: underline dotted; }
 .b-go { display: inline-block; margin: 10px 0 0; font-weight: 700; }
 .b-ovgo { display: flex; flex-wrap: wrap; gap: 4px 16px; }
 /* a panel stacked as blocks (Scrolls and Quests, and now Overview): even gaps, no doubled margin on its own foot */
@@ -417,20 +417,33 @@ body.appraiser-off #tab-appraiser .soon::after { right: 5px; }
 .b-icon { flex: none; width: 38px; height: 38px; background-repeat: no-repeat; image-rendering: pixelated; }
 .b-slot { font: 400 var(--tt-s) var(--font-title); }
 /* Skill paths, Points, Gear and Scrolls */
-/* Skill paths, Two roads: the switch, then two roads side by side, each a column of head, tiles, stops, Stuck? and its check */
+/* Skill paths, Community roads: the sign, the switch, then the roads two across */
+.b-sign { display: flex; flex-direction: column; gap: 2px; }
+.b-sign p { margin: 0; }
+.b-sign-big { font: 400 var(--tt-m)/1.2 var(--font-title); }
 .b-reach { display: flex; flex-wrap: wrap; align-items: center; gap: 8px var(--gap); }
 .b-rlab { font: 700 var(--fs-md) var(--font-body); }
 .b-rbtns { display: inline-flex; gap: 6px; }
 .b-rbtns .k-btn { min-width: 40px; }
-.b-reach .k-btn[aria-pressed="true"], .b-goroad[aria-pressed="true"] { --face: var(--accent); --face-hi: var(--key-hi); --face-lo: var(--key-lo); color: var(--key-ink); }
+.b-reach .k-btn[aria-pressed="true"] { --face: var(--accent); --face-hi: var(--key-hi); --face-lo: var(--key-lo); color: var(--key-ink); }
 .b-roads { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(440px, 100%), 1fr)); gap: var(--gap); }
-/* the roads share two rows (subgrid): a head and a body, so names and tiles line up and the spare room sits under the shorter description */
-.b-road { display: grid; grid-row: span 2; grid-template-rows: subgrid; gap: var(--gap); min-width: 0; }
-.b-rbody { display: flex; flex-direction: column; gap: var(--gap); min-width: 0; }
-.b-rhead { display: flex; align-items: flex-start; gap: var(--gap); }
-.b-rhead > div { flex: 1 1 auto; min-width: 0; }
-.b-rname { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
-.b-rname > b { font: 400 var(--tt-m) var(--font-title); }
+/* each road spans five rows it shares with the road beside it (subgrid): tag, head, credit, tiles, stops, so names and tiles line
+   up. The rows inside a road have no gap of their own; each piece brings its margin, so a row of roads with no tag has no hole */
+.b-road { display: grid; grid-row: span 5; grid-template-rows: subgrid; gap: 0; min-width: 0; border: 2px solid var(--card-o); padding: var(--gap); }
+.b-road.followed { outline: 3px solid var(--accent); outline-offset: 2px; }
+.b-rtag { grid-row: 1; justify-self: start; margin-bottom: 6px; }
+/* the head is the button that follows the road */
+.b-rhead { grid-row: 2; display: flex; align-items: flex-start; gap: var(--gap); width: 100%; margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.b-rhead:hover .b-rname { text-decoration: underline dotted; }
+.b-rhead:focus-visible { outline-offset: 4px; }
+.b-rtext { flex: 1 1 auto; min-width: 0; }
+.b-rname { display: block; font: 400 var(--tt-m)/1.2 var(--font-title); color: var(--ink); }
+.b-rnext { display: block; margin-top: 2px; }
+.b-rabout { grid-row: 3; display: flex; flex-direction: column; gap: 4px; margin-top: var(--gap); }
+.b-rabout p { margin: 0; }
+.b-road > .b-rtiles { grid-row: 4; margin-top: var(--gap); }
+.b-road > .b-grind { grid-row: 5; margin-top: var(--gap); }
+.b-resetline { border: 2px dashed var(--accent); padding: 8px 12px; }
 .b-rtiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gap); }
 .b-place { white-space: nowrap; }
 .b-rtile { min-width: 0; }
@@ -440,8 +453,6 @@ body.appraiser-off #tab-appraiser .soon::after { right: 5px; }
 /* the Lemon sits beside the number without its ring */
 .b-rtile .k-ring { width: auto; height: auto; background: none; }
 .b-rgh { display: flex; justify-content: space-between; gap: var(--gap); padding: 0 4px; font-weight: 700; }
-.b-stuck > p { margin: 4px 0 0; }
-.b-check { margin: 0; color: var(--muted); }
 .b-gear { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(210px, 100%), 1fr)); gap: var(--gap); }
 .b-item { margin: 2px 0 4px; }
 .b-craft { color: var(--good); font: 700 var(--fs-sm) var(--font-body); }
@@ -1790,7 +1801,7 @@ const CONFIG = {
   reportUrl: 'https://sixpathcrossway.pages.dev/api/report',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-10c',
+  version: '2026-11-10d',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };

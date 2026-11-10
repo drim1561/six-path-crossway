@@ -116,6 +116,9 @@ const GROUND_H = 96, GROUND_ROOM = 27, MOB_MAX_H = 110;
 // where the walkers stand, in percent of the columns' width: the centers of the columns under them (the stage itself runs 12px past
 // the columns on each side, edge to edge, so a spot is moved in by that much). Each paces left of its spot
 const WALK_SPOTS = { 1: [50], 2: [25, 75], 3: [16.67, 50, 83.33] };
+// no map known yet (Rimmah, 2026-11-09): a Pig and a Ribbon Pig walk past a few Lemons lying still on the ground, like drops,
+// in percent of the stage's width
+const NO_MAP_MOBS = [8, 10], LEMON_SPOTS = [9, 37, 58, 90];
 
 // build({ el, band, tools, lamp, mapPick, classPick, steps, lines, pics, mobName }): a Window. Its title bar holds the label (Now
 // grinding or This map), the map's pick and the lantern; under it the numbers line (band, grind.js draws it), the button row
@@ -123,7 +126,8 @@ const WALK_SPOTS = { 1: [50], 2: [25, 75], 3: [16.67, 50, 83.33] };
 // stage with a column under each monster (its head and its own drops), and at the foot the other monsters, the credit and the
 // class pick. pics = { item(id) }, a data URL or null.
 // update(state), state = { fold, nums, sharing, session, label, mobs (the map's monsters, most numerous first: { id, name, level,
-// exp, undead, count }), mobIds, D, sprites, L, cls, level }: fold is a saved run being open (the title bar and the button row
+// exp, undead, count }), mobIds, D, sprites, L, cls, level, noMap, lemon }: noMap is no map known yet (the stage gets the Pigs and
+// lemon's picture, and no columns or foot), fold is a saved run being open (the title bar and the button row
 // only), nums whether the numbers line has anything to say, session whether one exists; each part keeps what it last drew and
 // draws again only when that changes, so a frame restarts no walker.
 function build({ el, band, tools, lamp, mapPick, classPick, steps, lines, pics, mobName }) {
@@ -136,7 +140,7 @@ function build({ el, band, tools, lamp, mapPick, classPick, steps, lines, pics, 
   const notes = el('div', { class: 'g-nnotes' });
   const foot = el('div', { class: 'k-foot g-nowfoot', hidden: '' }, notes, classPick);
   const card = el('section', { class: 'k-win g-nowcard', id: 'g-nowcard' },
-    el('div', { class: 'k-bar k-grass' }, label, mapPick, el('span', { class: 'push' }, lamp)),
+    el('div', { class: 'k-bar' }, label, mapPick, el('span', { class: 'push' }, lamp)),
     el('div', { class: 'k-pad g-nowpad' }, nums, tools, steps, ...(lines || []), deep, foot),
     el('span', { class: 'g-orn g-shroom', 'aria-hidden': 'true' }));
 
@@ -177,6 +181,9 @@ function build({ el, band, tools, lamp, mapPick, classPick, steps, lines, pics, 
     }));
   }
 
+  // the Lemons on the ground with no map known: after the walkers, so their nth-child paces hold (a walker's z-index keeps it in front)
+  const dropLemons = src => { if (src) stage.append(...LEMON_SPOTS.map(p => el('span', { class: 'g-lemon', style: 'left:' + p + '%' }, el('img', { src, alt: '' })))); };
+
   // the columns and the foot's notes: each monster over its own drops
   function drawCols(x) {
     const mobs = (x.mobs || []).slice(0, 3), C = x.D ? dropColumns(x.mobIds, x.D, mobName, x.cls, x.level) : null;
@@ -202,11 +209,11 @@ function build({ el, band, tools, lamp, mapPick, classPick, steps, lines, pics, 
     card.classList.toggle('fold', !!x.fold);   // the CSS keeps only the title bar and the button row
     nums.hidden = !x.nums;
     steps.hidden = !!x.sharing || !!x.session;   // the first time steps: before sharing, and never under a stopped session's nudge
-    const ids = (x.mobIds || []).slice(0, 3);
-    if (changed('stage', ids, !!x.sprites)) drawStage(ids, x.sprites);
-    if (changed('cols', x.mobs, x.mobIds, !!x.D, x.cls, x.level)) drawCols(x);
+    const ids = x.noMap ? NO_MAP_MOBS : (x.mobIds || []).slice(0, 3);
+    if (changed('stage', ids, !!x.sprites, x.noMap ? x.lemon : null)) { drawStage(ids, x.sprites); if (x.noMap) dropLemons(x.lemon); }
+    if (changed('cols', !!x.noMap, x.mobs, x.mobIds, !!x.D, x.cls, x.level)) drawCols(x.noMap ? {} : x);
     if (x.L) fillIcons();
-    foot.hidden = !notes.children.length && classPick.hidden;
+    foot.hidden = !!x.noMap || (!notes.children.length && classPick.hidden);
   }
   return { el: card, update };
 }

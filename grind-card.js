@@ -19,9 +19,12 @@ const dateOf = ms => ms ? new Date(ms).toLocaleDateString('en-US', { month: 'sho
 // -> { badge, title, sub, bar, of, line, tabs: [{ key, label, mine, usual, vs, rows: [{ label, note, value, lit, rank }], verdict, line }], lemon, meat }
 function model(q) {
   const exp = q.exp || { value: null, rank: null, of: 0, best: null, usual: null };
-  const place = exp.rank == null ? null : exp.rank;
+  // no map (Rimmah, 2026-11-09: a map the reader can't name stays blank): nothing to rank against, and the live card says how to get one
+  const noMap = !q.map;
+  const place = noMap || exp.rank == null ? null : exp.rank;
   const short = q.mins < BEST_MIN;
-  const title = place == null ? (short ? 'A short run, so no rank yet' : q.gained > 0 ? 'No rank yet at ' + q.map : 'A run with no EXP at ' + q.map)
+  const title = noMap ? (q.live ? 'Pick the map to rank this run' : 'No map, so no rank')
+    : place == null ? (short ? 'A short run, so no rank yet' : q.gained > 0 ? 'No rank yet at ' + q.map : 'A run with no EXP at ' + q.map)
     : exp.of <= 1 ? 'Your first run at ' + q.map
     : place === 1 ? 'Your best run at ' + q.map + ' yet'
     : 'Your ' + ordinal(place) + ' best run at ' + q.map;
@@ -40,7 +43,7 @@ function model(q) {
     // the arrow against your usual (under 2% is no arrow); for potions per 1% lower is the good way
     const d = mine != null && usual ? mine / usual - 1 : null;
     const vs = d != null && Math.abs(d) >= 0.02 ? { up: d > 0, good: lower ? d < 0 : d > 0, text: (d > 0 ? '▲' : '▼') + Math.round(Math.abs(d) * 100) + '%' } : null;
-    const line = mine == null ? why : !best ? 'This run sets the bar for ' + q.map + '.' : '';
+    const line = mine == null ? why : !best && !noMap ? 'This run sets the bar for ' + q.map + '.' : '';
     return { key, label, mine: mine == null ? null : fmtV(mine), usual: usual == null ? null : fmtV(usual), vs, rows, verdict: null, line };
   };
   const sign = n => (n < 0 ? '−' : n > 0 ? '+' : '') + q.fmtK(Math.abs(n));
