@@ -318,8 +318,10 @@ function fineCounts(src, line, s) {
   }
   return top;
 }
-const KEYS = [['Shift', 'Ins', 'Hm', 'Pup'], ['Ctrl', 'Del', 'End', 'Pdn']];
-const keyOf = (bx, by) => { const row = KEYS[by < -73 ? 0 : 1], col = Math.round((bx - 241) / 36); return row[col] || null; };
+// three rows: the top one (under the chat buttons, Rimmah's 2026-11-10 setup keeps a potion in its 4th slot) sits at about -125 base
+// pixels from the EXP line, the middle at -90 and the bottom at -55. Without its own row a top potion took the middle row's key
+const KEYS = [['Top1', 'Top2', 'Top3', 'Top4'], ['Shift', 'Ins', 'Hm', 'Pup'], ['Ctrl', 'Del', 'End', 'Pdn']];
+const keyOf = (bx, by) => { const row = KEYS[by < -107 ? 0 : by < -73 ? 1 : 2], col = Math.round((bx - 241) / 36); return row[col] || null; };
 // every count in the two potion rows: [{ key, bx, by, x, y, value, score }] (bx, by in base pixels from the EXP line).
 // Nothing when measure() couldn't match the count digits well (a shrunk or blurry share): half read numbers like
 // "93" for 293 would be worse than none.
