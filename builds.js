@@ -355,13 +355,15 @@ function orderFor(cls, P, slot) {
   const t = cls.byType[cls.typeOf(slot)];
   return P.order.map(([id, n]) => [id === 'M' ? t[0] : id === 'B' ? t[1] : id === 'F' ? t[2] : id, n]);
 }
-// The skill boxes the form shows: the 1st job's skills under 30, the class's own (plus its attack) from 30.
+// The skill boxes the form shows: the 1st job's skills under 30, the class's own (plus its attack) from 30. A 2nd job mage
+// also gets a Magic Claw box (plenty of mages never took it, so the guide's 1st job can't just be assumed; Rimmah, 2026-11-10).
 function skillsFor(cls, lv) {
   if (!DATA) return cls.skills || [];
   const P = phaseOf(cls, lv);
-  if (P.phase === 2 && cls.skills) return cls.skills;
+  const claw = P.phase === 2 && cls.family === 'spell' && DATA.skills[cls.attack1] ? [cls.attack1] : [];
+  if (P.phase === 2 && cls.skills) return cls.skills.concat(claw);
   const ids = Object.keys(DATA.skills).map(Number).filter(id => DATA.skills[id].job === P.job && DATA.skills[id].name);
-  return P.attack && !ids.includes(P.attack) ? [P.attack].concat(ids) : ids;
+  return (P.attack && !ids.includes(P.attack) ? [P.attack].concat(ids) : ids).concat(claw);
 }
 
 // Turns the form into numbers. Blank fields get a typical value for the class and level and are listed in assumed.
@@ -397,8 +399,10 @@ function validateStats(raw, clsId) {
   }
   const zeroOk = !!cls && !noneTyped && P.phase === 2 && ZERO_OK(cls.id);
   if (cls && !noneTyped) {
-    const ids = skillsFor(cls, lv);
+    const ids = skillsFor(cls, lv), claw = P.phase === 2 && cls.attack1 !== P.attack && ids.includes(cls.attack1) ? cls.attack1 : null;
     for (const id of ids) {
+      // a blank Magic Claw box waits until we know whether a 2nd job attack has a point
+      if (id === claw && blank(sk[id])) continue;
       const max = DATA && DATA.skills[id] ? DATA.skills[id].max : 30;
       // A blank attack skill: as high as the points spent in this job allow (3 a level), up to its max.
       const typical = Math.max(1, Math.min(max, 1 + 3 * (lv - (P.phase === 1 ? ADV1(cls.id) : ADVANCE))));
@@ -409,6 +413,12 @@ function validateStats(raw, clsId) {
     const need = (P.phase === 2 && cls.attacks ? cls.attacks : [P.attack]).filter(id => ids.includes(id));
     if (DATA && zeroOk && !need.some(id => stats.skills[id] >= 1))
       stats.skills = { ...firstJobSkills(cls, cls.weaponSlot || cls.weapons[0]), ...stats.skills };
+    // with a 2nd job attack to fight with, a blank Magic Claw is one never taken, so a road can't lay the guide's 20 under it
+    if (claw && stats.skills[claw] === undefined) stats.skills[claw] = 0;
+    // and a Magic Claw typed 0 with no 2nd job attack (nor Heal) leaves nothing to fight with
+    const heals = cls.id === 'cleric' && stats.skills[HEAL] >= 1;
+    if (DATA && claw && zeroOk && !need.some(id => stats.skills[id] >= 1) && !(stats.skills[claw] >= 1) && !heals)
+      errors.push('Put at least 1 point in ' + need.concat(claw).map(id => DATA.skills[id] ? DATA.skills[id].name : 'your attack skill').join(' or ') + ' for a guide.');
     if (!zeroOk && need.length && !need.some(id => stats.skills[id] >= 1))
       errors.push('Put at least 1 point in ' + need.map(id => DATA && DATA.skills[id] ? DATA.skills[id].name : 'your attack skill').join(' or ') + ' for a guide.');
   }
@@ -2725,7 +2735,7 @@ function mount(root, deps) {
 }
 const estimatedNote = () => E('p', { id: 'b-estimated', class: 'k-foot b-badge', hidden: '' }, E('b', {}, 'Estimated. '), "Damage for this weapon comes from meowdb's table and hasn't been checked against a real stat window yet.");
 
-window.Builds = { planSkills, skillsAt, comparePaths, resetLine, roadBar, modelRoads, MODEL_ATTACKS, roadLine, ROADS, roadIds, roadState, recognize, ZERO_OK, REACH, HOLD, ROAD_KILLS, roadTarget, mainAttack, crowdHits, rankWith, attackModel, statsAt, planAP, pathClass, firstJobSkills, indieMagic, roadStats, tuneSeconds, EXP_TABLE, STEP_SEC, expHour, hoursTo, healRange, HEAL, standingText, KILL_GAP, CLASSES, BRANCHES, branchOf, weaponsFor, mastery, physRange, spellRange, weaponAttackFromMax, WEAPONS, CHECKED_WEAPONS, windowRange, levelScale, hitChance, defend, elemMult, makeRng, castsToKill,
+window.Builds = { planSkills, skillsFor, skillsAt, comparePaths, resetLine, roadBar, modelRoads, MODEL_ATTACKS, roadLine, ROADS, roadIds, roadState, recognize, ZERO_OK, REACH, HOLD, ROAD_KILLS, roadTarget, mainAttack, crowdHits, rankWith, attackModel, statsAt, planAP, pathClass, firstJobSkills, indieMagic, roadStats, tuneSeconds, EXP_TABLE, STEP_SEC, expHour, hoursTo, healRange, HEAL, standingText, KILL_GAP, CLASSES, BRANCHES, branchOf, weaponsFor, mastery, physRange, spellRange, weaponAttackFromMax, WEAPONS, CHECKED_WEAPONS, windowRange, levelScale, hitChance, defend, elemMult, makeRng, castsToKill,
   validateStats, rankMobs, buildGuide, pointsPlan, mount, fill, refresh, shrinkImage, take, classOf,
   dropGroups, findItems, droppers, meowMap, wearers, kindOf, gainRange, trusted, bestScroll, money, plural, mobFit };
 })();
