@@ -1405,7 +1405,7 @@ function loadRoads() {
   } catch { /* nothing saved yet, or broken */ }
 }
 const roadsFor = clsId => ({ reach: ui.roads.reach[clsId], pick: ui.roads.pick[clsId] });
-function setRoad(kind, clsId, v) { ui.roads[kind][clsId] = v; ui.deps.store.set('bt.roads', JSON.stringify(ui.roads)); renderGuide(); }
+function setRoad(kind, clsId, v) { if (window.track && kind === 'pick') window.track('road_picked', { cls: clsId }); ui.roads[kind][clsId] = v; ui.deps.store.set('bt.roads', JSON.stringify(ui.roads)); renderGuide(); }
 // The player changed the form by hand after it was loaded or read.
 const edited = () => { if (ui.form.from) ui.form.edited = true; };
 const saveForm = () => ui.deps.store.set('bt.calc', JSON.stringify(ui.form));
@@ -1485,6 +1485,7 @@ const toggle = (id, key) => setOpen(id, ui.root.querySelector('#' + id).hidden, 
 // Switching class keeps the numbers but drops a weapon the new class can't hold.
 function pickClass(id) {
   if (!CLASSES[id]) return;
+  if (window.track && ui.form.cls !== id) window.track('class_picked', { cls: id });
   ui.form.cls = id;
   const w = ui.form.v.weapon && ui.data.gear.find(x => x.id === Number(ui.form.v.weapon));
   if (w && !(CLASSES[id].weapons || []).includes(w.slot)) { delete ui.form.v.weapon; delete ui.form.v.wat; }
@@ -2350,6 +2351,7 @@ function take({ cls, values = {}, skills = {} } = {}) {
   if ((Object.keys(vals).length || filled.length) && ui.form.from !== 'read') { ui.form.from = 'read'; delete ui.form.edited; }
   clearTimeout(ui.timer);
   saveForm(); buildForm(); renderGuide();
+  if (window.track) window.track('read_applied', { cls: ui.form.cls, filled: filled.length, skipped: skipped.length });
   return { filled, skipped };
 }
 
@@ -2596,6 +2598,7 @@ async function save(quickName, quiet) {
     const saved = await ui.deps.api.saveBuild(row);
     // A replaced picture is no longer used by anything.
     if (target && target.shot_path && shot !== target.shot_path) ui.deps.api.removeShot(target.shot_path).catch(() => {});
+    if (window.track) { const lv = v.stats.level; window.track('build_saved', { cls: ui.form.cls, level_band: lv < 30 ? '1-29' : lv < 50 ? '30-49' : lv < 70 ? '50-69' : '70+', is_new: target ? 0 : 1 }); }
     ui.lastIgn = ign; ui.editing = null; ui.loaded = { ...row, id: (saved && saved.id) || row.id, user_id: me() && me().user_id };
     ui.deps.store.set('bt.ign', ign);
     renderSave(); say(note || 'Saved ' + ign + '.');

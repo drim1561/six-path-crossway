@@ -1065,6 +1065,8 @@ function mount(root, deps) {
     st.lastSave = now;
     jset(KEY_OPEN, session);
     const row = GS().toRow(session);
+    // anonymous funnel step: the first EXP read of a session (once per session)
+    if (window.track && row.exp > 0 && !(window.__expSeen = window.__expSeen || new Set()).has(row.id)) { window.__expSeen.add(row.id); window.track('first_exp_read', { app: app ? 1 : 0 }); }
     if (!signedIn()) {
       keepLocal(row);
       listSessions();
@@ -1086,6 +1088,7 @@ function mount(root, deps) {
     const [id, row] = waiting.entries().next().value;
     waiting.delete(id); busy = true; sending = row;
     api.saveGrind(row).then(() => {
+      if (window.track && row.exp > 0 && !(window.__acctSeen = window.__acctSeen || new Set()).has(id)) { window.__acctSeen.add(id); window.track('session_saved', { active_min: Math.round(row.active_min / 10) * 10 }); }
       busy = false; sending = null; lastOk = Date.now(); failNote = null;
       if (!waiting.has(id)) jset(KEY_LOCAL, jget(KEY_LOCAL, []).filter(x => x.id !== id));
       if (landsDeleted.delete(id)) api.deleteGrind(id).catch(er => setStatus("Couldn't delete it (" + er.message + ').')).then(listSessions);
@@ -1189,6 +1192,7 @@ function mount(root, deps) {
     onState: (state, why) => {
       // stopped: the player pressed Stop (not the game going away), which the one line says
       st.sharing = state === 'sharing'; st.stopped = !st.sharing && why === 'stop';
+      if (window.track) window.track(st.sharing ? 'share_started' : 'share_ended', { why: st.sharing ? '' : String(why || ''), app: app ? 1 : 0 });
       if (st.sharing) startChecks();
       else {
         if (app) setStatus(why === 'denied' || why === 'failed' ? LOST : 'Stopped. This session is kept, press Start to carry on.');
@@ -1389,6 +1393,7 @@ function mount(root, deps) {
     V.nudge.hidden = !!viewing || problem || h.nudge.state === 'ok' || (h.nudge.state === 'idle' && !s);
     V.problem.hidden = !!viewing || !problem;
     if (V.problemText.textContent !== h.nudge.text) V.problemText.textContent = h.nudge.text;
+    if (problem && window.track && window.__prob !== h.nudge.text) { window.__prob = h.nudge.text; window.track('reading_problem', { text: String(h.nudge.text).slice(0, 60), app: app ? 1 : 0 }); }
     V.nudge.className = 'g-nudge ' + h.nudge.state; V.nudge.textContent = h.nudge.text;   // the lantern and the band carry the state, so no sign here
     // an app older than this page: that comes first, with where to get the new one
     if (appOld) {
