@@ -320,6 +320,7 @@ body.appraiser-off #tab-appraiser .soon::after { right: 5px; }
 .b-skills { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr)); gap: 0 var(--gap); }
 .b-skill { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 0; background: var(--art-dots) left bottom / 8px 2px repeat-x; font: 600 var(--fs-md) var(--font-body); color: var(--ink); }
 .b-skill input { width: 64px; height: 26px; padding: 0 4px; text-align: center; font: 700 var(--n-s) var(--font-num); color: var(--ink); }
+.b-job1 > summary { cursor: pointer; }
 .b-more-details > summary { cursor: pointer; font: 700 var(--fs-sm) var(--font-body); color: var(--muted); padding: 4px 0; }
 .b-more-details[open] > summary { margin-bottom: var(--gap); }
 /* Read from game, opening under the button row (reader.js draws .r-bar and .r-drop) */
@@ -1827,7 +1828,7 @@ const CONFIG = {
   reportUrl: 'https://sixpathcrossway.pages.dev/api/report',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-11e',
+  version: '2026-11-11f',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };

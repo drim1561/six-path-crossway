@@ -357,13 +357,22 @@ function orderFor(cls, P, slot) {
 }
 // The skill boxes the form shows: the 1st job's skills under 30, the class's own (plus its attack) from 30. A 2nd job mage
 // also gets a Magic Claw box (plenty of mages never took it, so the guide's 1st job can't just be assumed; Rimmah, 2026-11-10).
+// 2nd job forms (Rimmah, 2026-11-10) also get boxes for the 1st job skills the numbers read: the 1st job attacks, the crit and
+// accuracy passives, and for mages Magic Guard and Magic Armor (not read by the math, but a reset build puts its points there).
+const JOB1_BOXES = {
+  warrior: [1001001, 1001002, 1000002], magician: [2001003, 2001002, 2001000, 2001001],
+  bowman: [3001001, 3001002, 3000000, 3001000], thief: [4001003, 4001002, 4000000, 4000001] };
+const job1Boxes = cls => DATA ? (JOB1_BOXES[branchOf(cls.id)] || []).filter(id => DATA.skills[id]) : [];
 function skillsFor(cls, lv) {
   if (!DATA) return cls.skills || [];
   const P = phaseOf(cls, lv);
-  const claw = P.phase === 2 && cls.family === 'spell' && DATA.skills[cls.attack1] ? [cls.attack1] : [];
-  if (P.phase === 2 && cls.skills) return cls.skills.concat(claw);
-  const ids = Object.keys(DATA.skills).map(Number).filter(id => DATA.skills[id].job === P.job && DATA.skills[id].name);
-  return (P.attack && !ids.includes(P.attack) ? [P.attack].concat(ids) : ids).concat(claw);
+  let ids;
+  if (P.phase === 2 && cls.skills) ids = cls.skills.slice();
+  else {
+    ids = Object.keys(DATA.skills).map(Number).filter(id => DATA.skills[id].job === P.job && DATA.skills[id].name);
+    if (P.attack && !ids.includes(P.attack)) ids.unshift(P.attack);
+  }
+  return P.phase === 2 ? ids.concat(job1Boxes(cls).filter(id => !ids.includes(id))) : ids;
 }
 
 // Turns the form into numbers. Blank fields get a typical value for the class and level and are listed in assumed.
@@ -399,10 +408,12 @@ function validateStats(raw, clsId) {
   }
   const zeroOk = !!cls && !noneTyped && P.phase === 2 && ZERO_OK(cls.id);
   if (cls && !noneTyped) {
-    const ids = skillsFor(cls, lv), claw = P.phase === 2 && cls.attack1 !== P.attack && ids.includes(cls.attack1) ? cls.attack1 : null;
+    const ids = skillsFor(cls, lv), claw = P.phase === 2 && cls.family === 'spell' && cls.attack1 !== P.attack && ids.includes(cls.attack1) ? cls.attack1 : null;
+    // 1st job boxes on a 2nd job form: once any has a point typed, a blank one is not taken (a reset build), never the guide's
+    const j1 = P.phase === 2 ? job1Boxes(cls) : [], j1typed = j1.some(id => !blank(sk[id]));
     for (const id of ids) {
-      // a blank Magic Claw box waits until we know whether a 2nd job attack has a point
-      if (id === claw && blank(sk[id])) continue;
+      // a blank 1st job box waits for the guide, unless one of them was typed (then it's not taken)
+      if (j1.includes(id) && id !== P.attack && blank(sk[id])) { if (j1typed) stats.skills[id] = 0; continue; }
       const max = DATA && DATA.skills[id] ? DATA.skills[id].max : 30;
       // A blank attack skill: as high as the points spent in this job allow (3 a level), up to its max.
       const typical = Math.max(1, Math.min(max, 1 + 3 * (lv - (P.phase === 1 ? ADV1(cls.id) : ADVANCE))));
@@ -1450,9 +1461,19 @@ function buildForm() {
     E('div', { class: 'b-tablewrap' }, E('table', { class: 'b-stable' },
       E('thead', {}, E('tr', {}, heads.map(h => E('th', { scope: 'col' }, h)))),
       E('tbody', {}, E('tr', {}, cells.map(c => E('td', {}, c))))))];
-  if (ids.length) kids.push(E('h4', { class: 'b-sec' }, ui.formPhase === 1 ? BRANCHES[branchOf(cls.id)].name + ' skill levels' : 'Skill levels'),
-    E('div', { class: 'b-skills' }, ids.map(id => E('label', { class: 'b-skill' }, E('span', {}, ui.data.skills[id].name),
-      cell('b-s-' + id, ui.data.skills[id].name, ui.form.s[id], e => { ui.form.s[id] = e.target.value; changed(); }, 's:' + id)))));
+  const skillBox = id => E('label', { class: 'b-skill' }, E('span', {}, ui.data.skills[id].name),
+    cell('b-s-' + id, ui.data.skills[id].name, ui.form.s[id], e => { ui.form.s[id] = e.target.value; changed(); }, 's:' + id));
+  // from 30 the 1st job skills the numbers read sit in their own fold (open once any of them has a value)
+  const job1 = ui.formPhase === 2 ? ids.filter(id => ui.data.skills[id].job === BRANCHES[branchOf(cls.id)].job1 && id !== phaseOf(cls, formLevel()).attack) : [], main = ids.filter(id => !job1.includes(id));
+  if (main.length) kids.push(E('h4', { class: 'b-sec' }, ui.formPhase === 1 ? BRANCHES[branchOf(cls.id)].name + ' skill levels' : 'Skill levels'),
+    E('div', { class: 'b-skills' }, main.map(skillBox)));
+  if (job1.length) {
+    const fold = E('details', { id: 'b-job1', class: 'b-job1' }, E('summary', { class: 'b-sec' }, BRANCHES[branchOf(cls.id)].name + ' skill levels (1st job)'),
+      E('p', { class: 'small' }, 'Leave all blank to use the guide. Once one has a level, a blank box counts as not taken (an SP reset).'),
+      E('div', { class: 'b-skills' }, job1.map(skillBox)));
+    if (job1.some(id => !blank(ui.form.s[id]))) fold.open = true;
+    kids.push(fold);
+  }
   box.replaceChildren(...kids.filter(Boolean));
   // every way the class changes (tiles, the select, a loaded card, Read from game) redraws the form, so the tiles follow here
   renderTiles();
