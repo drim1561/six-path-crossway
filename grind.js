@@ -888,7 +888,9 @@ function mount(root, deps) {
     readLoot(src, S, false);
     if (!st.line) {
       st.line = S.findExpLine(src, w, h); st.m = null; st.measureAt = 0;
-      if (!st.line) { mark('exp', false); setCheck('exp', 'fix', 'Make sure the bar at the bottom of the game is showing'); render(); return; }
+      if (!st.line) {
+        if (!st.probeAt || Date.now() - st.probeAt > 15000) { st.probeAt = Date.now(); try { st.probe = S.greenProbe(src, w, h); } catch (e) { st.probe = null; } }   // for a report: why no bar
+        mark('exp', false); setCheck('exp', 'fix', 'Make sure the bar at the bottom of the game is showing'); render(); return; }
     }
     const exp = S.readExp(src, st.line);
     mark('exp', exp.ok);
@@ -1974,6 +1976,8 @@ function mount(root, deps) {
   const reporter = {
     report: () => ({ sharing: st.sharing, ticks: st.ticks, reads: st.reads, frame: [st.fw, st.fh],
       stretch: st.m ? { s: st.m.s, score: st.m.score, countScore: st.m.countScore } : null, line: st.line, level: st.level,
+      greenProbe: st.probe || null,
+      can: { share: !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia), frames: typeof MediaStreamTrackProcessor === 'function', popout: !!window.documentPictureInPicture, platform: (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '' },
       slots: st.slots, mesos: st.mesos == null ? null : st.mesos, mesoHome: MS().mesoHome(), checks: lastHealth, recent: st.recent.slice(), drawError,
       map: mapId, session: session ? GS().stats(session, Date.now(), avgExp(session.mapId || mapId)) : null, popout: overlay.win() ? { layout } : null,
       // Count my loot: the switch, how far each tab's flip got, the bag sets, shop visits and prices learned

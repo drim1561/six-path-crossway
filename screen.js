@@ -89,21 +89,41 @@ function whiteMap(img) {
   return m;
 }
 const isGreen = (r, g, b) => g > 170 && b < 120 && g > r + 15 && r > 90;
-const greenBrackets = (img, w, h) => {
-  const gm = new Uint8Array(w * h);
-  for (let i = 0; i < w * h; i++) { const k = i * 4; gm[i] = isGreen(img.data[k], img.data[k + 1], img.data[k + 2]) ? 1 : 0; }
+// A looser green for captures whose colours came out shifted (a Mac's colour managed screen share, 2026-11-11: a friend's
+// EXP bar was never found there while the white mesos box read fine). Only tried when the exact green finds nothing.
+const isGreenLoose = (r, g, b) => g > 130 && g > r + 12 && g > b + 55 && r >= 40;
+const greenBrackets = (img, w, h, loose) => {
+  const gm = new Uint8Array(w * h), test = loose ? isGreenLoose : isGreen;
+  for (let i = 0; i < w * h; i++) { const k = i * 4; gm[i] = test(img.data[k], img.data[k + 1], img.data[k + 2]) ? 1 : 0; }
   return components(gm, w, h, 6).filter(c => c.h >= 7 && c.w <= 6 && c.h >= 2 * c.w).sort((a, b) => a.x0 - b.x0);
 };
-// the EXP line's box: the lowest pair of green brackets in the bottom part of the frame
+// the EXP line's box: the lowest pair of green brackets in the bottom part of the frame. line.loose says the looser green
+// found it (expGlyphs then reads the brackets the same way)
 function findExpLine(src, fw, fh) {
-  const y0 = Math.floor(fh * 0.55), img = region(src, 0, y0, fw, fh - y0), cs = greenBrackets(img, img.w, img.h);
-  let o = null, c = null;
-  for (let j = 0; j + 1 < cs.length; j++) {
-    if (Math.abs(cs[j].y0 - cs[j + 1].y0) <= 1 && cs[j].h === cs[j + 1].h && cs[j + 1].x0 - cs[j].x0 < 200 && (!o || cs[j].y0 >= o.y0)) { o = cs[j]; c = cs[j + 1]; }
+  const y0 = Math.floor(fh * 0.55), img = region(src, 0, y0, fw, fh - y0);
+  for (const loose of [false, true]) {
+    const cs = greenBrackets(img, img.w, img.h, loose), tol = loose ? 1 : 0;
+    let o = null, c = null;
+    for (let j = 0; j + 1 < cs.length; j++) {
+      if (Math.abs(cs[j].y0 - cs[j + 1].y0) <= 1 && Math.abs(cs[j].h - cs[j + 1].h) <= tol && cs[j + 1].x0 - cs[j].x0 < 200 && (!o || cs[j].y0 >= o.y0)) { o = cs[j]; c = cs[j + 1]; }
+    }
+    if (!o) continue;
+    const x = Math.max(0, o.x0 - 150), y = o.y0 + y0 - 6;
+    return { x, y, w: Math.min(fw - x, (c.x1 - o.x0) + 160), h: o.h + 12, digitH: o.h, loose };
   }
-  if (!o) return null;
-  const x = Math.max(0, o.x0 - 150), y = o.y0 + y0 - 6;
-  return { x, y, w: Math.min(fw - x, (c.x1 - o.x0) + 160), h: o.h + 12, digitH: o.h };
+  return null;
+}
+// For a Something off? report when the EXP line isn't found: how many pixels pass the exact and the loose green in the
+// bottom of the frame, and the average colour of the loose ones (a shifted colour profile shows as exact 0, loose many)
+function greenProbe(src, fw, fh) {
+  const y0 = Math.floor(fh * 0.55), img = region(src, 0, y0, fw, fh - y0), d = img.data;
+  let exact = 0, loose = 0, r = 0, g = 0, b = 0;
+  for (let i = 0; i < img.w * img.h; i++) {
+    const k = i * 4;
+    if (isGreen(d[k], d[k + 1], d[k + 2])) exact++;
+    if (isGreenLoose(d[k], d[k + 1], d[k + 2])) { loose++; r += d[k]; g += d[k + 1]; b += d[k + 2]; }
+  }
+  return { exact, loose, avg: loose ? [Math.round(r / loose), Math.round(g / loose), Math.round(b / loose)] : null };
 }
 // "EXP 98,856[17.79%]": { ok, exp, pct } or { ok: false, reason }
 function readExp(src, line) {
@@ -120,7 +140,7 @@ function readExp(src, line) {
 // side ('exp' | 'pct'), grid, aspect }] } (tools/make-exp-seeds.js learns from these)
 function expGlyphs(src, line) {
   const img = region(src, line.x, line.y, line.w, line.h), w = img.w, h = img.h, wm = whiteMap(img);
-  const gc = greenBrackets(img, w, h);
+  const gc = greenBrackets(img, w, h, !!line.loose);
   if (gc.length < 2) return { ok: false, reason: 'EXP brackets not found' };
   const open = gc[gc.length - 2], close = gc[gc.length - 1];
   const yTop = Math.min(open.y0, close.y0), yBot = Math.max(open.y1, close.y1);
@@ -1198,6 +1218,6 @@ function readMap(src, frameH, opts) {
 }
 function mapHome(spot) { if (arguments.length) mapSpot = spot || null; return mapSpot; }
 
-window.MapleScreen = { loadMaps, readMap, mapHome, load, sizeOf, findExpLine, readExp, expGlyphs, measure, readLevel, readCounts, readIcon, readParty, levelArea, slotArea, partyArea,
+window.MapleScreen = { loadMaps, readMap, mapHome, load, sizeOf, findExpLine, greenProbe, readExp, expGlyphs, measure, readLevel, readCounts, readIcon, readParty, levelArea, slotArea, partyArea,
   findMesoBox, mesoHome, mesoGlyphs, readMesos, invGeometry, readInventory, loadLoot, readBag, readScroll, readShop, shopHome };
 })();

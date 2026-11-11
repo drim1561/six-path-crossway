@@ -605,8 +605,11 @@ var SEEDS = {"glyphs":{"0":[{"g":[21,83,153,177,177,164,115,22,90,154,206,222,22
   // browser for the window at full size; drop false leaves out the paste and drop area.
   // opts.beforeStart (the Windows app finding the game itself): awaited before the browser is asked for the window; false,
   // or a rejection, puts the buttons back with no onState call.
-  var CAPTURE_COPY = { share: 'Share the game window', stop: 'Stop', drop: 'Or paste a screenshot here (Win+Shift+S, then Ctrl+V)',
-    notPicture: "That file isn't a picture.", failed: "Couldn't start sharing the game window. Try again, or paste a screenshot instead." };
+  var IS_MAC = /Mac/i.test((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '');
+  var CAPTURE_COPY = { share: 'Share the game window', stop: 'Stop',
+    drop: IS_MAC ? 'Or paste a screenshot here (Cmd+Shift+4, then Cmd+V)' : 'Or paste a screenshot here (Win+Shift+S, then Ctrl+V)',
+    notPicture: "That file isn't a picture.",
+    failed: "Couldn't start sharing the game window. Try again, or paste a screenshot instead." + (IS_MAC ? ' On a Mac, allow your browser under System Settings, Privacy & Security, Screen Recording, then restart it.' : '') };
   var activeShare = null; // the one capture that is sharing right now
   function capture(root, opts) {
     var o = Object.assign({ prefix: 'r-', every: 500, limit: 120000, onState: function () {}, say: function () {} }, opts);
