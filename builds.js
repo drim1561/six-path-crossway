@@ -1379,7 +1379,8 @@ const ASSUMED_LABEL = { ...LABEL, atkMin: 'attack range', atkMax: 'attack range'
 // for Read from game, none when typed by hand), and form.edited once the player changed something after that
 // lastPic: the picture Read from game read last ({ img, at }), kept for a report until the next one or a reload
 // find: the Train tab's item finder ({ q typed, id picked }), not saved anywhere; findBox is built once and kept
-const ui = { deps: null, data: null, root: null, form: { cls: 'cleric', v: {}, s: {} }, fresh: true, timer: 0, read: new Set(), lastPic: null,
+// firstVisit: no form kept on this device yet, so the class pills start open
+const ui = { deps: null, data: null, root: null, form: { cls: 'cleric', v: {}, s: {} }, firstVisit: true, timer: 0, read: new Set(), lastPic: null,
   find: { q: '', id: null }, findBox: null, findG: null };
 const FROM = ['mine', 'community', 'read', 'friend'];
 const E = (...a) => ui.deps.el(...a);
@@ -1392,7 +1393,7 @@ const fmt = n => Math.round(n).toLocaleString('en-US');
 function loadForm() {
   try {
     const f = JSON.parse(ui.deps.store.get('bt.calc'));
-    if (f && CLASSES[f.cls]) { ui.form = { cls: f.cls, v: f.v || {}, s: f.s || {}, ...(FROM.includes(f.from) ? { from: f.from } : {}), ...(f.edited === true ? { edited: true } : {}) }; ui.fresh = false; }
+    if (f && CLASSES[f.cls]) { ui.form = { cls: f.cls, v: f.v || {}, s: f.s || {}, ...(FROM.includes(f.from) ? { from: f.from } : {}), ...(f.edited === true ? { edited: true } : {}) }; ui.firstVisit = false; }
   } catch { /* nothing saved yet */ }
 }
 // The Skill paths switch and pick, per class on the device (bt.roads): { reach: { cls: n }, pick: { cls: roadId } }.
@@ -1512,18 +1513,23 @@ async function renderMine() {
     const rows = await ui.deps.api.listBuilds({ userId: s.user_id, sort: 'new' });
     if (gen !== ui.mineGen) return;
     const mine = ui.mineRows = rows.filter(b => b.user_id === s.user_id);
+    // after a reload the remembered character name (bt.ign) is the build Save writes back to, once the list is here
+    const sb = ui.root.querySelector('#b-savebtn'), rem = !ui.loaded && !ui.editing && ui.lastIgn && saveTarget(ui.lastIgn);
+    if (sb && rem) sb.textContent = saveLabel(null, rem);
     box.replaceChildren(mine.length
       ? E('div', { class: 'b-mine-list' }, mine.map(b => E('button', { type: 'button', class: 'b-mine-card k-card', 'aria-pressed': String(!!ui.loaded && ui.loaded.id === b.id), onclick: () => load(b, true) },
         E('b', {}, b.ign), ' Lv ' + b.level + ' ' + (CLASSES[b.class] ? CLASSES[b.class].name : b.class))))
       : E('p', { class: 'small' }, 'Builds you save show up here.'));
+    syncTicks();
   } catch (e) { if (gen === ui.mineGen) box.replaceChildren(E('p', { class: 'small' }, "Couldn't load your builds: " + e.message)); }
 }
 // Opens a saved build in the calculator; one of yours is remembered as the build Save writes back to.
 function load(b, mine) {
   if (ui.editing && ui.editing.id !== b.id) ui.editing = null;
-  fill(b.stats, b.class, mine ? 'mine' : 'community');
+  // set before fill draws the guide, so the Quests tab already knows whose ticks to show
   ui.loaded = mine ? b : null;
-  if (mine) ui.lastIgn = b.ign;
+  if (mine) { ui.lastIgn = b.ign; ui.deps.store.set('bt.ign', b.ign); }
+  fill(b.stats, b.class, mine ? 'mine' : 'community');
   renderSave(); renderMine();
 }
 function changed() { edited(); saveForm(); clearTimeout(ui.timer); ui.timer = setTimeout(renderGuide, 150); }
@@ -2159,11 +2165,105 @@ function loadQuests() {
 // Cozy Market's listing date, named only in the Quests foot's gear note, since freezeQuests never fakes it in tests.
 const listWhen = prices => prices && prices.listDate && new Date(prices.listDate + 'T00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-// questsFor(g, cls) -> { plan, look, parties, gearPriced }, the pure shaping of ui.quests for this character.
-// me matches quests.js's shape: level, the job for rewards keyed by job, the class's reqJob bit, and its weapon stem.
-function questsFor(g, cls) {
+// Quest ticks: only a signed in player's own saved build has them. tickState says which build they belong to, or which
+// line the Quests foot shows instead (sign in, load yours, save yours, or ticks that didn't load). key changes whenever
+// what the tab should show for ticks changes, so syncTicks knows when to draw again.
+function tickState() {
+  const s = me();
+  if (!s) return { build: null, prompt: 'signin', key: 'signin' };
+  const name = (ui.loaded && ui.loaded.ign) || (ui.editing && ui.editing.ign) || ui.lastIgn;
+  const from = ui.form.from, t = from !== 'community' && from !== 'friend' ? saveTarget(name) : null;
+  if (t && t.id && t.user_id === s.user_id) return { build: t, prompt: ui.done[t.id] === false ? 'failed' : null, key: 'b:' + t.id };
+  const prompt = ui.mineRows === null ? null : ui.mineRows.length ? 'load' : 'save';
+  return { build: null, prompt, key: prompt || '' };
+}
+const TICK_PROMPT = {
+  signin: "Sign in and save your build to tick off quests you've done.",
+  load: "Load yours from My builds to tick off quests you've done.",
+  save: "Save your build to tick off quests you've done.",
+  failed: "Your ticks didn't load. Try reloading the page.",
+};
+// A build's ticks, once: null while loading, a Set of quest ids, or false when they didn't load. An answer for a player who
+// has since signed out (or in as someone else) is dropped.
+function loadDone(id) {
+  const done = ui.done, who = ui.who;
+  done[id] = null;
+  Promise.resolve().then(() => ui.deps.api.listQuestDone(id))
+    .then(rows => new Set((rows || []).map(r => Number(r.quest_id))))
+    .catch(() => false)
+    .then(set => { if (ui.done !== done || ui.who !== who) return; done[id] = set; if (ui.qArgs) { const [g, cls] = ui.qArgs; g.questPlan = renderQuests(g, cls); renderOverview(g, cls); } else renderGuide(); });
+}
+// Draws the guide again only when the ticks the Quests tab shows would change (My builds landed, a first save).
+function syncTicks() { if (tickState().key !== ui.tickKey) renderGuide(); }
+
+// A pixel picture from the bitmap tool at 2 px a dot (the level steps, the quest tick); its markup comes from a fixed bitmap, never from text.
+function pixelGlyph(rows) {
+  const t = document.createElement('template'); t.innerHTML = window.PixelIcons.pixelSvg(rows);
+  const s = t.content.firstChild; s.setAttribute('width', String(rows[0].length * 2)); s.setAttribute('height', String(rows.length * 2)); return s;
+}
+const CHECK_BITS = ['........#', '.......##', '......##.', '#....##..', '##..##...', '.####....', '..##.....'];
+// A quest row's right side once ticks have loaded: the price and the tick (a check), or, once ticked this visit, Done and Undo.
+// Both buttons name the giver and the row for a screen reader and carry the quest id for focus. While their save is out
+// they wait as aria-disabled, not disabled, so focus can stay on them (pressTick turns a press away until the answer).
+function tickEnd(r, price, tick) {
+  const id = String(r.id), what = r.who + "'s quest for " + r.title, wait = tick.busy ? { 'aria-disabled': 'true' } : {};
+  return E('div', { class: 'b-qend' }, tick.done
+    ? [E('span', { class: 'b-qdone' }, 'Done'),
+      E('button', { type: 'button', class: 'linkish b-qundo', 'data-q': id, 'aria-label': 'Undo the tick on ' + what, onclick: () => untickQuest(r.id), ...wait }, 'Undo')]
+    : [price,
+      E('button', { type: 'button', class: 'b-qtick', 'data-q': id, title: 'Done it', 'aria-label': 'Mark ' + what + ' done', onclick: () => tickQuest(r.id), ...wait },
+        E('i', { 'aria-hidden': 'true' }, pixelGlyph(CHECK_BITS)))]);
+}
+
+// Ticking: the change shows at once (the row greys in place, ui.fresh keeps it on screen), the save goes out behind it with the
+// row's button waiting, and only the Quests box redraws. A failed save puts things back and says so under the first block.
+// The row leaves the plan when the player comes back to the tab (showTab), a reload, or a change of player.
+const tickNow = () => { const b = tickState().build; return b && ui.done[b.id] ? b.id : null; };
+// press: a press starts this build's fresh list when another build's is there; putting a failed save back (press false)
+// touches the fresh list only when it is still this build's, so a late answer for build A can't wipe build B's
+function setTick(bid, id, on, press) {
+  const set = ui.done[bid];
+  if (on) set.add(id); else set.delete(id);
+  if (press && ui.fresh.build !== bid) ui.fresh = { build: bid, ids: new Set() };
+  if (ui.fresh.build === bid) { if (on) ui.fresh.ids.add(id); else ui.fresh.ids.delete(id); }
+}
+// the failed save is also spoken from a hidden status element outside the Quests box (which is redrawn), so it is announced once
+function tickSay(t) { const e = ui.root.querySelector('#b-tickstatus'); if (e) e.textContent = t; }
+function pressTick(id, on) {
+  const bid = tickNow();
+  if (!bid || ui.busy.has(bid + ':' + id)) return;
+  const done = ui.done, who = ui.who, busy = ui.busy, key = bid + ':' + id;
+  ui.tickNote = null; tickSay('');
+  setTick(bid, id, on, true);
+  busy.add(key);
+  if (ui.qArgs) renderQuests(...ui.qArgs);
+  // the row's other button (Undo after a tick, the tick after Undo) takes the focus, waiting until the save answers
+  const q = ui.root.querySelector('#quests [data-q="' + id + '"]');
+  if (q && !q.closest('[hidden]')) q.focus();
+  Promise.resolve().then(() => on ? ui.deps.api.addQuestDone(bid, id) : ui.deps.api.removeQuestDone(bid, id)).then(() => {
+    busy.delete(key);
+    if (ui.done !== done || ui.who !== who) return;
+    if (ui.qArgs) renderQuests(...ui.qArgs);
+  }, e => {
+    busy.delete(key);
+    if (ui.done !== done || ui.who !== who || !ui.done[bid]) return;
+    setTick(bid, id, !on, false);
+    ui.tickNote = (on ? "Couldn't save that tick: " : "Couldn't undo that tick: ") + ((e && e.message) || 'something went wrong');
+    tickSay(ui.tickNote);
+    renderGuide();
+  });
+}
+const tickQuest = id => pressTick(id, true);
+const untickQuest = id => pressTick(id, false);
+
+// questsFor(g, cls, tick) -> { plan, look, parties, gearPriced }, the pure shaping of ui.quests for this character.
+// me matches quests.js's shape: level, the job for rewards keyed by job, the class's reqJob bit, and its weapon stem,
+// plus done: the build's ticked quests once they've loaded (minus the ones ticked this visit, which stay on screen greyed).
+function questsFor(g, cls, tick) {
   const Q = ui.quests;
   const me = { level: g.stats.level, job: phaseOf(cls, g.stats.level).job, mask: cls.jobMask, weapon: slotOf(g.stats, cls) };
+  const id = tick && tick.build && tick.build.id, set = id && ui.done[id];
+  if (set) me.done = ui.fresh.build === id ? new Set([...set].filter(q => !ui.fresh.ids.has(q))) : set;
   const plan = window.Quests.plan(Q, me, window.Quests.stamp(new Date()));
   const mobs = [...g.overview.spots.map(x => x.row), ...g.stages.map(st => st.picks[0])];
   const look = window.Quests.lookOut(plan.wanting, Q, mobs, (ui.data.drops && ui.data.drops.mobs) || {});
@@ -2173,37 +2273,49 @@ function questsFor(g, cls) {
 }
 
 // A quest row: the item's picture, a title (with an optional tag, At 48) and small say line, and the right side
-// value, linked to Cozy when the row names one priced item.
-function questRow(row, tag) {
-  return E('div', { class: 'k-row b-qrow' },
+// value, linked to Cozy when the row names one priced item. tick is null (no ticks here) or { done, busy }: the price
+// and the tick button, or a greyed row (is-done) with Done and Undo in place of the price.
+function questRow(row, tag, tick) {
+  const price = row.link
+    ? E('a', { class: 'b-hr', href: 'https://cozy.markets/items/' + row.link, target: '_blank', rel: 'noopener' }, row.right)
+    : E('div', { class: 'b-hr' }, row.right);
+  return E('div', { class: 'k-row b-qrow' + (tick && tick.done ? ' is-done' : '') },
     itemPic(row.pic),
     E('div', {},
       E('div', { class: 'b-ovt' }, row.title, tag ? [' ', E('span', { class: 'k-tag' }, tag)] : null),
       E('div', { class: 'small' }, row.say)),
-    row.link
-      ? E('a', { class: 'b-hr', href: 'https://cozy.markets/items/' + row.link, target: '_blank', rel: 'noopener' }, row.right)
-      : E('div', { class: 'b-hr' }, row.right));
+    tick ? tickEnd(row, price, tick) : price);
 }
 
 // Quests tab: what's open now, what's coming up, what to look out for towards it, and parties for a change of pace.
 // Returns the plan (for Task 8) or null while loading, failed, or before the level is known.
 function renderQuests(g, cls) {
-  const box = ui.root.querySelector('#quests');
+  const box = ui.root.querySelector('#quests'), tick = tickState();
+  ui.tickKey = tick.key; ui.qArgs = [g, cls];
   if (ui.quests === null) { box.replaceChildren(E('p', { class: 'small' }, 'Loading the quests.')); return null; }
   if (ui.quests === false) { box.replaceChildren(E('p', { class: 'small' }, "Quests didn't load. Try reloading the page.")); return null; }
 
-  const { plan, look, parties, gearPriced } = questsFor(g, cls);
+  // the first time a build is met, its ticks load (and draw the guide again when they land); buttons only once they have
+  if (tick.build && ui.done[tick.build.id] === undefined) loadDone(tick.build.id);
+  const bid = tick.build && ui.done[tick.build.id] ? tick.build.id : null;
+  const tickOf = r => bid ? { done: ui.fresh.build === bid && ui.fresh.ids.has(r.id), busy: ui.busy.has(bid + ':' + r.id) } : null;
+  const { plan, look, parties, gearPriced } = questsFor(g, cls, tick);
   const sec = text => E('h4', { class: 'b-sec' }, text);
   const partyRow = pt => questRow({ pic: pt.pic, title: pt.name, say: pt.say, right: pt.right, link: null });
+  // while the tab is showing, a redraw keeps an opened list open and the focus on the button it was on
+  const showing = !box.hidden, unfold = showing && !!box.querySelector('.b-qopen .b-extra:not([hidden])');
+  const was = document.activeElement, inBox = !!was && box.contains(was), keepQ = inBox && was.dataset ? was.dataset.q : null;
 
   let openBlock = null;
   if (plan.open.length) {
     openBlock = E('div', { class: 'b-block b-qopen' }, sec('Quests open at level ' + g.stats.level),
-      ...plan.open.map((r, i) => extra(questRow(r), i, 5)));
+      ...plan.open.map((r, i) => extra(questRow(r, null, tickOf(r)), i, 5)));
     moreButton(openBlock, 'Show ' + (plan.open.length - 5) + ' more');
+    const more = unfold && openBlock.querySelector('.b-more');
+    if (more) { for (const x of openBlock.querySelectorAll('.b-extra')) x.hidden = false; more.textContent = 'Show less'; }
   }
   const soonBlock = plan.soon.length
-    ? E('div', { class: 'b-block b-qsoon' }, sec('Coming up by level ' + (g.stats.level + 5)), ...plan.soon.map(r => questRow(r, 'At ' + r.at)))
+    ? E('div', { class: 'b-block b-qsoon' }, sec('Coming up by level ' + (g.stats.level + 5)), ...plan.soon.map(r => questRow(r, 'At ' + r.at, tickOf(r))))
     : null;
   const nothing = (!plan.open.length && !plan.soon.length)
     ? E('div', { class: 'b-block' }, E('p', { class: 'small' }, 'Nothing worth chasing yet.')) : null;
@@ -2216,10 +2328,20 @@ function renderQuests(g, cls) {
     footKids.push(credit.slice(0, idx), E('a', { href: 'https://cozy.markets', target: '_blank', rel: 'noopener' }, 'Cozy Market'), credit.slice(idx + 'Cozy Market'.length));
   }
   if (gearPriced) { const w = listWhen(g.prices); if (w) footKids.push(" Gear is Cozy's usual price, " + w + '.'); }
-  footKids.push(" We don't keep track of what you've done, so skip what you've finished.");
+  if (tick.prompt) footKids.push((footKids.length ? ' ' : '') + TICK_PROMPT[tick.prompt]);
 
-  box.replaceChildren(...[openBlock, soonBlock, nothing, lookBlock, boredBlock].filter(Boolean), E('p', { class: 'small b-foot' }, ...footKids));
+  const footP = footKids.length ? E('p', { class: 'small b-foot' }, ...footKids) : null;
+  // a tick that didn't save says so under the first block, until the next press or leaving the tab
+  const note = ui.tickNote ? E('p', { class: 'small b-qnote' }, ui.tickNote) : null;
+  const blocks = [openBlock, soonBlock, nothing].filter(Boolean);
+  box.replaceChildren(...[blocks[0], note, ...blocks.slice(1), lookBlock, boredBlock, footP].filter(Boolean));
   loadPics();
+
+  const now = document.activeElement;
+  if (showing && keepQ && (!now || now === document.body)) {
+    const to = box.querySelector('[data-q="' + keepQ + '"]');
+    if (to) to.focus();
+  }
   return plan;
 }
 
@@ -2234,6 +2356,8 @@ function showTab(t, persist = true) {
     ui.root.querySelector('[data-tab="' + id + '"]').setAttribute('aria-selected', String(id === t));
   }
   if (persist) ui.deps.store.set('bt.btab', t);
+  // leaving Quests: rows ticked this visit leave the plan and a note about a failed save goes, so the box draws again
+  if (t !== 'quests' && (ui.fresh.ids.size || ui.tickNote)) { ui.fresh = { build: null, ids: new Set() }; ui.tickNote = null; tickSay(''); renderGuide(); }
 }
 // Add them, and Read from game: the Points tab, on the first box still empty.
 function goStats() {
@@ -2249,7 +2373,8 @@ function renderGuide() {
   if (!g.ok) {
     // no guide yet (a beginner, no level, a number turned down): the window stays up with just the two tabs that still work, the stat
     // table to fix a box where it is and My builds to load a saved one
-    ui.limited = true; out.hidden = false; ui.pathsPass = null;
+    // ui.qArgs goes too, so a save answering late can't draw the emptied Quests box from the last character's guide
+    ui.limited = true; out.hidden = false; ui.pathsPass = null; ui.qArgs = null;
     ui.root.querySelector('#b-big').replaceChildren();
     for (const [id] of TABS) if (id !== 'mybuilds') panelBox(id).replaceChildren();
     for (const [id] of TABS) ui.root.querySelector('[data-tab="' + id + '"]').hidden = id !== 'points' && id !== 'mybuilds';
@@ -2541,6 +2666,8 @@ function saveTarget(ign) {
   if (ui.loaded && (!ign || ui.loaded.ign.toLowerCase() === ign.toLowerCase())) return ui.loaded;
   return ign ? (ui.mineRows || []).find(b => b.ign.toLowerCase() === ign.toLowerCase()) || null : null;
 }
+// The Save button's words: the build it writes back to, or a plain Save build.
+const saveLabel = (ed, target) => ed ? 'Save changes' : target ? 'Save to ' + target.ign : 'Save build';
 function renderSave() {
   const box = ui.root.querySelector('#b-savebody'), s = me(), ed = ui.editing, target = ed || ui.loaded;
   if (!s) {
@@ -2553,7 +2680,7 @@ function renderSave() {
       : 'Saves the numbers above to your profile. Type the name once and it is remembered. Anyone can see saved builds.'),
     E('div', { class: 'b-row' },
       field('b-ign', 'Character name', target ? target.ign : ui.lastIgn, 12),
-      E('button', { id: 'b-savebtn', type: 'button', class: 'k-btn key', onclick: () => save() }, ed ? 'Save changes' : target ? 'Save to ' + target.ign : 'Save build'),
+      E('button', { id: 'b-savebtn', type: 'button', class: 'k-btn key', onclick: () => save() }, saveLabel(ed, target)),
       ed ? E('button', { type: 'button', class: 'k-btn', onclick: () => { ui.editing = null; renderSave(); } }, 'Cancel') : null),
     E('details', { class: 'b-more-details', ...(ed ? { open: '' } : {}) }, E('summary', {}, 'Where you train, a note, a screenshot (optional)'),
       E('div', { class: 'b-row' },
@@ -2582,10 +2709,20 @@ async function save(quickName, quiet) {
   if (!ign) return say('Type your character name first.');
   const v = validateStats(rawStats(), ui.form.cls);
   if (v.errors.length) return say(v.errors.join(' '));
-  const target = saveTarget(ign), fileBox = ui.root.querySelector('#b-shot'), file = fileBox && fileBox.files[0];
+  // one save at a time, from either Save button, so a double press can't write two builds
+  if (ui.saving) return;
+  ui.saving = true; if (btn) btn.disabled = true;
+  let target = saveTarget(ign);
+  // right after a reload My builds may not be here yet: wait for it, so a build of this name is updated and not saved twice
+  if (!target && ui.mineRows === null && me()) {
+    say('Checking your saved builds...');
+    await renderMine(); target = saveTarget(ign);
+    if (ui.mineRows === null) { ui.saving = false; const b2 = ui.root.querySelector('#b-savebtn'); if (b2) b2.disabled = false; return say("Couldn't check your saved builds. Try again."); }
+  }
+  const fileBox = ui.root.querySelector('#b-shot'), file = fileBox && fileBox.files[0];
   // a quick save keeps what the saved build already says; the form's boxes are only read when it is on screen
   const typed = !quiet && ui.root.querySelector('#b-trains');
-  if (btn) btn.disabled = true; say('Saving...');
+  say('Saving...');
   let shot = target ? target.shot_path || null : null, note = '';
   try {
     if (file) {
@@ -2599,14 +2736,18 @@ async function save(quickName, quiet) {
     // A replaced picture is no longer used by anything.
     if (target && target.shot_path && shot !== target.shot_path) ui.deps.api.removeShot(target.shot_path).catch(() => {});
     if (window.track) { const lv = v.stats.level; window.track('build_saved', { cls: ui.form.cls, level_band: lv < 30 ? '1-29' : lv < 50 ? '30-49' : lv < 70 ? '50-69' : '70+', is_new: target ? 0 : 1 }); }
+    const newId = !target && saved && saved.id;
+    if (newId && ui.done) ui.done[newId] = new Set();
     ui.lastIgn = ign; ui.editing = null; ui.loaded = { ...row, id: (saved && saved.id) || row.id, user_id: me() && me().user_id };
     ui.deps.store.set('bt.ign', ign);
-    renderSave(); say(note || 'Saved ' + ign + '.');
+    if (ui.form.from === 'community') { ui.form.from = 'mine'; saveForm(); }
+    // a first save shows its tick buttons straight away (before say, since drawing the guide clears its note line)
+    renderSave(); syncTicks(); say(note || 'Saved ' + ign + '.');
     loadList(); renderMine();
   } catch (e) {
     if (shot && (!target || shot !== target.shot_path)) ui.deps.api.removeShot(shot).catch(() => {});
     say("Couldn't save: " + e.message);
-  } finally { const b2 = ui.root.querySelector('#b-savebtn'); if (b2) b2.disabled = false; }
+  } finally { ui.saving = false; const b2 = ui.root.querySelector('#b-savebtn'); if (b2) b2.disabled = false; }
 }
 
 function renderFilters() {
@@ -2667,22 +2808,23 @@ function refresh() {
   const s = me(), who = (s ? s.user_id : '') + '|' + !!(ui.deps.admin && ui.deps.admin());
   if (who === ui.who) return;
   ui.who = who; ui.grind = null;
+  // ticks and My builds belong to the player: a new one starts with none known, until their list and ticks land
+  ui.done = {}; ui.fresh = { build: null, ids: new Set() }; ui.mineRows = null; ui.busy = new Set(); ui.tickNote = null;
   renderSave(); loadList(); renderMine(); renderGuide();
 }
 
 function mount(root, deps) {
   ui.root = root; ui.deps = deps; ui.data = deps.data; DATA = deps.data;
-  ui.editing = null; ui.loaded = null; ui.mineRows = []; ui.limited = false; ui.lastIgn = ''; try { ui.lastIgn = ui.deps.store.get('bt.ign') || ''; } catch { /* no saved name */ } ui.listGen = 0; ui.who = null; ui.filter = { cls: '', minLv: '', maxLv: '', sort: 'level' };
+  ui.editing = null; ui.loaded = null; ui.mineRows = null; ui.done = {}; ui.fresh = { build: null, ids: new Set() }; ui.busy = new Set(); ui.tickNote = null; ui.qArgs = null; ui.limited = false; ui.lastIgn = ''; try { ui.lastIgn = ui.deps.store.get('bt.ign') || ''; } catch { /* no saved name */ } ui.listGen = 0; ui.who = null; ui.filter = { cls: '', minLv: '', maxLv: '', sort: 'level' };
   loadForm(); loadRoads();
   const shut = open => open ? {} : { hidden: '' };
   const P = window.PixelIcons;
   // a wood sign button with its pixel picture (the Grind page's buttons); the minus is built from the same bitmap tool
   const sign = (id, icon, label, onclick, more) => E('button', { id, type: 'button', class: 'k-btn', onclick, ...more }, E('i', { 'aria-hidden': 'true' }, P.railIcon(icon)), E('span', {}, label));
   const step = (id, label, d, glyph) => E('button', { id, type: 'button', class: 'k-sq', 'aria-label': label, title: label, onclick: () => stepLevel(d) }, glyph);
-  const glyph = rows => { const t = document.createElement('template'); t.innerHTML = P.pixelSvg(rows); const s = t.content.firstChild; s.setAttribute('width', String(rows[0].length * 2)); s.setAttribute('height', String(rows.length * 2)); return s; };
-  const minus = () => glyph(['#####']), plus = () => glyph(['..#..', '..#..', '#####', '..#..', '..#..']);
+  const minus = () => pixelGlyph(['#####']), plus = () => pixelGlyph(['..#..', '..#..', '#####', '..#..', '..#..']);
   // a visitor with no class yet sees the class pills open; everyone else finds them behind Change class
-  const pickOpen = ui.fresh;
+  const pickOpen = ui.firstVisit;
   // one column: the character window (name, level, buttons, numbers), the guide window (tabs on its plank), then Save build and Community
   // builds as windows of their own when open
   root.replaceChildren(E('div', { class: 'k-col b-col' },
@@ -2717,7 +2859,7 @@ function mount(root, deps) {
                 E('h4', { class: 'b-sec' }, 'Community builds'),
                 E('p', { class: 'small' }, "Other players' characters, their stats and where they train. Load one into the calculator to see its guide."),
                 renderFilters(), E('div', { id: 'b-list' })] : []))),
-          estimatedNote())))));
+          E('p', { id: 'b-tickstatus', class: 'k-sr', role: 'status' }), estimatedNote())))));
   showTab(ui.deps.store.get('bt.btab'));
   buildForm();
   renderGuide();

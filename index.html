@@ -366,6 +366,18 @@ body.appraiser-off #tab-appraiser .soon::after { right: 5px; }
 /* a ring row about 62 tall: Scrolls, Quests and the Overview's rows share it; the money stays on one line, never squeezed by long text beside it */
 .k-row.b-srow, .k-row.b-qrow, .b-ovrow.k-row, .b-stop.k-row { padding: 4px 0 6px; }
 .k-row.b-srow > :last-child:not(:first-child), .k-row.b-qrow > :last-child:not(:first-child), .b-stop.k-row > :last-child:not(:first-child) { flex-shrink: 0; }
+/* a quest row's tick: the price and a small square check, or Done and Undo once ticked; this side never shrinks or wraps,
+   and keeps the button's 28 px in every row so a row doesn't jump when it greys */
+.k-row.b-qrow > .b-hr { flex-shrink: 0; }
+.k-row.b-qrow > .b-qend:last-child { display: flex; align-items: center; gap: var(--gap); min-height: 28px; flex-shrink: 0; white-space: nowrap; font: 700 var(--fs-md) var(--font-body); }
+.b-qtick { display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; background: var(--card); border: 2px solid var(--line); color: var(--muted); cursor: pointer; }
+.b-qtick:hover:not([aria-disabled="true"]) { border-color: var(--ink); color: var(--ink); }
+.b-qtick:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.b-qtick i, .b-qtick svg { display: block; }
+.b-qrow.is-done .b-ovt, .b-qrow.is-done .small, .b-qdone { color: var(--muted); }
+.b-qrow.is-done .b-ovt { text-decoration: line-through; }
+.b-qrow.is-done .b-icon { filter: grayscale(1); }
+#quests > .b-qnote { margin: 0; }
 .b-more, .b-dmore { display: block; background: none; border: 0; padding: 8px 0 0; color: var(--focus); font: 700 var(--fs-sm) var(--font-body); text-align: left; text-decoration: underline; cursor: pointer; }
 .b-seeall { font-weight: 700; }
 /* a row title reads in one size; the rows start at the heading's left edge */
@@ -1815,7 +1827,7 @@ const CONFIG = {
   reportUrl: 'https://sixpathcrossway.pages.dev/api/report',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-11d',
+  version: '2026-11-11e',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
@@ -2029,6 +2041,7 @@ function makeSupabaseApi(cfg) {
       post: down, remove: down, hide: down, unhide: down, block: down, isAdmin: async () => false,
       listBuilds: down, saveBuild: down, deleteBuild: down, uploadShot: down, removeShot: down, shotUrl: () => '', hideBuild: down,
       listGrind: down, getGrind: down, saveGrind: down, deleteGrind: down,
+      listQuestDone: down, addQuestDone: down, removeQuestDone: down,
       listPriceReports: down, addPriceReport: down, deletePriceReport: down, listPriceHistory: down, savePriceHistory: down };
   }
   const COLUMNS = 'id,boss_id,channel,kind,at,posted_at,user_id,user_name,hidden';
@@ -2096,6 +2109,18 @@ function makeSupabaseApi(cfg) {
       return data;
     },
     async deleteBuild(id) { check(await sb.from('builds').delete().eq('id', id)); },
+    // Quest ticks are private to the player; the database stamps who (supabase/quests-done.sql).
+    async listQuestDone(buildId) {
+      const { data, error } = await sb.from('quest_done').select('build_id, quest_id').eq('build_id', buildId);
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    async addQuestDone(buildId, questId) {
+      // 23505 is the unique index: the tick is already saved (another tab or device), which is what was asked for
+      const { error } = await sb.from('quest_done').insert({ build_id: buildId, quest_id: questId });
+      if (error && error.code !== '23505') throw new Error(error.message);
+    },
+    async removeQuestDone(buildId, questId) { check(await sb.from('quest_done').delete().eq('build_id', buildId).eq('quest_id', questId)); },
     // Appraiser: prices players report (the last 14 days, like Cozy) and the tab's daily estimates. The database stamps
     // who wrote each row itself, so nothing here sends or reads user_id.
     async listPriceReports(itemId) {

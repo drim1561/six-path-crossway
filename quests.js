@@ -151,13 +151,16 @@ function stepRow(step, Q, me) {
   const pricedIdx = items.map((it, i) => it.p != null ? i : -1).filter(i => i >= 0);
   const link = pricedIdx.length === 1 && items[pricedIdx[0]].c != null ? items[pricedIdx[0]].c : null;
   const gearLv = items.some(isGear) ? Math.max(...items.filter(isGear).map(it => it.lv)) : -Infinity;
-  return { row: { id: step.id, at: step.lv, title, right, say, pic: survivors[0].id, value, link, gearPriced }, gearLv };
+  const who = typeof step.npc === 'string' ? step.npc : nameFromSay(step.say);
+  return { row: { id: step.id, at: step.lv, title, right, say, pic: survivors[0].id, value, link, gearPriced, who }, gearLv };
 }
 
 // plan(Q, me, now) -> { open: Row[], soon: Row[], wanting: Step[] }
+// me.done (optional Set of step ids) skips those steps, so they are in none of the three.
 function plan(Q, me, now) {
   const openEntries = [], soonEntries = [], wanting = [];
   for (const step of Q.steps) {
+    if (me.done && me.done.has(step.id)) continue;
     if (!stepApplies(step, me, now)) continue;
     if (step.wants && step.wants.length && step.lv <= me.level + 5) wanting.push(step);
     const entry = stepRow(step, Q, me);
