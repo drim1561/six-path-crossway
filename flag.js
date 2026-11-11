@@ -23,7 +23,7 @@
   const TOAST_MS = 8000;
   const COPY = {
     busy: 'Taking a picture…',
-    title: 'Something off?',
+    title: 'Feeling wonky?',
     wrong: "Something's wrong", idea: 'An idea',
     place: { wrong: 'What looked wrong? A few words is fine', idea: 'What would make it better?' },
     also: 'Also sends which tab, your browser and screen size, and what the page was reading.',
@@ -36,6 +36,8 @@
     gameTooBig: 'Your game window is too big to send a picture of, so that one stays on your computer.',
     open: 'Open full size',
     shots: { page: 'This page', game: 'Your game', popout: 'Pop out' },
+    quickTitle: 'Grind feeling wonky?', quickPlace: 'What just happened? A few words is fine', quickEmpty: 'Type a few words first.',
+    quickAlso: 'Sends a picture of this and your game, your browser, screen size and what the tracker read.',
     lastRead: 'From your last Read from game', leaveLastRead: 'Leave out the picture from your last Read from game',
   };
 
@@ -145,12 +147,9 @@
     return { json: JSON.stringify({ v: obj.v, kind: obj.kind, tab: obj.tab, version: obj.version, app: obj.app, when: obj.when, stateCut: true }), cut: true };
   }
 
-  async function open(deps) {
-    const { el: E, api, config, view, reporter, button } = deps;
-    if (document.getElementById('flag-panel')) return;
-    // the words sit in their own span beside the pixel flag, and show only on a wide window
-    const labelEl = button.querySelector('.flag-txt') || button, label = labelEl.textContent;
-    button.disabled = true; labelEl.textContent = COPY.busy;
+  // The state and the pictures at the moment of the click, so the numbers match what was on screen. skip: page nodes left out of the page picture.
+  async function capture(deps, skip) {
+    const { reporter, view, config } = deps;
     const when = new Date(), signedIn = !!deps.session;
     // the state at the moment of the click, so the numbers match the picture
     const base = details({ kind: 'wrong', view, reporter, config, signedIn, pictures: {}, when });
@@ -171,7 +170,7 @@
       } catch (e) { pictures.game = 'failed'; }
       deps.game.width = 0;
     }
-    try { keep('page', await drawPage([button, document.getElementById('flag-toast')].filter(Boolean)), 'page.jpg'); } catch (e) { pictures.page = 'failed'; }
+    try { keep('page', await drawPage(skip), 'page.jpg'); } catch (e) { pictures.page = 'failed'; }
     // the Grind pop out lives in its own window; drawn as it is, if the library can
     const pop = reporter && typeof reporter.popout === 'function' ? reporter.popout() : null;
     if (pop) {
@@ -184,6 +183,73 @@
         keep('popout', blob, 'popout.png');
       } catch (e) { pictures.popout = 'failed'; }
     }
+    return { base, pictures, pics, strips, note, signedIn };
+  }
+
+  // Posts one report to the relay; resolves to null when it went, else the words to show
+  async function submit(deps, { kind, words, base, pics, strips }) {
+    const { api, config } = deps;
+    try {
+      const fd = new FormData();
+      fd.append('kind', kind);
+      fd.append('text', words);
+      fd.append('details', capDetails(base).json);
+      const token = typeof api.token === 'function' ? await api.token().catch(() => null) : null;
+      if (token) fd.append('token', token);
+      if (pics.page) fd.append('page', pics.page.blob, pics.page.name);
+      if (pics.game) strips.forEach((b, i) => fd.append(i ? 'game' + (i + 1) : 'game', b, i ? 'game-' + (i + 1) + '.png' : 'game.png'));
+      if (pics.popout) fd.append('popout', pics.popout.blob, pics.popout.name);
+      const r = await fetch(config.reportUrl, { method: 'POST', body: fd });
+      if (r.ok) return null;
+      let body = null;
+      try { body = await r.json(); } catch (e) { /* not the relay talking */ }
+      return (body && typeof body.error === 'string' && body.error) || COPY.failed;
+    } catch (e) { return COPY.failed; }
+  }
+
+  // The small form for the Grind pop out: a few words and Send, the pictures taken in the background from the click.
+  // Returns { el, ready }; onDone(sent) when it is sent or cancelled. The caller puts el where it likes
+  function quick(deps) {
+    const E = deps.el;
+    let sending = false, done = false;
+    const snap = capture(deps, []);
+    const text = E('textarea', { class: 'gq-text', maxlength: '1000', placeholder: COPY.quickPlace, 'aria-label': COPY.quickPlace });
+    const msg = E('p', { class: 'gq-msg', role: 'status' });
+    const sendBtn = E('button', { type: 'button', class: 'k-btn key sm gq-send', onclick: () => send() }, COPY.send);
+    const cancel = E('button', { type: 'button', class: 'k-btn sm gq-cancel', onclick: () => finish(false) }, COPY.cancel);
+    const el = E('section', { class: 'gq', 'aria-label': COPY.title },
+      E('div', { class: 'gq-h' }, E('h2', {}, COPY.quickTitle)),
+      E('div', { class: 'gq-body' }, text, E('p', { class: 'gq-small' }, COPY.quickAlso), msg, E('div', { class: 'gq-row' }, cancel, sendBtn)));
+    function finish(sent) {
+      if (done) return;
+      done = true;
+      snap.then(s => { for (const p of Object.values(s.pics)) URL.revokeObjectURL(p.url); }, () => {});
+      if (deps.onDone) deps.onDone(sent);
+    }
+    async function send() {
+      if (sending || done) return;
+      const words = text.value.trim();
+      if (!words) { msg.textContent = COPY.quickEmpty; return; }
+      sending = true; sendBtn.disabled = cancel.disabled = true; sendBtn.textContent = COPY.sending; msg.textContent = '';
+      const s = await snap;
+      const error = await submit(deps, { kind: 'wrong', words, base: Object.assign({}, s.base, { kind: 'wrong', from: 'pop out', pictures: Object.assign({}, s.pictures) }), pics: s.pics, strips: s.strips });
+      sending = false; sendBtn.disabled = cancel.disabled = false; sendBtn.textContent = COPY.send;
+      if (error) { msg.textContent = error; return; }
+      // the thanks shows in the pop out itself for a moment, then the form goes
+      el.classList.add('gq-sent'); sendBtn.disabled = cancel.disabled = text.disabled = true; msg.textContent = COPY.thanks;
+      setTimeout(() => finish(true), 1600);
+    }
+    el.addEventListener('keydown', e => { if (e.key === 'Escape' && !sending) finish(false); });
+    return { el, focus: () => text.focus() };
+  }
+
+  async function open(deps) {
+    const { el: E, api, config, view, reporter, button } = deps;
+    if (document.getElementById('flag-panel')) return;
+    // the words sit in their own span beside the pixel flag, and show only on a wide window
+    const labelEl = button.querySelector('.flag-txt') || button, label = labelEl.textContent;
+    button.disabled = true; labelEl.textContent = COPY.busy;
+    const { base, pictures, pics, strips, note, signedIn } = await capture(deps, [button, document.getElementById('flag-toast')].filter(Boolean));
     labelEl.textContent = label; button.hidden = true;
 
     let kind = 'wrong', sending = false;
@@ -246,24 +312,7 @@
       if (!words && !Object.keys(pics).length) { say(COPY.empty); return; }
       // once it's on its way nothing can be taken back, so Cancel, the ✕s and the pick wait with Send
       sending = true; sendBtn.disabled = true; sendBtn.textContent = COPY.sending; say(''); lock(true);
-      let error = null;
-      try {
-        const fd = new FormData();
-        fd.append('kind', kind);
-        fd.append('text', words);
-        fd.append('details', capDetails(current()).json);
-        const token = typeof api.token === 'function' ? await api.token().catch(() => null) : null;
-        if (token) fd.append('token', token);
-        if (pics.page) fd.append('page', pics.page.blob, pics.page.name);
-        if (pics.game) strips.forEach((b, i) => fd.append(i ? 'game' + (i + 1) : 'game', b, i ? 'game-' + (i + 1) + '.png' : 'game.png'));
-        if (pics.popout) fd.append('popout', pics.popout.blob, pics.popout.name);
-        const r = await fetch(config.reportUrl, { method: 'POST', body: fd });
-        if (!r.ok) {
-          let body = null;
-          try { body = await r.json(); } catch (e) { /* not the relay talking */ }
-          error = (body && typeof body.error === 'string' && body.error) || COPY.failed;
-        }
-      } catch (e) { error = COPY.failed; }
+      const error = await submit(deps, { kind, words, base: current(), pics, strips });
       sending = false; sendBtn.disabled = false; sendBtn.textContent = COPY.send;
       if (error) { lock(false); say(error); return; }
       close();
@@ -283,5 +332,5 @@
     setTimeout(() => toast.remove(), TOAST_MS);
   }
 
-  window.Flag = { open, details, capDetails };
+  window.Flag = { open, quick, details, capDetails };
 })();

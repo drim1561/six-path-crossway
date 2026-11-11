@@ -402,7 +402,7 @@ function mount(root, deps) {
   // when it needs you. Hero (timers stacked on the right), Bar (one slim row), Column (down the side) and Corner (timers side
   // by side). Each layout has its own window size for one potion tile and for two
   const SP = {};
-  const LAYOUTS = { hero: { 1: [720, 242], 2: [720, 242] }, bar: { 1: [985, 80], 2: [1105, 80] }, column: { 1: [278, 504], 2: [278, 596] }, corner: { 1: [516, 313], 2: [516, 313] } };
+  const LAYOUTS = { hero: { 1: [720, 242], 2: [720, 242] }, bar: { 1: [1020, 80], 2: [1140, 80] }, column: { 1: [312, 504], 2: [312, 596] }, corner: { 1: [516, 313], 2: [516, 313] } };
   const ORDER = Object.keys(LAYOUTS);
   let layout = ORDER.includes(store.get(KEY_LAYOUT)) ? store.get(KEY_LAYOUT) : 'hero';
   // the app's own (the site's pop-out can't be see-through, so there both stay at 100%): See-through fades the panel's
@@ -467,6 +467,7 @@ function mount(root, deps) {
       el('span', { class: 'g-btns' },
         layWrap,
         el('button', { type: 'button', class: 'g-reset k-sq', title: 'Reset average', 'aria-label': 'Reset average', onclick: () => resetAverage() }, railIcon('reset')),
+        SP.rep = deps.report ? el('button', { type: 'button', class: 'g-rep k-sq', title: 'Grind feeling wonky?', 'aria-label': 'Grind feeling wonky?', 'aria-pressed': 'false', onclick: () => toggleReport() }, railIcon('flag')) : null,
         SP.gear = el('button', { type: 'button', class: 'g-gear k-sq', title: 'Settings', 'aria-label': 'Settings', 'aria-pressed': 'false', onclick: () => toggleSettings() }, railIcon('gear')),
         // the app's overlay has no frame: ✕ closes just it and brings the main window up, the session goes on (Show the
         // overlay brings it back). The site's pop-out has the browser's own ✕
@@ -666,8 +667,21 @@ function mount(root, deps) {
     settings.update(settingsState());   // before it's measured: who is signed in changes its height
     if (overlay.showSettings(settings.el)) SP.gear.setAttribute('aria-pressed', 'true');
   }
-  function closeSettings() { overlay.hideSettings(); SP.gear.setAttribute('aria-pressed', 'false'); }
-  function toggleSettings() { if (overlay.settingsOpen()) closeSettings(); else openSettings(); }
+  function closeSettings() { overlay.hideSettings(); SP.gear.setAttribute('aria-pressed', 'false'); if (SP.rep) SP.rep.setAttribute('aria-pressed', 'false'); reportOpen = false; }
+  function toggleSettings() { if (overlay.settingsOpen() && !reportOpen) closeSettings(); else { if (reportOpen) closeSettings(); openSettings(); } }
+  // The flag on the pop out: a small form in Settings' place (the pop out grows to hold it), so a report goes from the pop out itself
+  // while the game is in front. The pictures are taken at the press, before the form is on screen
+  let reportOpen = false, reporting = false;
+  function toggleReport() {
+    if (reportOpen) { closeSettings(); return; }
+    if (reporting || !deps.report || !overlay.win()) return;
+    if (overlay.settingsOpen()) closeSettings();
+    reporting = true;
+    Promise.resolve(deps.report(() => closeSettings(), sent => { if (sent) setStatus('Sent, thanks!'); })).then(f => {
+      if (!f || !overlay.showSettings(f.el)) return;
+      reportOpen = true; SP.rep.setAttribute('aria-pressed', 'true'); f.focus();
+    }).catch(() => {}).then(() => { reporting = false; });
+  }
   // Sign out from Settings: this device's sessions take over from the account's
   function signOut() { return deps.signOut().then(() => { listSessions(); render(); }); }
   // in the app Settings is a window of its own, and Sign in and Open my profile act on the main window: it comes to the

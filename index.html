@@ -1005,6 +1005,18 @@ body.g-ov .g-strip.g-moving { cursor: grabbing; }
 /* the pictures follow the button: 2 CSS pixels to the art pixel while u is 2, 1 once the panel is dragged small (u rounds down), so they never spill out of their 14u square */
 .g-strip .k-sq svg { width: calc(9 * var(--u)); height: calc(9 * var(--u)); }
 .g-strip .k-sq svg[viewBox="0 0 7 7"] { width: calc(7 * var(--u)); height: calc(7 * var(--u)); }
+.g-btns .g-rep[aria-pressed="true"] { --face: var(--accent); --face-hi: var(--key-hi); --face-lo: var(--key-lo); color: var(--key-ink); }
+/* the pop out's report form (flag.js quick): sits where Settings does, the same plank and paper */
+.gq { container-type: inline-size; background: var(--surface); color: var(--ink); font-family: var(--font-body); font-size: var(--fs-md); font-weight: 600; line-height: 1.4; }
+.gq-h { display: flex; align-items: center; height: 32px; padding: 0 12px; background: var(--art-plank) 0 0 / 64px 32px repeat-x; image-rendering: pixelated; color: var(--bar-ink); }
+.gq-h h2 { margin: 0; font-family: var(--font-title); font-size: var(--tt-s); font-weight: 400; line-height: 1.2; color: var(--bar-ink); }
+.gq-body { display: grid; gap: var(--gap); padding: 12px 14px; box-shadow: inset 0 4px 0 var(--pad-shade); }
+.gq-text { display: block; width: 100%; min-height: 76px; resize: vertical; box-sizing: border-box; background: var(--card); border: 2px solid var(--card-o); border-radius: var(--corner); padding: 8px 10px; font: inherit; color: inherit; }
+.gq-small { margin: 0; font-size: var(--fs-sm); color: var(--muted); }
+.gq-msg { margin: 0; color: var(--bad); font-weight: 700; font-size: var(--fs-sm); }
+.gq-msg:empty { display: none; }
+.gq-sent .gq-msg { color: var(--ink); }
+.gq-row { display: flex; justify-content: flex-end; gap: 8px; }
 .g-btns .g-gear[aria-pressed="true"] { --face: var(--accent); --face-hi: var(--key-hi); --face-lo: var(--key-lo); color: var(--key-ink); }
 /* ⇆ Layout's row: the four layouts as pictures with their names over the panel, under the buttons (beside them in Bar,
    which has no room under), the one showing lit. Solid whatever See-through says: it's only there while it's being used.
@@ -1176,6 +1188,7 @@ body.g-ov .g-strip.g-moving { cursor: grabbing; }
 .g-strip[data-layout="bar"] .g-lamp { order: -1; flex: none; width: 8.4em; font-size: .9em; align-self: stretch; padding-right: .6em; border-right: var(--u) solid var(--div); color: var(--ink); }
 .g-strip[data-layout="bar"] .g-lw { flex-direction: column; align-items: flex-start; gap: 0; }
 .g-strip[data-layout="bar"] .g-lt { max-width: 100%; white-space: normal; }
+/* Bar: a tab that is done keeps only its tick, so the three fit under the words */
 /* Bar and Column have the least room beside the words: a tab done is only its tick, one to go only its name */
 .g-strip:is([data-layout="bar"], [data-layout="column"]) .g-flip { gap: .45em; }
 .g-strip:is([data-layout="bar"], [data-layout="column"]) .g-flip b:not(.done, .fix)::before { content: none; }
@@ -1213,7 +1226,7 @@ body.g-ov .g-strip.g-moving { cursor: grabbing; }
    fit it. On the paper in the site's theme (the tokens, no colors of its own): a plank title bar, wood sign buttons, flat
    switches. Its sections stack as in the mockup, and sit side by side when the window is wide. Fonts as longhands, as on
    .g-kn: the pop-out copies these rules by their text. Should the window not grow, Settings scrolls rather than being cut off */
-html:has(body.g-pip #g-set) { overflow-y: auto; }
+html:has(body.g-pip #g-set), html:has(body.g-pip .gq) { overflow-y: auto; }
 #g-set { container-type: inline-size; background: var(--surface); color: var(--ink); font-family: var(--font-body); font-size: var(--fs-md); font-weight: 600; line-height: 1.4; }
 .g-set-h { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px 0 12px; background: var(--art-plank) 0 0 / 64px 32px repeat-x; image-rendering: pixelated; color: var(--bar-ink); }
 #g-set .g-set-h h2 { flex: 1; margin: 0; font-family: var(--font-title); font-size: var(--tt-s); font-weight: 400; line-height: 1.2; color: var(--bar-ink); }
@@ -1512,7 +1525,7 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
 .k-btn.flag { position: fixed; right: 15px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 50; margin-top: 0; gap: 12px; padding: 8px 15px 13px; box-shadow: 3px 3px 0 var(--win-shadow); }
 .flag[hidden] { display: none; }
 .flag-ico { display: inline-flex; }
-@media (max-width: 1559px) { .k-btn.flag { padding-inline: 12px; } .flag:not(:disabled) .flag-txt { display: none; } }
+
 #flag-panel { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 51; display: flex; flex-direction: column; width: min(420px, calc(100vw - 32px)); max-height: calc(100vh - 32px); }
 #flag-panel .k-bar h2 { margin: 0; font: inherit; }
 #flag-panel .k-pad { display: grid; gap: var(--gap); min-height: 0; overflow: auto; }
@@ -1845,7 +1858,7 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
   <p class="small smallprint">Fan made, not affiliated with Nexon. Game art comes from the MapleStory client and belongs to Nexon. Item prices come from Cozy Market, and damage formulas and drop lists from meowdb and community players.</p>
   </div>
 </main>
-<button id="flag" class="flag k-btn key" type="button" aria-label="Something off?"><span class="flag-ico" aria-hidden="true"></span><span class="flag-txt">Something off?</span></button>
+<button id="flag" class="flag k-btn key" type="button" aria-label="Feeling wonky?"><span class="flag-ico" aria-hidden="true"></span><span class="flag-txt">Feeling wonky?</span></button>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
 <script>
 const CONFIG = {
@@ -1855,7 +1868,7 @@ const CONFIG = {
   reportUrl: 'https://sixpathcrossway.pages.dev/api/report',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-11g',
+  version: '2026-11-11h',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
@@ -2575,7 +2588,9 @@ function loadGrind() {
   const pickups = PICKUPS_ON ? Promise.all([script('pickup-lines.js'), json('pickup-templates.json')]).then(([, tpl]) => window.PickupLines.setTemplates(tpl)) : Promise.resolve();
   grindLoading = Promise.all([scripts, pickups, json('grind.json'), json('grind-pictures.json')]).then(([, , data, pictures]) => {
     reporters.grind = window.Grind.mount($('grind-root'), { api, store, el, data, pictures, session: () => state.session, signIn: () => signIn(),
-      signOut: () => api.signOut().catch(() => {}).then(() => setSession(null)), app: APP, appDownload: CONFIG.appDownload });
+      signOut: () => api.signOut().catch(() => {}).then(() => setSession(null)), app: APP,
+      // the flag on the pop out: the small report form, its pictures taken now
+      report: (close, done) => loadFlag().then(() => window.Flag.quick({ api, el, config: CONFIG, view: 'grind', reporter: reporters.grind, game: window.Reader && window.Reader.grab ? window.Reader.grab() : null, gameAt: null, session: state.session, onDone: sent => { done(sent); close(); } })), appDownload: CONFIG.appDownload });
   }).catch(() => {
     grindLoading = null; window.track('load_failed', { what: 'grind' });
     $('grind-root').replaceChildren(el('p', { class: 'empty' }, "The grind tracker didn't load. Try reloading the page."));
