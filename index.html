@@ -110,6 +110,7 @@ window.BT_ERRORS = [];
   --receipt-ink: #33261a;
   --receipt-muted: #5a4630;
   --due-bg: #f7b53f; --due-fg: #38200f; --due-bar: var(--due-bg);
+  --lamp-ok: #5fd35a; --lamp-wait: #ffb02e; --lamp-bad: #f0553c; --lamp-idle: #a89f8a; --lamp-hi: rgba(255, 255, 255, .45);
   --soon-bg: #c9dfd6; --soon-fg: #1d5a6b; --soon-bar: #7cb7f0;
   --up-bg: #cfe0a7; --up-fg: #2a4415; --up-dot: #6cbf3f;
   --watch-bg: #f6dc8e; --watch-fg: #5f3a06; --watch-bar: repeating-linear-gradient(45deg, #ffcf8a 0 6px, #ffe3b8 6px 12px);
@@ -185,6 +186,7 @@ window.BT_ERRORS = [];
   --stage-sky: #593c62;
   --receipt: #f6ecd0;
   --due-bg: #ffb648; --due-fg: #2a1a00; --due-bar: var(--due-bg);
+  --lamp-ok: #6ee068; --lamp-wait: #ffb648; --lamp-bad: #ff6b55; --lamp-idle: #8f937f; --lamp-hi: rgba(255, 255, 255, .35);
   --soon-bg: #16343a; --soon-fg: #8fd8e0; --soon-bar: #4b8fd1;
   --up-bg: #21402a; --up-fg: #b8efb0; --up-dot: #6cbf3f;
   --watch-bg: #3c3312; --watch-fg: #ffd66b; --watch-bar: repeating-linear-gradient(45deg, #8a6420 0 6px, #5a4214 6px 12px);
@@ -1096,15 +1098,29 @@ body.g-ov .g-strip.g-moving { cursor: grabbing; }
 .g-alert button { padding: 0 .6em; border: var(--u) solid var(--wood-o); border-radius: var(--corner); background-color: var(--btn); box-shadow: inset 0 var(--u) 0 var(--btn-hi), inset 0 calc(-1 * var(--u)) 0 var(--btn-lo); color: var(--btn-ink); font-family: inherit; font-size: 1em; font-weight: 700; line-height: inherit; cursor: pointer; }
 .g-l3b { display: flex; gap: .4em; }
 .g-l3b button { float: none; margin-left: 0; }
-/* flipping the bag: the three tabs with the same ticks as the main card's checklist, so progress shows instead of one
-   stuck looking sentence. One line where that's all there's room for (Bar, Hero); Column and Corner have the height
-   to stack them */
-.g-flip { display: flex; gap: .7em; }
-.g-flip b { font-weight: 700; }
-.g-flip b::before { content: '… '; color: var(--muted); font-weight: 700; }
-.g-flip b.fix::before { content: '! '; color: var(--over-fg); }
-.g-flip b.done::before { content: '✓ '; color: var(--up-fg); }
-.g-strip[data-layout="column"] .g-flip, .g-strip[data-layout="corner"] .g-flip { flex-direction: column; gap: .1em; }
+/* the light, first in the title bar (Bar: at the left end): a square lamp in its state's colour and two or three words,
+   green reading everything, amber it wants something (EXP still counts), red paused, grey not running. Its box takes no
+   room of its own in the title bar (fit() measures the panel's longest line): it has what the title bar has left, and
+   the wordmark and the map step aside for words that ask for something */
+.g-lamp { display: flex; align-items: center; gap: .45em; flex: 1 1 0; width: 0; min-width: calc(5 * var(--u)); font-size: .88em; font-weight: 700; line-height: 1.25; white-space: nowrap; }
+.g-dot { flex: none; width: calc(5 * var(--u)); height: calc(5 * var(--u)); background-color: var(--lamp, var(--lamp-idle)); box-shadow: 0 0 0 var(--u) var(--wood-o), inset var(--u) var(--u) 0 var(--lamp-hi); }
+.g-lamp.ok { --lamp: var(--lamp-ok); } .g-lamp.wait { --lamp: var(--lamp-wait); } .g-lamp.bad { --lamp: var(--lamp-bad); }
+.g-lw { display: flex; align-items: baseline; gap: .7em; min-width: 0; overflow: hidden; }
+.g-lt { overflow: hidden; text-overflow: ellipsis; }
+/* flipping the bag: the three tabs tick off beside the words, so progress shows */
+.g-flip { display: flex; flex: none; gap: .55em; font-weight: 600; }
+.g-flip b { font-weight: 600; }
+.g-flip b::before { content: '… '; }
+.g-flip b.fix::before { content: '! '; }
+.g-flip b.done::before { content: '✓ '; }
+.g-top:has(.g-lamp:is(.wait, .bad)) .g-brand, .g-strip:not([data-layout="column"]) .g-top:has(.g-flip:not([hidden])) .g-el { display: none; }
+.g-strip[data-layout="corner"] .g-brand { display: none; }
+/* Column: the light takes a plank of its own under the map and the buttons */
+.g-strip[data-layout="column"] .g-top { flex-wrap: wrap; height: auto; row-gap: 0; background-repeat: repeat; }
+.g-strip[data-layout="column"] .g-top > * { height: calc(16 * var(--u)); }
+.g-strip[data-layout="column"] .g-top > :is(.g-el, .g-lamp, .g-btns) { align-items: center; }
+.g-strip[data-layout="column"] .g-lamp { order: 3; flex: none; width: 100%; }
+.g-strip[data-layout="column"] .g-lw { flex: 1 1 0; width: 0; }
 /* while it shows, the window stays as it is and so does the size of the text (fit() measures the panel without it). Its room
    comes from the small lines under the numbers, which step aside in Hero, Column and Corner; Bar's is further down */
 .g-strip:is([data-layout="hero"], [data-layout="column"], [data-layout="corner"]):has(> .g-l3:not([hidden])) .g-ks { display: none; }
@@ -1154,7 +1170,18 @@ body.g-ov .g-strip.g-moving { cursor: grabbing; }
    title bar, just the frame */
 .g-strip[data-layout="bar"] { display: flex; flex-wrap: wrap; align-items: center; gap: 0 .6em; padding: .25em .77em; }
 .g-strip[data-layout="bar"] .g-body { flex: 1 1 0; display: flex; align-items: center; gap: .6em; }
-.g-strip[data-layout="bar"] .g-top { order: 1; flex: none; align-self: flex-start; height: auto; margin: 0; padding: 0; background: none; box-shadow: none; }
+/* (its title bar is no box: the light goes to the left end, the buttons to the right) */
+.g-strip[data-layout="bar"] .g-top { display: contents; }
+.g-strip[data-layout="bar"] .g-btns { order: 1; align-self: flex-start; margin-left: 0; }
+.g-strip[data-layout="bar"] .g-lamp { order: -1; flex: none; width: 8.4em; font-size: .9em; align-self: stretch; padding-right: .6em; border-right: var(--u) solid var(--div); color: var(--ink); }
+.g-strip[data-layout="bar"] .g-lw { flex-direction: column; align-items: flex-start; gap: 0; }
+.g-strip[data-layout="bar"] .g-lt { max-width: 100%; white-space: normal; }
+/* Bar and Column have the least room beside the words: a tab done is only its tick, one to go only its name */
+.g-strip:is([data-layout="bar"], [data-layout="column"]) .g-flip { gap: .45em; }
+.g-strip:is([data-layout="bar"], [data-layout="column"]) .g-flip b:not(.done, .fix)::before { content: none; }
+.g-strip:is([data-layout="bar"], [data-layout="column"]) .g-flip b.fix::before { content: '!'; }
+.g-strip:is([data-layout="bar"], [data-layout="column"]) .g-flip b.done::before { content: '✓'; }
+.g-strip:is([data-layout="bar"], [data-layout="column"]) .g-flip b.done span { display: none; }
 .g-strip[data-layout="bar"] :is(.g-brand, .g-el, .g-uw, .g-ks, .g-pcap, .g-plf) { display: none; }
 .g-strip[data-layout="bar"] .g-k-exp { flex: none; display: grid; grid-template-columns: auto auto; align-items: center; column-gap: .6em; }
 .g-strip[data-layout="bar"] .g-kh { display: contents; }
@@ -1181,7 +1208,7 @@ body.g-ov .g-strip.g-moving { cursor: grabbing; }
 .g-strip[data-layout="column"] .g-seg:has([data-w="since"]:not([hidden])) button { padding-inline: .4em; }
 /* Bar's alert: one line in what's left of its 80 pixels, the tiles' second line making room */
 .g-strip[data-layout="bar"]:has(> .g-l3:not([hidden])) .g-pleft { display: none; }
-.g-strip[data-layout="bar"] .g-alert { order: 2; flex-basis: 100%; padding: 0 .5em; border: 0; background: none; box-shadow: none; overflow: hidden; white-space: nowrap; }
+.g-strip[data-layout="bar"] .g-alert { order: 2; flex-basis: 100%; padding: 0 .5em; border: 0; background: none; box-shadow: none; color: var(--ink); overflow: hidden; white-space: nowrap; }
 /* Settings (grind-settings.js), opened by ⚙ Settings on the top strip: under the panel inside the pop-out, which grows to
    fit it. On the paper in the site's theme (the tokens, no colors of its own): a plank title bar, wood sign buttons, flat
    switches. Its sections stack as in the mockup, and sit side by side when the window is wide. Fonts as longhands, as on
@@ -1828,7 +1855,7 @@ const CONFIG = {
   reportUrl: 'https://sixpathcrossway.pages.dev/api/report',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-11f',
+  version: '2026-11-11g',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };

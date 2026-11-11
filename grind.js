@@ -89,29 +89,31 @@ function health(f) {
   C.mesos = f.meso.unclear ? { state: 'wait', text: "can't read clearly" } : f.meso.at == null ? { state: 'wait', text: 'waiting' } : { state: mesoStale ? 'wait' : 'ok', text: ago(f.meso.at) };
 
   const stuck = ['exp', 'potions', 'level'].some(k => C[k].state === 'bad');
-  const say = (state, text, extra) => ({ checks: C, nudge: Object.assign({ state, text }, extra), stuck });
+  // short: the two or three words the light says (the pop out's, and the page's lantern); text: the whole sentence
+  const say = (state, short, text, extra) => ({ checks: C, nudge: Object.assign({ state, short, text }, extra), stuck });
   const app = !!f.app;   // the Windows app has no share step: Start picks the game
   // f.stopped: the player pressed Stop, so in the app the game wasn't lost
-  if (!f.sharing) return say('idle', app ? (!f.hasSession ? 'Press Start to begin' : f.stopped ? 'Stopped. Press Start to carry on' : 'Lost the game window. Press Start to carry on')
-    : f.hasSession ? 'Share stopped. Share the game window again to carry on' : 'Share the game window to start');
-  if (C.exp.state === 'bad') return say('bad', app ? "Can't see your EXP bar, paused. Is the game open, with the bar showing?" : "Can't see your EXP bar, paused. Is the game still shared, with the bar showing?");
-  if (stuckOn(f.size)) return say('bad', app ? "Can't measure the game. Is it minimized, or very small?" : "Can't measure the game. Share the game window itself, at full size");
-  if (C.potions.state === 'bad') return say('bad', app ? "Can't read your quickslot numbers. Make the game window bigger, or press Find my game again" : "Can't read your quickslot numbers. Make the game window bigger, or share it again");
-  if (C.level.state === 'bad') return say('bad', "Can't read your level. Try Find my game again");
-  if (f.exp.ok == null || f.size.ok == null) return say('wait', 'Looking for your game…');
-  if (f.potNone) return say('wait', 'Put the potions you drink on your quickslots so they count');
+  if (!f.sharing) return app ? (!f.hasSession ? say('idle', 'Press Start', 'Press Start to begin') : f.stopped ? say('idle', 'Stopped', 'Stopped. Press Start to carry on') : say('idle', 'Lost the game', 'Lost the game window. Press Start to carry on'))
+    : f.hasSession ? say('idle', 'Share stopped', 'Share stopped. Share the game window again to carry on') : say('idle', 'Not sharing yet', 'Share the game window to start');
+  if (C.exp.state === 'bad') return say('bad', "Can't see EXP bar", app ? "Can't see your EXP bar, paused. Is the game open, with the bar showing?" : "Can't see your EXP bar, paused. Is the game still shared, with the bar showing?");
+  if (stuckOn(f.size)) return say('bad', "Can't measure game", app ? "Can't measure the game. Is it minimized, or very small?" : "Can't measure the game. Share the game window itself, at full size");
+  if (C.potions.state === 'bad') return say('bad', "Can't read quickslots", app ? "Can't read your quickslot numbers. Make the game window bigger, or press Find my game again" : "Can't read your quickslot numbers. Make the game window bigger, or share it again");
+  if (C.level.state === 'bad') return say('bad', "Can't read level", "Can't read your level. Try Find my game again");
+  if (f.exp.ok == null || f.size.ok == null) return say('wait', 'Looking for game', 'Looking for your game…');
+  if (f.potNone) return say('wait', 'No quickslot potions', 'Put the potions you drink on your quickslots so they count');
   // Count my loot (f.loot: { on, pictures, sets, refillAfter }): a flip through the bag also reads the mesos, so it comes
   // first, once the item pictures are in (a flip before then reads nothing)
-  if (f.loot && f.loot.on && f.loot.pictures === false) return say('wait', 'Loading the item pictures for Count my loot');
-  // flip: the pop out shows the three tabs' own checkmarks (bagTabStates in renderHealth) instead of this sentence
-  if (f.loot && f.loot.on && !f.loot.sets) return say('wait', 'Open your bag and flip through Equip, Use and Etc, scrolling to the bottom of each', { flip: true });
-  if (f.loot && f.loot.on && f.loot.refillAfter) return say('wait', 'In town? Flip through your bag so your loot counts', { flip: true });
+  if (f.loot && f.loot.on && f.loot.pictures === false) return say('wait', 'Loading pictures', 'Loading the item pictures for Count my loot');
+  // flip: the pop out's light shows the three tabs' own checkmarks beside its words (bagTabStates in renderHealth)
+  if (f.loot && f.loot.on && !f.loot.sets) return say('wait', 'Flip your bag', 'Open your bag and flip through Equip, Use and Etc, scrolling to the bottom of each', { flip: true });
+  if (f.loot && f.loot.on && f.loot.refillAfter) return say('wait', 'Flip your bag', 'In town? Flip through your bag so your loot counts', { flip: true });
   // with the pickup lines on, the bag is only asked for again when they can't be trusted (loot.needsFlip)
-  if (f.loot && f.loot.on && f.loot.needsFlip) return say('wait', "Flip through your bag again, the pickup lines can't be trusted for now", { flip: true });
-  if (f.meso.unclear) return say('wait', "Can't read your meso total clearly yet. Move the mouse off it");
-  if (f.meso.at == null) return say('wait', 'Open your inventory for a moment so mesos count');
-  if (mesoStale) return say('wait', 'Mesos last seen ' + ago(f.meso.at) + '. Open your inventory for a moment');
-  return say('ok', 'Reading everything');
+  if (f.loot && f.loot.on && f.loot.needsFlip) return say('wait', 'Flip your bag', "Flip through your bag again, the pickup lines can't be trusted for now", { flip: true });
+  if (f.meso.unclear) return say('wait', 'Mouse off mesos', "Can't read your meso total clearly yet. Move the mouse off it");
+  if (f.meso.at == null) return say('wait', 'Open your bag', 'Open your inventory for a moment so mesos count');
+  if (mesoStale) return say('wait', 'Open your bag', 'Mesos last seen ' + ago(f.meso.at) + '. Open your inventory for a moment');
+  // green: everything is read. f.killed: the session has gained EXP
+  return say('ok', f.killed ? 'Grinding' : 'Ready to grind', 'Reading everything');
 }
 
 // the panel's potion tiles. slots: Object.values(s.slots).concat(s.retired || []), where a retired slot is flagged
@@ -400,7 +402,7 @@ function mount(root, deps) {
   // when it needs you. Hero (timers stacked on the right), Bar (one slim row), Column (down the side) and Corner (timers side
   // by side). Each layout has its own window size for one potion tile and for two
   const SP = {};
-  const LAYOUTS = { hero: { 1: [720, 242], 2: [720, 242] }, bar: { 1: [845, 80], 2: [1005, 80] }, column: { 1: [278, 470], 2: [278, 562] }, corner: { 1: [516, 313], 2: [516, 313] } };
+  const LAYOUTS = { hero: { 1: [720, 242], 2: [720, 242] }, bar: { 1: [985, 80], 2: [1105, 80] }, column: { 1: [278, 504], 2: [278, 596] }, corner: { 1: [516, 313], 2: [516, 313] } };
   const ORDER = Object.keys(LAYOUTS);
   let layout = ORDER.includes(store.get(KEY_LAYOUT)) ? store.get(KEY_LAYOUT) : 'hero';
   // the app's own (the site's pop-out can't be see-through, so there both stay at 100%): See-through fades the panel's
@@ -456,6 +458,10 @@ function mount(root, deps) {
   SP.segs[3].hidden = true;
   const strip = el('div', { class: 'g-strip', id: 'g-strip', 'data-layout': layout, 'data-pots': '1', hidden: '' },
     el('div', { class: 'g-top' },
+      // the light: is it ready, in a colour and two or three words (green reading, amber it wants something, red paused,
+      // grey not running), with the bag's three tabs ticking off beside it during a flip
+      SP.lamp = el('span', { class: 'g-lamp idle', role: 'status' }, el('i', { class: 'g-dot', 'aria-hidden': 'true' }),
+        el('span', { class: 'g-lw' }, SP.lampT = el('span', { class: 'g-lt' }), SP.lampF = el('span', { class: 'g-flip', hidden: '' }))),
       el('span', { class: 'g-brand' }, 'Six Path Crossway'),
       el('span', { class: 'g-el' }, SP.elMap = el('span', { class: 'g-elm' }), SP.elTime = el('span', { class: 'g-elt' })),
       el('span', { class: 'g-btns' },
@@ -479,7 +485,7 @@ function mount(root, deps) {
   // the window the panel lives in; on the site a window dragged to a new size keeps that size for the layout and tile
   // count it showed when it was dragged (the app's overlay can't be dragged: the page alone sizes it). The app's overlay
   // and Settings are windows of their own, titled as the app's windows are
-  const overlay = window.GrindOverlay.create({ strip, home: root, app, title: app ? 'Six Path EXP Tracker overlay' : 'Grind', setTitle: 'Six Path EXP Tracker settings', hide: () => [SP.l3],
+  const overlay = window.GrindOverlay.create({ strip, home: root, app, title: app ? 'Six Path EXP Tracker overlay' : 'Grind', setTitle: 'Six Path EXP Tracker settings', hide: () => [SP.l3, strip.dataset.layout === 'column' && SP.lamp],
     sizeKey: () => strip.dataset.layout + potCount(),
     onResize: (w, h, key) => { const all = jget(KEY_SIZES, {}); all[key] = [Math.round(w), Math.round(h)]; jset(KEY_SIZES, all); },
     // the window closed (Settings with it, if it was open); the share and the session go on
@@ -1378,7 +1384,7 @@ function mount(root, deps) {
   function renderHealth() {
     const s = session;
     const h = lastHealth = health({ t: Date.now(), app: !!app, sharing: st.sharing, stopped: !!st.stopped, hasSession: !!s, exp: st.h.exp, level: st.h.level, levelNow: st.level,
-      size: st.h.size, counts: st.h.counts, potNone: st.potNone, potCount: st.potCount,
+      size: st.h.size, counts: st.h.counts, potNone: st.potNone, potCount: st.potCount, killed: !!s && (s.gainExp > 0 || s.gainPct > 0),
       meso: { at: s && s.meso && s.meso.last ? s.meso.last.t : null, unclear: !!(st.mesoOpen && st.mesoUnclear) },
       loot: { on: lootOn, pictures: lootReady, sets: s && s.bag ? s.bag.sets : 0, refillAfter: !!s && !PICKUPS && GS().inTown(s),
         needsFlip: st.needsFlip = PICKUPS && !!s && lootOn && GS().pickNeedsFlip(s, Date.now(), { sinceT: st.lineT, movedT: st.movedT, inTown: GS().inTown(s) }) } });
@@ -1386,7 +1392,8 @@ function mount(root, deps) {
     const core = ['exp', 'level', 'potions'].map(k => h.checks[k].state);
     const ps = !st.sharing ? 'idle' : core.includes('bad') ? 'bad' : core.every(x => x === 'ok') ? 'ok' : 'wait';
     V.pill.className = 'k-lamp g-pill ' + ps + (ps === 'idle' ? ' off' : '');
-    const pillText = ps === 'idle' ? (app ? (s ? 'Stopped' : 'Not started') : s ? 'Share stopped' : 'Not sharing yet') : ps === 'bad' ? "Can't read your game" : ps === 'ok' ? 'Reading · Lv ' + (st.level || '·') : 'Looking for your game…';
+    // its words are the light's (the pop out says the same), with the level once it's read
+    const pillText = h.nudge.short + (ps !== 'idle' && ps !== 'bad' && st.level ? ' · Lv ' + st.level : '');
     // written only when it changes: the pill is a live region, and this runs on every frame
     if (V.pillText.textContent !== pillText) V.pillText.textContent = pillText;
     // the one thing to do, only when there is one (a saved session being looked at isn't live); a check that matters failing is
@@ -1402,12 +1409,22 @@ function mount(root, deps) {
       V.nudge.hidden = false; V.nudge.className = 'g-nudge bad';
       V.nudge.replaceChildren('This page needs a newer app. ', el('a', { href: deps.appDownload || RELEASES, target: '_blank', rel: 'noopener' }, 'Update the app'));
     }
-    // the pop out's alert: the one thing to do, live only; a mesos jump to answer comes before anything amber
+    // the pop out's light says it all in a colour and a few words, live only; a saved run being looked at is grey
     const jump = s && s.meso && s.meso.jump;
     const savedRun = !!stripView();
-    // drawn again only when what it says changes: this runs on every frame, and a press spanning one would lose its click
+    const ask = !!jump && !savedRun && h.nudge.state !== 'bad';   // a mesos jump to answer comes before anything amber
+    const lamp = savedRun ? ['idle', 'Saved run'] : ask ? ['wait', 'Check your mesos'] : [h.nudge.state, h.nudge.short];
+    const tabs = !savedRun && !ask && h.nudge.flip ? bagTabStates(s && s.bag) : null;
+    // drawn again only when what it says changes: this runs on every frame, and the light is a live region
+    const lampKey = lamp.join() + (tabs ? tabs.map(x => x.tab + x.state).join() : '');
+    if (SP.lampSays !== lampKey) {
+      SP.lampSays = lampKey;
+      SP.lamp.className = 'g-lamp ' + lamp[0]; SP.lampT.textContent = lamp[1];
+      SP.lampF.hidden = !tabs; SP.lampF.replaceChildren(...(tabs || []).map(({ tab, state }) => el('b', { class: state }, el('span', {}, tab))));
+    }
+    // the alert under the numbers is only for what needs a button: a mesos jump to answer, and Find my game again when it's stuck
     const alertSays = (key, draw) => { if (SP.l3Says !== key) { SP.l3Says = key; draw(); } };
-    if (jump && !savedRun && h.nudge.state !== 'bad') {
+    if (ask) {
       SP.l3.hidden = false; SP.l3.className = 'g-l3 g-alert wait';
       alertSays('jump ' + jump.amount, () => {
         const out = el('button', { type: 'button', onclick: () => answerJump(true) }, 'Leave it out'), keep = el('button', { type: 'button', class: 'g-keep', onclick: () => answerJump(false) }, 'Keep it');
@@ -1416,14 +1433,8 @@ function mount(root, deps) {
       });
       return;
     }
-    SP.l3.hidden = savedRun || h.nudge.state === 'ok';
+    SP.l3.hidden = savedRun || h.nudge.state !== 'bad';
     SP.l3.className = 'g-l3 g-alert ' + h.nudge.state;
-    // flipping the bag: the three tabs' own checkmarks instead of the sentence, so it reads as progress, not as stuck
-    if (h.nudge.flip) {
-      const tabs = bagTabStates(s && s.bag);
-      alertSays('flip ' + tabs.map(x => x.tab + x.state).join(), () => SP.l3.replaceChildren(el('span', { class: 'g-flip' }, tabs.map(({ tab, state }) => el('b', { class: state }, tab)))));
-      return;
-    }
     alertSays([h.nudge.state, h.nudge.text, h.stuck].join(), () => SP.l3.replaceChildren(h.nudge.text, h.stuck ? el('button', { type: 'button', onclick: () => refind() }, railIcon('reset'), ' Find my game again') : ''));
   }
 
