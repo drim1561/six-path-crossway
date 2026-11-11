@@ -15,7 +15,12 @@ window.track = function (name, params) { try { var e = { event: name }; for (var
 // script runs. Capture phase, so a script or picture that fails to load counts too.
 window.BT_ERRORS = [];
 (function () {
-  var keep = function (e) { var a = window.BT_ERRORS; a.push(e); if (a.length > 20) a.shift(); };
+  var sent = 0;
+  var keep = function (e) {
+    var a = window.BT_ERRORS; a.push(e); if (a.length > 20) a.shift();
+    // anonymous error counts for analytics: a short message and the file name only, at most 5 a page
+    try { if (sent++ < 5 && window.track) window.track('js_error', { msg: String(e.msg).slice(0, 100), src: String(e.src || '').split('/').pop().split('?')[0].slice(0, 60) }); } catch (x) {}
+  };
   var cut = function (s) { return String(s || '').slice(0, 2000); };
   addEventListener('error', function (e) {
     var t = e.target;
@@ -1810,7 +1815,7 @@ const CONFIG = {
   reportUrl: 'https://sixpathcrossway.pages.dev/api/report',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-11b',
+  version: '2026-11-11c',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
@@ -2372,6 +2377,7 @@ function renderAuth() {
 // along there). The tab is kept in this browser tab for ten minutes and opened again once the page sees the session.
 const BACK = 'bt.back';
 function signIn() {
+  window.track('sign_in_started', { view: viewNow() }); try { sessionStorage.setItem('bt.signing', '1'); } catch { /* fine */ }
   try { if (location.hash) sessionStorage.setItem(BACK, JSON.stringify({ hash: location.hash, t: Date.now() })); } catch { /* storage blocked: the front page it is */ }
   return api.signIn();
 }
@@ -2386,6 +2392,7 @@ async function setSession(s) {
   state.session = s;
   state.admin = s ? await api.isAdmin().catch(() => false) : false;
   if (s) comeBack();
+  try { if (s && sessionStorage.getItem('bt.signing')) { sessionStorage.removeItem('bt.signing'); window.track('sign_in_done', {}); } } catch { /* fine */ }
   renderAuth();
   if (TIMER_ON) render();
   if (window.Builds && window.Builds.refresh) window.Builds.refresh();
@@ -2441,11 +2448,12 @@ function viewNow() {
 let lastViewSent = null;
 // Anonymous button counts (names only, never anything typed or read): one delegated listener so the tabs' own code stays untouched.
 const TRACKED = [['#b-readbtn', 'read_from_game'], ['#b-savebtn', 'save_build'], ['#g-pop', 'pop_out'], ['#g-sharearea button', 'share_game_window'],
-  ['#g-loot', 'count_my_loot'], ['#flag', 'something_off']];
+  ['#g-loot', 'count_my_loot'], ['#flag', 'something_off'], ['#theme', 'theme_toggle']];
 document.addEventListener('click', e => {
   try {
-    const t = e.target.closest && e.target.closest('button, [role=tab]');
+    const t = e.target.closest && e.target.closest('button, [role=tab], a[href]');
     if (!t) return;
+    if (t.tagName === 'A') { const u = new URL(t.href, location.href); if (u.host !== location.host) window.track('outbound_click', { host: u.host, view: viewNow(), app: APP ? 1 : 0 }); return; }
     if (t.getAttribute('role') === 'tab' && t.dataset.tab) return window.track('builds_tab', { tab: t.dataset.tab, app: APP ? 1 : 0 });
     for (const [sel, name] of TRACKED) if (t.matches(sel)) return window.track(name, { view: viewNow(), app: APP ? 1 : 0 });
   } catch { /* tracking never breaks the page */ }
@@ -2458,7 +2466,7 @@ function showView() {
   }
   if (view !== lastViewSent) {   // a virtual page view per tab (the # part is dropped by GA4), once per change
     lastViewSent = view;
-    window.track('page_view', { page_path: '/' + view, page_title: view, app: APP ? 1 : 0 });
+    window.track('page_view', { page_path: '/' + view + location.search, page_title: view, app: APP ? 1 : 0 });
   }
   if (view === 'builds') loadBuilds();
   if (view === 'appraiser' && APPRAISER_ON) loadAppraiser();
@@ -2477,7 +2485,7 @@ function loadBuilds() {
   buildsLoading = Promise.all([script, data]).then(([, d]) => {
     reporters.builds = window.Builds.mount($('builds-root'), { api, store, el, data: d, session: () => state.session, admin: () => state.admin, signIn: () => signIn() });
   }).catch(() => {
-    buildsLoading = null;
+    buildsLoading = null; window.track('load_failed', { what: 'builds' });
     $('builds-root').replaceChildren(el('p', { class: 'empty' }, "The calculator didn't load. Try reloading the page."));
   });
   return buildsLoading;
@@ -2516,7 +2524,7 @@ function loadGrind() {
     reporters.grind = window.Grind.mount($('grind-root'), { api, store, el, data, pictures, session: () => state.session, signIn: () => signIn(),
       signOut: () => api.signOut().catch(() => {}).then(() => setSession(null)), app: APP, appDownload: CONFIG.appDownload });
   }).catch(() => {
-    grindLoading = null;
+    grindLoading = null; window.track('load_failed', { what: 'grind' });
     $('grind-root').replaceChildren(el('p', { class: 'empty' }, "The grind tracker didn't load. Try reloading the page."));
   });
   return grindLoading;
