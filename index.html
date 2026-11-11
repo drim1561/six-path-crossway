@@ -195,9 +195,11 @@ h1 { font-size: var(--tt-m); margin: 0; }
    grass, the tabs are signposts (a plank with an arrow tip, a post and grass), Sign in and the theme button are wood
    sign buttons. Words sit on wood here, never on the scene. */
 .topbar { color: var(--bar-ink); }
-.topbar .in { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0 18px; min-height: 122px; padding: 14px 22px 4px; }
+/* wide screens: the logo lines up with the left edge of the panels (the Grind and Builds columns are 1120 wide less their padding) and the tabs and sign in with the right edge, the rail still runs edge to edge */
+.topbar { --hpad: max(22px, calc((100vw - 1088px) / 2)); }
+.topbar .in { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0 18px; min-height: 122px; padding: 14px var(--hpad) 4px; }
 /* the rail: a full-width plank under the signs, so the header has a floor instead of open sky above the panel */
-.topbar .rail { flex: 0 0 100%; height: 8px; margin-top: 2px; background: var(--art-plank, var(--wood)) 0 0 / 64px 8px repeat-x; image-rendering: pixelated; box-shadow: 0 2px 0 var(--wood-o); position: relative; z-index: 1; }
+.topbar .rail { flex: 0 0 calc(100% + 2 * var(--hpad)); margin-inline: calc(-1 * var(--hpad)); height: 8px; margin-top: 2px; background: var(--art-plank, var(--wood)) 0 0 / 64px 8px repeat-x; image-rendering: pixelated; box-shadow: 0 2px 0 var(--wood-o); position: relative; z-index: 1; }
 .logo { position: relative; isolation: isolate; margin: 0 0 14px; padding: 8px 18px 14px; font: 400 var(--tt-logo)/1 var(--font-title); color: var(--logo); text-shadow: 2px 2px 0 var(--logo-e); white-space: nowrap; }
 .logo::after { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--btn);
   clip-path: polygon(2px 0, calc(100% - 2px) 0, calc(100% - 2px) 2px, 100% 2px, 100% calc(100% - 2px), calc(100% - 2px) calc(100% - 2px), calc(100% - 2px) 100%, 2px 100%, 2px calc(100% - 2px), 0 calc(100% - 2px), 0 2px, 2px 2px);
@@ -1756,7 +1758,7 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
 
   <section>
   <h3>Builds</h3>
-  <p class="lead">Pick your class and type just your level to get a leveling guide: where to train, where your skill and ability points go, and what to wear and scroll. The Quests tab lists what to do next, from quests open now to ones coming up.</p>
+  <p class="lead">Pick your class and type just your level to get a leveling guide: where to train, where your skill and ability points go, and what to wear and scroll. Skill paths compares two ways to spend your skill points, with the hours each one takes, and the Quests tab lists what to do next, from quests open now to ones coming up.</p>
   <div class="how-mock how-mock-b" role="img" aria-label="Example of a guide row: a monster, where to train, and EXP an hour">
     <div class="how-row"><span class="how-ring"><span class="how-mob how-mob-pig"></span></span><span class="how-name">Train here now<small>Example row</small></span><span class="how-num">112K<small>EXP an hour</small></span></div>
     <div class="how-row"><span class="how-ring"><span class="how-skill"></span></span><span class="how-name">Next skill point<small>Example row</small></span><span class="how-num">Heal<small>level 3</small></span></div>
@@ -1785,7 +1787,7 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
   </section>
   <section>
   <h3>Discord</h3>
-  <p>Something look off, or have an idea? Press Something off? in the bottom corner of any page (on a small screen it shrinks to just its flag) and it comes straight to Rimmah, with a picture of what you saw. Fixes and news go up in our Discord. <a id="how-discord" href="https://discord.gg/sHupB2U7tD" target="_blank" rel="noopener">Join our Discord</a></p>
+  <p>Something look off, or have an idea? Press Something off? in the bottom corner of any page and it comes straight to Rimmah, with a picture of what you saw. Fixes and news go up in our Discord. <a id="how-discord" href="https://discord.gg/sHupB2U7tD" target="_blank" rel="noopener">Join our Discord</a></p>
 
   </section>
   <div class="timer-only">
@@ -1795,7 +1797,7 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
   </section>
   </div>
 
-  <p class="small smallprint">Fan made, not affiliated with Nexon. Game art comes from the MapleStory client and belongs to Nexon.</p>
+  <p class="small smallprint">Fan made, not affiliated with Nexon. Game art comes from the MapleStory client and belongs to Nexon. Item prices come from Cozy Market, and damage formulas and drop lists from meowdb and community players.</p>
   </div>
 </main>
 <button id="flag" class="flag k-btn key" type="button" aria-label="Something off?"><span class="flag-ico" aria-hidden="true"></span><span class="flag-txt">Something off?</span></button>
@@ -1808,7 +1810,7 @@ const CONFIG = {
   reportUrl: 'https://sixpathcrossway.pages.dev/api/report',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-11a',
+  version: '2026-11-11b',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
