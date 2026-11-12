@@ -2849,7 +2849,7 @@ function mount(root, deps) {
   // one column: the character window (name, level, buttons, numbers), the guide window (tabs on its plank), then Save build and Community
   // builds as windows of their own when open
   root.replaceChildren(E('div', { class: 'k-col b-col' },
-    E('section', { id: 'b-char', class: 'k-win b-win' },
+    E('section', { id: 'b-char', class: 'k-win k-grass b-win' },
       E('div', { class: 'k-bar' }, E('h2', { id: 'b-name' }), E('small', { id: 'b-branch' }),
         E('button', { id: 'b-chgclass', type: 'button', class: 'b-chg', 'aria-controls': 'b-picker', 'aria-expanded': String(pickOpen), onclick: () => toggle('b-picker') }, 'Change class'),
         E('span', { class: 'push b-lv' }, E('span', { class: 'b-lvl' }, 'Level'),

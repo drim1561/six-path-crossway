@@ -66,7 +66,7 @@
     const H = await loadLib();
     const w = Math.max(1, document.documentElement.clientWidth);
     const filter = n => !skip.includes(n) && drawable(n);
-    // the page's color fills the canvas under the drawing, and the drawn body itself is clear: the forest scene is a fixed canvas behind
+    // the page's color fills the canvas under the drawing, and the drawn body itself is clear: the night scene is a fixed element behind
     // everything (z-index -1), and an opaque body in the drawing would paint over it, leaving bare paper in the picture
     const opts = ratio => ({ pixelRatio: ratio, filter, imagePlaceholder: BLANK, backgroundColor: getComputedStyle(document.body).backgroundColor, style: { backgroundColor: 'transparent' } });
     const draw = async ratio => {
@@ -123,7 +123,7 @@
       // the Windows app's version when the report comes from inside it (grind-app/), else null
       app: (window.sixPathApp && window.sixPathApp.version) || null,
       browser: navigator.userAgent, screen: [screen.width, screen.height], window: [innerWidth, innerHeight], dpr: window.devicePixelRatio || 1,
-      theme: document.documentElement.dataset.theme || 'light', signedIn: !!signedIn, onlyGrind: document.body.classList.contains('only-grind'),
+      theme: 'night', signedIn: !!signedIn, onlyGrind: document.body.classList.contains('only-grind'),
       errors: (window.BT_ERRORS || []).slice(-20), inputs: inputsOf(view), pictures: Object.assign({}, pictures),
     };
     if (reporter && typeof reporter.report === 'function') {

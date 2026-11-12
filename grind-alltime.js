@@ -226,7 +226,7 @@ function build({ el, pics, mapName, mobName }) {
   }
   const ghost = g => {
     const w = Math.round(g.h * PIG_W / PIG_H), halo = Math.round(w * 0.42), left = g.mid ? 'calc(100% * ' + g.x.toFixed(3) + ' - ' + (w / 2) + 'px)' : 'calc((100% - ' + w + 'px) * ' + g.x.toFixed(3) + ')';
-    return [el('div', { class: 'g-at-ghost' + (g.big ? ' big' : '') + (g.flip ? ' flip' : ''), style: 'background-image:url(' + PIG + ');background-size:auto ' + g.h + 'px;width:' + w + 'px;height:' + g.h + 'px;left:' + left + ';top:' + Math.round(g.top) + 'px' }),
+    return [el('div', { class: 'g-at-ghost' + (g.big ? ' big' : '') + (g.flip ? ' flip' : ''), style: '-webkit-mask-image:url(' + PIG + ');mask-image:url(' + PIG + ');-webkit-mask-size:auto ' + g.h + 'px;mask-size:auto ' + g.h + 'px;width:' + w + 'px;height:' + g.h + 'px;left:' + left + ';top:' + Math.round(g.top) + 'px' }),
       el('img', { class: 'g-at-halo', alt: '', src: haloUrl(), style: 'width:' + halo + 'px;height:' + Math.round(halo * 2 / 7) + 'px;left:calc(' + left + ' + ' + Math.round((w - halo) / 2) + 'px);top:' + Math.round(g.top - 4) + 'px' })];
   };
   function drawPen(n) {

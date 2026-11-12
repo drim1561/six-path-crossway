@@ -1934,7 +1934,7 @@ function mount(root, deps) {
     const pot = (pic, n, name) => el('span', { class: 'pot', title: fmt(n) + ' ' + name }, pic ? el('img', { src: pic, alt: name }) : name + ' ', el('b', {}, fmt(n)));
     sessions.replaceChildren(...shown.map(r => {
       const x = runRow(r, rows, { lemon: LEMON_IDS, meat: MEAT_IDS, fmtK, shortMap: panelMap });
-      return el('button', { type: 'button', class: 'g-run' + (x.edge ? ' ' + x.edge : ''), onclick: () => openSession(r) },
+      return el('button', { type: 'button', class: 'g-run k-dash' + (x.edge ? ' ' + x.edge : ''), onclick: () => openSession(r) },
         el('span', { class: 'where' }, el('b', {}, x.map), el('small', {}, x.when + (x.best ? ' · your best' : ''))),
         el('span', { class: 'xp' }, el('b', {}, x.expHr != null ? fmtK(x.expHr) : '·'), el('small', {}, 'an hour'), x.vs ? arrowed(el('em', { class: x.vs.sign === '▲' ? 'up' : 'down' }), x.vs.text) : null),
         pot(lemonPic, x.lemons, 'Lemons'), pot(meatPic, x.meat, 'Meat'), el('span', { class: 'ms' }, el('b', {}, x.mesos || '·')));

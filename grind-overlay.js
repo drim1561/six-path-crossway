@@ -157,35 +157,16 @@ function create(o) {
     // turned Clicks pass through off, or the call failed). It asks again once the mouse comes back to a button
     call(o.app, 'holdClicks', true).then(r => { if (r === true && holding) strip.classList.add('g-hold'); }, () => {});
   }
-  // the windows that follow the page's theme: toggling it on the page reaches the open pop-out, overlay and Settings at once
-  const themed = new Set();
-  let themeWatch = null;
-  function unfollow(win) {
-    themed.delete(win);
-    if (!themed.size && themeWatch) { themeWatch.disconnect(); themeWatch = null; }
-  }
-  function followTheme(win) {
-    themed.add(win);
-    if (themeWatch) return;
-    try {
-      themeWatch = new MutationObserver(() => {
-        const t = document.documentElement.dataset.theme;
-        for (const x of themed) {
-          try { if (x.closed) unfollow(x); else if (t) x.document.documentElement.dataset.theme = t; else delete x.document.documentElement.dataset.theme; } catch (e) { unfollow(x); }
-        }
-      });
-      themeWatch.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-    } catch (e) { /* the window keeps the theme it opened with */ }
-  }
-  // a new window takes the page's styles and theme, and is told apart by its body's class (g-pip on the site, g-ov for
+  // a new window takes the page's styles, and is told apart by its body's class (g-pip on the site, g-ov for
   // the app's overlay, g-setwin for the app's Settings)
   function dress(win, cls, title) {
     const d = win.document;
-    followTheme(win);
     for (const ss of document.styleSheets) {
       try { const s = d.createElement('style'); s.textContent = Array.from(ss.cssRules).map(r => r.cssText).join('\n'); d.head.append(s); } catch (e) { /* a stylesheet from another site */ }
     }
-    if (document.documentElement.dataset.theme) d.documentElement.dataset.theme = document.documentElement.dataset.theme;
+    // the page swaps its big (over 2 KB) --night-* pictures for blob: addresses (see index.html); the copied rules would bring the
+    // data pictures back, and the report picture copies them into every node, so the new window gets the same blobs
+    try { const inl = document.documentElement.style; for (let i = 0; i < inl.length; i++) if (inl[i].indexOf('--night-') === 0) d.documentElement.style.setProperty(inl[i], inl.getPropertyValue(inl[i])); } catch (e) { /* the data pictures stay */ }
     d.title = title;
     d.body.className = cls;
     return d;
@@ -229,7 +210,7 @@ function create(o) {
   // the window closed: the panel goes back to the page (once, however it was seen), and Settings closes with it
   function gone(pip) {
     if (pipWin !== pip) return;
-    pipWin = null; unfollow(pip); strip.hidden = true; strip.style.fontSize = '';
+    pipWin = null; strip.hidden = true; strip.style.fontSize = '';
     clearTimeout(sizeTimer); clearTimeout(pressT); asked = null; unmet = null;
     if (holding) { holding = false; strip.classList.remove('g-hold'); }   // its window is gone, and the app's hold with it
     if (setEl) { setEl.remove(); setEl = null; }   // it opens next time without
@@ -305,14 +286,13 @@ function create(o) {
   // the app's Settings window closed by itself (the app, or Alt+F4): the same as its ×
   function setGone(win) {
     if (setWin !== win) return;
-    unfollow(win);
     setWin = null;
     hideSettings();
     if (o.onSettingsClose) o.onSettingsClose();
   }
   function shutSetWin() {
     const w = setWin;
-    setWin = null; if (w) unfollow(w);
+    setWin = null;
     if (w && !w.closed) try { w.close(); } catch (e) { /* already going */ }
   }
   function hideSettings() {
@@ -323,8 +303,7 @@ function create(o) {
     if (pipWin && panel) sizeTo(panel[0], panel[1]);
     fit();
   }
-  // closing stops the theme being followed for the pop-out at once (its pagehide may come late, or never in a window that was only asked to close)
-  const close = () => { if (pipWin) { try { pipWin.close(); } catch (e) { /* already gone */ } unfollow(pipWin); } };
+  const close = () => { if (pipWin) { try { pipWin.close(); } catch (e) { /* already gone */ } } };
   return { open, win: () => pipWin, resize, fit, close, showSettings, hideSettings, settingsOpen: () => !!setEl };
 }
 window.GrindOverlay = { create };

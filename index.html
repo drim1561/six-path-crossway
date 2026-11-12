@@ -33,110 +33,40 @@ window.BT_ERRORS = [];
   });
 })();
 </script>
-<script>
-// Theme before first paint: the player's saved choice, else their system setting.
-(function () {
-  var t = null;
-  try { t = localStorage.getItem('bt.theme'); } catch (e) { /* blocked storage */ }
-  if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  document.documentElement.dataset.theme = t;
-})();
-</script>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" crossorigin="anonymous" href="https://fonts.googleapis.com/css2?family=Bree+Serif&family=Cabin:wght@600;700&family=Asap:wght@600;700&display=swap">
-<link rel="stylesheet" href="forest-art.css">
-<script src="forest-scene.js"></script>
+<link rel="stylesheet" href="night-art.css">
+<script>
+/* Report pictures copy every inherited custom property into every node, so a --night-* picture over 2 KB (the 94 KB bark) goes to a blob:
+   address before first paint. The small ones stay data: because report pictures draw pseudo element art only from data: addresses. */
+(function () {
+  var cs = getComputedStyle(document.documentElement);
+  for (var i = 0; i < cs.length; i++) {
+    try {
+      var nm = cs[i]; if (nm.indexOf('--night-') !== 0) continue;
+      var v = cs.getPropertyValue(nm).trim(); if (v.length <= 2048) continue;
+      var m = v.match(/^url\(\s*["']?data:([^;,"')]+);base64,([^"')]+)["']?\s*\)$/); if (!m) continue;
+      var bin = atob(m[2]), u8 = new Uint8Array(bin.length); for (var k = 0; k < bin.length; k++) u8[k] = bin.charCodeAt(k);
+      document.documentElement.style.setProperty(nm, 'url("' + URL.createObjectURL(new Blob([u8], { type: m[1] })) + '")');
+    } catch (e) { /* this picture stays as it is */ }
+  }
+})();
+</script>
 <script src="pixel-icons.js"></script>
 <style>
 :root {
-  color-scheme: light;
-  --page: #f6e6d0;
-  --surface: #f9f0da;
-  --card: #fffbee;
-  --card-o: #6e4524;
-  --card-hi: #ffffff;
-  --card-lo: #dcc9a3;
-  --ink: #1f1004;
-  --num: #1f1004;
-  --muted: #4b3117;
-  --num-big: #6e2f00;
-  --good: #14501a;
-  --exp: #0d4d5f;
-  --focus: #0d4d5f;
-  --bad: #8f2b18;
-  --dot: #6e4524;
-  --div: #c9b48a;
-  --wood-o: #2a1606;
-  --wood-hi: #b5824f;
-  --wood: #7a5230;
-  --wood-g: #6a4626;
-  --wood-lo: #4a2e18;
-  --bar-ink: #fff6df;
-  --bar-muted: #f6e3bd;
-  --btn-hi: #b98a55;
-  --btn: #7a5230;
-  --btn-lo: #40260f;
-  --btn-ink: #fff6df;
-  --key-hi: #ffe39a;
-  --accent: #f7b53f;
-  --key-lo: #a8640f;
-  --key-ink: #1f1004;
-  --lemon: #ffe98f;
-  --lemon-ink: #2b1d02;
-  --meat: #f9cdaa;
-  --meat-ink: #3a1706;
-  --warn: #f9cdaa;
-  --warn-ink: #5e1a0b;
-  --warn-e: #8f2b18;
-  --seg-e: #1f1004;
-  --pill: #3a2414;
-  --pill-ink: #ffe9ae;
-  --pill-ink-y: #d8f0c8;
-  --disc: #f4e9cd;
-  --win-shadow: rgba(31,16,4,.45);
-  --pad-shade: rgba(64,38,15,.16);
-  --glass: #f6e6c6;
-  --glass-e: #7f5331;
-  --j-lemon: #f7c33f;
-  --j-lemon-t: #ffe79a;
-  --j-meat: #e58a5a;
-  --j-meat-t: #f7bd9e;
-  --logo: #fff3d6;
-  --logo-e: #3a2414;
-  --sign-off-ink: #1f1004;
-  --post-off: #a79a85;
-  --stage-sky: #f2efd2;
-  --receipt: #fffdf6;
-  --receipt-ink: #33261a;
-  --receipt-muted: #5a4630;
-  --due-bg: #f7b53f; --due-fg: #38200f; --due-bar: var(--due-bg);
-  --lamp-ok: #5fd35a; --lamp-wait: #ffb02e; --lamp-bad: #f0553c; --lamp-idle: #a89f8a; --lamp-hi: rgba(255, 255, 255, .45);
-  --soon-bg: #c9dfd6; --soon-fg: #1d5a6b; --soon-bar: #7cb7f0;
-  --up-bg: #cfe0a7; --up-fg: #2a4415; --up-dot: #6cbf3f;
-  --watch-bg: #f6dc8e; --watch-fg: #5f3a06; --watch-bar: repeating-linear-gradient(45deg, #ffcf8a 0 6px, #ffe3b8 6px 12px);
-  --over-bg: #ecbf9c; --over-fg: #7c2412; --over-bar: repeating-linear-gradient(45deg, #f2a3a7 0 6px, #f9d2d4 6px 12px);
-  --surface-2: var(--card); --line: var(--div); --row-line: #e6d6b3; --track: #ecdcb8;
-  --btn-line: var(--btn-lo); --btn-k: var(--btn-lo); --btn-k-ink: var(--btn-ink); --now: var(--bad);
-  --halo: var(--surface);
-  --corner: 0; --corner-dot: 0; --gap: 12px;
-  --fs-xs: 13px; --fs-tag: 14px; --fs-sm: 15px; --fs-md: 17px; --fs-lg: 19px;
-  --tt-s: 19px; --tt-m: 24px; --tt-l: 30px; --tt-logo: 36px;
-  --n-s: 17px; --n-m: 25px; --n-l: 36px; --n-xl: 50px;
-  --font-title: 'Bree Serif', Georgia, serif;
-  --font-body: Cabin, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-num: Asap, Cabin, system-ui, sans-serif;
-}
-:root[data-theme="dark"] {
   color-scheme: dark;
-  --page: #211d3d;
-  --surface: #17211c;
-  --card: #212e28;
-  --card-o: #0b100d;
+  --page: #04110f;
+  --scene-hi: #1b5a52; --scene-mid: #0b2a25; --scene-lo: #04110f;
+  --surface: rgba(9,38,33,.9);
+  --mint-line: rgba(160,255,220,.4);
+  --card: rgba(160,255,220,.12);
+  --card-o: rgba(160,255,220,.3);
   --card-hi: #34463b;
   --card-lo: #101814;
-  --ink: #fdf6e3;
-  --num: #fdf6e3;
-  --muted: #d6d6bf;
+  --ink: #e6fff0;
+  --num: #ffffff;
+  --muted: #c9f7dc;
   --num-big: #ffd66b;
   --good: #9bf095;
   --exp: #9be3ea;
@@ -145,20 +75,22 @@ window.BT_ERRORS = [];
   --dot: #5a7364;
   --div: #3f5a4b;
   --wood-o: #0b100d;
-  --wood-hi: #7f9a7a;
   --wood: #7a5230;
-  --wood-g: #6a4626;
   --wood-lo: #4a2e18;
   --bar-ink: #fff6df;
   --bar-muted: #f3e3c4;
   --btn-hi: #c9a06e;
   --btn: #8f6238;
-  --btn-lo: #40260f;
-  --btn-ink: #fff8e8;
-  --key-hi: #ffe9ae;
-  --accent: #ffc75a;
+  --btn-lo: #2c1806;
+  --btn-ink: #fff6df;
+  --key-hi: #ffe39a;
+  --accent: #f7b53f;
   --key-lo: #a8640f;
-  --key-ink: #241400;
+  --key-ink: #2b1d02;
+  --lime: #c8f56a; --lime-hi: #e6ffa8; --lime-lo: #86b030; --lime-ink: #16360a;
+  --glow: #ffd98a; --fly: #fff7b0;
+  --ground: #1c4412; --ground-line: #2f6a1e;
+  --credit: #9fc4b3;
   --lemon: #3e3a17;
   --lemon-ink: #fff0ae;
   --meat: #472a1e;
@@ -170,7 +102,6 @@ window.BT_ERRORS = [];
   --pill: #14130f;
   --pill-ink: #ffe9ae;
   --pill-ink-y: #d8f0c8;
-  --disc: #1f3327;
   --win-shadow: rgba(0,0,0,.55);
   --pad-shade: rgba(0,0,0,.2);
   --glass: #0e1915;
@@ -181,79 +112,99 @@ window.BT_ERRORS = [];
   --j-meat-t: #f2a57e;
   --logo: #fff3d6;
   --logo-e: #3a2414;
-  --sign-off-ink: #d5cdb9;
-  --post-off: #3f3a30;
-  --stage-sky: #593c62;
   --receipt: #f6ecd0;
+  --receipt-ink: #33261a;
+  --receipt-muted: #5a4630;
   --due-bg: #ffb648; --due-fg: #2a1a00; --due-bar: var(--due-bg);
-  --lamp-ok: #6ee068; --lamp-wait: #ffb648; --lamp-bad: #ff6b55; --lamp-idle: #8f937f; --lamp-hi: rgba(255, 255, 255, .35);
+  --lamp-wait: #ffb648; --lamp-bad: #ff6b55; --lamp-idle: #8f937f; --lamp-hi: rgba(255, 255, 255, .35);
   --soon-bg: #16343a; --soon-fg: #8fd8e0; --soon-bar: #4b8fd1;
   --up-bg: #21402a; --up-fg: #b8efb0; --up-dot: #6cbf3f;
   --watch-bg: #3c3312; --watch-fg: #ffd66b; --watch-bar: repeating-linear-gradient(45deg, #8a6420 0 6px, #5a4214 6px 12px);
   --over-bg: #40261b; --over-fg: #ffb08a; --over-bar: repeating-linear-gradient(45deg, #6a2f36 0 6px, #43222a 6px 12px);
-  --row-line: #26352d; --track: #1c2a23; --halo: #0b100d;
+  --surface-2: var(--card); --line: var(--div); --row-line: rgba(160,255,220,.35); --track: #1c2a23;
+  --btn-line: var(--btn-lo); --btn-k: var(--btn-lo); --btn-k-ink: var(--btn-ink); --now: var(--bad);
+  --halo: #04110f;
+  --gap: 12px;
+  --r-frame: 26px 30px 24px 28px; --r-glass: 17px 20px 15px 18px; --r-card: 12px; --r-btn: 14px 16px 18px 15px; --r-pill: 999px;
+  --fs-xs: 13px; --fs-tag: 14px; --fs-sm: 15px; --fs-md: 17px; --fs-lg: 19px;
+  --tt-s: 19px; --tt-m: 24px; --tt-l: 30px; --tt-logo: 36px;
+  --n-s: 17px; --n-m: 25px; --n-l: 36px; --n-xl: 50px;
+  --font-title: 'Bree Serif', Georgia, serif;
+  --font-body: Cabin, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-num: Asap, Cabin, system-ui, sans-serif;
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--page); color: var(--ink); font: 600 var(--fs-md)/1.45 var(--font-body); font-synthesis: none; }
 main { max-width: 1200px; margin: 0 auto; padding: 16px; }
 h1 { font-size: var(--tt-m); margin: 0; }
 
-/* top of the site (Trail Signs): no band, the header floats over the scene, 122px tall. The logo is a wood sign with
-   grass, the tabs are signposts (a plank with an arrow tip, a post and grass), Sign in and the theme button are wood
-   sign buttons. Words sit on wood here, never on the scene. */
-.topbar { color: var(--bar-ink); }
-/* wide screens: the logo lines up with the left edge of the panels (the Grind and Builds columns are 1120 wide less their padding) and the tabs and sign in with the right edge, the rail still runs edge to edge */
+/* top of the site (Night glow): no band, the header floats over the scene, 122px tall. The logo is a bark sign with a few moss
+   tufts, the tabs are pills on a slim glass strip, Sign in is a bark button. Words sit on bark or glass, never on the scene. */
+.topbar { color: var(--ink); }
+/* wide screens: the logo lines up with the left edge of the panels (the Grind and Builds columns are 1120 wide less their padding) and the tabs and sign in with the right edge */
 .topbar { --hpad: max(22px, calc((100vw - 1088px) / 2)); }
 .topbar .in { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0 18px; min-height: 122px; padding: 14px var(--hpad) 4px; }
-/* the rail: a full-width plank under the signs, so the header has a floor instead of open sky above the panel */
-.topbar .rail { flex: 0 0 calc(100% + 2 * var(--hpad)); margin-inline: calc(-1 * var(--hpad)); height: 8px; margin-top: 2px; background: var(--art-plank, var(--wood)) 0 0 / 64px 8px repeat-x; image-rendering: pixelated; box-shadow: 0 2px 0 var(--wood-o); position: relative; z-index: 1; }
-.logo { position: relative; isolation: isolate; margin: 0 0 14px; padding: 8px 18px 14px; font: 400 var(--tt-logo)/1 var(--font-title); color: var(--logo); text-shadow: 2px 2px 0 var(--logo-e); white-space: nowrap; }
-.logo::after { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--btn);
-  clip-path: polygon(2px 0, calc(100% - 2px) 0, calc(100% - 2px) 2px, 100% 2px, 100% calc(100% - 2px), calc(100% - 2px) calc(100% - 2px), calc(100% - 2px) 100%, 2px 100%, 2px calc(100% - 2px), 0 calc(100% - 2px), 0 2px, 2px 2px);
-  box-shadow: inset 0 0 0 2px var(--wood-o), inset 0 -4px 0 2px var(--btn-lo), inset 2px 2px 0 2px var(--btn-hi), inset -2px 0 0 2px var(--btn-lo); }
-.logo::before { content: ""; position: absolute; left: -4px; right: -4px; top: -6px; height: 10px; background: var(--art-grass) 0 0 / 32px 10px repeat-x; image-rendering: pixelated; pointer-events: none; }
+/* the logo: a bark sign. Its face colors come from the kit's shared face rule; its face is ::after (drawn by the kit's button rules), the moss is ::before (the kit's moss tufts) */
+.logo {
+  position: relative; isolation: isolate; margin: 0 0 14px; padding: 8px 18px 14px; font: 400 var(--tt-logo)/1 var(--font-title); color: var(--logo); text-shadow: 0 2px 4px var(--logo-e); white-space: nowrap; }
+/* a darker top than the buttons, so the cream words keep 4.5:1 near the light edge (.topbar to win over the shared face rule) */
+.topbar .logo { --f1: color-mix(in srgb, color-mix(in srgb, var(--face-lo) 22%, var(--face)) 92%, transparent); }
+.topbar .logo::before { left: 20px; right: 20px; top: -8px; }
 .logo b { font-weight: inherit; }
-.tabs { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin-left: auto; isolation: isolate; }
-.tabs button { position: relative; display: flex; align-items: center; height: 34px; margin: 0 0 10px; padding: 0 4px 2px; background: none; border-style: solid; border-color: transparent; border-width: 8px 16px 8px 8px; border-image: var(--art-sign) 4 8 4 4 fill / 8px 16px 8px 8px stretch; border-radius: var(--corner); color: var(--bar-ink); font: 400 var(--tt-s)/1 var(--font-title); white-space: nowrap; image-rendering: pixelated; cursor: pointer; }
-.tabs button::before { content: ""; position: absolute; z-index: 1; left: -8px; right: -14px; top: -10px; height: 10px; background: var(--art-grass) 0 0 / 32px 10px repeat-x; image-rendering: pixelated; pointer-events: none; }
-.tabs button::after { content: ""; position: absolute; z-index: -1; left: 12px; top: 26px; width: 8px; height: 24px; background: var(--wood); border-left: 2px solid var(--wood-o); border-right: 2px solid var(--wood-o); }
-.tabs button[aria-selected="true"] { border-image-source: var(--art-sign-on); color: var(--key-ink); }
-/* the active sign's post runs on past the rail, so it reads as this sign's own post holding the panel up, not a separate button pointing at it */
-.tabs button[aria-selected="true"]::after { top: 26px; height: 34px; background: var(--accent); z-index: 2; }
-/* the art file missing: words on wood stay on wood (a color taken from an image variable is invalid, so it is transparent whenever the art is there) */
-.tabs button { background-color: var(--art-sign, var(--wood)); }
-.tabs button[aria-selected="true"] { background-color: var(--art-sign-on, var(--accent)); }
-.tabs button:hover { color: var(--bar-ink); transform: translateY(-2px); }
-.tabs button[aria-selected="true"]:hover { color: var(--key-ink); }
-.tabs button:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
-/* the closed Appraiser: faded, the crew on top, a Soon tag on its post, no grass */
+.tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 0 14px auto; padding: 4px; border-radius: var(--r-pill); background-color: var(--surface); box-shadow: 0 0 0 2px var(--wood-o), inset 0 0 0 1px var(--mint-line); }
+.tabs button { display: flex; align-items: center; height: 34px; margin: 0; padding: 0 16px; background: none; background-color: var(--card); box-shadow: inset 0 0 0 1px var(--card-o); border: 0; border-radius: var(--r-pill); color: var(--ink); font: 700 var(--fs-md)/1 var(--font-body); white-space: nowrap; cursor: pointer; }
+.tabs button:hover { color: var(--num); box-shadow: inset 0 0 0 1px var(--mint-line); }
+.tabs button[aria-selected="true"], .tabs button[aria-selected="true"]:hover { background-color: var(--lime); color: var(--lime-ink); box-shadow: none; }
+.tabs button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* the closed Appraiser: dimmed words with no ground and no edge, and a Soon tag beside its name */
 .tabs .soon { display: none; }
-body.appraiser-off #tab-appraiser { border-image-source: var(--art-sign-off); color: var(--sign-off-ink); }
-body.appraiser-off #tab-appraiser:hover { color: var(--sign-off-ink); }
-body.appraiser-off #tab-appraiser::before { left: 22px; right: auto; top: auto; bottom: calc(100% + 6px); width: 44px; height: 24px; background: var(--art-crew) 0 0 / 44px 24px no-repeat; }
-body.appraiser-off #tab-appraiser::after { background: var(--post-off); }
-body.appraiser-off #tab-appraiser .soon { display: block; position: absolute; left: 22px; top: 30px; z-index: 1; padding: 0 5px; background: var(--card); box-shadow: 0 0 0 2px var(--wood-o); color: var(--ink); font: 700 var(--fs-sm) var(--font-body); line-height: 18px; }
-body.appraiser-off #tab-appraiser .soon::before, body.appraiser-off #tab-appraiser .soon::after { content: ""; position: absolute; top: -6px; width: 2px; height: 4px; background: var(--wood-o); }
-body.appraiser-off #tab-appraiser .soon::before { left: 5px; }
-body.appraiser-off #tab-appraiser .soon::after { right: 5px; }
+body.appraiser-off #tab-appraiser, body.appraiser-off #tab-appraiser:hover { background-color: transparent; color: var(--credit); box-shadow: none; }
+body.appraiser-off #tab-appraiser .soon { display: inline-block; margin-left: 8px; padding: 0 8px; border-radius: var(--r-pill); background-color: var(--pill); color: var(--pill-ink); font: 700 var(--fs-xs) var(--font-body); line-height: 18px; }
 .auth { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 20px; }
 .auth [hidden] { display: none; }
-.auth #who { padding: 2px 10px; background: var(--wood); box-shadow: 0 0 0 2px var(--wood-o); color: var(--bar-ink); font-size: var(--fs-sm); }
-/* the theme button floats above Something off? in the corner of every tab, so it never needs a scroll up */
-#theme { position: fixed; right: 15px; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); z-index: 50; margin: 0; gap: 12px; padding: 8px 15px 13px; box-shadow: 3px 3px 0 var(--win-shadow); }
-#theme .theme-ico { display: inline-flex; }
-@media (max-width: 1559px) { #theme { padding-inline: 12px; } #theme .theme-txt { display: none; } }
+.auth #who { padding: 2px 10px; border-radius: var(--r-pill); background-color: var(--surface); box-shadow: 0 0 0 2px var(--wood-o); color: var(--ink); font-size: var(--fs-sm); }
+/* the credit: quiet, small, centered, under every tab, on a faint glass strip because the night scene behind it is too bright for 4.5 to 1 on its own; the pop-out and the app's windows show none */
+.credit { width: fit-content; max-width: min(1200px, calc(100% - 32px)); margin: 8px auto 20px; padding: 4px 16px; border-radius: var(--r-pill); background-color: var(--surface); text-align: center; color: var(--credit); font: 600 var(--fs-xs)/1.4 var(--font-body); }
+.credit a { color: inherit; text-decoration: underline; }
+.credit a:hover { color: var(--num); }
+
+/* ---------- the scene: Ellinia at night behind the page. Plain boxes, no canvas. The ground is a gradient from the scene tokens and paints
+   at once; the pictures (night-art.css, .scene-on) arrive one frame after load, so the first paint never waits on them. Boxes come from
+   night-art.css; this block only places them. A trunk shows only when it clears the 1120px column (hidden, never slid under it), the tree house
+   only with room to its right. Only opacity and transform move, and all of it holds still under reduced motion. ---------- */
+#night-scene { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; background: radial-gradient(ellipse 90% 100% at 62% 18%, var(--scene-hi), var(--scene-mid) 50%, var(--scene-lo)); }
+#night-scene > * { position: absolute; }
+.ns-trunk-left { left: -120px; bottom: -20px; }
+.ns-trunk-right { right: -110px; bottom: -20px; }
+.ns-trunk-inner-left { left: 70px; bottom: -20px; opacity: .8; }
+.ns-trunk-inner-right { right: 92px; bottom: -20px; opacity: .8; }
+.ns-far-left, .ns-far-right { bottom: 0; opacity: .2; mask-image: linear-gradient(90deg, transparent, black 30% 70%, transparent), linear-gradient(transparent, black 25% 80%, transparent); mask-composite: intersect; -webkit-mask-image: linear-gradient(90deg, transparent, black 30% 70%, transparent), linear-gradient(transparent, black 25% 80%, transparent); -webkit-mask-composite: source-in; }
+/* a trunk's picture ends in a hard cut at the top of its box, so it fades in from nothing */
+.ns-trunk-left, .ns-trunk-right, .ns-trunk-inner-left, .ns-trunk-inner-right { mask-image: linear-gradient(transparent, black 22%); -webkit-mask-image: linear-gradient(transparent, black 22%); }
+.ns-far-left { left: 16%; }
+.ns-far-right { right: 20%; }
+.ns-treehouse { right: 26px; top: 40px; opacity: .85; }
+.ns-glow { position: absolute; left: 33px; top: 75px; width: 52px; height: 52px; border-radius: 50%; background: radial-gradient(circle, var(--glow) 0, var(--glow) 25%, transparent 70%); opacity: .75; animation: ns-glow 5s ease-in-out infinite; }
+.ns-ray-a, .ns-ray-b { top: -10px; opacity: .16; mask-image: radial-gradient(ellipse at 50% 45%, black 30%, transparent 68%); -webkit-mask-image: radial-gradient(ellipse at 50% 45%, black 30%, transparent 68%); animation: ns-ray 9s ease-in-out infinite alternate; }
+.ns-ray-a { left: 18%; }
+.ns-ray-b { left: 52%; animation-delay: -4s; }
+.ns-fly { width: 6px; height: 6px; border-radius: 50%; background: var(--fly); box-shadow: 0 0 10px 4px var(--fly); animation: ns-drift var(--t, 9s) ease-in-out infinite alternate, ns-blink 3.2s ease-in-out infinite; }
+/* idle: the window has no focus or the page is hidden (set beside the load handler), so the scene freezes in place and costs nothing */
+.scene-still #night-scene *, .scene-still #night-scene *::before { animation-play-state: paused; }
+@keyframes ns-glow { 50% { opacity: .4; } }
+@keyframes ns-ray { from { opacity: .07; transform: translateX(-10px); } to { opacity: .2; transform: translateX(12px); } }
+@keyframes ns-drift { from { transform: translate(0, 0); } to { transform: translate(var(--x, 30px), var(--y, -40px)); } }
+@keyframes ns-blink { 50% { opacity: .3; } }
+@media (max-width: 1639px) { .ns-trunk-left, .ns-trunk-right { display: none; } }
+@media (max-width: 1719px) { .ns-trunk-inner-left, .ns-trunk-inner-right { display: none; } }
+@media (max-width: 1439px) { .ns-treehouse { display: none; } }
+@media (prefers-reduced-motion: reduce) { #night-scene *, #night-scene *::before { animation: none; } .ns-ray-a, .ns-ray-b { opacity: .12; } }
+body.g-pip .credit, body.g-ov .credit, body.g-setwin .credit { display: none; }
 @media (max-width: 759px) {
   .topbar .in { align-items: center; gap: 12px; min-height: 0; padding: 16px 16px 8px; }
-  .topbar .rail { display: none; }
   .logo { margin: 0 auto 0 0; padding: 6px 12px 12px; font-size: var(--tt-m); }
   .auth { margin: 0; }
-  .tabs { order: 3; width: 100%; margin-left: 0; padding-top: 12px; gap: 12px 10px; }
-  body.appraiser-off .tabs { row-gap: 32px; }
-  .tabs button { margin: 0; }
-  .tabs button::after { display: none; }
-  body.appraiser-off #tab-appraiser .soon { position: static; margin-left: 6px; padding: 0 4px; font-size: var(--fs-xs); }
-  body.appraiser-off #tab-appraiser .soon::before, body.appraiser-off #tab-appraiser .soon::after { display: none; }
+  .tabs { order: 3; width: 100%; margin: 12px 0 0; }
 }
 
 /* Builds (Trail Signs): one column of Windows, the kit's. The character window holds the name and level in its bar, the button row, the
@@ -281,14 +232,15 @@ body.appraiser-off #tab-appraiser .soon::after { right: 5px; }
 /* the class pills (behind Change class), signed in builds, and the one quiet line at the window's foot */
 .b-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 12px; padding-top: 6px; }
 .b-tiles { display: flex; flex-wrap: wrap; gap: 12px 8px; }
-.b-picker .k-btn[aria-pressed="true"] { --face: var(--accent); --face-hi: var(--key-hi); --face-lo: var(--key-lo); color: var(--key-ink); }
+.b-picker .k-btn[aria-pressed="true"] { --face: var(--lime); --face-hi: var(--lime-hi); --face-lo: var(--lime-lo); color: var(--lime-ink); }
 .b-paths { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 8px; padding-left: 12px; border-left: 2px dotted var(--dot); }
 .b-paths-label { font: 700 var(--fs-sm) var(--font-body); color: var(--muted); margin-right: 2px; }
 @media (max-width: 560px) { .b-paths { padding-left: 0; border-left: 0; } }
 .b-mine:empty { display: none; }
 .b-mine-list { display: flex; flex-wrap: wrap; gap: 8px; }
 .b-mine-card { color: var(--ink); font: 600 var(--fs-md) var(--font-body); text-align: left; cursor: pointer; }
-.b-mine-card:hover, .b-mine-card:focus-visible, .b-mine-card[aria-pressed="true"] { border-color: var(--focus); }
+.b-mine-card:hover, .b-mine-card:focus-visible { border-color: var(--focus); }
+.b-mine-card[aria-pressed="true"] { border-color: var(--lime); }
 #b-msg { order: 8; margin: 0; padding: 0 4px; color: var(--ink); font: 600 var(--fs-sm) var(--font-body); }
 #b-msg:empty { display: none; }
 #b-msg.error { color: var(--bad); }
@@ -320,7 +272,7 @@ body.appraiser-off #tab-appraiser .soon::after { right: 5px; }
 .b-weapon select, .b-row input, .b-row select { width: 100%; min-width: 0; font: 600 var(--n-s) var(--font-num); color: var(--ink); }
 .b-stats input.b-read { background: var(--up-bg); border-color: var(--up-dot); }
 .b-skills { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr)); gap: 0 var(--gap); }
-.b-skill { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 0; background: var(--art-dots) left bottom / 8px 2px repeat-x; font: 600 var(--fs-md) var(--font-body); color: var(--ink); }
+.b-skill { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 0; background: var(--night-dots) left bottom / 8px 2px repeat-x; font: 600 var(--fs-md) var(--font-body); color: var(--ink); }
 .b-skill input { width: 64px; height: 26px; padding: 0 4px; text-align: center; font: 700 var(--n-s) var(--font-num); color: var(--ink); }
 .b-job1 > summary { cursor: pointer; }
 .b-more-details > summary { cursor: pointer; font: 700 var(--fs-sm) var(--font-body); color: var(--muted); padding: 4px 0; }
@@ -342,13 +294,13 @@ body.appraiser-off #tab-appraiser .soon::after { right: 5px; }
 #r-status { margin: 0; font: 700 var(--fs-sm) var(--font-body); }
 #r-status:empty, #r-msg:empty { display: none; }
 #r-msg { display: grid; gap: 2px; font: 700 var(--fs-sm) var(--font-body); color: var(--bad); }
-/* the guide window: its tabs sit on the plank, the chosen one takes the paper's color */
+/* the guide window: its tabs are the same pills as the top, the chosen one lime */
 #b-guidewin > .k-bar { align-items: flex-end; padding: 12px 12px 0; }
 .b-dtabs { display: flex; align-items: flex-end; align-self: stretch; gap: 4px; min-width: 0; }
-.b-dtabs button { height: 32px; margin: 0 0 -2px; padding: 0 12px; background: none; border: 0; color: var(--bar-ink); font: 400 var(--tt-s) var(--font-title); line-height: 32px; white-space: nowrap; cursor: pointer; }
-.b-dtabs button:hover { text-decoration: underline dotted; }
+.b-dtabs button { height: 32px; margin: 0; padding: 0 14px; background: none; background-color: var(--card); box-shadow: inset 0 0 0 1px var(--card-o); border: 0; border-radius: var(--r-pill); color: var(--ink); font: 700 var(--fs-md) var(--font-body); line-height: 32px; white-space: nowrap; cursor: pointer; }
+.b-dtabs button:hover { color: var(--num); box-shadow: inset 0 0 0 1px var(--mint-line); }
 .b-dtabs button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.b-dtabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 2px var(--wood-o); text-decoration: none; }
+.b-dtabs button[aria-selected="true"], .b-dtabs button[aria-selected="true"]:hover { background-color: var(--lime); color: var(--lime-ink); box-shadow: none; }
 .b-dpanel { min-width: 0; }
 .b-dpanel > p { margin: 4px 0; }
 .b-dpanel > p.b-foot { margin-top: var(--gap); }
@@ -379,7 +331,7 @@ body.appraiser-off #tab-appraiser .soon::after { right: 5px; }
 .b-qtick i, .b-qtick svg { display: block; }
 .b-qrow.is-done .b-ovt, .b-qrow.is-done .small, .b-qdone { color: var(--muted); }
 .b-qrow.is-done .b-ovt { text-decoration: line-through; }
-.b-qrow.is-done .b-icon { filter: grayscale(1); }
+.b-qrow.is-done .b-icon { opacity: .45; }
 #quests > .b-qnote { margin: 0; }
 .b-more, .b-dmore { display: block; background: none; border: 0; padding: 8px 0 0; color: var(--focus); font: 700 var(--fs-sm) var(--font-body); text-align: left; text-decoration: underline; cursor: pointer; }
 .b-seeall { font-weight: 700; }
@@ -399,12 +351,12 @@ body.appraiser-off #tab-appraiser .soon::after { right: 5px; }
 .b-nowt .v { margin: 2px 0; font: 400 var(--tt-m)/1.2 var(--font-title); overflow-wrap: anywhere; }
 .b-nowt .s { font: 600 var(--fs-sm) var(--font-body); color: var(--muted); overflow-wrap: anywhere; }
 .b-mob { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 6px 4px; }
-.b-mob + .b-mob { background: var(--art-dots) left top / 8px 2px repeat-x; }
+.b-mob + .b-mob { background: var(--night-dots) left top / 8px 2px repeat-x; }
 .b-mob .num { text-align: right; }
 .b-mob .num .small { white-space: nowrap; }
 .b-time { list-style: none; margin: 6px 0 0; padding: 0; }
 .b-ev { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 12px; padding: 6px 4px; }
-.b-ev + .b-ev { background: var(--art-dots) left top / 8px 2px repeat-x; }
+.b-ev + .b-ev { background: var(--night-dots) left top / 8px 2px repeat-x; }
 .b-ev .num { font: 700 var(--n-s) var(--font-num); color: var(--num); }
 .b-tune { margin: 6px 0 0; }
 .b-name { font: 400 var(--tt-s) var(--font-title); }
@@ -430,7 +382,7 @@ body.appraiser-off #tab-appraiser .soon::after { right: 5px; }
 #b-find-q { box-sizing: border-box; width: 100%; min-width: 0; font: 600 var(--fs-md) var(--font-body); }
 #b-find-list { display: flex; flex-direction: column; margin-top: 4px; padding: 4px 0; }
 .b-sug { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: none; border: 0; padding: 2px 10px; color: var(--ink); font: 700 var(--fs-md) var(--font-body); }
-.b-sug + .b-sug { background: var(--art-dots) left top / 8px 2px repeat-x; }
+.b-sug + .b-sug { background: var(--night-dots) left top / 8px 2px repeat-x; }
 .b-sug:hover, .b-sug:focus-visible { background-color: var(--div); }
 #b-find-out > p { margin: 8px 0; }
 .b-fhead { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
@@ -453,12 +405,12 @@ body.appraiser-off #tab-appraiser .soon::after { right: 5px; }
 .b-rlab { font: 700 var(--fs-md) var(--font-body); }
 .b-rbtns { display: inline-flex; gap: 6px; }
 .b-rbtns .k-btn { min-width: 40px; }
-.b-reach .k-btn[aria-pressed="true"] { --face: var(--accent); --face-hi: var(--key-hi); --face-lo: var(--key-lo); color: var(--key-ink); }
+.b-reach .k-btn[aria-pressed="true"] { --face: var(--lime); --face-hi: var(--lime-hi); --face-lo: var(--lime-lo); color: var(--lime-ink); }
 .b-roads { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(440px, 100%), 1fr)); gap: var(--gap); }
 /* each road spans five rows it shares with the road beside it (subgrid): tag, head, credit, tiles, stops, so names and tiles line
    up. The rows inside a road have no gap of their own; each piece brings its margin, so a row of roads with no tag has no hole */
 .b-road { display: grid; grid-row: span 5; grid-template-rows: subgrid; gap: 0; min-width: 0; border: 2px solid var(--card-o); padding: var(--gap); }
-.b-road.followed { outline: 3px solid var(--accent); outline-offset: 2px; }
+.b-road.followed { outline: 3px solid var(--lime); outline-offset: 2px; }
 .b-rtag { grid-row: 1; justify-self: start; margin-bottom: 6px; }
 /* the head is the button that follows the road */
 .b-rhead { grid-row: 2; display: flex; align-items: flex-start; gap: var(--gap); width: 100%; margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
@@ -471,7 +423,7 @@ body.appraiser-off #tab-appraiser .soon::after { right: 5px; }
 .b-rabout p { margin: 0; }
 .b-road > .b-rtiles { grid-row: 4; margin-top: var(--gap); }
 .b-road > .b-grind { grid-row: 5; margin-top: var(--gap); }
-.b-resetline { border: 2px dashed var(--accent); padding: 8px 12px; }
+.b-resetline { border: 2px dashed var(--mint-line); padding: 8px 12px; }
 .b-rtiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gap); }
 .b-place { white-space: nowrap; }
 .b-rtile { min-width: 0; }
@@ -530,7 +482,7 @@ body.timer-off #tab-timer, body.timer-off .timer-only { display: none; }
    closed card, its part of How it works goes, and none of its code loads */
 body.appraiser-off .appraiser-only, body.appraiser-off #appraiser-root, body:not(.appraiser-off) .appraiser-closed { display: none; }
 .closed-body { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 16px; }
-.closed-crew { width: 88px; height: 48px; background: var(--art-crew) 0 0 / 88px 48px no-repeat; image-rendering: pixelated; }
+.closed-crew { width: 88px; height: 48px; background: var(--night-crew) 0 0 / 88px 48px no-repeat; image-rendering: pixelated; }
 .closed-text h2 { margin: 0; font: 400 var(--tt-m) var(--font-title); }
 .closed-text p { margin: 4px 0 12px; color: var(--muted); }
 .closed-text .k-btn { margin-top: 4px; }
@@ -539,7 +491,7 @@ body.appraiser-off .appraiser-only, body.appraiser-off #appraiser-root, body:not
 body.in-app .tabs, body.in-app #g-getapp { display: none; }
 #view-grind [hidden] { display: none !important; }
 .g-lbl { font: 700 var(--fs-xs) var(--font-body); color: var(--muted); }
-.g-check { list-style: none; margin: 0; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--corner); display: grid; gap: 6px; font-size: var(--fs-md); }
+.g-check { list-style: none; margin: 0; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); display: grid; gap: 6px; font-size: var(--fs-md); }
 .g-check li { display: grid; grid-template-columns: 22px 92px minmax(0, 1fr); gap: 6px; align-items: baseline; }
 .g-check li::before { content: '…'; color: var(--muted); font-weight: 700; }
 .g-check li.done::before { content: '✓'; color: var(--up-fg); }
@@ -559,13 +511,13 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 .g-ico { width: 22px; height: 22px; image-rendering: pixelated; vertical-align: middle; margin-right: 6px; }
 #g-pots input { width: 6em; padding: 3px 6px; font: inherit; font-family: var(--font-num); }
 .g-note { font-size: var(--fs-sm); color: var(--muted); margin: 8px 0 0; }
-.g-viewing { margin-top: 12px; padding: 8px 12px; border-radius: var(--corner); background: var(--soon-bg); color: var(--soon-fg); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.g-viewing { margin-top: 12px; padding: 8px 12px; border-radius: var(--r-card); background: var(--soon-bg); color: var(--soon-fg); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 /* Grind charts: EXP is categorical slot 1 (blue), potions take slots 2 to 4 (orange, aqua, yellow), the heatmap one blue ramp */
 #g-sharearea, #g-sharearea .r-bar { display: contents; }
 /* the app's game chooser, when more than one MapleStory window is open: a button per window with its picture and title */
 .g-choose { display: grid; gap: 7px; }
 .g-choose p { margin: 2px 2px 0; font: 700 var(--fs-md) var(--font-body); }
-.g-pick img { width: 96px; height: 54px; object-fit: cover; border-radius: var(--corner); flex: none; background: var(--surface-2); }
+.g-pick img { width: 96px; height: 54px; object-fit: cover; border-radius: var(--r-card); flex: none; background: var(--surface-2); }
 /* the Grind page (Trail Signs): one column of Windows. The status line, All time, Now grinding, Session details when open, Your runs and
    Your record, the small print. Every block sits in the kit's column, whose one gap (--gap) is the only space between them, and a
    block with nothing to show is hidden, so it takes no room. An empty status line stays in the page as a live region (display: none
@@ -582,14 +534,14 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 #view-grind .k-bar h2 { margin: 0; font: inherit; }
 /* All time (grind-alltime.js): the Orchard and the Tab share one grid cell, so the window is as tall as the taller one and nothing below it moves
    when they swap. It is a container, since what fits goes by the window's width and the app's window is its own */
-.g-at-sw button { margin: 0 0 0 -2px; padding: 0 12px; min-height: 30px; border: 2px solid var(--bar-muted); border-radius: var(--corner); background: none; color: var(--bar-ink); font: 700 var(--fs-sm)/1 var(--font-body); white-space: nowrap; cursor: pointer; }
+.g-at-sw button { margin: 0 0 0 -2px; padding: 0 12px; min-height: 30px; border: 2px solid var(--bar-muted); border-radius: var(--r-card); background: none; color: var(--bar-ink); font: 700 var(--fs-sm)/1 var(--font-body); white-space: nowrap; cursor: pointer; }
 .g-at-sw { align-items: center; gap: 10px; }
 .k-bar > .g-at-sw { gap: 10px; }
 .g-at-sw button:hover { background-color: var(--wood-lo); }
 .g-at-sw button:focus-visible { outline-color: var(--accent); }
 .g-at-dots { display: flex; gap: 5px; }
 .g-at-dots i { width: 8px; height: 8px; background: var(--bar-muted); opacity: .6; }
-.g-at-dots i.on { background: var(--accent); opacity: 1; }
+.g-at-dots i.on { background: var(--lime); opacity: 1; }
 /* Monsters felled, Potions per level, Maps visited: one big number and two small lines on the paper */
 .g-at-stat { display: flex; flex-direction: column; justify-content: center; gap: 6px; height: 100%; min-height: 222px; box-shadow: inset 0 4px 0 var(--pad-shade); }
 .g-at-stat .g-ts { min-width: 0; overflow-wrap: anywhere; }
@@ -598,8 +550,8 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 .g-at-face.on { opacity: 1; visibility: visible; transition: opacity .4s steps(4); }
 @media (prefers-reduced-motion: reduce) { .g-at-face, .g-at-face.on { transition: none; } }
 /* the Orchard: a sign and a picture for each, on the stage's art at twice its size */
-.g-at-stage { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); height: 100%; overflow: hidden; background: var(--art-stage) center bottom / 2240px 192px no-repeat var(--stage-sky); image-rendering: pixelated; }
-:root[data-theme="dark"] .g-at-stage { background-image: var(--art-fly), var(--art-fly), var(--art-fly), var(--art-fly), var(--art-stage); background-position: 8% 12%, 33% 24%, 62% 10%, 91% 20%, center bottom; background-size: 6px 6px, 6px 6px, 6px 6px, 6px 6px, 2240px 192px; }
+.g-at-stage { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); height: 100%; overflow: hidden; image-rendering: pixelated; }
+.g-at-half::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 10px; border-top: 4px solid var(--ground-line); background-color: var(--ground); }
 .g-at-half { position: relative; min-width: 0; min-height: 222px; }
 .g-at-stage .g-at-sign { position: absolute; z-index: 3; left: 12px; top: 12px; width: max-content; max-width: 244px; padding: 6px 12px; }
 .g-tl { font: 400 var(--tt-s) var(--font-title); }
@@ -615,14 +567,14 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 .g-at-low { position: absolute; left: 172px; right: 8px; top: 140px; bottom: 0; }
 .g-at-pig { position: absolute; z-index: 3; left: 80px; bottom: 14px; width: 68px; height: 50px; background-position: 0 0; background-repeat: no-repeat; transform: scaleX(-1); image-rendering: pixelated; }
 .g-at-bang { position: absolute; z-index: 3; left: 142px; bottom: 58px; font: 400 var(--tt-m)/1 var(--font-title); color: var(--num-big); }
-.g-at-ghost { position: absolute; background-position: 0 0; background-repeat: no-repeat; filter: grayscale(1) brightness(1.9) opacity(.5); image-rendering: pixelated; }
+.g-at-ghost { position: absolute; background-color: var(--muted); -webkit-mask-position: 0 0; mask-position: 0 0; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; opacity: .5; image-rendering: pixelated; }
 .g-at-ghost.flip { transform: scaleX(-1); }
 .g-at-halo { position: absolute; image-rendering: pixelated; }
 /* the Tab: a piece of paper in both themes, with a torn foot (the clip takes its shadow, so the shadow is on the box around it) */
 .g-at-tab { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: var(--gap); height: 100%; box-shadow: inset 0 4px 0 var(--pad-shade); }
-.g-at-recw { min-width: 0; filter: drop-shadow(3px 3px 0 var(--win-shadow)); }
+.g-at-recw { min-width: 0; box-shadow: 0 .3em .9em var(--win-shadow); }
 .g-at-rec { display: grid; align-content: start; gap: 3px; height: 100%; padding: 8px 16px 18px; background: var(--receipt); color: var(--receipt-ink); font: 600 var(--fs-sm) var(--font-body); }
-.g-at-rech { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0 12px; padding-bottom: 5px; background: var(--art-dots) left bottom / 8px 2px repeat-x; }
+.g-at-rech { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0 12px; padding-bottom: 5px; background: var(--night-dots) left bottom / 8px 2px repeat-x; }
 .g-at-rec h3 { margin: 0; font: 400 var(--tt-m)/1.2 var(--font-title); color: var(--receipt-ink); }
 .g-at-rech small { font: 600 var(--fs-sm) var(--font-body); color: var(--receipt-muted); }
 .g-at-bill { width: 100%; border-collapse: collapse; }
@@ -630,7 +582,7 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 .g-at-bill td { padding: 0 0 0 12px; font: 700 var(--fs-lg)/1.45 var(--font-num); font-variant-numeric: tabular-nums; text-align: right; }
 .g-at-bill td:first-child { padding-left: 0; font: 700 var(--fs-md)/1.45 var(--font-body); text-align: left; white-space: nowrap; }
 .g-at-bill img { width: auto; height: 22px; margin-right: 8px; vertical-align: -5px; image-rendering: pixelated; }
-.g-at-bill .tot td { padding-top: 3px; background: var(--art-dots) left top / 8px 2px repeat-x; font-size: var(--n-m); line-height: 1.25; }
+.g-at-bill .tot td { padding-top: 3px; background: var(--night-dots) left top / 8px 2px repeat-x; font-size: var(--n-m); line-height: 1.25; }
 .g-at-bill .tot td:first-child { font: 400 var(--tt-s)/1.25 var(--font-title); }
 .g-at-li { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
 .g-at-li[hidden] { display: none; }
@@ -648,7 +600,6 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 /* narrower: the Lemons over the Meat, each on a stage of its own so the trees have ground under them, and the receipt over the card */
 @container (max-width: 860px) {
   .g-at-stage, .g-at-tab { grid-template-columns: minmax(0, 1fr); }
-  .g-at-half { background: var(--art-stage) center bottom / 2240px 192px no-repeat var(--stage-sky); }
   .g-at-tab { grid-template-rows: auto 1fr; }
 }
 /* a phone: each sign over its picture, smaller trees to keep the window short, and a tighter bill */
@@ -678,14 +629,11 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 .g-nowl { flex: none; }
 .g-pickw { position: relative; display: inline-flex; align-items: center; min-width: 0; max-width: 100%; }
 .g-pickt { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 20px; border-bottom: 2px dotted var(--bar-muted); color: var(--bar-ink); font: 600 var(--fs-md)/1.3 var(--font-body); }
-.g-pickw::after { content: ""; position: absolute; right: 0; top: 50%; width: 14px; height: 8px; margin-top: -4px; background: var(--bar-ink); pointer-events: none;
-  clip-path: polygon(0 0, 14px 0, 14px 2px, 12px 2px, 12px 4px, 10px 4px, 10px 6px, 8px 6px, 8px 8px, 6px 8px, 6px 6px, 4px 6px, 4px 4px, 2px 4px, 2px 2px, 0 2px); }
-.g-pickw select { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; opacity: 0; cursor: pointer; color: var(--ink); background: var(--card); font: 600 var(--fs-md) var(--font-body); }
+.g-pickw::after { content: ""; position: absolute; right: 0; top: 50%; margin-top: -4px; width: 0; height: 0; border: 7px solid transparent; border-top-color: var(--bar-ink); border-bottom-width: 0; pointer-events: none; }
+.g-pickw select { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; opacity: 0; cursor: pointer; color: var(--ink); background: var(--page); font: 600 var(--fs-md) var(--font-body); }
 .g-pickw:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
 .g-nowcard .g-pickw:hover .g-pickt { border-bottom-style: solid; }
 .g-nowcard .k-bar > .push { min-width: 0; }
-.k-lamp.g-pill { width: auto; height: auto; min-height: 18px; padding: 0 0 0 22px; background-position: 0 0; color: var(--bar-ink); font-family: var(--font-body); font-size: var(--fs-sm); font-weight: 600; line-height: 18px; white-space: nowrap; }
-.k-lamp.g-pill::before { inset: 6px auto auto 3px; width: 8px; height: 6px; }
 .g-nowpad { display: grid; gap: var(--gap); min-width: 0; }
 .g-nowpad > * { min-width: 0; }
 /* the button row's grass hangs 6px above its buttons: with the row first under the title bar, the gap to the grass is the one 12px */
@@ -706,7 +654,7 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 .g-nowpad .k-tools { row-gap: 14px; }
 .k-btn > i { display: inline-grid; place-items: center; font-style: normal; }
 .k-btn > i svg { display: block; }
-.g-nowpad .k-btn[aria-pressed="true"] { --face: var(--up-bg); color: var(--up-fg); }
+.g-nowpad .k-btn[aria-pressed="true"] { --face: var(--lime); --face-hi: var(--lime-hi); --face-lo: var(--lime-lo); color: var(--lime-ink); }
 .k-tools .g-choose { flex: 1 1 100%; }
 .g-steps { display: block; margin: 0; padding: 0 0 0 28px; list-style: decimal; color: var(--ink); font: 600 var(--fs-md) var(--font-body); }
 .g-steps li { padding: 2px 0; }
@@ -717,7 +665,7 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 .g-problem .k-btn { margin-top: 4px; }
 .g-nowpad > .g-nudge { margin: 0; padding: 8px 12px; font: 600 var(--fs-md) var(--font-body); }
 .g-nowpad > .g-bagcheck { margin: 0; padding: 0; border: 0; background: none; gap: 0; }
-.g-bagcheck li { padding: 4px 4px 6px; background: var(--art-dots) left bottom / 8px 2px repeat-x; }
+.g-bagcheck li { padding: 4px 4px 6px; background: var(--night-dots) left bottom / 8px 2px repeat-x; }
 .g-bagcheck li:last-child { background: none; }
 .g-nowin { display: flex; flex-direction: column; gap: var(--gap); min-width: 0; }
 .g-nowfoot { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
@@ -728,8 +676,8 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 /* the stage: the art on a sky for a tall monster, with a 2px wood line above and below. Each monster on the map walks on it, paces left and
    back with a flip, and stands over its own column: its spot is the column's center plus half the pace, so it never leaves its column. Under it
    one column a monster (a head, then its drops as rows); a lone monster's rows flow in two. Still fireflies in dark, and nothing moves in a number update */
-.g-ground { position: relative; flex: none; box-sizing: content-box; margin-inline: calc(-1 * var(--gap)); height: var(--g-gh, 96px); border-block: 2px solid var(--wood-o); overflow: hidden; background: var(--art-stage) center bottom / 1120px 96px no-repeat var(--stage-sky); image-rendering: pixelated; }
-:root[data-theme="dark"] .g-ground { background-image: var(--art-fly), var(--art-fly), var(--art-fly), var(--art-fly), var(--art-stage); background-position: 8% 16%, 33% 30%, 62% 12%, 91% 26%, center bottom; background-size: 6px 6px, 6px 6px, 6px 6px, 6px 6px, 1120px 96px; }
+.g-ground { position: relative; flex: none; box-sizing: content-box; margin-inline: calc(-1 * var(--gap)); height: var(--g-gh, 96px); border-block: 2px solid var(--wood-o); overflow: hidden; image-rendering: pixelated; }
+.g-ground::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 8px; border-top: 4px solid var(--ground-line); background-color: var(--ground); }
 .g-walker { position: absolute; bottom: 12px; z-index: 1; --g-far: max(-150px, -18cqw); animation: g-pace 9s linear infinite; }
 .g-walker:nth-child(2) { animation-duration: 11s; animation-delay: -4s; }
 /* no map known yet: Lemons lying still on the ground where the walkers stand, behind them (a walker's z-index puts it in front) */
@@ -773,7 +721,7 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
   .g-mobcol, .g-mobcol:first-of-type, .g-mobcol:last-of-type { padding: 0; }
   .g-mobcol + .g-mobcol { border-left: 0; border-top: 2px solid var(--div); padding-top: 12px; }
   .g-mobcols.one .g-drops { grid-template-columns: minmax(0, 1fr); }
-  .g-drops .k-row.last:not(:last-child) { background: var(--art-dots) left bottom / 8px 2px repeat-x; }
+  .g-drops .k-row.last:not(:last-child) { background: var(--night-dots) left bottom / 8px 2px repeat-x; }
 }
 /* Session details (Trail Signs): a column of Windows under Now grinding, one gap between them (the kit's --gap), and a block with nothing to show is
    hidden, so it takes no room. This run, What it earned, The numbers, then Potions beside Notices. Rows are the kit's rows: a number on the
@@ -827,7 +775,7 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 .g-wcells i[data-k="0"] { opacity: .3; } .g-wcells i[data-k="1"] { opacity: .45; } .g-wcells i[data-k="2"] { opacity: .6; }
 .g-wcells i[data-k="3"] { opacity: .75; } .g-wcells i[data-k="4"] { opacity: .9; } .g-wcells i[data-k="5"] { opacity: 1; }
 .g-wcells i:hover { outline: 2px solid var(--ink); outline-offset: -1px; }
-.g-tip { position: absolute; z-index: 5; top: 0; max-width: 220px; padding: 6px 9px; background: var(--pill); color: var(--pill-ink); border: 2px solid var(--wood-o); box-shadow: 2px 2px 0 var(--win-shadow); font: 700 var(--fs-sm) var(--font-body); pointer-events: none; }
+.g-tip { position: absolute; z-index: 5; top: 0; max-width: 220px; padding: 6px 9px; background: var(--pill); color: var(--pill-ink); border: 2px solid var(--wood-o); box-shadow: 0 .2em .6em var(--win-shadow); font: 700 var(--fs-sm) var(--font-body); pointer-events: none; }
 /* What it earned: the total with Profitable or Losing, plain rows that add up to it, and What you picked up beside them */
 .g-res-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gap) 24px; align-items: start; }
 .g-res-grid:has(> .g-res-loot[hidden]) { grid-template-columns: minmax(0, 1fr); }
@@ -886,8 +834,7 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 /* Your runs: a run is a row, newest first, the arrow against your usual beside its number */
 .g-runs-list { display: flex; flex-direction: column; min-width: 0; }
 .g-runs-list > .g-note { margin: 0; padding: 4px; }
-.g-run { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.2fr) 66px 66px minmax(60px, auto); align-items: center; gap: 12px; width: 100%; padding: 6px 4px 8px; border: 0; background: var(--art-dots) left bottom / 8px 2px repeat-x; color: var(--ink); font: 600 var(--fs-sm) var(--font-body); text-align: left; cursor: pointer; }
-.g-run:last-child { background: none; }
+.g-run { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.2fr) 66px 66px minmax(60px, auto); align-items: center; gap: 12px; width: 100%; padding: 6px 4px 8px; border: 0; background-color: transparent; color: var(--ink); font: 600 var(--fs-sm) var(--font-body); text-align: left; cursor: pointer; }
 .g-run:hover, .g-run:focus-visible { background-color: var(--card); }
 .g-run .where { min-width: 0; } .g-run .where b { display: block; font: 700 var(--fs-md) var(--font-body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .g-run small { display: block; font: 600 var(--fs-sm) var(--font-body); color: var(--muted); }
@@ -935,7 +882,7 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
   .g-days { grid-template-columns: repeat(15, minmax(0, 1fr)); }
 }
 /* is it reading everything: a sign and a colour per check, and the one thing to do */
-.g-nudge { font-size: var(--fs-sm); font-weight: 700; padding: 6px 10px; border-radius: var(--corner); margin: 0 0 8px; background: var(--surface-2); color: var(--muted); }
+.g-nudge { font-size: var(--fs-sm); font-weight: 700; padding: 6px 10px; border-radius: var(--r-card); margin: 0 0 8px; background: var(--surface-2); color: var(--muted); }
 .g-nudge.ok { background: var(--up-bg); color: var(--up-fg); }
 .g-nudge.wait { background: var(--watch-bg); color: var(--watch-fg); }
 .g-nudge.bad { background: var(--over-bg); color: var(--over-fg); }
@@ -962,37 +909,35 @@ body.g-ov .g-strip.g-moving { cursor: grabbing; }
    bigger makes it all bigger, and a small window shrinks it rather than scrolling. The text sizes follow Rimmah's:
    text 1, small .88, numbers 1.47, the lead number 2.94, a clock 1.59, the title bar 1.41 (at 17px that's 17, 15, 25, 50,
    27 and 24). --u is one art pixel in CSS pixels at the panel's size (2 at 17px), whole, so the lines and the art stay
-   crisp: the frame is 4 of them, the title bar 16 */
+   crisp: the title bar is 16 of them */
 @property --u { syntax: '<length>'; inherits: true; initial-value: 2px; }
 /* See-through (the app only): --g-see on the panel is the alpha every ground in it is drawn with (the window's, the cards',
-   the glasses', the switch's); words, pictures, juice, the frame, the title bar and the buttons stay solid. Without it (the
+   the glasses', the switch's); words, pictures, juice, the title bar and the buttons stay solid. Without it (the
    site) it's 1, a solid panel. The pop out copies these rules by their text. The window's font size is 1rem only for the
    page's own sake: fit() sets it in pixels the moment the panel moves into a window, whatever the browser's default is */
 .g-strip { --pots: 1; --u: round(.125em, 1px); position: relative; display: grid; gap: .45em; font-family: var(--font-body); font-synthesis: none; font-size: 1rem; font-weight: 600; line-height: 1.5; color: var(--ink);
-  border: 8px solid transparent; border-width: round(.5em, 4px); padding: 0 .6em .6em; background-color: color-mix(in srgb, var(--surface) calc(var(--g-see, 1) * 100%), transparent); background-clip: padding-box; transition: opacity .15s ease; }
-/* the frame is the window's own overlay, a border image drawn over the real border, so the real border and the overlay follow
-   one expression and the art stays a whole number of pixels at every size */
-.g-strip::before { content: ""; position: absolute; inset: calc(-1 * round(.5em, 4px)); border-style: solid; border-color: transparent; border-width: round(.5em, 4px); border-image: var(--art-frame) 4 / 1 / 0 round; image-rendering: pixelated; pointer-events: none; }
-/* faded to 60% or less: a halo (--halo: the paper in light, near black in dark) under every word and number,
+  border: 8px solid transparent; border-width: round(.5em, 4px); padding: 0 .6em .6em; background-color: color-mix(in srgb, var(--surface) calc(var(--g-see, 1) * 100%), transparent); background-clip: border-box; transition: opacity .15s ease; }
+/* night glass: the pane is plain glass edge to edge with square corners and no bark frame (it arrives in round 2 with the new layouts). The 8px border stays, transparent, so nothing inside moves; the glass is drawn under it */
+/* faded to 60% or less: a halo (--halo: near black) under every word and number,
    so they read over a bright map */
 .g-strip.g-faint { text-shadow: 0 0 .3em var(--halo), 0 0 .15em var(--halo); }
 .g-strip[data-pots="2"] { --pots: 2; }
 /* a layout picked: the panel fades out, takes the new layout, and fades back in */
 .g-strip.g-swap { opacity: 0; }
-/* ornaments, inside the window's rectangle: grass along the frame's top edge (between its cut corners) and a mushroom in the
-   bottom right corner, red in light and teal in dark. Art at one art pixel to --u, taking no clicks; the layouts keep their words
+/* ornaments, inside the window's rectangle: moss tufts along the top edge and a mushroom in the
+   bottom right corner. Art at one art pixel to --u, taking no clicks; the layouts keep their words
    and buttons clear of them */
 .g-strip { --fw: round(.5em, 4px); }
 .g-orn { position: absolute; z-index: 2; pointer-events: none; image-rendering: pixelated; background-repeat: no-repeat; }
-.g-grass { left: 0; right: 0; top: calc(-1 * var(--fw)); height: calc(5 * var(--u)); background: var(--art-moss) 0 0 / calc(64 * var(--u)) calc(7 * var(--u)) repeat-x; }
-.g-shroom { right: calc(-1 * var(--fw)); bottom: calc(-1 * var(--fw)); width: calc(15 * var(--u)); height: calc(14 * var(--u)); background: var(--art-shroom) 0 0 / 100% 100%; }
+.g-grass { left: 0; right: 0; top: calc(-1 * var(--fw)); height: calc(5 * var(--u)); background: var(--night-moss) 0 0 / calc(64 * var(--u)) calc(7 * var(--u)) repeat-x; }
+.g-shroom { right: calc(-1 * var(--fw)); bottom: calc(-1 * var(--fw)); width: calc(15 * var(--u)); height: calc(14 * var(--u)); background: var(--night-shroom) 0 0 / 100% 100%; }
 @media (prefers-reduced-motion: reduce) { .g-strip { transition: none; } }
 .g-strip button:focus-visible { outline: .14em solid var(--focus); outline-offset: .1em; }
 .g-top button:focus-visible { outline-color: var(--accent); }
 /* the title bar: the wordmark (not in Bar or Column), the map and how long, the buttons at the right end. It spans the
    panel's width over the padding. The map gives way before the panel does: fit() measures its longest line, so a long map
    name would shrink everything else (its box is one width whatever it says, and it ends in dots) */
-.g-top { display: flex; align-items: center; gap: .6em; min-width: 0; height: calc(16 * var(--u)); margin: 0 -.6em; padding: 0 .6em; background: var(--art-plank) 0 0 / calc(32 * var(--u)) calc(16 * var(--u)) repeat-x; image-rendering: pixelated; box-shadow: 0 calc(2 * var(--u)) 0 var(--pad-shade); color: var(--bar-ink); white-space: nowrap; }
+.g-top { display: flex; align-items: center; gap: .6em; min-width: 0; height: calc(16 * var(--u)); margin: 0 -.6em; padding: 0 .6em; background-color: var(--wood-lo); background-image: var(--night-bark); background-position: 0 0; background-size: 230px auto; background-repeat: repeat; box-shadow: inset 0 calc(-1 * var(--u)) 0 var(--wood-o); color: var(--bar-ink); white-space: nowrap; }
 .g-brand { flex: none; font-family: var(--font-title); font-size: 1.41em; font-weight: 400; line-height: 1.2; color: var(--bar-ink); }
 .g-el { display: flex; flex: none; width: 11em; font-size: .88em; font-weight: 600; color: var(--bar-muted); }
 .g-elm { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -1001,31 +946,31 @@ body.g-ov .g-strip.g-moving { cursor: grabbing; }
 .g-layw { display: inline-flex; }
 /* ⇆ ↺ ⚙ and the app's ✕: the kit's square wood buttons with pixel icons, sized in em, the ledge two art pixels. The pictures
    keep two CSS pixels to the art pixel (railIcon) */
-.g-strip .k-sq { --ledge: calc(2 * var(--u)); width: calc(14 * var(--u)); height: calc(14 * var(--u)); padding: 0 0 var(--ledge); font-size: 1em; }
+.g-strip .k-sq { --ledge: calc(2 * var(--u)); width: calc(14 * var(--u)); height: calc(14 * var(--u)); padding: 0 0 calc(2 * var(--u)); font-size: 1em; }
 /* the pictures follow the button: 2 CSS pixels to the art pixel while u is 2, 1 once the panel is dragged small (u rounds down), so they never spill out of their 14u square */
 .g-strip .k-sq svg { width: calc(9 * var(--u)); height: calc(9 * var(--u)); }
 .g-strip .k-sq svg[viewBox="0 0 7 7"] { width: calc(7 * var(--u)); height: calc(7 * var(--u)); }
-.g-btns .g-rep[aria-pressed="true"] { --face: var(--accent); --face-hi: var(--key-hi); --face-lo: var(--key-lo); color: var(--key-ink); }
-/* the pop out's report form (flag.js quick): sits where Settings does, the same plank and paper */
+.g-btns .g-rep[aria-pressed="true"] { --face: var(--lime); --face-hi: var(--lime-hi); --face-lo: var(--lime-lo); color: var(--lime-ink); }
+/* the pop out's report form (flag.js quick): sits where Settings does, the same bark strip and glass */
 .gq { container-type: inline-size; background: var(--surface); color: var(--ink); font-family: var(--font-body); font-size: var(--fs-md); font-weight: 600; line-height: 1.4; }
-.gq-h { display: flex; align-items: center; height: 32px; padding: 0 12px; background: var(--art-plank) 0 0 / 64px 32px repeat-x; image-rendering: pixelated; color: var(--bar-ink); }
+.gq-h { display: flex; align-items: center; height: 32px; padding: 0 12px; background-color: var(--wood-lo); background-image: var(--night-bark); background-position: 0 0; background-size: 230px auto; background-repeat: repeat; box-shadow: inset 0 -2px 0 var(--wood-o); color: var(--bar-ink); }
 .gq-h h2 { margin: 0; font-family: var(--font-title); font-size: var(--tt-s); font-weight: 400; line-height: 1.2; color: var(--bar-ink); }
 .gq-body { display: grid; gap: var(--gap); padding: 12px 14px; box-shadow: inset 0 4px 0 var(--pad-shade); }
-.gq-text { display: block; width: 100%; min-height: 76px; resize: vertical; box-sizing: border-box; background: var(--card); border: 2px solid var(--card-o); border-radius: var(--corner); padding: 8px 10px; font: inherit; color: inherit; }
+.gq-text { display: block; width: 100%; min-height: 76px; resize: vertical; box-sizing: border-box; background: var(--card); border: 2px solid var(--card-o); border-radius: var(--r-card); padding: 8px 10px; font: inherit; color: inherit; }
 .gq-small { margin: 0; font-size: var(--fs-sm); color: var(--muted); }
 .gq-msg { margin: 0; color: var(--bad); font-weight: 700; font-size: var(--fs-sm); }
 .gq-msg:empty { display: none; }
 .gq-sent .gq-msg { color: var(--ink); }
 .gq-row { display: flex; justify-content: flex-end; gap: 8px; }
-.g-btns .g-gear[aria-pressed="true"] { --face: var(--accent); --face-hi: var(--key-hi); --face-lo: var(--key-lo); color: var(--key-ink); }
+.g-btns .g-gear[aria-pressed="true"] { --face: var(--lime); --face-hi: var(--lime-hi); --face-lo: var(--lime-lo); color: var(--lime-ink); }
 /* ⇆ Layout's row: the four layouts as pictures with their names over the panel, under the buttons (beside them in Bar,
    which has no room under), the one showing lit. Solid whatever See-through says: it's only there while it's being used.
    While clicks pass through to the game (g-pass) it waits for the mouse on ⇆ to hold them (g-hold) */
-.g-laypick { position: absolute; z-index: 5; top: calc(100% + .35em); right: 0; display: flex; gap: .3em; padding: .3em; background-color: var(--surface); border: var(--u) solid var(--card-o); box-shadow: calc(3 * var(--u)) calc(3 * var(--u)) 0 var(--win-shadow); }
+.g-laypick { position: absolute; z-index: 5; top: calc(100% + .35em); right: 0; display: flex; gap: .3em; padding: .3em; background-color: color-mix(in srgb, var(--page) 80%, var(--card-hi)); border: var(--u) solid var(--card-o); box-shadow: 0 .3em .9em var(--win-shadow); }
 .g-laypick[hidden], .g-strip.g-pass:not(.g-hold) .g-laypick { display: none !important; }
-.g-laypic { display: flex; flex-direction: column; align-items: center; gap: .2em; padding: .3em .35em .25em; font-family: inherit; font-size: .95em; font-weight: 700; line-height: 1.1; color: var(--ink); background-color: var(--card); border: var(--u) solid var(--card-o); border-radius: var(--corner); box-shadow: inset 0 var(--u) 0 var(--card-hi), inset 0 calc(-1 * var(--u)) 0 var(--card-lo); cursor: pointer; }
+.g-laypic { background-image: none; display: flex; flex-direction: column; align-items: center; gap: .2em; padding: .3em .35em .25em; font-family: inherit; font-size: .95em; font-weight: 700; line-height: 1.1; color: var(--ink); background-color: var(--card); border: var(--u) solid var(--card-o); border-radius: 0; box-shadow: inset 0 var(--u) 0 var(--card-hi), inset 0 calc(-1 * var(--u)) 0 var(--card-lo); cursor: pointer; }
 .g-laypic:hover:not([aria-pressed="true"]) { background-color: color-mix(in srgb, var(--card), var(--card-hi) 60%); }
-.g-laypic[aria-pressed="true"] { background-color: var(--accent); color: var(--key-ink); box-shadow: inset 0 var(--u) 0 var(--key-hi), inset 0 calc(-1 * var(--u)) 0 var(--key-lo); }
+.g-laypic[aria-pressed="true"] { background-color: var(--lime); color: var(--lime-ink); box-shadow: inset 0 var(--u) 0 var(--lime-hi), inset 0 calc(-1 * var(--u)) 0 var(--lime-lo); }
 .g-laypic svg { display: block; width: 3.2em; height: 1.8em; }
 /* (the little pictures' fills are with Settings', which draws the same ones) */
 /* Column is narrow: two by two */
@@ -1041,10 +986,10 @@ body.g-ov .g-strip.g-moving { cursor: grabbing; }
 .g-kh { display: flex; align-items: center; gap: .5em; white-space: nowrap; }
 .g-kh .g-kl { font-family: var(--font-title); font-size: 1.12em; font-weight: 400; line-height: 1.3; color: var(--ink); }
 .g-seg { display: inline-flex; margin-left: auto; font-size: .88em; line-height: 1.25; }
-.g-seg button { margin: 0 0 0 calc(-1 * var(--u)); padding: 0 .4em; border: var(--u) solid var(--seg-e); border-radius: var(--corner); background: none; color: var(--ink); font-family: inherit; font-size: 1em; font-weight: 700; line-height: inherit; white-space: nowrap; cursor: pointer; }
+.g-seg button { margin: 0 0 0 calc(-1 * var(--u)); padding: 0 .4em; border: var(--u) solid var(--seg-e); border-radius: 0; background: none; color: var(--ink); font-family: inherit; font-size: 1em; font-weight: 700; line-height: inherit; white-space: nowrap; cursor: pointer; }
 .g-seg button:first-child { margin-left: 0; }
 .g-seg button:hover:not(:disabled):not([aria-pressed="true"]) { background-color: var(--div); }
-.g-seg button[aria-pressed="true"] { background-color: var(--accent); color: var(--key-ink); }
+.g-seg button[aria-pressed="true"] { background-color: var(--lime); color: var(--lime-ink); }
 .g-seg button:disabled { color: var(--muted); cursor: default; }
 .g-kv { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 .4em; }
 .g-kn { font-family: var(--font-num); font-weight: 700; font-size: 1.47em; line-height: 1.2; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -1107,7 +1052,7 @@ body.g-ov .g-strip.g-moving { cursor: grabbing; }
 /* its buttons are small wood signs at the right end of the words' last line, or under them when there's no room; a
    question's two stay together */
 .g-alert button, .g-l3b { float: right; margin-left: .7em; }
-.g-alert button { padding: 0 .6em; border: var(--u) solid var(--wood-o); border-radius: var(--corner); background-color: var(--btn); box-shadow: inset 0 var(--u) 0 var(--btn-hi), inset 0 calc(-1 * var(--u)) 0 var(--btn-lo); color: var(--btn-ink); font-family: inherit; font-size: 1em; font-weight: 700; line-height: inherit; cursor: pointer; }
+.g-alert button { padding: 0 .6em; border: var(--u) solid var(--wood-o); border-radius: 0; background-color: var(--btn); box-shadow: inset 0 var(--u) 0 var(--btn-hi), inset 0 calc(-1 * var(--u)) 0 var(--btn-lo); color: var(--btn-ink); font-family: inherit; font-size: 1em; font-weight: 700; line-height: inherit; cursor: pointer; }
 .g-l3b { display: flex; gap: .4em; }
 .g-l3b button { float: none; margin-left: 0; }
 /* the light, first in the title bar (Bar: at the left end): a square lamp in its state's colour and two or three words,
@@ -1116,7 +1061,7 @@ body.g-ov .g-strip.g-moving { cursor: grabbing; }
    the wordmark and the map step aside for words that ask for something */
 .g-lamp { display: flex; align-items: center; gap: .45em; flex: 1 1 0; width: 0; min-width: calc(5 * var(--u)); font-size: .88em; font-weight: 700; line-height: 1.25; white-space: nowrap; }
 .g-dot { flex: none; width: calc(5 * var(--u)); height: calc(5 * var(--u)); background-color: var(--lamp, var(--lamp-idle)); box-shadow: 0 0 0 var(--u) var(--wood-o), inset var(--u) var(--u) 0 var(--lamp-hi); }
-.g-lamp.ok { --lamp: var(--lamp-ok); } .g-lamp.wait { --lamp: var(--lamp-wait); } .g-lamp.bad { --lamp: var(--lamp-bad); }
+.g-lamp.ok { --lamp: var(--lime); } .g-lamp.wait { --lamp: var(--lamp-wait); } .g-lamp.bad { --lamp: var(--lamp-bad); }
 .g-lw { display: flex; align-items: baseline; gap: .7em; min-width: 0; overflow: hidden; }
 .g-lt { overflow: hidden; text-overflow: ellipsis; }
 /* flipping the bag: the three tabs tick off beside the words, so progress shows */
@@ -1169,7 +1114,7 @@ body.g-ov .g-strip.g-moving { cursor: grabbing; }
 .g-strip[data-layout="column"] .g-kh { display: grid; justify-items: start; gap: .1em 0; }
 .g-strip[data-layout="column"] .g-seg { margin-left: 0; }
 .g-strip[data-layout="column"] .g-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: .35em; }
-.g-strip[data-layout="column"] .g-k { grid-template-columns: minmax(0, 1fr) auto; column-gap: .5em; padding-bottom: .3em; background: var(--art-dots) left bottom / calc(4 * var(--u)) var(--u) repeat-x; }
+.g-strip[data-layout="column"] .g-k { grid-template-columns: minmax(0, 1fr) auto; column-gap: .5em; padding-bottom: .3em; background: var(--night-dots) left bottom / calc(4 * var(--u)) var(--u) repeat-x; }
 .g-strip[data-layout="column"] .g-k:last-child { padding-bottom: 0; background: none; }
 .g-strip[data-layout="column"] .g-kl { grid-column: 1; grid-row: 1; color: var(--ink); }
 .g-strip[data-layout="column"] .g-ks { grid-column: 1; grid-row: 2; }
@@ -1179,7 +1124,7 @@ body.g-ov .g-strip.g-moving { cursor: grabbing; }
 .g-strip[data-layout="column"] .g-d { position: absolute; top: 0; right: 0; font-size: 1.3em; line-height: 1.15; }
 /* Bar: one slim row, EXP an hour with "an hour / your usual" under it and its switch beside it, the columns with no small
    lines, the timers with no caption and no what's left, and the buttons at the right end; the alert goes under. It has no
-   title bar, just the frame */
+   title bar, just the glass */
 .g-strip[data-layout="bar"] { display: flex; flex-wrap: wrap; align-items: center; gap: 0 .6em; padding: .25em .77em; }
 .g-strip[data-layout="bar"] .g-body { flex: 1 1 0; display: flex; align-items: center; gap: .6em; }
 /* (its title bar is no box: the light goes to the left end, the buttons to the right) */
@@ -1223,12 +1168,12 @@ body.g-ov .g-strip.g-moving { cursor: grabbing; }
 .g-strip[data-layout="bar"]:has(> .g-l3:not([hidden])) .g-pleft { display: none; }
 .g-strip[data-layout="bar"] .g-alert { order: 2; flex-basis: 100%; padding: 0 .5em; border: 0; background: none; box-shadow: none; color: var(--ink); overflow: hidden; white-space: nowrap; }
 /* Settings (grind-settings.js), opened by ⚙ Settings on the top strip: under the panel inside the pop-out, which grows to
-   fit it. On the paper in the site's theme (the tokens, no colors of its own): a plank title bar, wood sign buttons, flat
+   fit it. On the glass in the site's theme (the tokens, no colors of its own): a bark title bar, wood sign buttons, flat
    switches. Its sections stack as in the mockup, and sit side by side when the window is wide. Fonts as longhands, as on
    .g-kn: the pop-out copies these rules by their text. Should the window not grow, Settings scrolls rather than being cut off */
 html:has(body.g-pip #g-set), html:has(body.g-pip .gq) { overflow-y: auto; }
 #g-set { container-type: inline-size; background: var(--surface); color: var(--ink); font-family: var(--font-body); font-size: var(--fs-md); font-weight: 600; line-height: 1.4; }
-.g-set-h { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px 0 12px; background: var(--art-plank) 0 0 / 64px 32px repeat-x; image-rendering: pixelated; color: var(--bar-ink); }
+.g-set-h { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px 0 12px; background-color: var(--wood-lo); background-image: var(--night-bark); background-position: 0 0; background-size: 230px auto; background-repeat: repeat; box-shadow: inset 0 -2px 0 var(--wood-o); color: var(--bar-ink); }
 #g-set .g-set-h h2 { flex: 1; margin: 0; font-family: var(--font-title); font-size: var(--tt-s); font-weight: 400; line-height: 1.2; color: var(--bar-ink); }
 .g-set-x { flex: none; }
 .g-set-body { display: grid; box-shadow: inset 0 4px 0 var(--pad-shade); }
@@ -1253,25 +1198,25 @@ html:has(body.g-pip #g-set), html:has(body.g-pip .gq) { overflow-y: auto; }
 .g-set-row + .g-set-row { margin-top: 6px; }
 .g-set-lbl { flex: 1; min-width: 0; }
 .g-set-lbl small { display: block; color: var(--muted); font-size: var(--fs-sm); font-weight: 600; line-height: 1.3; }
-/* the layouts as little pictures: Cards, the chosen one amber */
+/* the layouts as little pictures: Cards, the chosen one lime */
 .g-set-pics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-.g-set-pic { min-width: 0; padding: 8px 6px 6px; background-color: var(--card); border: 2px solid var(--card-o); box-shadow: inset 0 2px 0 var(--card-hi), inset 0 -2px 0 var(--card-lo); color: var(--ink); font-family: var(--font-body); font-size: var(--fs-sm); font-weight: 700; text-align: center; cursor: pointer; }
+.g-set-pic { background-image: none; min-width: 0; padding: 8px 6px 6px; background-color: var(--card); border: 2px solid var(--card-o); box-shadow: inset 0 2px 0 var(--card-hi), inset 0 -2px 0 var(--card-lo); color: var(--ink); font-family: var(--font-body); font-size: var(--fs-sm); font-weight: 700; text-align: center; cursor: pointer; }
 .g-set-pic:hover:not([aria-pressed="true"]) { background-color: color-mix(in srgb, var(--card), var(--card-hi) 60%); }
-.g-set-pic[aria-pressed="true"] { background-color: var(--accent); box-shadow: inset 0 2px 0 var(--key-hi), inset 0 -2px 0 var(--key-lo); color: var(--key-ink); }
+.g-set-pic[aria-pressed="true"] { background-color: var(--lime); box-shadow: inset 0 2px 0 var(--lime-hi), inset 0 -2px 0 var(--lime-lo); color: var(--lime-ink); }
 .g-set-pic svg { display: block; width: 100%; height: 36px; margin-bottom: 4px; }
 .g-set-pic rect, .g-laypic rect { fill: var(--wood); }
 .g-set-pic rect.e, .g-laypic rect.e { fill: var(--num-big); }
 .g-set-pic rect.l, .g-laypic rect.l { fill: var(--j-meat); }
-.g-set-pic[aria-pressed="true"] rect.e, .g-laypic[aria-pressed="true"] rect.e { fill: var(--key-ink); }
+.g-set-pic[aria-pressed="true"] rect.e, .g-laypic[aria-pressed="true"] rect.e { fill: var(--lime-ink); }
 .g-set-pic[aria-pressed="true"] rect.l, .g-laypic[aria-pressed="true"] rect.l { fill: var(--wood-lo); }
-/* a switch: a flat box with a square knob, amber when on */
-.g-set-sw { position: relative; flex: none; width: 38px; height: 22px; padding: 0; border: 2px solid var(--seg-e); border-radius: var(--corner); background: var(--div); cursor: pointer; }
-.g-set-sw::after { content: ""; position: absolute; left: 2px; top: 2px; width: 14px; height: 14px; border-radius: var(--corner-dot); background: var(--seg-e); }
-.g-set-sw[aria-pressed="true"] { background: var(--accent); }
-.g-set-sw[aria-pressed="true"]::after { left: 18px; background: var(--key-ink); }
+/* a switch: a flat box with a round knob, lime when on */
+.g-set-sw { position: relative; flex: none; width: 38px; height: 22px; padding: 0; border: 2px solid var(--seg-e); border-radius: var(--r-pill); background: var(--div); cursor: pointer; }
+.g-set-sw::after { content: ""; position: absolute; left: 2px; top: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--seg-e); }
+.g-set-sw[aria-pressed="true"] { background: var(--lime); }
+.g-set-sw[aria-pressed="true"]::after { left: 18px; background: var(--lime-ink); }
 /* its buttons are the kit's wood signs (k-btn); this is only their place in a row */
 .g-set-btn { white-space: nowrap; }
-.g-set-av { flex: none; display: grid; place-items: center; width: 30px; height: 30px; overflow: hidden; border-radius: var(--corner-dot); background: var(--pill); color: var(--pill-ink); font-weight: 700; }
+.g-set-av { flex: none; display: grid; place-items: center; width: 30px; height: 30px; overflow: hidden; border-radius: 50%; background: var(--pill); color: var(--pill-ink); font-weight: 700; }
 .g-set-av img { width: 100%; height: 100%; object-fit: cover; }
 .g-set-links { display: flex; flex-wrap: wrap; gap: 12px 10px; margin-top: 12px; }
 /* the app's rows: See-through's slider, Size's − and + around its number, the version line (kept one line tall while
@@ -1300,11 +1245,11 @@ body.g-setwin .g-set-h button { -webkit-app-region: no-drag; }
 .ap-page { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 18px; align-items: start; margin-top: 14px; }
 .ap-railin { position: sticky; top: 12px; display: flex; flex-direction: column; gap: 10px; }
 @media (max-width: 760px) { .ap-page { grid-template-columns: minmax(0, 1fr); } .ap-railin { position: static; } }
-.ap-btn { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 8px 16px; border-radius: var(--corner); font: 700 var(--fs-lg) var(--font-body); text-align: left; color: var(--btn-ink); background: var(--btn); border: 1.5px solid var(--btn-line); }
+.ap-btn { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 8px 16px; border-radius: var(--r-card); font: 700 var(--fs-lg) var(--font-body); text-align: left; color: var(--btn-ink); background: var(--btn); border: 1.5px solid var(--btn-line); }
 .ap-btn[hidden] { display: none; }
 .ap-btn i { font-style: normal; font-size: var(--fs-lg); width: 22px; text-align: center; flex: none; }
-.ap-btn.go { background: var(--accent); border-color: var(--key-lo); color: var(--key-ink); box-shadow: 0 4px 0 var(--key-lo); justify-content: center; min-height: 60px; }
-.ap-box { background: var(--surface); border: 1px solid var(--line); border-radius: var(--corner); padding: 12px; }
+.ap-btn.go { background: var(--accent); border-color: var(--key-lo); color: var(--key-ink); box-shadow: 0 .2em .6em var(--key-lo); justify-content: center; min-height: 60px; }
+.ap-box { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: 12px; }
 .ap-boxh { font: 700 var(--fs-xs) var(--font-body); color: var(--muted); margin: 2px 2px 8px; }
 .ap-checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; font-size: var(--fs-sm); color: var(--muted); }
 .ap-checks li.done { color: var(--ink); font-weight: 700; }
@@ -1316,41 +1261,41 @@ body.g-setwin .g-set-h button { -webkit-app-region: no-drag; }
 .ap-statrow .ap-del { padding: 4px 0; }
 .ap-card .ap-read { outline: 2px solid var(--up-fg); outline-offset: 1px; }
 #ap-addstat { margin-top: 8px; font-size: var(--fs-sm); }
-.ap-line { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; padding: 10px 14px; border-radius: var(--corner); background: var(--pill); color: var(--pill-ink); border: 2px solid var(--wood-o); min-height: 52px; }
+.ap-line { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; padding: 10px 14px; border-radius: var(--r-card); background: var(--pill); color: var(--pill-ink); border: 2px solid var(--wood-o); min-height: 52px; }
 .ap-lmuted { color: var(--bar-muted); }
 .ap-nm { font: 400 var(--tt-s) var(--font-title); color: var(--pill-ink); }
-.ap-ico { width: 32px; height: 32px; border-radius: var(--corner); background: var(--soon-bar); flex: none; }
+.ap-ico { width: 32px; height: 32px; border-radius: var(--r-card); background: var(--soon-bar); flex: none; }
 .ap-chip { white-space: nowrap; font-size: var(--fs-sm); }
 .ap-chip b { font: 700 var(--n-s) var(--font-num); color: var(--bar-ink); }
 .ap-chip .lav { color: var(--pill-ink-y); font: 600 var(--n-s) var(--font-num); }
 .ap-readok { font-size: var(--fs-sm); color: var(--pill-ink-y); font-weight: 700; }
 .ap-links { display: inline-flex; gap: 6px; margin-left: auto; }
-.ap-band { display: flex; align-items: center; gap: 8px 22px; flex-wrap: wrap; background: var(--lemon); border: 2px solid var(--card-o); border-radius: var(--corner); padding: 14px 18px; color: var(--lemon-ink); }
+.ap-band { display: flex; align-items: center; gap: 8px 22px; flex-wrap: wrap; background: var(--lemon); border: 2px solid var(--card-o); border-radius: var(--r-card); padding: 14px 18px; color: var(--lemon-ink); }
 .ap-bk { font: 700 var(--fs-xs) var(--font-body); color: var(--lemon-ink); }
 .ap-big { font: 700 var(--n-xl)/1.05 var(--font-num); color: var(--lemon-ink); margin-top: 4px; }
 .ap-bandl { display: grid; gap: 4px; font-size: var(--fs-sm); min-width: 0; }
-.ap-pill { display: inline-flex; gap: 6px; font-weight: 700; font-size: var(--fs-sm); border-radius: var(--corner); padding: 3px 10px; width: max-content; max-width: 100%; background: var(--track); color: var(--muted); }
+.ap-pill { display: inline-flex; gap: 6px; font-weight: 700; font-size: var(--fs-sm); border-radius: var(--r-card); padding: 3px 10px; width: max-content; max-width: 100%; background: var(--track); color: var(--muted); }
 .ap-pill[hidden] { display: none; }
 .ap-pill.solid { background: var(--up-bg); color: var(--up-fg); }
 .ap-pill.rough { background: var(--watch-bg); color: var(--watch-fg); }
 .ap-offer { display: flex; gap: 8px; align-items: center; font-size: var(--fs-sm); font-weight: 700; }
 .ap-offer input { width: 8em; font: 600 var(--n-s) var(--font-num); }
 .ap-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
-.ap-tabs button { border-radius: var(--corner); }
+.ap-tabs button { border-radius: var(--r-card); }
 .ap-tabs button[aria-selected="true"] { background: var(--ink); color: var(--page); border-color: var(--ink); }
-.ap-pane { background: var(--surface); border: 1px solid var(--line); border-radius: var(--corner); padding: 12px 14px; min-width: 0; }
+.ap-pane { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: 12px 14px; min-width: 0; }
 .ap-pane p { margin: 0 0 8px; }
 .ap-pane .error { color: var(--bad); font-weight: 700; }
 .ap-pane .small { font-size: var(--fs-sm); color: var(--muted); }
 .ap-one { font: 700 var(--n-m) var(--font-num); color: var(--num); }
 .ap-chart { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; align-items: end; height: 120px; max-width: 440px; margin: 10px 0 4px; }
 .ap-bar { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; gap: 3px; font-size: var(--fs-xs); color: var(--muted); min-width: 0; }
-.ap-bar i { display: block; width: 100%; background: var(--soon-bar); border-radius: var(--corner); }
+.ap-bar i { display: block; width: 100%; background: var(--soon-bar); border-radius: var(--r-card); }
 .ap-bar.me i { background: var(--accent); }
 .ap-bar.me { color: var(--ink); font-weight: 700; }
 .ap-or { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: var(--fs-sm); color: var(--muted); font-weight: 700; margin-top: 4px; }
 .ap-or button { padding: 3px 10px; font-size: var(--fs-sm); }
-.ap-or button[aria-pressed="true"] { border-color: var(--accent); }
+.ap-or button[aria-pressed="true"] { border-color: var(--lime); }
 /* Sales: the paste box, the rows behind the estimate (left out ones faded), what it went for before, the report form */
 .ap-paste { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
 .ap-paste label { display: grid; gap: 4px; font-size: var(--fs-sm); font-weight: 700; color: var(--muted); }
@@ -1373,14 +1318,14 @@ body.g-setwin .g-set-h button { -webkit-app-region: no-drag; }
 .ap-rin[hidden], .ap-rout[hidden] { display: none; }
 .ap-rin input { width: 9em; font: 600 var(--n-s) var(--font-num); }
 .ap-rout { font-size: var(--fs-sm); color: var(--muted); }
-.ap-card { background: var(--card); border: 2px solid var(--card-o); border-radius: var(--corner); padding: 14px 16px; display: grid; gap: 10px; min-width: 0; }
+.ap-card { background: var(--card); border: 2px solid var(--card-o); border-radius: var(--r-card); padding: 14px 16px; display: grid; gap: 10px; min-width: 0; }
 .ap-card label { display: grid; gap: 4px; font-size: var(--fs-sm); font-weight: 700; color: var(--muted); min-width: 0; }
 .ap-card input, .ap-card select { width: 100%; min-width: 0; font: 600 var(--n-s) var(--font-num); color: var(--ink); }
 .ap-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 10px; }
-#ap-facts { margin: 0; padding: 8px 10px; border-radius: var(--corner); background: var(--track); color: var(--muted); font-size: var(--fs-sm); }
+#ap-facts { margin: 0; padding: 8px 10px; border-radius: var(--r-card); background: var(--track); color: var(--muted); font-size: var(--fs-sm); }
 #ap-facts:empty { display: none; }
-button.cozy { padding: 2px 9px; font-size: var(--fs-xs); border-radius: var(--corner); }
-a.cozy { padding: 2px 9px; font-size: var(--fs-xs); font-weight: 700; border-radius: var(--corner); background: var(--btn); border: 1.5px solid var(--btn-line); color: var(--btn-ink); text-decoration: none; }
+button.cozy { padding: 2px 9px; font-size: var(--fs-xs); border-radius: var(--r-card); }
+a.cozy { padding: 2px 9px; font-size: var(--fs-xs); font-weight: 700; border-radius: var(--r-card); background: var(--btn); border: 1.5px solid var(--btn-line); color: var(--btn-ink); text-decoration: none; }
 a.cozy:hover { border-color: var(--muted); }
 #ap-note { margin: 0; font-size: var(--fs-sm); font-weight: 700; }
 #ap-note:empty { display: none; }
@@ -1391,49 +1336,50 @@ a.cozy:hover { border-color: var(--muted); }
 #view-how { max-width: 840px; width: calc(100% - 2 * var(--gap)); margin: var(--gap) auto; padding: 0; }
 #view-how .k-bar h2 { margin: 0; font: inherit; }
 #view-how .k-pad { display: grid; gap: var(--gap); }
-#view-how section { display: grid; gap: var(--gap); min-width: 0; padding-top: var(--gap); background: var(--art-dots) left top / 8px 2px repeat-x; }
+#view-how section { display: grid; gap: var(--gap); min-width: 0; padding-top: var(--gap); background: var(--night-dots) left top / 8px 2px repeat-x; }
 #view-how section.how-first { padding-top: 0; background: none; }
 body:not(.timer-off) #view-how .timer-only, body:not(.appraiser-off) #view-how .appraiser-only { display: contents; }
 #view-how h3 { margin: 0; font: 400 var(--tt-m) var(--font-title); }
 #view-how p, #view-how li { margin: 0; color: var(--ink); }
 #view-how .lead { font-size: var(--fs-lg); }
-#view-how code { font: 600 var(--n-s) var(--font-num); background: var(--card); border: 2px solid var(--card-o); border-radius: var(--corner); padding: 0 6px; }
+#view-how code { font: 600 var(--n-s) var(--font-num); background: var(--card); border: 2px solid var(--card-o); border-radius: var(--r-card); padding: 0 6px; }
 #view-how a { color: var(--focus); text-decoration: underline; }
 .legend, .examples { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
 .legend li { display: grid; grid-template-columns: 120px 1fr; gap: 12px; align-items: center; }
 .examples li { display: grid; grid-template-columns: 150px 1fr; gap: 12px; align-items: baseline; }
 .examples code { justify-self: start; }
-.smallprint { padding-top: var(--gap); background: var(--art-dots) left top / 8px 2px repeat-x; }
+.smallprint { padding-top: var(--gap); background: var(--night-dots) left top / 8px 2px repeat-x; }
 /* How it works: a hero stage, example cards drawn from the site's own pictures, and the Good to know note */
 .how-hero { display: grid; gap: var(--gap); min-width: 0; }
-.how-stage { position: relative; height: 70px; overflow: hidden; display: flex; align-items: flex-end; gap: 28px; padding: 0 var(--gap); background: var(--stage-sky); border: 2px solid var(--card-o); border-radius: var(--corner); image-rendering: pixelated; }
+.how-stage { position: relative; height: 70px; overflow: hidden; display: flex; align-items: flex-end; gap: 28px; padding: 0 var(--gap) 12px; isolation: isolate; border: 2px solid var(--card-o); border-radius: var(--r-card); image-rendering: pixelated; }
+.how-stage::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 8px; z-index: -1; border-top: 4px solid var(--ground-line); background-color: var(--ground); }
 .how-mob { display: block; flex: none; background-repeat: no-repeat; image-rendering: pixelated; animation: how-walk .7s steps(3) infinite; }
 .how-mob-pig { width: 68px; height: 46px; background-image: url(sprites/mobs/8.png); background-size: 204px 46px; --how-sheet: -204px; }
 .how-mob-ribbon { width: 68px; height: 50px; background-image: url(sprites/mobs/10.png); background-size: 204px 50px; --how-sheet: -204px; }
 @keyframes how-walk { to { background-position: var(--how-sheet) 0; } }
 .how-lemon { display: inline-block; flex: none; width: 38px; height: 38px; background: url(data/loot-icons.png) -190px -722px no-repeat; image-rendering: pixelated; }
-.how-stage .how-lemon { align-self: flex-end; margin-bottom: 2px; }
-.how-mock { display: grid; gap: var(--gap); padding: var(--gap); background: var(--card); border: 2px solid var(--card-o); border-radius: var(--corner); max-width: 420px; min-width: 0; }
-.how-row { display: flex; align-items: center; gap: var(--gap); min-width: 0; padding-bottom: 8px; background: var(--art-dots) left bottom / 8px 2px repeat-x; }
+.how-stage .how-lemon { align-self: flex-end; margin-bottom: 0; }
+.how-mock { display: grid; gap: var(--gap); padding: var(--gap); background: var(--card); border: 2px solid var(--card-o); border-radius: var(--r-card); max-width: 420px; min-width: 0; }
+.how-row { display: flex; align-items: center; gap: var(--gap); min-width: 0; padding-bottom: 8px; background: var(--night-dots) left bottom / 8px 2px repeat-x; }
 .how-row:last-child { padding-bottom: 0; background: none; }
 .how-name { flex: 1; min-width: 0; display: grid; font: 600 var(--fs-md) var(--font-body); color: var(--ink); }
 .how-name small, .how-num small { font: 400 var(--fs-xs) var(--font-body); color: var(--muted); }
 .how-num { display: grid; justify-items: end; font: 700 var(--n-s) var(--font-num); color: var(--num); white-space: nowrap; }
 .how-num.how-big { font-size: var(--tt-l); color: var(--num-big); }
-.how-ring { display: inline-grid; place-items: center; flex: none; width: 52px; height: 52px; background: var(--art-ring) 0 0 / 52px 52px no-repeat; image-rendering: pixelated; }
+.how-ring { display: inline-grid; place-items: center; flex: none; width: 52px; height: 52px; background: var(--night-ring) 0 0 / 52px 52px no-repeat; image-rendering: pixelated; }
 .how-ring .how-mob { transform: scale(.55); transform-origin: center; animation: none; }
 .how-ring .how-lemon { width: 38px; height: 38px; margin: 6px 0 0 4px; }
 .how-skill { width: 32px; height: 32px; background: url(data/skill-icons.png) -384px -192px no-repeat; image-rendering: pixelated; }
 .how-seg { display: flex; gap: 0; }
 .how-seg span { flex: 1; text-align: center; padding: 4px 0; font: 700 var(--fs-sm) var(--font-body); color: var(--btn-ink); background: var(--btn); border: 2px solid var(--btn-lo); }
-.how-seg span.on { background: var(--accent); color: var(--key-ink); border-color: var(--key-lo); }
+.how-seg span.on { background: var(--lime); color: var(--lime-ink); border-color: var(--lime-lo); }
 .how-list { margin: 0; padding: 0 0 0 20px; display: grid; gap: 8px; }
-.how-note { display: flex; gap: var(--gap); align-items: flex-start; padding: var(--gap); background: var(--lemon); color: var(--lemon-ink); border: 2px solid var(--key-lo); border-radius: var(--corner); }
+.how-note { display: flex; gap: var(--gap); align-items: flex-start; padding: var(--gap); background: var(--lemon); color: var(--lemon-ink); border: 2px solid var(--key-lo); border-radius: var(--r-card); }
 .how-note p, .how-note strong { color: var(--lemon-ink) !important; }
 .how-note > div { display: grid; gap: 8px; min-width: 0; }
 .how-note-ico { flex: none; }
 @media (prefers-reduced-motion: reduce) { .how-mob { animation: none; } }
-.pill { font: 700 var(--fs-sm) var(--font-body); padding: 3px 9px; border-radius: var(--corner); justify-self: start; white-space: nowrap; }
+.pill { font: 700 var(--fs-sm) var(--font-body); padding: 3px 9px; border-radius: var(--r-pill); justify-self: start; white-space: nowrap; }
 .pill-due { background: var(--due-bg); color: var(--due-fg); }
 .pill-soon { background: var(--soon-bg); color: var(--soon-fg); }
 .pill-watched { background: var(--watch-bg); color: var(--watch-fg); }
@@ -1442,7 +1388,7 @@ body:not(.timer-off) #view-how .timer-only, body:not(.appraiser-off) #view-how .
 .muted { color: var(--muted); }
 small, .small { font-size: var(--fs-sm); color: var(--muted); }
 /* stage: dusk sky, the boss walking on a Maple ledge */
-#stage { position: relative; height: 210px; border-radius: var(--corner); overflow: hidden; color: var(--logo);
+#stage { position: relative; height: 210px; border-radius: var(--r-card); overflow: hidden; color: var(--logo);
   background: linear-gradient(180deg, #1c2547 0%, #3d3a73 55%, #c9797a 92%, #eaa67a 100%); }
 .stars { position: absolute; inset: 0; background-image: radial-gradient(1.5px 1.5px at 12% 22%, #fff9, transparent), radial-gradient(1px 1px at 33% 12%, #fff8, transparent),
   radial-gradient(1.5px 1.5px at 71% 18%, #fffa, transparent), radial-gradient(1px 1px at 86% 35%, #fff7, transparent), radial-gradient(1px 1px at 55% 30%, #fff6, transparent),
@@ -1452,24 +1398,25 @@ small, .small { font-size: var(--fs-sm); color: var(--muted); }
 #spritebox { position: relative; flex: none; }
 #sprite { position: absolute; background-repeat: no-repeat; }
 .title { padding-bottom: 16px; min-width: 0; }
-#bossname { font: 400 var(--tt-logo)/1 var(--font-title); margin: 0; text-shadow: 0 2px 0 var(--win-shadow); }
+#bossname { font: 400 var(--tt-logo)/1 var(--font-title); margin: 0; text-shadow: 0 2px 4px var(--win-shadow); }
 #bossmap { margin: 6px 0 0; color: var(--logo); font-weight: 700; }
 .stat { margin-left: auto; text-align: right; padding-bottom: 16px; flex: none; }
-#estimate { font: 400 var(--tt-logo)/1 var(--font-title); text-shadow: 0 2px 0 var(--win-shadow); }
+#estimate { font: 400 var(--tt-logo)/1 var(--font-title); text-shadow: 0 2px 4px var(--win-shadow); }
 #estimate small { font-size: var(--fs-md); color: inherit; opacity: .85; }
 #estimatenote { margin: 6px 0 0; font-size: var(--fs-sm); font-weight: 700; color: var(--logo); }
 #bossinfo { margin: 2px 0 0; font-size: var(--fs-sm); color: var(--logo); opacity: .8; }
 
 /* boss buttons */
 .picker { display: flex; gap: 6px; padding: 10px 0; overflow-x: auto; }
-.boss { flex: none; display: flex; align-items: center; gap: 6px; padding: 4px 12px 4px 4px; border: 0; border-radius: var(--corner); background: none;
+.boss { flex: none; display: flex; align-items: center; gap: 6px; padding: 4px 12px 4px 4px; border: 0; border-radius: var(--r-card); background: none;
   color: var(--muted); font: 700 var(--fs-sm) var(--font-body); white-space: nowrap; }
 .boss:hover { color: var(--ink); }
-.boss[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 2px var(--accent); }
+.boss[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 2px var(--lime); }
 .boss .mini { display: block; flex: none; background-repeat: no-repeat; }
 select, input, button { font: inherit; color: inherit; }
-input { background: var(--card); border: 1.5px solid var(--card-o); border-radius: var(--corner); padding: 8px 12px; }
-button { background: var(--btn); color: var(--btn-ink); border: 1.5px solid var(--btn-lo); border-radius: var(--corner); padding: 7px 14px; font-weight: 700; font-size: var(--fs-sm); cursor: pointer; }
+input { background: var(--card); border: 1.5px solid var(--card-o); border-radius: var(--r-card); padding: 8px 12px; }
+button { background-color: var(--btn); color: var(--btn-ink); border: 1.5px solid var(--btn-lo); border-radius: var(--r-btn); padding: 7px 14px; font-weight: 700; font-size: var(--fs-sm); cursor: pointer; }
+button { background-image: linear-gradient(color-mix(in srgb, var(--btn-hi) 35%, transparent), color-mix(in srgb, var(--btn-lo) 40%, transparent)), var(--night-bark); background-size: auto, 160px auto; }
 button:hover { border-color: var(--btn-hi); }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 button:disabled, input:disabled { opacity: .5; cursor: not-allowed; }
@@ -1485,7 +1432,7 @@ button:disabled, input:disabled { opacity: .5; cursor: not-allowed; }
 #status:empty { display: none; }
 
 /* board: one line per channel */
-#timeline { margin-top: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--corner); overflow: hidden; }
+#timeline { margin-top: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; }
 .axis, .row .main { display: grid; grid-template-columns: 56px 128px minmax(0, 1fr) 120px; gap: 6px 16px; align-items: center; padding: 10px 16px; }
 .axis { background: var(--surface-2); font: 700 var(--n-s) var(--font-num); color: var(--muted); padding-block: 8px 4px; }
 .axis .label { display: block; }
@@ -1498,31 +1445,31 @@ button:disabled, input:disabled { opacity: .5; cursor: not-allowed; }
 .row .ch { font: 700 var(--n-m) var(--font-num); color: var(--num); }
 .row .when { font: 700 var(--n-m) var(--font-num); color: var(--num); text-align: right; white-space: nowrap; }
 .row .what { margin-top: 6px; font-size: var(--fs-sm); }
-.track { position: relative; height: 10px; border-radius: var(--corner); background: var(--track); }
-.bar { position: absolute; top: 0; bottom: 0; border-radius: var(--corner); }
+.track { position: relative; height: 10px; border-radius: var(--r-pill); background: var(--track); }
+.bar { position: absolute; top: 0; bottom: 0; border-radius: var(--r-pill); }
 .state-due .bar { background: var(--due-bar); }
 .state-soon .bar { background: var(--soon-bar); }
 .state-watched .bar { background: var(--watch-bar); }
 .state-overdue { opacity: .55; }
 .state-overdue .bar { background: var(--over-bar); }
 .secondhand .bar { background: transparent !important; border: 2px dashed var(--muted); }
-.mark { position: absolute; top: -3px; width: 16px; height: 16px; margin-left: -8px; border-radius: var(--corner-dot); background: var(--up-dot); border: 3px solid var(--surface); box-shadow: 0 0 0 1px var(--up-dot); }
+.mark { position: absolute; top: -3px; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: var(--up-dot); border: 3px solid var(--surface); box-shadow: 0 0 0 1px var(--up-dot); }
 .now { position: absolute; top: -5px; bottom: -5px; width: 2px; background: var(--now); }
 .postlist { grid-column: 1 / -1; margin: 4px 0 0 72px; padding: 0; list-style: none; font-size: var(--fs-sm); }
 .postlist li { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 2px 0; }
-.postlist button { padding: 1px 8px; font-size: var(--fs-sm); border-radius: var(--corner); }
+.postlist button { padding: 1px 8px; font-size: var(--fs-sm); border-radius: var(--r-card); }
 .empty { margin: 0; padding: 18px 16px; color: var(--muted); }
 /* the loading and failure lines of a tab sit on a card, never straight on the scene */
 :is(#builds-root, #appraiser-root, #grind-root) > .empty { background: var(--card); border: 2px solid var(--card-o); box-shadow: inset 0 2px 0 var(--card-hi), inset 0 -2px 0 var(--card-lo); color: var(--ink); }
-#hiddenlist { margin-top: 12px; padding: 12px; border: 1px dashed var(--line); border-radius: var(--corner); }
+#hiddenlist { margin-top: 12px; padding: 12px; border: 1px dashed var(--line); border-radius: var(--r-card); }
 #hiddenlist h2 { font-size: var(--fs-md); margin: 0 0 6px; color: var(--muted); }
 #hiddenlist .postlist { margin-left: 0; }
 b.t { font-family: var(--font-num); }
 
-/* Something off? (flag.js): the kit's main button with its grass, fixed in the corner of every tab, a flag then the words (under 1560 wide just the
+/* Something off? (flag.js): the kit's main button, fixed in the corner of every tab, a flag then the words (under 1560 wide just the
    flag, its name kept for screen readers). Its panel is a Window and the thank you note a Card. Every page keeps its foot clear of the button. */
 body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
-.k-btn.flag { position: fixed; right: 15px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 50; margin-top: 0; gap: 12px; padding: 8px 15px 13px; box-shadow: 3px 3px 0 var(--win-shadow); }
+.k-btn.flag { position: fixed; right: 15px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 50; margin-top: 0; gap: 12px; padding: 8px 15px 13px; }
 .flag[hidden] { display: none; }
 .flag-ico { display: inline-flex; }
 
@@ -1530,23 +1477,23 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
 #flag-panel .k-bar h2 { margin: 0; font: inherit; }
 #flag-panel .k-pad { display: grid; gap: var(--gap); min-height: 0; overflow: auto; }
 .flag-kinds { display: flex; flex-wrap: wrap; gap: 12px 8px; }
-.flag-kinds .k-btn[aria-pressed="true"] { --face: var(--accent); --face-hi: var(--key-hi); --face-lo: var(--key-lo); color: var(--key-ink); }
+.flag-kinds .k-btn[aria-pressed="true"] { --face: var(--lime); --face-hi: var(--lime-hi); --face-lo: var(--lime-lo); color: var(--lime-ink); }
 .flag-shots { display: flex; gap: 8px; }
 .flag-shots:empty { display: none; }
-.flag-shot { position: relative; flex: 1 1 0; min-width: 0; margin: 0; border: 2px solid var(--card-o); border-radius: var(--corner); overflow: hidden; background: var(--card); }
+.flag-shot { position: relative; flex: 1 1 0; min-width: 0; margin: 0; border: 2px solid var(--card-o); border-radius: var(--r-card); overflow: hidden; background: var(--card); }
 .flag-shot a { display: block; }
 /* the whole picture, chat box and all: what goes is what they see; a click opens it full size */
 .flag-shot img { display: block; width: 100%; height: 84px; object-fit: contain; background: var(--card-lo); }
 .flag-shot figcaption { font-size: var(--fs-sm); padding: 3px 8px; color: var(--muted); }
 .flag-shot .flag-drop { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; padding-bottom: 3px; }
-#flag-text { display: block; width: 100%; min-height: 76px; resize: vertical; background: var(--card); border: 2px solid var(--card-o); border-radius: var(--corner); padding: 8px 10px; font: inherit; color: inherit; }
+#flag-text { display: block; width: 100%; min-height: 76px; resize: vertical; background: var(--card); border: 2px solid var(--card-o); border-radius: var(--r-card); padding: 8px 10px; font: inherit; color: inherit; }
 .flag-small { font-size: var(--fs-sm); color: var(--muted); margin: 0; }
-#flag-details { max-height: 220px; overflow: auto; font: 600 var(--n-s)/1.4 var(--font-num); background: var(--card); border: 2px solid var(--card-o); border-radius: var(--corner); padding: 8px; margin: 0; white-space: pre-wrap; word-break: break-all; }
+#flag-details { max-height: 220px; overflow: auto; font: 600 var(--n-s)/1.4 var(--font-num); background: var(--card); border: 2px solid var(--card-o); border-radius: var(--r-card); padding: 8px; margin: 0; white-space: pre-wrap; word-break: break-all; }
 #flag-details[hidden] { display: none; }
 #flag-msg { color: var(--bad); font-weight: 700; font-size: var(--fs-sm); margin: 0; }
 #flag-msg:empty { display: none; }
 .flag-row { display: flex; gap: 8px; justify-content: flex-end; }
-#flag-toast { position: fixed; right: 16px; bottom: calc(120px + env(safe-area-inset-bottom, 0px)); z-index: 51; max-width: calc(100vw - 32px); background: var(--card); color: var(--ink); border: 2px solid var(--card-o); box-shadow: 4px 4px 0 var(--win-shadow); border-radius: var(--corner); padding: 10px 14px; font-weight: 700; }
+#flag-toast { position: fixed; right: 16px; bottom: calc(120px + env(safe-area-inset-bottom, 0px)); z-index: 51; max-width: calc(100vw - 32px); background: var(--surface); color: var(--ink); border: 1px solid var(--mint-line); box-shadow: 0 0 0 2px var(--wood-o); border-radius: var(--r-glass); padding: 10px 14px; font-weight: 700; }
 #flag-toast a { color: var(--focus); margin-left: 8px; }
 
 /* phone: shorter stage with the stats under the name, board keeps CH, STATUS and the time */
@@ -1569,35 +1516,35 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
   .row .when { font-size: var(--fs-md); }
   .postlist { margin-left: 0; }
   .k-btn.flag { right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
-  #theme { right: 12px; bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
   #flag-panel { right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); width: calc(100vw - 24px); }
 }
 
-/* ---------- The Trail Signs kit (forest foundation): shared pieces other areas build on. One art pixel is 2 CSS pixels. The art
-   comes from forest-art.css (npm run boss:forest) as --art-* custom properties, so both themes follow data-theme. ---------- */
+/* ---------- The kit: shared pieces other areas build on. One art pixel is 2 CSS pixels. The art
+   comes from night-art.css (npm run boss:night) as --night-* custom properties. ---------- */
 
 /* kit: k-win */
-.k-win { position: relative; border: 8px solid transparent; background: var(--surface) padding-box; box-shadow: 6px 6px 0 var(--win-shadow); color: var(--ink); }
-.k-win::before { content: ""; position: absolute; inset: -8px; border-style: solid; border-color: transparent; border-width: 8px; border-width: round(.5em, 4px); border-image: var(--art-frame) 4 / 1 / 0 round; image-rendering: pixelated; pointer-events: none; }
+/* a bark frame (the tiled picture on the element, a plain wood color under it for when the art file is missing) with the glass inside it on ::before. The light top edge is a gradient in the same layer list as the bark; the dark outline is a ring outside the frame and another outside the glass */
+.k-win { position: relative; isolation: isolate; border: 15px solid transparent; border-radius: var(--r-frame); color: var(--ink); box-shadow: 0 0 0 2px var(--wood-o); }
+.k-win { background-color: var(--wood-lo); }
+.k-win { background-image: linear-gradient(color-mix(in srgb, var(--btn-hi) 40%, transparent) 0 3px, transparent 3px), var(--night-bark); background-size: auto, 230px auto; background-repeat: no-repeat, repeat; background-origin: border-box, padding-box; }
+.k-win::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: var(--r-glass); background-color: var(--surface); box-shadow: 0 0 0 2px var(--wood-o), inset 0 0 0 1px var(--mint-line), inset 0 0 30px var(--card); pointer-events: none; }
 
 /* kit: k-bar */
-/* the mock's plank: 38 tall at least, the 64 x 32 tile repeating both ways (its second row is the lighter lip), and the frame's outline under it */
-.k-bar { position: relative; display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 6px 12px 8px; background: var(--art-plank) 0 0 / 64px 32px; border-bottom: 2px solid var(--wood-o); image-rendering: pixelated; color: var(--bar-ink); font-family: var(--font-title); font-size: var(--tt-m); font-weight: 400; line-height: 1; white-space: nowrap; }
-/* the plank's ground when the art file is missing (a separate rule: the pop-out copies rules by their text, and a background shorthand holding var() followed by a longhand copies as nothing). Every plank rule is above this one */
-.k-bar, .g-top, .g-set-h { background-color: var(--art-plank, var(--wood)); }
+/* the title row sits right on the glass: no plank, no line under it */
+.k-bar { position: relative; display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 6px 12px 8px; color: var(--num); font-family: var(--font-title); font-size: var(--tt-m); font-weight: 400; line-height: 1; white-space: nowrap; }
 .k-bar .k-sq { width: 24px; height: 24px; padding-bottom: 3px; }
 .k-bar small { font: 600 var(--fs-sm) var(--font-body); color: var(--bar-muted); }
 .k-bar > .push { margin-left: auto; display: flex; align-items: center; gap: 4px; }
 
 /* kit: k-grass */
-.k-grass::before { content: ""; position: absolute; left: -4px; right: -4px; top: -7px; height: 14px; background: var(--art-moss) 0 0 / 128px 14px repeat-x; image-rendering: pixelated; pointer-events: none; }
+/* moss tufts with gaps on part of the top edge, never a full line. Only Now grinding, the Builds character window and the logo wear it. No fallback color: it is only decoration */
+.k-grass::after, .logo::before { content: ""; position: absolute; left: 22px; right: 22px; top: -22px; height: 14px; z-index: 2; background-image: var(--night-moss); background-size: 128px 14px; background-repeat: repeat-x; image-rendering: pixelated; -webkit-mask-image: linear-gradient(90deg, var(--num) 0 34%, transparent 44% 58%, var(--num) 70%, transparent 80%); mask-image: linear-gradient(90deg, var(--num) 0 34%, transparent 44% 58%, var(--num) 70%, transparent 80%); pointer-events: none; }
 
 /* kit: k-pad */
 .k-pad { padding: var(--gap); }
-.k-bar + .k-pad { box-shadow: inset 0 4px 0 var(--pad-shade); }
 
 /* kit: k-card */
-.k-card { background: var(--card); border: 2px solid var(--card-o); box-shadow: inset 0 2px 0 var(--card-hi), inset 0 -2px 0 var(--card-lo); padding: 8px 12px; color: var(--ink); }
+.k-card { background: var(--card); border: 1px solid var(--card-o); border-radius: var(--r-card); padding: 8px 12px; color: var(--ink); }
 
 /* kit: k-card.lemon */
 .k-card.lemon { background: var(--lemon); color: var(--lemon-ink); }
@@ -1606,31 +1553,34 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
 .k-card.meat { background: var(--meat); color: var(--meat-ink); }
 
 /* kit: k-btn */
-.k-btn, .k-sq { --face: var(--btn); --face-hi: var(--btn-hi); --face-lo: var(--btn-lo); --ledge: 4px; position: relative; isolation: isolate; background: none; border: 0; color: var(--btn-ink); font-family: var(--font-body); font-size: var(--fs-md); font-weight: 700; line-height: 1.2; white-space: nowrap; cursor: pointer; text-decoration: none; }
-.k-btn::after, .k-sq::after { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--face);
-  clip-path: polygon(2px 0, calc(100% - 2px) 0, calc(100% - 2px) 2px, 100% 2px, 100% calc(100% - 2px), calc(100% - 2px) calc(100% - 2px), calc(100% - 2px) 100%, 2px 100%, 2px calc(100% - 2px), 0 calc(100% - 2px), 0 2px, 2px 2px);
-  box-shadow: inset 0 0 0 2px var(--wood-o), inset 0 calc(var(--ledge) * -1) 0 2px var(--face-lo), inset 2px 2px 0 2px var(--face-hi), inset -2px 0 0 2px var(--face-lo); }
-.k-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; margin-top: 2px; padding: 8px 18px 12px; }
-.k-btn::before { content: ""; position: absolute; left: 0; right: 0; top: -2px; height: 10px; background: var(--art-grass) 0 0 / 32px 10px repeat-x; image-rendering: pixelated; pointer-events: none; }
-.k-btn:hover::after, .k-sq:hover::after { background: color-mix(in srgb, var(--face), var(--face-hi) 40%); }
-.k-btn:active, .k-sq:active { --ledge: 2px; transform: translateY(2px); }
+/* the face is ::after (so --face can be changed by a state): a tint of --face over the bark, a 3px ledge under it */
+/* the button face colors, shared by the kit's buttons and the logo sign */
+.k-btn, .k-sq, .logo { --face: var(--btn); --face-hi: var(--btn-hi); --face-lo: var(--btn-lo); --ledge: 3px; --f1: color-mix(in srgb, color-mix(in srgb, var(--face-hi) 35%, var(--face)) 86%, transparent); --f2: color-mix(in srgb, color-mix(in srgb, var(--face-lo) 40%, var(--face)) 90%, transparent); }
+.k-btn, .k-sq { position: relative; isolation: isolate; background: none; border: 0; border-radius: var(--r-btn); color: var(--btn-ink); font-family: var(--font-body); font-size: var(--fs-md); font-weight: 700; line-height: 1.2; white-space: nowrap; cursor: pointer; text-decoration: none; }
+.k-btn::after, .k-sq::after, .logo::after { content: ""; position: absolute; inset: 0 0 var(--ledge); z-index: -1; border-radius: var(--r-btn); box-shadow: 0 var(--ledge) 0 var(--face-lo), inset 0 1px 0 color-mix(in srgb, var(--face-hi) 70%, transparent); }
+.k-btn::after, .k-sq::after, .logo::after { background-color: var(--face); }
+.k-btn::after, .k-sq::after, .logo::after { background-image: linear-gradient(var(--f1), var(--f2)), var(--night-bark); background-size: auto, 160px auto; }
+.k-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; margin-top: 2px; padding: 8px 18px calc(8px + 3px); }
+.k-btn:hover::after, .k-sq:hover::after { box-shadow: 0 var(--ledge) 0 var(--face-lo), inset 0 0 0 99px color-mix(in srgb, var(--face-hi) 28%, transparent); }
+.k-btn:active, .k-sq:active { --ledge: 1px; transform: translateY(2px); }
 .k-btn:focus-visible, .k-sq:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
-/* on wood the ring is the amber (the teal ring is 1.4:1 on the plank); over the scene, in the header, it sits on a paper halo */
+/* over the glass the ring is the amber; over the scene, in the header, it sits on a halo */
 .k-bar :is(button, select, input, a):focus-visible, .k-bar .g-pickw:focus-within, .g-set-h :focus-visible, #g-set .g-set-h :is(button, select, input):focus-visible { outline-color: var(--accent); }
-.topbar :is(button, a):focus-visible { box-shadow: 0 0 0 8px var(--card); }
+.topbar :is(button, a):focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 /* kit: k-btn.key */
 .k-btn.key { --face: var(--accent); --face-hi: var(--key-hi); --face-lo: var(--key-lo); color: var(--key-ink); }
+.k-btn.key::after { background-image: linear-gradient(var(--face-hi), var(--face)); background-size: auto; }
 
 /* kit: k-btn.sm */
-.k-btn.sm { padding: 4px 12px 8px; font-size: var(--fs-sm); gap: 6px; }
+.k-btn.sm { padding: 4px 12px calc(4px + 3px); font-size: var(--fs-sm); gap: 6px; }
 
 /* kit: k-sq */
-.k-sq { display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0 0 4px; }
+.k-sq { display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0 0 3px; }
 .k-sq svg { display: block; }
 
 /* kit: k-ring */
-.k-ring { display: inline-grid; place-items: center; flex: none; width: 52px; height: 52px; background: var(--art-ring) 0 0 / 52px 52px no-repeat; image-rendering: pixelated; }
+.k-ring { display: inline-grid; place-items: center; flex: none; width: 52px; height: 52px; border-radius: 50%; background-color: var(--card); background-image: var(--night-ring); background-size: 52px 52px; background-repeat: no-repeat; image-rendering: pixelated; }
 .k-ring > img { width: 32px; height: 32px; image-rendering: pixelated; }
 
 /* kit: k-ring.big */
@@ -1638,34 +1588,41 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
 .k-ring.big > img { width: 48px; height: 48px; }
 
 /* kit: k-ring.gold */
-.k-ring.gold { background-image: var(--art-ring-gold); }
+.k-ring.gold { background-image: var(--night-ring-gold); }
 
 /* kit: k-tag */
-.k-tag { display: inline-block; vertical-align: middle; border: 6px solid transparent; border-image: var(--art-tag) 6 fill / 6px round; background-color: var(--art-tag, var(--pill)); padding: 0 2px; color: var(--pill-ink); font-family: var(--font-body); font-size: var(--fs-tag); font-weight: 700; line-height: 12px; white-space: nowrap; image-rendering: pixelated; }
+.k-tag { display: inline-block; vertical-align: middle; padding: 3px 10px; border: 1px solid var(--mint-line); border-radius: var(--r-pill); background-color: var(--pill); color: var(--pill-ink); font-family: var(--font-body); font-size: var(--fs-tag); font-weight: 700; line-height: 18px; white-space: nowrap; }
 
 /* kit: k-tag.y */
-.k-tag.y { background-color: var(--art-tag-y, var(--pill)); border-image-source: var(--art-tag-y); color: var(--pill-ink-y); }
+.k-tag.y { color: var(--pill-ink-y); }
 
 /* kit: k-lamp */
-.k-lamp { --glow: var(--accent); position: relative; display: inline-block; vertical-align: middle; flex: none; width: 14px; height: 18px; background: var(--art-lantern) 0 0 / 14px 18px no-repeat; image-rendering: pixelated; }
-.k-lamp::before { content: ""; position: absolute; inset: 6px 3px; box-shadow: 0 0 10px 4px var(--glow); opacity: .55; pointer-events: none; animation: k-blink 2s steps(1) infinite; }
-/* the lantern blinks (two frames) rather than pings */
-@keyframes k-blink { 0% { opacity: .55; } 50% { opacity: .2; } }
+/* the light: a lime pill with a dot that blinks. The words are its child, the dot takes the words' color */
+.k-lamp { display: inline-flex; align-items: center; gap: 6px; vertical-align: middle; flex: none; padding: 3px 12px; border-radius: var(--r-pill); background-color: var(--lime); color: var(--lime-ink); font-family: var(--font-body); font-size: var(--fs-sm); font-weight: 700; line-height: 18px; white-space: nowrap; }
+.k-lamp::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background-color: currentColor; animation: k-blink 2s steps(1) infinite; }
+@keyframes k-blink { 0% { opacity: 1; } 50% { opacity: .3; } }
 @media (prefers-reduced-motion: reduce) { .k-lamp::before { animation: none; } }
 
+/* kit: k-lamp.wait */
+.k-lamp.wait { background-color: var(--accent); color: var(--key-ink); }
+
 /* kit: k-lamp.bad */
-.k-lamp.bad { --glow: var(--bad); background-image: var(--art-lantern-bad); }
+.k-lamp.bad { background-color: var(--bad); color: var(--logo-e); }
 
 /* kit: k-lamp.off */
-.k-lamp.off { background-image: var(--art-lantern-off); }
-.k-lamp.off::before { display: none; }
+.k-lamp.off { background-color: var(--card); color: var(--muted); box-shadow: inset 0 0 0 1px var(--card-o); }
+.k-lamp.off::before { animation: none; opacity: .6; }
 
 /* kit: k-row */
-/* a row with a ring is 56 tall: the 52px ring, 2px over it and the 2px dotted rule under it (the picture's rows), and a row of plain text takes its own padding */
-.k-row { display: flex; align-items: center; gap: var(--gap); padding: 2px 4px 2px; background: var(--art-dots) left bottom / 8px 2px repeat-x; }
+/* a row with a ring is 56 tall: the 52px ring, 2px over it and the 2px dashed rule under it, and a row of plain text takes its own padding */
+.k-row { display: flex; align-items: center; gap: var(--gap); padding: 2px 4px 2px; background-image: linear-gradient(90deg, var(--row-line) 0 8px, transparent 8px 12px); background-size: 12px 2px; background-position: left bottom; background-repeat: repeat-x; }
 .k-row > * { min-width: 0; }
 .k-row > :nth-child(2) { flex: 1 1 auto; }
 .k-row > :last-child:not(:first-child) { margin-left: auto; text-align: right; font: 700 var(--n-m) var(--font-num); }
+
+/* kit: k-dash */
+.k-dash { background-image: linear-gradient(90deg, var(--row-line) 0 8px, transparent 8px 12px); background-size: 12px 2px; background-position: left bottom; background-repeat: repeat-x; }
+.k-dash:last-child { background-image: none; }
 
 /* kit: k-rows */
 .k-rows { display: grid; }
@@ -1687,6 +1644,8 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
 </style>
 </head>
 <body>
+<div id="night-scene" aria-hidden="true"><i class="ns-far-left"></i><i class="ns-far-right"></i><i class="ns-ray-a"></i><i class="ns-ray-b"></i><i class="ns-trunk-left"></i><i class="ns-trunk-right"></i><i class="ns-trunk-inner-left"></i><i class="ns-trunk-inner-right"></i><i class="ns-treehouse"><i class="ns-glow"></i></i>
+  <i class="ns-fly" style="left:120px;top:90px;--x:40px;--y:-30px;--t:8s"></i><i class="ns-fly" style="right:200px;top:260px;--x:-36px;--y:44px;--t:11s"></i><i class="ns-fly" style="left:48%;top:14px;--x:24px;--y:12px;--t:7s"></i><i class="ns-fly" style="left:90px;bottom:150px;--x:44px;--y:-26px;--t:10s"></i><i class="ns-fly" style="right:130px;bottom:90px;--x:-20px;--y:-50px;--t:9s"></i></div>
 <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-MDNKTKB5" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 <header class="topbar"><div class="in">
   <h1 class="logo">Six Path <b>Crossway</b></h1>
@@ -1702,8 +1661,6 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
     <button id="signout" class="k-btn sm" type="button" hidden>Sign out</button>
     <button id="signin" class="k-btn sm" type="button">Sign in with Discord</button>
   </span>
-  <button id="theme" class="k-btn key" type="button" aria-label="Switch to dark theme" title="Switch to dark theme"><span class="theme-ico" aria-hidden="true"></span><span class="theme-txt">Dark mode</span></button>
-  <div class="rail" aria-hidden="true"></div>
 </div></header>
 <main id="view-timer" role="tabpanel" aria-labelledby="tab-timer" hidden>
   <section id="stage" aria-label="Selected boss">
@@ -1822,7 +1779,7 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
     <div class="how-row"><span class="how-ring"><span class="how-skill"></span></span><span class="how-name">Next skill point<small>Example row</small></span><span class="how-num">Heal<small>level 3</small></span></div>
   </div>
   <p>Tired of typing your stats? Read from game reads them off your screen: share your game window or paste a screenshot, with your Character Stat window (DETAIL on) and Skill window open. It marks every box it filled, and leaves a box empty when it isn't sure. The reading happens on your computer.</p>
-  <p>Numbers come from the game's own files and meowdb's Classic damage formulas. Claws, one handed swords and polearms have been matched to real stat windows, and other weapons carry an Estimated note until one is. Saving a build needs Discord and shows the character name you type, never your Discord name.</p>
+  <p>Numbers come from the game's own files and meowdb's Classic damage formulas. Claws, one handed swords and polearms have been matched to real stat windows, and other weapons carry an Estimated note until one is. Saving a build needs Discord and shows the character name you type, never your Discord name. It keeps the numbers in the form, plus where you train, a note and an equip screenshot if you add them.</p>
   </section>
   <div class="appraiser-only">
   <section>
@@ -1858,6 +1815,7 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
   <p class="small smallprint">Fan made, not affiliated with Nexon. Game art comes from the MapleStory client and belongs to Nexon. Item prices come from Cozy Market, and damage formulas and drop lists from meowdb and community players.</p>
   </div>
 </main>
+<p id="credit" class="credit">Fan project, not affiliated with or endorsed by Nexon. MapleStory belongs to Nexon. · Prices from <a href="https://cozy.markets" target="_blank" rel="noopener">Cozy Market</a> · <a href="https://meowdb.com" target="_blank" rel="noopener">meowdb</a> · <span id="credit-ver"></span></p>
 <button id="flag" class="flag k-btn key" type="button" aria-label="Feeling wonky?"><span class="flag-ico" aria-hidden="true"></span><span class="flag-txt">Feeling wonky?</span></button>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
 <script>
@@ -1868,10 +1826,11 @@ const CONFIG = {
   reportUrl: 'https://sixpathcrossway.pages.dev/api/report',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-11h',
+  version: '2026-11-12a',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
+document.getElementById('credit-ver').textContent = CONFIG.version;
 // the Windows app (grind-app/): its preload hands the page this bridge, and the page turns into the app's Grind page
 const APP = window.sixPathApp || null;
 
@@ -2514,7 +2473,7 @@ function viewNow() {
 let lastViewSent = null;
 // Anonymous button counts (names only, never anything typed or read): one delegated listener so the tabs' own code stays untouched.
 const TRACKED = [['#b-readbtn', 'read_from_game'], ['#b-savebtn', 'save_build'], ['#g-pop', 'pop_out'], ['#g-sharearea button', 'share_game_window'],
-  ['#g-loot', 'count_my_loot'], ['#flag', 'something_off'], ['#theme', 'theme_toggle']];
+  ['#g-loot', 'count_my_loot'], ['#flag', 'something_off']];
 document.addEventListener('click', e => {
   try {
     const t = e.target.closest && e.target.closest('button, [role=tab], a[href]');
@@ -2631,21 +2590,6 @@ addEventListener('hashchange', showView);
 addEventListener('popstate', showView);
 showView();
 
-// the button shows what the click goes to: the sun in the dark theme, the moon in the light (the game's pixel icons, pixel-icons.js)
-function labelTheme() {
-  const dark = document.documentElement.dataset.theme === 'dark', label = dark ? 'Switch to light theme' : 'Switch to dark theme';
-  if (window.PixelIcons) document.querySelector('#theme .theme-ico').replaceChildren(window.PixelIcons.railIcon(dark ? 'sun' : 'moon'));
-  document.querySelector('#theme .theme-txt').textContent = dark ? 'Light mode' : 'Dark mode';
-  $('theme').setAttribute('aria-label', label);
-  $('theme').title = label;
-}
-$('theme').addEventListener('click', () => {
-  const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
-  document.documentElement.dataset.theme = next;
-  store.set('bt.theme', next);
-  labelTheme();
-});
-labelTheme();
 // the Something off? button's pixel flag (pixel-icons.js)
 if (window.PixelIcons) document.querySelector('#flag .flag-ico').replaceChildren(window.PixelIcons.railIcon('flag'));
 
@@ -2657,7 +2601,12 @@ function chooseBoss(id) {
   markBosses(); startWalk(); render(); subscribeBoss(); fetchFull();
 }
 renderAuth();
-try { if (window.ForestScene) window.ForestScene.mount(); } catch { /* the page works without its scenery */ }
+// the scene's pictures wait for the first paint and the load: .scene-on (night-art.css) asks for them one frame after. Only this page runs
+// it; the pop-out, the app's overlay and Settings are other windows that take the styles but never this markup or class.
+const sceneStill = on => document.documentElement.classList.toggle('scene-still', on);
+addEventListener('load', () => { requestAnimationFrame(() => document.documentElement.classList.add('scene-on')); sceneStill(!document.hasFocus()); });
+addEventListener('blur', () => sceneStill(true)); addEventListener('focus', () => sceneStill(false));
+document.addEventListener('visibilitychange', () => sceneStill(document.hidden || !document.hasFocus()));
 if (TIMER_ON) {
   renderBosses();
   startWalk();

@@ -139,7 +139,7 @@ function build({ el, band, tools, lamp, mapPick, classPick, steps, lines, pics, 
   const deep = el('div', { class: 'g-nowin' }, stage, cols);
   const notes = el('div', { class: 'g-nnotes' });
   const foot = el('div', { class: 'k-foot g-nowfoot', hidden: '' }, notes, classPick);
-  const card = el('section', { class: 'k-win g-nowcard', id: 'g-nowcard' },
+  const card = el('section', { class: 'k-win k-grass g-nowcard', id: 'g-nowcard' },
     el('div', { class: 'k-bar' }, label, mapPick, el('span', { class: 'push' }, lamp)),
     el('div', { class: 'k-pad g-nowpad' }, nums, tools, steps, ...(lines || []), deep, foot),
     el('span', { class: 'g-orn g-shroom', 'aria-hidden': 'true' }));
