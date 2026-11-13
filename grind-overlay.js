@@ -50,8 +50,8 @@ function create(o) {
   function fit() {
     const w = strip.ownerDocument.defaultView;
     if (strip.hidden || !w || w === window) return;
-    const H = w.innerHeight - (under() ? setEl.offsetHeight : 0), W = w.innerWidth;
-    const out = (o.hide ? o.hide() : []).filter(Boolean);
+    const H = w.innerHeight - (under() ? setEl.offsetHeight : 0) - (o.reserve || 0), W = w.innerWidth;
+    const out = (o.hide ? o.hide() : []).filter(Boolean), undo = o.wide ? o.wide() : null;
     const was = out.map(e => e.hidden), size = () => strip.getBoundingClientRect();
     const clamp = v => Math.max(8, Math.min(48, v));
     strip.style.minHeight = ''; strip.style.width = 'max-content'; out.forEach(e => { e.hidden = true; });
@@ -81,6 +81,7 @@ function create(o) {
       for (let i = 0; i < 7 && hi - lo > 0.05; i++) { const mid = (lo + hi) / 2; strip.style.fontSize = mid + 'px'; if (size().height <= H + 0.5) lo = mid; else hi = mid; }
       f = lo; strip.style.fontSize = f + 'px';
     }
+    if (undo) undo();
     // a floating window is a solid rectangle, so the frame reaches its bottom edge: what the font can't use goes inside the panel
     // (spread between its rows), never as a band under it. The app's window is sized to the panel, so it needs none
     if (!o.app) strip.style.minHeight = H + 'px';

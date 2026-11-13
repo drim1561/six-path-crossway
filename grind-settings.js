@@ -17,13 +17,11 @@
 // timer tile, and nothing is the top strip's bits and the little columns
 const PICS = {
   // the top strip across, EXP an hour with the four columns under it on the left, the timers stacked on the right
-  hero: [[2, 3, 24, 3, 1], [48, 3, 14, 3, 1], [2, 8, 42, 11, 2, 'e'], [2, 21, 9, 11, 2], [13, 21, 9, 11, 2], [24, 21, 9, 11, 2], [35, 21, 9, 11, 2], [46, 8, 16, 11, 2, 'l'], [46, 21, 16, 11, 2, 'l']],
+  tile: [[2, 3, 24, 3, 1], [48, 3, 14, 3, 1], [2, 8, 42, 11, 2, 'e'], [2, 21, 9, 11, 2], [13, 21, 9, 11, 2], [24, 21, 9, 11, 2], [35, 21, 9, 11, 2], [46, 8, 16, 11, 2, 'l'], [46, 21, 16, 11, 2, 'l']],
   // one slim row: EXP an hour, the four columns, the timers, the buttons at the right end
   bar: [[2, 12, 13, 12, 2, 'e'], [17, 14, 6, 8, 1], [24, 14, 6, 8, 1], [31, 14, 6, 8, 1], [38, 14, 6, 8, 1], [46, 12, 6, 12, 2, 'l'], [53, 12, 6, 12, 2, 'l'], [60, 13, 3, 3, 1], [60, 17, 3, 3, 1], [60, 21, 3, 3, 1]],
   // stacked down the side: the top strip, EXP an hour, the timers, the numbers as rows
   column: [[22, 1, 20, 2, 1], [22, 4, 20, 7, 2, 'e'], [22, 12, 20, 5, 1, 'l'], [22, 18, 20, 5, 1, 'l'], [22, 24, 20, 2, 1], [22, 27, 20, 2, 1], [22, 30, 20, 2, 1], [22, 33, 20, 2, 1]],
-  // the top strip across, EXP an hour, the timers side by side, the four columns along the bottom
-  corner: [[12, 2, 40, 3, 1], [12, 7, 40, 9, 2, 'e'], [12, 18, 19, 8, 2, 'l'], [33, 18, 19, 8, 2, 'l'], [12, 28, 9, 7, 1], [22, 28, 9, 7, 1], [33, 28, 9, 7, 1], [43, 28, 9, 7, 1]],
 };
 const NS = 'http://www.w3.org/2000/svg';
 function picture(l) {

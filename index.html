@@ -974,7 +974,6 @@ body.g-ov .g-strip.g-moving { cursor: grabbing; }
    panel's width over the padding. The map gives way before the panel does: fit() measures its longest line, so a long map
    name would shrink everything else (its box is one width whatever it says, and it ends in dots) */
 .g-top { display: flex; align-items: center; gap: .6em; min-width: 0; height: calc(16 * var(--u)); margin: 0 -.6em; padding: 0 .6em; background-color: var(--wood-lo); background-image: var(--night-bark); background-position: 0 0; background-size: 230px auto; background-repeat: repeat; box-shadow: inset 0 calc(-1 * var(--u)) 0 var(--wood-o); color: var(--bar-ink); white-space: nowrap; }
-.g-brand { flex: none; font-family: var(--font-title); font-size: 1.41em; font-weight: 400; line-height: 1.2; color: var(--bar-ink); }
 .g-el { display: flex; flex: none; width: 11em; font-size: .88em; font-weight: 600; color: var(--bar-muted); }
 .g-elm { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .g-elt { flex: none; white-space: pre; }
@@ -999,7 +998,7 @@ body.g-ov .g-strip.g-moving { cursor: grabbing; }
 .gq-sent .gq-msg { color: var(--ink); }
 .gq-row { display: flex; justify-content: flex-end; gap: 8px; }
 .g-btns .g-gear[aria-pressed="true"] { --face: var(--lime); --face-hi: var(--lime-hi); --face-lo: var(--lime-lo); color: var(--lime-ink); }
-/* ⇆ Layout's row: the four layouts as pictures with their names over the panel, under the buttons (beside them in Bar,
+/* ⇆ Layout's row: the three layouts as pictures with their names over the panel, under the buttons (beside them in Bar,
    which has no room under), the one showing lit. Solid whatever See-through says: it's only there while it's being used.
    While clicks pass through to the game (g-pass) it waits for the mouse on ⇆ to hold them (g-hold) */
 .g-laypick { position: absolute; z-index: 5; top: calc(100% + .35em); right: 0; display: flex; gap: .3em; padding: .3em; background-color: color-mix(in srgb, var(--page) 80%, var(--card-hi)); border: var(--u) solid var(--card-o); box-shadow: 0 .3em .9em var(--win-shadow); }
@@ -1033,12 +1032,21 @@ body.g-ov .g-strip.g-moving { cursor: grabbing; }
 .g-us { font-family: var(--font-num); font-weight: 700; font-size: 1.47em; font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
 .g-d { display: inline-flex; align-items: center; gap: .25em; font-family: var(--font-num); font-weight: 700; font-size: 1.47em; white-space: nowrap; }
 .g-d:empty { display: none; }
+/* the arrow against your usual, in a small bordered chip beside the lead number; nothing to say, no chip */
+.g-chip { display: inline-flex; align-items: center; padding: 0 .35em; border: var(--u) solid var(--seg-e); border-radius: var(--r-card); background-color: color-mix(in srgb, var(--card) calc(var(--g-see, 1) * 100%), transparent); }
+.g-chip:has(> .g-d:empty) { display: none; }
+.g-chip .g-d { font-size: 1.1em; line-height: 1.25; }
+/* closed: the rest (EXP gained, Per 1%, Pace and the small lines) waits behind the ▾ button */
+.g-strip[data-open="0"] :is(.g-grid, .g-k-meso .g-ks, .g-k-lv .g-ks, .g-quip) { display: none; }
+.g-k-lv { grid-area: lv; } .g-k-meso { grid-area: meso; }
 .g-strip .up { color: var(--good); } .g-strip .down { color: var(--bad); }
 /* the four little columns: label over number with a small line under */
 .g-strip .g-grid { grid-area: grid; display: flex; justify-content: space-between; gap: .3em .8em; min-width: 0; }
 .g-k { display: grid; align-content: start; min-width: 0; line-height: 1.25; color: var(--muted); white-space: nowrap; }
 .g-k .g-kl, .g-ks { font-size: .88em; }
 .g-k .g-kn { color: var(--ink); }
+.g-mesosw { margin-left: .5em; padding: 0 .4em; border: var(--u) solid var(--seg-e); border-radius: var(--r-card); background: none; color: var(--ink); font-family: inherit; font-size: 1em; font-weight: 700; line-height: 1.2; white-space: nowrap; cursor: pointer; }
+.g-mesosw:hover { background-color: var(--div); }
 .g-k-meso .g-kn { color: var(--good); } .g-k-gain .g-kn, .g-k-lv .g-kn { color: var(--exp); }
 .g-ppr { display: flex; align-items: center; gap: .3em; color: var(--ink); }
 .g-perp { display: inline-flex; align-items: center; gap: .3em; }
@@ -1075,13 +1083,21 @@ body.g-ov .g-strip.g-moving { cursor: grabbing; }
 @keyframes g-bob { 0% { transform: translateY(0); } 50% { transform: translateY(calc(-1 * var(--u))); } }
 @keyframes g-shake { 0% { transform: translateX(calc(-1 * var(--u))); } 50% { transform: translateX(var(--u)); } }
 @media (prefers-reduced-motion: reduce) { .g-strip .g-vial img, .g-strip .g-pot, .g-strip .g-juice::before { animation: none !important; } }
-/* one potion in Hero: a line from the session card in the spare slot */
+/* one potion in Tile: a line from the session card in the spare slot */
 .g-quip { display: grid; align-content: center; min-width: 0; padding: .35em .7em; background-color: color-mix(in srgb, var(--card) calc(var(--g-see, 1) * 100%), transparent); border: var(--u) solid var(--card-o); box-shadow: inset 0 var(--u) 0 var(--card-hi), inset 0 calc(-1 * var(--u)) 0 var(--card-lo); color: var(--ink); white-space: nowrap; }
 .g-quip b { font-family: var(--font-title); font-size: 1.12em; font-weight: 400; color: var(--num-big); }
 .g-quip span { font-size: .88em; font-weight: 600; color: var(--muted); }
-.g-strip:not([data-layout="hero"]) .g-quip { display: none; }
+.g-strip:not([data-layout="tile"]) .g-quip { display: none; }
 /* the alert: the one thing to do, only when something needs you, in the panel's small text, a Card on its state's ground:
    plain paper, amber to wait, red when it's stuck */
+/* the potion bubble: a low or empty potion pops out. In the app it hangs in the window's clear margin under the panel; on the
+   site there is no room outside the window, so it sits over the panel's lower edge. It takes no room and no clicks */
+.g-bubble { position: absolute; z-index: 3; left: 1em; bottom: calc(var(--fw, .5em) + .4em); max-width: calc(100% - 2em); box-sizing: border-box; padding: 4px 11px; border-radius: var(--r-card); background: var(--due-bg); color: var(--due-fg); border: 2px solid var(--card-o); font-size: var(--fs-xs); font-weight: 700; line-height: 1.25; box-shadow: 0 .2em .6em var(--win-shadow); pointer-events: none; transform-origin: 14px 0; animation: g-pop .28s cubic-bezier(.3, 1.5, .5, 1); }
+.g-bubble.out { background: var(--over-bg); color: var(--over-fg); }
+.g-bubble::before { content: ""; position: absolute; top: -7px; left: 12px; width: 10px; height: 10px; background: inherit; border-left: 2px solid var(--card-o); border-top: 2px solid var(--card-o); transform: rotate(45deg); }
+body.g-ov .g-bubble { bottom: auto; top: calc(100% + var(--fw, .5em) + 8px); }
+@keyframes g-pop { from { opacity: 0; transform: translateY(-6px) scale(.6); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .g-bubble { animation: none; } }
 .g-alert { min-width: 0; padding: .1em .6em; background-color: color-mix(in srgb, var(--card) calc(var(--g-see, 1) * 100%), transparent); border: var(--u) solid var(--card-o); box-shadow: inset 0 var(--u) 0 var(--card-hi), inset 0 calc(-1 * var(--u)) 0 var(--card-lo); color: var(--ink); font-size: .88em; line-height: 1.3; display: flow-root; }
 .g-alert.wait { background-color: color-mix(in srgb, var(--due-bg) calc(var(--g-see, 1) * 100%), transparent); color: var(--due-fg); }
 .g-alert.bad { background-color: color-mix(in srgb, var(--over-bg) calc(var(--g-see, 1) * 100%), transparent); color: var(--over-fg); }
@@ -1106,77 +1122,85 @@ body.g-ov .g-strip.g-moving { cursor: grabbing; }
 .g-flip b::before { content: '… '; }
 .g-flip b.fix::before { content: '! '; }
 .g-flip b.done::before { content: '✓ '; }
-.g-top:has(.g-lamp:is(.wait, .bad)) .g-brand, .g-strip:not([data-layout="column"]) .g-top:has(.g-flip:not([hidden])) .g-el { display: none; }
-.g-strip[data-layout="corner"] .g-brand { display: none; }
+.g-strip:not([data-layout="column"]) .g-top:has(.g-flip:not([hidden])) .g-el { display: none; }
 /* Column: the light takes a plank of its own under the map and the buttons */
-.g-strip[data-layout="column"] .g-top { flex-wrap: wrap; height: auto; row-gap: 0; background-repeat: repeat; }
-.g-strip[data-layout="column"] .g-top > * { height: calc(16 * var(--u)); }
-.g-strip[data-layout="column"] .g-top > :is(.g-el, .g-lamp, .g-btns) { align-items: center; }
-.g-strip[data-layout="column"] .g-lamp { order: 3; flex: none; width: 100%; }
-.g-strip[data-layout="column"] .g-lw { flex: 1 1 0; width: 0; }
+.g-strip:is([data-layout="column"], [data-layout="tile"]) .g-top { flex-wrap: wrap; height: auto; row-gap: 0; background-repeat: repeat; }
+.g-strip:is([data-layout="column"], [data-layout="tile"]) .g-top > * { height: calc(16 * var(--u)); }
+.g-strip:is([data-layout="column"], [data-layout="tile"]) .g-top > :is(.g-el, .g-lamp, .g-btns) { align-items: center; }
+.g-strip:is([data-layout="column"], [data-layout="tile"]) .g-lamp { order: 3; flex: none; width: 100%; }
+.g-strip:is([data-layout="column"], [data-layout="tile"]) .g-lw { flex: 1 1 0; width: 0; }
 /* while it shows, the window stays as it is and so does the size of the text (fit() measures the panel without it). Its room
-   comes from the small lines under the numbers, which step aside in Hero, Column and Corner; Bar's is further down */
-.g-strip:is([data-layout="hero"], [data-layout="column"], [data-layout="corner"]):has(> .g-l3:not([hidden])) .g-ks { display: none; }
-/* the four layouts. Hero: EXP an hour and the columns under it on the left, the timers stacked on the right (at least
-   12.6em, and more when a caption needs it, which fit() then takes off the left). One tile with no spare card takes both
-   rows. The panel itself is the grid here (.g-body steps out of the way), so the alert can go in the left track under the
-   numbers, and the timers keep the full height */
-.g-strip[data-layout="hero"] { grid-template: "top top" auto "exp tiles" auto "grid tiles" 1fr / minmax(0, 1fr) minmax(12.6em, max-content); gap: .35em .7em; }
-.g-strip[data-layout="hero"] .g-body { display: contents; }
-.g-strip[data-layout="hero"] .g-top { grid-area: top; margin-bottom: .15em; }
-.g-strip[data-layout="hero"] .g-l3 { grid-area: alert; align-self: end; }
-/* (the left track closes up a little too, the timers staying where they are) */
-.g-strip[data-layout="hero"]:has(> .g-l3:not([hidden])) { grid-template: "top top" auto "exp tiles" auto "grid tiles" auto "alert tiles" 1fr / minmax(0, 1fr) minmax(12.6em, max-content); row-gap: .2em; }
-.g-strip[data-layout="hero"]:has(> .g-l3:not([hidden])) .g-top { margin-bottom: .25em; }
-/* Column and Corner: EXP an hour, the timers, the numbers */
-.g-strip:is([data-layout="column"], [data-layout="corner"]) .g-body { grid-template: "exp" auto "tiles" auto "grid" auto / minmax(0, 1fr); }
-/* Corner: the timers side by side, and with two no caption. One tile is wide, its caption at its right */
-.g-strip[data-layout="corner"] .g-grid { column-gap: .35em; }
-.g-strip[data-layout="corner"] .g-tiles { grid-template-columns: repeat(var(--pots), minmax(0, 1fr)); gap: .5em; }
-.g-strip[data-layout="corner"][data-pots="2"] .g-pcap { display: none; }
-.g-strip[data-layout="corner"][data-pots="1"] .g-pwords { grid-template-columns: 1fr auto; align-items: center; column-gap: .6em; }
-.g-strip[data-layout="corner"][data-pots="1"] :is(.g-pclock, .g-pleft) { grid-column: 1; }
-.g-strip[data-layout="corner"][data-pots="1"] .g-pcap { grid-column: 2; grid-row: 1 / span 2; font-size: .85em; }
+   comes from the small lines under the numbers, which step aside in Tile and Column; Bar's is further down */
+.g-strip:is([data-layout="tile"], [data-layout="column"]):has(> .g-l3:not([hidden])) .g-ks { display: none; }
+/* the layouts. Tile: one narrow column, EXP an hour with its chip, Level in, Mesos, the timers as one small row each, and
+   when opened the rest in a little grid; the alert last. The panel itself is the grid here (.g-body steps out of the way) */
+.g-strip[data-layout="tile"] { grid-template: "top" auto "exp" auto "lv" auto "meso" auto "grid" auto "tiles" auto "alert" 1fr / minmax(0, 1fr); gap: .35em; }
+.g-strip[data-layout="tile"] .g-body { display: contents; }
+.g-strip[data-layout="tile"] .g-top { grid-area: top; margin-bottom: .15em; }
+.g-strip[data-layout="tile"] .g-l3 { grid-area: alert; align-self: end; }
+.g-strip[data-layout="tile"] .g-uw { display: none; }
+.g-strip[data-layout="tile"] .g-el { display: none; }
+.g-strip[data-layout="tile"] .g-k-pace .g-ks { display: none; }
+.g-strip[data-layout="tile"] .g-kh { flex-wrap: wrap; row-gap: 0; }
+.g-strip[data-layout="tile"] .g-seg { margin-left: 0; }
+.g-strip[data-layout="tile"] .g-kh:has([data-w="since"]:not([hidden])) { display: grid; justify-items: start; gap: .1em 0; }
+.g-strip[data-layout="tile"] .g-k-exp .g-kn { font-size: 2.4em; }
+.g-strip[data-layout="tile"] .g-k-lv, .g-strip[data-layout="tile"] .g-k-meso { grid-template-columns: minmax(0, 1fr) auto; column-gap: .5em; align-items: baseline; }
+.g-strip[data-layout="tile"] :is(.g-k-lv, .g-k-meso) .g-kl { grid-column: 1; grid-row: 1; }
+.g-strip[data-layout="tile"] :is(.g-k-lv, .g-k-meso) .g-kn { grid-column: 2; grid-row: 1; }
+.g-strip[data-layout="tile"] :is(.g-k-lv, .g-k-meso) .g-ks { grid-column: 1 / -1; grid-row: 2; }
+.g-strip[data-layout="tile"] .g-grid { display: grid; grid-template-columns: repeat(2, auto); justify-content: start; gap: .2em 1.4em; }
+.g-strip[data-layout="tile"] .g-tiles { gap: .3em; }
+.g-strip[data-layout="tile"] .g-pot { padding: .2em .5em; column-gap: .4em; }
+.g-strip[data-layout="tile"] .g-vial { width: 1.5em; height: 2.1em; }
+.g-strip[data-layout="tile"] .g-vial img { height: 1.15em; }
+.g-strip[data-layout="tile"] .g-pclock { font-size: 1.3em; }
+/* closed, a timer is its clock and what went down; the caption comes with ▾ (a low one always shows) */
+.g-strip[data-layout="tile"][data-open="0"] .g-pot:not(.low) .g-pcap { display: none; }
+/* Column: EXP an hour, the timers, the numbers */
+.g-strip:is([data-layout="column"]) .g-body { grid-template: "exp" auto "lv" auto "meso" auto "tiles" auto "grid" auto / minmax(0, 1fr); }
 /* Column: no wordmark, no word usual. A row is the site's row: the name with its small line under it on the left, the number on the right, a dashed line under */
 .g-strip[data-layout="column"] { gap: .55em; }
-/* Column and Corner end in right aligned numbers, where the mushroom stands: their floor is lifted to clear it */
-.g-strip:is([data-layout="column"], [data-layout="corner"]) { padding-bottom: max(.6em, calc(10 * var(--u))); }
+/* Column ends in right aligned numbers, where the mushroom stands: its floor is lifted to clear it */
+.g-strip:is([data-layout="column"]) { padding-bottom: max(.6em, calc(10 * var(--u))); }
 /* a window taller than the panel: the spare room goes to the body, between its blocks, and never under the title bar */
-.g-strip:is([data-layout="column"], [data-layout="corner"]) { grid-template-rows: auto 1fr; }
+.g-strip:is([data-layout="column"]) { grid-template-rows: auto 1fr; }
 .g-strip[data-layout="column"] .g-body { row-gap: .55em; }
-.g-strip[data-layout="column"] :is(.g-brand, .g-uw) { display: none; }
+.g-strip[data-layout="column"] .g-uw { display: none; }
 .g-strip[data-layout="column"] .g-el { width: 9em; }
 /* its switch goes under the label, not beside it (the column is narrow) */
 .g-strip[data-layout="column"] .g-kh { display: grid; justify-items: start; gap: .1em 0; }
 .g-strip[data-layout="column"] .g-seg { margin-left: 0; }
 .g-strip[data-layout="column"] .g-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: .35em; }
+.g-strip[data-layout="column"] .g-body > .g-k { grid-column: 1; }
 .g-strip[data-layout="column"] .g-k { grid-template-columns: minmax(0, 1fr) auto; column-gap: .5em; padding-bottom: .3em; background: var(--night-dots) left bottom / calc(4 * var(--u)) var(--u) repeat-x; }
-.g-strip[data-layout="column"] .g-k:last-child { padding-bottom: 0; background: none; }
+.g-strip[data-layout="column"] .g-grid .g-k:last-child { padding-bottom: 0; background: none; }
 .g-strip[data-layout="column"] .g-kl { grid-column: 1; grid-row: 1; color: var(--ink); }
 .g-strip[data-layout="column"] .g-ks { grid-column: 1; grid-row: 2; }
 .g-strip[data-layout="column"] .g-k .g-kn { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
 /* better or worse than your usual sits up beside EXP an hour, which leaves the big number its own line */
 .g-strip[data-layout="column"] .g-k-exp { position: relative; }
-.g-strip[data-layout="column"] .g-d { position: absolute; top: 0; right: 0; font-size: 1.3em; line-height: 1.15; }
+.g-strip[data-layout="column"] .g-chip { position: absolute; top: 0; right: 0; font-size: 1.1em; }
 /* Bar: one slim row, EXP an hour with "an hour / your usual" under it and its switch beside it, the columns with no small
    lines, the timers with no caption and no what's left, and the buttons at the right end; the alert goes under. It has no
    title bar, just the glass */
 .g-strip[data-layout="bar"] { display: flex; flex-wrap: wrap; align-items: center; gap: 0 .6em; padding: .25em .77em; }
-.g-strip[data-layout="bar"] .g-body { flex: 1 1 0; display: flex; align-items: center; gap: .6em; }
+.g-strip[data-layout="bar"] .g-body { flex: 1 1 0; display: grid; grid-template: "exp lv meso tiles" auto "grid grid grid grid" auto / auto auto auto auto; align-items: center; justify-content: space-between; gap: .35em .6em; }
+.g-strip[data-layout="bar"] .g-k-exp, .g-strip[data-layout="bar"] .g-tiles { align-self: stretch; }
+.g-strip[data-layout="bar"] { align-content: center; }
 /* (its title bar is no box: the light goes to the left end, the buttons to the right) */
 .g-strip[data-layout="bar"] .g-top { display: contents; }
 .g-strip[data-layout="bar"] .g-btns { order: 1; align-self: flex-start; margin-left: 0; }
 .g-strip[data-layout="bar"] .g-lamp { order: -1; flex: none; width: 8.4em; font-size: .9em; align-self: stretch; padding-right: .6em; border-right: var(--u) solid var(--div); color: var(--ink); }
 .g-strip[data-layout="bar"] .g-lw { flex-direction: column; align-items: flex-start; gap: 0; }
 .g-strip[data-layout="bar"] .g-lt { max-width: 100%; white-space: normal; }
-/* Bar: a tab that is done keeps only its tick, so the three fit under the words */
 /* Bar and Column have the least room beside the words: a tab done is only its tick, one to go only its name */
 .g-strip:is([data-layout="bar"], [data-layout="column"]) .g-flip { gap: .45em; }
 .g-strip:is([data-layout="bar"], [data-layout="column"]) .g-flip b:not(.done, .fix)::before { content: none; }
 .g-strip:is([data-layout="bar"], [data-layout="column"]) .g-flip b.fix::before { content: '!'; }
 .g-strip:is([data-layout="bar"], [data-layout="column"]) .g-flip b.done::before { content: '✓'; }
 .g-strip:is([data-layout="bar"], [data-layout="column"]) .g-flip b.done span { display: none; }
-.g-strip[data-layout="bar"] :is(.g-brand, .g-el, .g-uw, .g-ks, .g-pcap, .g-plf) { display: none; }
+.g-strip[data-layout="bar"] :is(.g-el, .g-uw, .g-ks, .g-pcap, .g-plf) { display: none; }
 .g-strip[data-layout="bar"] .g-k-exp { flex: none; display: grid; grid-template-columns: auto auto; align-items: center; column-gap: .6em; }
 .g-strip[data-layout="bar"] .g-kh { display: contents; }
 .g-strip[data-layout="bar"] .g-kh .g-kl { display: none; }
@@ -1185,9 +1209,12 @@ body.g-ov .g-strip.g-moving { cursor: grabbing; }
 .g-strip[data-layout="bar"] .g-kv::before { content: 'an hour'; grid-row: 2; }
 .g-strip[data-layout="bar"] .g-k-exp .g-kn { grid-column: 1 / -1; grid-row: 1; font-size: 2em; line-height: 1.05; }
 .g-strip[data-layout="bar"] .g-us { grid-row: 2; font-family: var(--font-body); font-size: 1em; font-weight: 700; }
-.g-strip[data-layout="bar"] .g-d { grid-row: 2; font-size: 1em; }
-.g-strip[data-layout="bar"] :is(.g-grid, .g-tiles) { align-self: stretch; padding-left: .6em; border-left: var(--u) solid var(--div); }
-.g-strip[data-layout="bar"] .g-grid { flex: 1 1 auto; align-items: center; gap: .6em; }
+.g-strip[data-layout="bar"] .g-chip { grid-row: 2; font-size: .95em; }
+.g-strip[data-layout="bar"] :is(.g-k-lv, .g-k-meso, .g-tiles) { align-self: stretch; padding-left: .6em; border-left: var(--u) solid var(--div); }
+.g-strip[data-layout="bar"] :is(.g-k-lv, .g-k-meso) { align-content: center; }
+.g-strip[data-layout="bar"] .g-k-lv { box-sizing: border-box; width: 7.6em; }
+/* opened: the rest wraps onto a second row of the panel (its window reserves the room) */
+.g-strip[data-layout="bar"] .g-grid { grid-area: grid; width: 0; min-width: 100%; align-items: center; justify-content: flex-start; gap: .3em 1.4em; padding-top: .2em; border-top: var(--u) solid var(--div); }
 .g-strip[data-layout="bar"] .g-tiles { display: flex; gap: .6em; }
 .g-strip[data-layout="bar"] .g-k .g-kn { font-size: 1.15em; }
 .g-strip[data-layout="bar"] .g-ppr .g-us { font-size: .8em; }
@@ -1197,9 +1224,9 @@ body.g-ov .g-strip.g-moving { cursor: grabbing; }
 .g-strip[data-layout="bar"] .g-pclock { font-size: 1.3em; }
 /* the fourth choice after Reset average has to fit too: Bar and Column drop the word since, Bar the words an hour, and
    Column's switch closes up */
-.g-strip:is([data-layout="bar"], [data-layout="column"]) .g-sw { display: none; }
+.g-strip:is([data-layout="bar"], [data-layout="column"], [data-layout="tile"]) .g-sw { display: none; }
 .g-strip[data-layout="bar"]:has(.g-seg [data-w="since"]:not([hidden])) .g-kv::before { display: none; }
-.g-strip[data-layout="column"] .g-seg:has([data-w="since"]:not([hidden])) button { padding-inline: .4em; }
+.g-strip:is([data-layout="column"], [data-layout="tile"]) .g-seg:has([data-w="since"]:not([hidden])) button { padding-inline: .4em; }
 /* Bar's alert: one line in what's left of its 80 pixels, the tiles' second line making room */
 .g-strip[data-layout="bar"]:has(> .g-l3:not([hidden])) .g-pleft { display: none; }
 .g-strip[data-layout="bar"] .g-alert { order: 2; flex-basis: 100%; padding: 0 .5em; border: 0; background: none; box-shadow: none; color: var(--ink); overflow: hidden; white-space: nowrap; }
@@ -1866,7 +1893,7 @@ const CONFIG = {
   reportUrl: 'https://sixpathcrossway.pages.dev/api/report',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-13b',
+  version: '2026-11-13c',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
