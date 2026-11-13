@@ -1,0 +1,2122 @@
+{
+  "made": "2026-11-13",
+  "guides": {
+    "mage": {
+      "id": "mage",
+      "title": "Mage, 1 to 50",
+      "intro": "The Planner's leveling guide written out for a Mage, 1 to 50: where to train, where your points go and what to wear, with every road the community's guides take side by side. The numbers are the calculator's own.",
+      "start": {
+        "heading": "1 to 10",
+        "text": "Levels 1 to 10 are Maple Island. Put every ability point into INT and talk to Grendel the Really Old in Ellinia at level 8 to become a Magician. From here the guide follows the Planner."
+      },
+      "roadmap": {
+        "first": {
+          "name": "Magician",
+          "from": 10,
+          "to": 30,
+          "hours": 9.1
+        },
+        "jobs": [
+          {
+            "id": "fp",
+            "clsId": "fpwizard",
+            "name": "Fire/Poison Wizard",
+            "line": "Fire and Poison hit hardest on their own, with no party needed.",
+            "roads": [
+              {
+                "id": "qchaos",
+                "name": "Fire Arrow, then Teleport",
+                "hours": 57.9,
+                "lemons": 33909
+              }
+            ]
+          },
+          {
+            "id": "il",
+            "clsId": "ilwizard",
+            "name": "Ice/Lightning Wizard",
+            "line": "Ice holds monsters still and Lightning hits a crowd, so a crowded map goes fast.",
+            "roads": [
+              {
+                "id": "qchaos",
+                "name": "Beam, then Teleport",
+                "hours": 59.5,
+                "lemons": 29633
+              },
+              {
+                "id": "beam",
+                "name": "Beam first",
+                "hours": 59.6,
+                "lemons": 29435
+              }
+            ]
+          },
+          {
+            "id": "cleric",
+            "clsId": "cleric",
+            "name": "Cleric",
+            "line": "Heal hits the undead and keeps a party up, so Clerics are wanted everywhere.",
+            "roads": [
+              {
+                "id": "heal",
+                "name": "Heal first",
+                "hours": 57,
+                "lemons": 31893
+              },
+              {
+                "id": "arrow",
+                "name": "Holy Arrow first",
+                "hours": 59.5,
+                "lemons": 36756
+              },
+              {
+                "id": "teleport",
+                "name": "Teleport first",
+                "hours": 61.4,
+                "lemons": 30855
+              },
+              {
+                "id": "meso",
+                "name": "Meso saver",
+                "hours": 63.4,
+                "lemons": 29188
+              }
+            ]
+          }
+        ]
+      },
+      "bands": [
+        {
+          "from": 10,
+          "to": 20,
+          "job": null,
+          "columns": [
+            {
+              "road": null,
+              "name": "Magician",
+              "credit": null,
+              "train": {
+                "stages": [
+                  {
+                    "from": 10,
+                    "to": 11,
+                    "mob": "Bubbling",
+                    "map": "Kerning City Subway : Line 1 <Area 1>",
+                    "mapId": 10003061,
+                    "expHour": 20700
+                  },
+                  {
+                    "from": 12,
+                    "to": 16,
+                    "mob": "Jr. Necki",
+                    "map": "Warning Street : Dangerous Croko I",
+                    "mapId": 10003093,
+                    "expHour": 25400
+                  },
+                  {
+                    "from": 17,
+                    "to": 19,
+                    "mob": "Horny Mushroom",
+                    "map": "Dungeon : Ant Tunnel IV",
+                    "mapId": 10005063,
+                    "expHour": 48400
+                  },
+                  {
+                    "from": 20,
+                    "to": 20,
+                    "mob": "Jr. Necki",
+                    "map": "Warning Street : Dangerous Croko I",
+                    "mapId": 10003093,
+                    "expHour": 57800
+                  }
+                ],
+                "tryNext": {
+                  "name": "Octopus",
+                  "level": 12,
+                  "map": "Dungeon : Damp Tree-Forest"
+                }
+              },
+              "ap": [
+                {
+                  "from": 11,
+                  "to": 20,
+                  "text": "5 INT"
+                }
+              ],
+              "points": [
+                {
+                  "from": 10,
+                  "to": 10,
+                  "id": 2001002,
+                  "target": 1,
+                  "text": "Energy Bolt to 1 (1 point)"
+                },
+                {
+                  "from": 10,
+                  "to": 10,
+                  "id": 2001003,
+                  "target": 1,
+                  "text": "Magic Claw to 1 (1 point)"
+                },
+                {
+                  "from": 11,
+                  "to": 17,
+                  "id": 2001003,
+                  "target": 20,
+                  "text": "Magic Claw to 20 (19 points)"
+                },
+                {
+                  "from": 17,
+                  "to": 20,
+                  "id": 2001000,
+                  "target": 11,
+                  "text": "Magic Guard to 11 (11 points)"
+                }
+              ],
+              "gear": [
+                {
+                  "slot": "Wand",
+                  "id": 1372000,
+                  "name": "Wooden Wand",
+                  "level": 10,
+                  "cozy": 648
+                },
+                {
+                  "slot": "Wand",
+                  "id": 1372002,
+                  "name": "Metal Wand",
+                  "level": 20,
+                  "cozy": 651,
+                  "up": true
+                },
+                {
+                  "slot": "Hat",
+                  "id": 1002011,
+                  "name": "White Bandana",
+                  "level": 10,
+                  "cozy": 719
+                },
+                {
+                  "slot": "Top",
+                  "id": 1040006,
+                  "name": "Blue Training Shirt",
+                  "level": 10,
+                  "cozy": 944
+                },
+                {
+                  "slot": "Gloves",
+                  "id": 1082000,
+                  "name": "Work Gloves",
+                  "level": 10,
+                  "cozy": 1435
+                }
+              ],
+              "hours": 1.9,
+              "lemons": null
+            }
+          ]
+        },
+        {
+          "from": 20,
+          "to": 30,
+          "job": null,
+          "columns": [
+            {
+              "road": null,
+              "name": "Magician",
+              "credit": null,
+              "train": {
+                "stages": [
+                  {
+                    "from": 20,
+                    "to": 24,
+                    "mob": "Jr. Necki",
+                    "map": "Warning Street : Dangerous Croko I",
+                    "mapId": 10003093,
+                    "expHour": 57800
+                  },
+                  {
+                    "from": 25,
+                    "to": 28,
+                    "mob": "Zombie Mushroom",
+                    "map": "Dungeon : Ant Tunnel III",
+                    "mapId": 10005062,
+                    "expHour": 66700
+                  },
+                  {
+                    "from": 29,
+                    "to": 30,
+                    "mob": "Fire Boar",
+                    "map": "Warning Street : The Burnt Land V",
+                    "mapId": 10004115,
+                    "expHour": 70800
+                  }
+                ],
+                "tryNext": {
+                  "name": "Zombie Mushroom",
+                  "level": 24,
+                  "map": "Dungeon : Ant Tunnel III"
+                }
+              },
+              "ap": [
+                {
+                  "from": 21,
+                  "to": 30,
+                  "text": "5 INT"
+                }
+              ],
+              "points": [
+                {
+                  "from": 21,
+                  "to": 22,
+                  "id": 2001000,
+                  "target": 15,
+                  "text": "Magic Guard to 15 (5 points)"
+                },
+                {
+                  "from": 22,
+                  "to": 27,
+                  "id": 2000000,
+                  "target": 15,
+                  "text": "Improved MP Recovery to 15 (15 points)"
+                },
+                {
+                  "from": 27,
+                  "to": 30,
+                  "id": 2000001,
+                  "target": 10,
+                  "text": "Max MP Increase to 10 (10 points)"
+                }
+              ],
+              "gear": [
+                {
+                  "slot": "Wand",
+                  "id": 1372002,
+                  "name": "Metal Wand",
+                  "level": 20,
+                  "cozy": 651
+                },
+                {
+                  "slot": "Wand",
+                  "id": 1372004,
+                  "name": "Mithril Wand",
+                  "level": 30,
+                  "cozy": 653,
+                  "up": true
+                },
+                {
+                  "slot": "Top",
+                  "id": 1040023,
+                  "name": "Blue Split Piece",
+                  "level": 20,
+                  "cozy": 981
+                },
+                {
+                  "slot": "Bottom",
+                  "id": 1060018,
+                  "name": "White Split Pants",
+                  "level": 20,
+                  "cozy": 1199
+                },
+                {
+                  "slot": "Gloves",
+                  "id": 1082009,
+                  "name": "Blue Morrican",
+                  "level": 20,
+                  "cozy": 1444
+                }
+              ],
+              "hours": 7.2,
+              "lemons": null
+            }
+          ]
+        },
+        {
+          "from": 30,
+          "to": 40,
+          "job": "fp",
+          "columns": [
+            {
+              "road": "qchaos",
+              "name": "Fire Arrow, then Teleport",
+              "credit": {
+                "parts": [
+                  {
+                    "text": "Qchaos's wizard guide, in the Classic World Discord's guide threads"
+                  }
+                ]
+              },
+              "train": {
+                "stages": [
+                  {
+                    "from": 30,
+                    "to": 39,
+                    "mob": "Fire Boar",
+                    "map": "Warning Street : The Burnt Land V",
+                    "mapId": 10004115,
+                    "expHour": 70800
+                  },
+                  {
+                    "from": 40,
+                    "to": 40,
+                    "mob": "Tortie",
+                    "map": "Florina Road : Hot Sand",
+                    "mapId": 10007040,
+                    "expHour": 102700
+                  }
+                ],
+                "tryNext": {
+                  "name": "Jr. Wraith",
+                  "level": 34,
+                  "map": "Kerning City Subway : Line 2 <Area 1>"
+                }
+              },
+              "ap": [
+                {
+                  "from": 31,
+                  "to": 38,
+                  "text": "5 INT"
+                },
+                {
+                  "from": 39,
+                  "to": 39,
+                  "text": "5 LUK, for a Wand at 40"
+                },
+                {
+                  "from": 40,
+                  "to": 40,
+                  "text": "5 INT"
+                }
+              ],
+              "points": [
+                {
+                  "from": 30,
+                  "to": 30,
+                  "id": 2101001,
+                  "target": 1,
+                  "text": "Teleport to 1 (1 point)"
+                },
+                {
+                  "from": 31,
+                  "to": 31,
+                  "id": 2100000,
+                  "target": 1,
+                  "text": "MP Eater to 1 (1 point)"
+                },
+                {
+                  "from": 31,
+                  "to": 40,
+                  "id": 2101003,
+                  "target": 29,
+                  "text": "Fire Arrow to 29 (29 points)"
+                }
+              ],
+              "gear": [
+                {
+                  "slot": "Wand",
+                  "id": 1372004,
+                  "name": "Mithril Wand",
+                  "level": 30,
+                  "cozy": 653
+                },
+                {
+                  "slot": "Wand",
+                  "id": 1372006,
+                  "name": "Fairy Wand",
+                  "level": 40,
+                  "cozy": 655,
+                  "up": true
+                },
+                {
+                  "slot": "Hat",
+                  "id": 1002102,
+                  "name": "Steel Pride",
+                  "level": 30,
+                  "cozy": 810
+                },
+                {
+                  "slot": "Overall",
+                  "id": 1050012,
+                  "name": "Blue Wizard Robe",
+                  "level": 30,
+                  "cozy": null
+                },
+                {
+                  "slot": "Gloves",
+                  "id": 1082032,
+                  "name": "Blue Lutia",
+                  "level": 30,
+                  "cozy": 1467
+                }
+              ],
+              "hours": 21.2,
+              "lemons": 9087
+            }
+          ]
+        },
+        {
+          "from": 40,
+          "to": 50,
+          "job": "fp",
+          "columns": [
+            {
+              "road": "qchaos",
+              "name": "Fire Arrow, then Teleport",
+              "credit": {
+                "parts": [
+                  {
+                    "text": "Qchaos's wizard guide, in the Classic World Discord's guide threads"
+                  }
+                ]
+              },
+              "train": {
+                "stages": [
+                  {
+                    "from": 40,
+                    "to": 45,
+                    "mob": "Tortie",
+                    "map": "Florina Road : Hot Sand",
+                    "mapId": 10007040,
+                    "expHour": 107400
+                  },
+                  {
+                    "from": 46,
+                    "to": 48,
+                    "mob": "Wraith",
+                    "map": "Kerning City Subway : Line 2 <Area 3>",
+                    "mapId": 10003068,
+                    "expHour": 134000
+                  },
+                  {
+                    "from": 49,
+                    "to": 50,
+                    "mob": "Croco",
+                    "map": "Warning Street : Dangerous Croko II",
+                    "mapId": 10003094,
+                    "expHour": 145200
+                  }
+                ],
+                "tryNext": {
+                  "name": "Tortie",
+                  "level": 46,
+                  "map": "Florina Road : Hot Sand"
+                }
+              },
+              "ap": [
+                {
+                  "from": 41,
+                  "to": 46,
+                  "text": "5 INT"
+                },
+                {
+                  "from": 47,
+                  "to": 49,
+                  "text": "5 LUK, for a Cromi at 50"
+                },
+                {
+                  "from": 50,
+                  "to": 50,
+                  "text": "5 INT"
+                }
+              ],
+              "points": [
+                {
+                  "from": 41,
+                  "to": 41,
+                  "id": 2101003,
+                  "target": 30,
+                  "text": "Fire Arrow to 30 (1 point)"
+                },
+                {
+                  "from": 41,
+                  "to": 47,
+                  "id": 2101001,
+                  "target": 20,
+                  "text": "Teleport to 20 (19 points)"
+                },
+                {
+                  "from": 47,
+                  "to": 48,
+                  "id": 2100000,
+                  "target": 3,
+                  "text": "MP Eater to 3 (2 points)"
+                },
+                {
+                  "from": 48,
+                  "to": 50,
+                  "id": 2101000,
+                  "target": 8,
+                  "text": "Meditation to 8 (8 points)"
+                }
+              ],
+              "gear": [
+                {
+                  "slot": "Wand",
+                  "id": 1372006,
+                  "name": "Fairy Wand",
+                  "level": 40,
+                  "cozy": 655
+                },
+                {
+                  "slot": "Wand",
+                  "id": 1372007,
+                  "name": "Cromi",
+                  "level": 50,
+                  "cozy": 656,
+                  "up": true
+                },
+                {
+                  "slot": "Hat",
+                  "id": 1002146,
+                  "name": "Brown Guiltian",
+                  "level": 40,
+                  "cozy": 854
+                },
+                {
+                  "slot": "Overall",
+                  "id": 1050025,
+                  "name": "Blue Starlight",
+                  "level": 40,
+                  "cozy": 1133
+                },
+                {
+                  "slot": "Gloves",
+                  "id": 1082056,
+                  "name": "Blue Arten",
+                  "level": 40,
+                  "cozy": 1491
+                }
+              ],
+              "hours": 36.7,
+              "lemons": 24822
+            }
+          ]
+        },
+        {
+          "from": 30,
+          "to": 40,
+          "job": "il",
+          "columns": [
+            {
+              "road": "beam",
+              "name": "Beam first",
+              "credit": {
+                "parts": [
+                  {
+                    "text": "Polly's I/L build",
+                    "link": "https://meowdb.com/msclassic/character-builder/gNpM60Rowd"
+                  }
+                ]
+              },
+              "train": {
+                "stages": [
+                  {
+                    "from": 30,
+                    "to": 40,
+                    "mob": "Zombie Mushroom",
+                    "map": "Dungeon : Ant Tunnel III",
+                    "mapId": 10005062,
+                    "expHour": 130400
+                  }
+                ],
+                "tryNext": {
+                  "name": "Curse Eye",
+                  "level": 33,
+                  "map": "Dungeon : Sleepy Dungeon V"
+                }
+              },
+              "ap": [
+                {
+                  "from": 31,
+                  "to": 38,
+                  "text": "5 INT"
+                },
+                {
+                  "from": 39,
+                  "to": 39,
+                  "text": "5 LUK, for a Wand at 40"
+                },
+                {
+                  "from": 40,
+                  "to": 40,
+                  "text": "5 INT"
+                }
+              ],
+              "points": [
+                {
+                  "from": 30,
+                  "to": 30,
+                  "id": 2201004,
+                  "target": 1,
+                  "text": "Thunder Bolt to 1 (1 point)"
+                },
+                {
+                  "from": 31,
+                  "to": 40,
+                  "id": 2201003,
+                  "target": 30,
+                  "text": "Cold Beam to 30 (30 points)"
+                }
+              ],
+              "gear": [
+                {
+                  "slot": "Wand",
+                  "id": 1372004,
+                  "name": "Mithril Wand",
+                  "level": 30,
+                  "cozy": 653
+                },
+                {
+                  "slot": "Wand",
+                  "id": 1372006,
+                  "name": "Fairy Wand",
+                  "level": 40,
+                  "cozy": 655,
+                  "up": true
+                },
+                {
+                  "slot": "Hat",
+                  "id": 1002102,
+                  "name": "Steel Pride",
+                  "level": 30,
+                  "cozy": 810
+                },
+                {
+                  "slot": "Overall",
+                  "id": 1050012,
+                  "name": "Blue Wizard Robe",
+                  "level": 30,
+                  "cozy": null
+                },
+                {
+                  "slot": "Gloves",
+                  "id": 1082032,
+                  "name": "Blue Lutia",
+                  "level": 30,
+                  "cozy": 1467
+                }
+              ],
+              "hours": 20.9,
+              "lemons": 8535
+            },
+            {
+              "road": "qchaos",
+              "name": "Beam, then Teleport",
+              "credit": {
+                "parts": [
+                  {
+                    "text": "Qchaos's wizard guide, in the Classic World Discord's guide threads"
+                  }
+                ]
+              },
+              "train": {
+                "stages": [
+                  {
+                    "from": 30,
+                    "to": 37,
+                    "mob": "Fire Boar",
+                    "map": "Warning Street : The Burnt Land V",
+                    "mapId": 10004115,
+                    "expHour": 70800
+                  },
+                  {
+                    "from": 38,
+                    "to": 40,
+                    "mob": "Jr. Wraith",
+                    "map": "Kerning City Subway : Line 2 <Area 1>",
+                    "mapId": 10003066,
+                    "expHour": 92100
+                  }
+                ],
+                "tryNext": {
+                  "name": "Curse Eye",
+                  "level": 33,
+                  "map": "Dungeon : Sleepy Dungeon V"
+                }
+              },
+              "ap": [
+                {
+                  "from": 31,
+                  "to": 38,
+                  "text": "5 INT"
+                },
+                {
+                  "from": 39,
+                  "to": 39,
+                  "text": "5 LUK, for a Wand at 40"
+                },
+                {
+                  "from": 40,
+                  "to": 40,
+                  "text": "5 INT"
+                }
+              ],
+              "points": [
+                {
+                  "from": 30,
+                  "to": 30,
+                  "id": 2201001,
+                  "target": 1,
+                  "text": "Teleport to 1 (1 point)"
+                },
+                {
+                  "from": 31,
+                  "to": 31,
+                  "id": 2200000,
+                  "target": 1,
+                  "text": "MP Eater to 1 (1 point)"
+                },
+                {
+                  "from": 31,
+                  "to": 40,
+                  "id": 2201003,
+                  "target": 29,
+                  "text": "Cold Beam to 29 (29 points)"
+                }
+              ],
+              "gear": [
+                {
+                  "slot": "Wand",
+                  "id": 1372004,
+                  "name": "Mithril Wand",
+                  "level": 30,
+                  "cozy": 653
+                },
+                {
+                  "slot": "Wand",
+                  "id": 1372006,
+                  "name": "Fairy Wand",
+                  "level": 40,
+                  "cozy": 655,
+                  "up": true
+                },
+                {
+                  "slot": "Hat",
+                  "id": 1002102,
+                  "name": "Steel Pride",
+                  "level": 30,
+                  "cozy": 810
+                },
+                {
+                  "slot": "Overall",
+                  "id": 1050012,
+                  "name": "Blue Wizard Robe",
+                  "level": 30,
+                  "cozy": null
+                },
+                {
+                  "slot": "Gloves",
+                  "id": 1082032,
+                  "name": "Blue Lutia",
+                  "level": 30,
+                  "cozy": 1467
+                }
+              ],
+              "hours": 22.1,
+              "lemons": 9541
+            }
+          ]
+        },
+        {
+          "from": 40,
+          "to": 50,
+          "job": "il",
+          "columns": [
+            {
+              "road": "beam",
+              "name": "Beam first",
+              "credit": {
+                "parts": [
+                  {
+                    "text": "Polly's I/L build",
+                    "link": "https://meowdb.com/msclassic/character-builder/gNpM60Rowd"
+                  }
+                ]
+              },
+              "train": {
+                "stages": [
+                  {
+                    "from": 40,
+                    "to": 44,
+                    "mob": "Jr. Wraith",
+                    "map": "Kerning City Subway : Line 2 <Area 1>",
+                    "mapId": 10003066,
+                    "expHour": 170600
+                  },
+                  {
+                    "from": 45,
+                    "to": 50,
+                    "mob": "Wraith",
+                    "map": "Kerning City Subway : Line 2 <Area 3>",
+                    "mapId": 10003068,
+                    "expHour": 220700
+                  }
+                ],
+                "tryNext": {
+                  "name": "Tortie",
+                  "level": 46,
+                  "map": "Florina Road : Hot Sand"
+                }
+              },
+              "ap": [
+                {
+                  "from": 41,
+                  "to": 46,
+                  "text": "5 INT"
+                },
+                {
+                  "from": 47,
+                  "to": 49,
+                  "text": "5 LUK, for a Cromi at 50"
+                },
+                {
+                  "from": 50,
+                  "to": 50,
+                  "text": "5 INT"
+                }
+              ],
+              "points": [
+                {
+                  "from": 41,
+                  "to": 50,
+                  "id": 2201004,
+                  "target": 30,
+                  "text": "Thunder Bolt to 30 (29 points)"
+                },
+                {
+                  "from": 50,
+                  "to": 50,
+                  "id": 2200000,
+                  "target": 1,
+                  "text": "MP Eater to 1 (1 point)"
+                }
+              ],
+              "gear": [
+                {
+                  "slot": "Wand",
+                  "id": 1372006,
+                  "name": "Fairy Wand",
+                  "level": 40,
+                  "cozy": 655
+                },
+                {
+                  "slot": "Wand",
+                  "id": 1372007,
+                  "name": "Cromi",
+                  "level": 50,
+                  "cozy": 656,
+                  "up": true
+                },
+                {
+                  "slot": "Hat",
+                  "id": 1002146,
+                  "name": "Brown Guiltian",
+                  "level": 40,
+                  "cozy": 854
+                },
+                {
+                  "slot": "Overall",
+                  "id": 1050025,
+                  "name": "Blue Starlight",
+                  "level": 40,
+                  "cozy": 1133
+                },
+                {
+                  "slot": "Gloves",
+                  "id": 1082056,
+                  "name": "Blue Arten",
+                  "level": 40,
+                  "cozy": 1491
+                }
+              ],
+              "hours": 38.7,
+              "lemons": 20900
+            },
+            {
+              "road": "qchaos",
+              "name": "Beam, then Teleport",
+              "credit": {
+                "parts": [
+                  {
+                    "text": "Qchaos's wizard guide, in the Classic World Discord's guide threads"
+                  }
+                ]
+              },
+              "train": {
+                "stages": [
+                  {
+                    "from": 40,
+                    "to": 41,
+                    "mob": "Tortie",
+                    "map": "Florina Road : Hot Sand",
+                    "mapId": 10007040,
+                    "expHour": 98000
+                  },
+                  {
+                    "from": 42,
+                    "to": 43,
+                    "mob": "Fire Boar",
+                    "map": "Warning Street : The Burnt Land V",
+                    "mapId": 10004115,
+                    "expHour": 118000
+                  },
+                  {
+                    "from": 44,
+                    "to": 46,
+                    "mob": "Tortie",
+                    "map": "Florina Road : Hot Sand",
+                    "mapId": 10007040,
+                    "expHour": 125700
+                  },
+                  {
+                    "from": 47,
+                    "to": 50,
+                    "mob": "Wraith",
+                    "map": "Kerning City Subway : Line 2 <Area 3>",
+                    "mapId": 10003068,
+                    "expHour": 139300
+                  }
+                ],
+                "tryNext": {
+                  "name": "Tortie",
+                  "level": 46,
+                  "map": "Florina Road : Hot Sand"
+                }
+              },
+              "ap": [
+                {
+                  "from": 41,
+                  "to": 46,
+                  "text": "5 INT"
+                },
+                {
+                  "from": 47,
+                  "to": 49,
+                  "text": "5 LUK, for a Cromi at 50"
+                },
+                {
+                  "from": 50,
+                  "to": 50,
+                  "text": "5 INT"
+                }
+              ],
+              "points": [
+                {
+                  "from": 41,
+                  "to": 41,
+                  "id": 2201003,
+                  "target": 30,
+                  "text": "Cold Beam to 30 (1 point)"
+                },
+                {
+                  "from": 41,
+                  "to": 47,
+                  "id": 2201001,
+                  "target": 20,
+                  "text": "Teleport to 20 (19 points)"
+                },
+                {
+                  "from": 47,
+                  "to": 48,
+                  "id": 2200000,
+                  "target": 3,
+                  "text": "MP Eater to 3 (2 points)"
+                },
+                {
+                  "from": 48,
+                  "to": 50,
+                  "id": 2201000,
+                  "target": 8,
+                  "text": "Meditation to 8 (8 points)"
+                }
+              ],
+              "gear": [
+                {
+                  "slot": "Wand",
+                  "id": 1372006,
+                  "name": "Fairy Wand",
+                  "level": 40,
+                  "cozy": 655
+                },
+                {
+                  "slot": "Wand",
+                  "id": 1372007,
+                  "name": "Cromi",
+                  "level": 50,
+                  "cozy": 656,
+                  "up": true
+                },
+                {
+                  "slot": "Hat",
+                  "id": 1002146,
+                  "name": "Brown Guiltian",
+                  "level": 40,
+                  "cozy": 854
+                },
+                {
+                  "slot": "Overall",
+                  "id": 1050025,
+                  "name": "Blue Starlight",
+                  "level": 40,
+                  "cozy": 1133
+                },
+                {
+                  "slot": "Gloves",
+                  "id": 1082056,
+                  "name": "Blue Arten",
+                  "level": 40,
+                  "cozy": 1491
+                }
+              ],
+              "hours": 37.4,
+              "lemons": 20092
+            }
+          ]
+        },
+        {
+          "from": 30,
+          "to": 40,
+          "job": "cleric",
+          "columns": [
+            {
+              "road": "teleport",
+              "name": "Teleport first",
+              "credit": {
+                "parts": [
+                  {
+                    "text": "Cleric SP Guide, pinned in the Classic World Discord"
+                  }
+                ]
+              },
+              "train": {
+                "stages": [
+                  {
+                    "from": 30,
+                    "to": 36,
+                    "mob": "Fire Boar",
+                    "map": "Warning Street : The Burnt Land V",
+                    "mapId": 10004115,
+                    "expHour": 70800
+                  },
+                  {
+                    "from": 37,
+                    "to": 40,
+                    "mob": "Zombie Mushroom",
+                    "map": "Dungeon : Ant Tunnel III",
+                    "mapId": 10005062,
+                    "expHour": 89100
+                  }
+                ],
+                "tryNext": {
+                  "name": "Jr. Wraith",
+                  "level": 34,
+                  "map": "Kerning City Subway : Line 2 <Area 1>"
+                }
+              },
+              "ap": [
+                {
+                  "from": 31,
+                  "to": 38,
+                  "text": "5 INT"
+                },
+                {
+                  "from": 39,
+                  "to": 39,
+                  "text": "5 LUK, for a Wand at 40"
+                },
+                {
+                  "from": 40,
+                  "to": 40,
+                  "text": "5 INT"
+                }
+              ],
+              "points": [
+                {
+                  "from": 30,
+                  "to": 30,
+                  "id": 2300000,
+                  "target": 1,
+                  "text": "MP Eater to 1 (1 point)"
+                },
+                {
+                  "from": 31,
+                  "to": 31,
+                  "id": 2301001,
+                  "target": 1,
+                  "text": "Heal to 1 (1 point)"
+                },
+                {
+                  "from": 31,
+                  "to": 37,
+                  "id": 2301000,
+                  "target": 20,
+                  "text": "Teleport to 20 (20 points)"
+                },
+                {
+                  "from": 38,
+                  "to": 40,
+                  "id": 2301004,
+                  "target": 9,
+                  "text": "Holy Arrow to 9 (9 points)"
+                }
+              ],
+              "gear": [
+                {
+                  "slot": "Wand",
+                  "id": 1372004,
+                  "name": "Mithril Wand",
+                  "level": 30,
+                  "cozy": 653
+                },
+                {
+                  "slot": "Wand",
+                  "id": 1372006,
+                  "name": "Fairy Wand",
+                  "level": 40,
+                  "cozy": 655,
+                  "up": true
+                },
+                {
+                  "slot": "Hat",
+                  "id": 1002102,
+                  "name": "Steel Pride",
+                  "level": 30,
+                  "cozy": 810
+                },
+                {
+                  "slot": "Overall",
+                  "id": 1050012,
+                  "name": "Blue Wizard Robe",
+                  "level": 30,
+                  "cozy": null
+                },
+                {
+                  "slot": "Gloves",
+                  "id": 1082032,
+                  "name": "Blue Lutia",
+                  "level": 30,
+                  "cozy": 1467
+                }
+              ],
+              "hours": 21.3,
+              "lemons": 9114
+            },
+            {
+              "road": "heal",
+              "name": "Heal first",
+              "credit": {
+                "parts": [
+                  {
+                    "text": "Cleric SP Guide, pinned in the Classic World Discord"
+                  }
+                ]
+              },
+              "train": {
+                "stages": [
+                  {
+                    "from": 30,
+                    "to": 34,
+                    "mob": "Fire Boar",
+                    "map": "Warning Street : The Burnt Land V",
+                    "mapId": 10004115,
+                    "expHour": 70800
+                  },
+                  {
+                    "from": 35,
+                    "to": 40,
+                    "mob": "Jr. Wraith",
+                    "map": "Kerning City Subway : Line 2 <Area 1>",
+                    "mapId": 10003066,
+                    "expHour": 121600
+                  }
+                ],
+                "tryNext": {
+                  "name": "Jr. Wraith",
+                  "level": 34,
+                  "map": "Kerning City Subway : Line 2 <Area 1>"
+                }
+              },
+              "ap": [
+                {
+                  "from": 31,
+                  "to": 38,
+                  "text": "5 INT"
+                },
+                {
+                  "from": 39,
+                  "to": 39,
+                  "text": "5 LUK, for a Wand at 40"
+                },
+                {
+                  "from": 40,
+                  "to": 40,
+                  "text": "5 INT"
+                }
+              ],
+              "points": [
+                {
+                  "from": 30,
+                  "to": 30,
+                  "id": 2300000,
+                  "target": 1,
+                  "text": "MP Eater to 1 (1 point)"
+                },
+                {
+                  "from": 31,
+                  "to": 40,
+                  "id": 2301001,
+                  "target": 30,
+                  "text": "Heal to 30 (30 points)"
+                }
+              ],
+              "gear": [
+                {
+                  "slot": "Wand",
+                  "id": 1372004,
+                  "name": "Mithril Wand",
+                  "level": 30,
+                  "cozy": 653
+                },
+                {
+                  "slot": "Wand",
+                  "id": 1372006,
+                  "name": "Fairy Wand",
+                  "level": 40,
+                  "cozy": 655,
+                  "up": true
+                },
+                {
+                  "slot": "Hat",
+                  "id": 1002102,
+                  "name": "Steel Pride",
+                  "level": 30,
+                  "cozy": 810
+                },
+                {
+                  "slot": "Overall",
+                  "id": 1050012,
+                  "name": "Blue Wizard Robe",
+                  "level": 30,
+                  "cozy": null
+                },
+                {
+                  "slot": "Gloves",
+                  "id": 1082032,
+                  "name": "Blue Lutia",
+                  "level": 30,
+                  "cozy": 1467
+                }
+              ],
+              "hours": 20.3,
+              "lemons": 9634
+            },
+            {
+              "road": "arrow",
+              "name": "Holy Arrow first",
+              "credit": {
+                "parts": [
+                  {
+                    "text": "Rimmah's road, from the Cleric who runs this site"
+                  }
+                ]
+              },
+              "train": {
+                "stages": [
+                  {
+                    "from": 30,
+                    "to": 31,
+                    "mob": "Fire Boar",
+                    "map": "Warning Street : The Burnt Land V",
+                    "mapId": 10004115,
+                    "expHour": 70800
+                  },
+                  {
+                    "from": 32,
+                    "to": 39,
+                    "mob": "Jr. Wraith",
+                    "map": "Kerning City Subway : Line 2 <Area 1>",
+                    "mapId": 10003066,
+                    "expHour": 69600
+                  },
+                  {
+                    "from": 40,
+                    "to": 40,
+                    "mob": "Zombie Lupin",
+                    "map": "Hidden Street : Monkey Swamp III",
+                    "mapId": 10003097,
+                    "expHour": 98600
+                  }
+                ],
+                "tryNext": {
+                  "name": "Jr. Wraith",
+                  "level": 34,
+                  "map": "Kerning City Subway : Line 2 <Area 1>"
+                }
+              },
+              "ap": [
+                {
+                  "from": 31,
+                  "to": 38,
+                  "text": "5 INT"
+                },
+                {
+                  "from": 39,
+                  "to": 39,
+                  "text": "5 LUK, for a Wand at 40"
+                },
+                {
+                  "from": 40,
+                  "to": 40,
+                  "text": "5 INT"
+                }
+              ],
+              "points": [
+                {
+                  "from": 30,
+                  "to": 30,
+                  "id": 2300000,
+                  "target": 1,
+                  "text": "MP Eater to 1 (1 point)"
+                },
+                {
+                  "from": 31,
+                  "to": 40,
+                  "id": 2301004,
+                  "target": 30,
+                  "text": "Holy Arrow to 30 (30 points)"
+                }
+              ],
+              "gear": [
+                {
+                  "slot": "Wand",
+                  "id": 1372004,
+                  "name": "Mithril Wand",
+                  "level": 30,
+                  "cozy": 653
+                },
+                {
+                  "slot": "Wand",
+                  "id": 1372006,
+                  "name": "Fairy Wand",
+                  "level": 40,
+                  "cozy": 655,
+                  "up": true
+                },
+                {
+                  "slot": "Hat",
+                  "id": 1002102,
+                  "name": "Steel Pride",
+                  "level": 30,
+                  "cozy": 810
+                },
+                {
+                  "slot": "Overall",
+                  "id": 1050012,
+                  "name": "Blue Wizard Robe",
+                  "level": 30,
+                  "cozy": null
+                },
+                {
+                  "slot": "Gloves",
+                  "id": 1082032,
+                  "name": "Blue Lutia",
+                  "level": 30,
+                  "cozy": 1467
+                }
+              ],
+              "hours": 20.7,
+              "lemons": 9359
+            },
+            {
+              "road": "meso",
+              "name": "Meso saver",
+              "credit": {
+                "parts": [
+                  {
+                    "text": "Grummash's Cleric Meso Management Guide",
+                    "link": "https://meowdb.com/msclassic/forum/guides/Grummash/cleric-meso-management-guide"
+                  }
+                ]
+              },
+              "train": {
+                "stages": [
+                  {
+                    "from": 30,
+                    "to": 37,
+                    "mob": "Fire Boar",
+                    "map": "Warning Street : The Burnt Land V",
+                    "mapId": 10004115,
+                    "expHour": 70800
+                  },
+                  {
+                    "from": 38,
+                    "to": 40,
+                    "mob": "Jr. Wraith",
+                    "map": "Kerning City Subway : Line 2 <Area 1>",
+                    "mapId": 10003066,
+                    "expHour": 97400
+                  }
+                ],
+                "tryNext": {
+                  "name": "Jr. Wraith",
+                  "level": 34,
+                  "map": "Kerning City Subway : Line 2 <Area 1>"
+                }
+              },
+              "ap": [
+                {
+                  "from": 31,
+                  "to": 38,
+                  "text": "5 INT"
+                },
+                {
+                  "from": 39,
+                  "to": 39,
+                  "text": "5 LUK, for a Wand at 40"
+                },
+                {
+                  "from": 40,
+                  "to": 40,
+                  "text": "5 INT"
+                }
+              ],
+              "points": [
+                {
+                  "from": 30,
+                  "to": 30,
+                  "id": 2300000,
+                  "target": 1,
+                  "text": "MP Eater to 1 (1 point)"
+                },
+                {
+                  "from": 31,
+                  "to": 31,
+                  "id": 2301000,
+                  "target": 1,
+                  "text": "Teleport to 1 (1 point)"
+                },
+                {
+                  "from": 31,
+                  "to": 32,
+                  "id": 2301001,
+                  "target": 5,
+                  "text": "Heal to 5 (5 points)"
+                },
+                {
+                  "from": 33,
+                  "to": 34,
+                  "id": 2301002,
+                  "target": 5,
+                  "text": "Invincible to 5 (5 points)"
+                },
+                {
+                  "from": 34,
+                  "to": 34,
+                  "id": 2301003,
+                  "target": 1,
+                  "text": "Bless to 1 (1 point)"
+                },
+                {
+                  "from": 35,
+                  "to": 37,
+                  "id": 2300000,
+                  "target": 10,
+                  "text": "MP Eater to 10 (9 points)"
+                },
+                {
+                  "from": 38,
+                  "to": 38,
+                  "id": null,
+                  "target": null,
+                  "text": "SP Reset Scroll at 38: your 2nd job points come back and go down this road's next order"
+                },
+                {
+                  "from": 38,
+                  "to": 38,
+                  "id": 2300000,
+                  "target": 1,
+                  "text": "MP Eater to 1 (1 point)"
+                },
+                {
+                  "from": 38,
+                  "to": 38,
+                  "id": 2301000,
+                  "target": 1,
+                  "text": "Teleport to 1 (1 point)"
+                },
+                {
+                  "from": 38,
+                  "to": 38,
+                  "id": 2301001,
+                  "target": 2,
+                  "text": "Heal to 2 (2 points)"
+                },
+                {
+                  "from": 38,
+                  "to": 38,
+                  "id": 2301004,
+                  "target": 21,
+                  "text": "Holy Arrow to 21 (21 points)"
+                },
+                {
+                  "from": 39,
+                  "to": 39,
+                  "id": 2301001,
+                  "target": 5,
+                  "text": "Heal to 5 (3 points)"
+                },
+                {
+                  "from": 40,
+                  "to": 40,
+                  "id": 2301002,
+                  "target": 3,
+                  "text": "Invincible to 3 (3 points)"
+                }
+              ],
+              "gear": [
+                {
+                  "slot": "Wand",
+                  "id": 1372004,
+                  "name": "Mithril Wand",
+                  "level": 30,
+                  "cozy": 653
+                },
+                {
+                  "slot": "Wand",
+                  "id": 1372006,
+                  "name": "Fairy Wand",
+                  "level": 40,
+                  "cozy": 655,
+                  "up": true
+                },
+                {
+                  "slot": "Hat",
+                  "id": 1002102,
+                  "name": "Steel Pride",
+                  "level": 30,
+                  "cozy": 810
+                },
+                {
+                  "slot": "Overall",
+                  "id": 1050012,
+                  "name": "Blue Wizard Robe",
+                  "level": 30,
+                  "cozy": null
+                },
+                {
+                  "slot": "Gloves",
+                  "id": 1082032,
+                  "name": "Blue Lutia",
+                  "level": 30,
+                  "cozy": 1467
+                }
+              ],
+              "hours": 21.2,
+              "lemons": 9089
+            }
+          ]
+        },
+        {
+          "from": 40,
+          "to": 50,
+          "job": "cleric",
+          "columns": [
+            {
+              "road": "teleport",
+              "name": "Teleport first",
+              "credit": {
+                "parts": [
+                  {
+                    "text": "Cleric SP Guide, pinned in the Classic World Discord"
+                  }
+                ]
+              },
+              "train": {
+                "stages": [
+                  {
+                    "from": 40,
+                    "to": 45,
+                    "mob": "Zombie Mushroom",
+                    "map": "Dungeon : Ant Tunnel III",
+                    "mapId": 10005062,
+                    "expHour": 95000
+                  },
+                  {
+                    "from": 46,
+                    "to": 50,
+                    "mob": "Wraith",
+                    "map": "Kerning City Subway : Line 2 <Area 3>",
+                    "mapId": 10003068,
+                    "expHour": 134600
+                  }
+                ],
+                "tryNext": {
+                  "name": "Skeledog",
+                  "level": 44,
+                  "map": "Victoria Road : Remains <Tomb> I"
+                }
+              },
+              "ap": [
+                {
+                  "from": 41,
+                  "to": 46,
+                  "text": "5 INT"
+                },
+                {
+                  "from": 47,
+                  "to": 49,
+                  "text": "5 LUK, for a Cromi at 50"
+                },
+                {
+                  "from": 50,
+                  "to": 50,
+                  "text": "5 INT"
+                }
+              ],
+              "points": [
+                {
+                  "from": 41,
+                  "to": 47,
+                  "id": 2301004,
+                  "target": 30,
+                  "text": "Holy Arrow to 30 (21 points)"
+                },
+                {
+                  "from": 48,
+                  "to": 50,
+                  "id": 2301001,
+                  "target": 10,
+                  "text": "Heal to 10 (9 points)"
+                }
+              ],
+              "gear": [
+                {
+                  "slot": "Wand",
+                  "id": 1372006,
+                  "name": "Fairy Wand",
+                  "level": 40,
+                  "cozy": 655
+                },
+                {
+                  "slot": "Wand",
+                  "id": 1372007,
+                  "name": "Cromi",
+                  "level": 50,
+                  "cozy": 656,
+                  "up": true
+                },
+                {
+                  "slot": "Hat",
+                  "id": 1002146,
+                  "name": "Brown Guiltian",
+                  "level": 40,
+                  "cozy": 854
+                },
+                {
+                  "slot": "Overall",
+                  "id": 1050025,
+                  "name": "Blue Starlight",
+                  "level": 40,
+                  "cozy": 1133
+                },
+                {
+                  "slot": "Gloves",
+                  "id": 1082056,
+                  "name": "Blue Arten",
+                  "level": 40,
+                  "cozy": 1491
+                }
+              ],
+              "hours": 40.1,
+              "lemons": 21741
+            },
+            {
+              "road": "heal",
+              "name": "Heal first",
+              "credit": {
+                "parts": [
+                  {
+                    "text": "Cleric SP Guide, pinned in the Classic World Discord"
+                  }
+                ]
+              },
+              "train": {
+                "stages": [
+                  {
+                    "from": 40,
+                    "to": 45,
+                    "mob": "Jr. Wraith",
+                    "map": "Kerning City Subway : Line 2 <Area 1>",
+                    "mapId": 10003066,
+                    "expHour": 162300
+                  },
+                  {
+                    "from": 46,
+                    "to": 50,
+                    "mob": "Wraith",
+                    "map": "Kerning City Subway : Line 2 <Area 3>",
+                    "mapId": 10003068,
+                    "expHour": 174700
+                  }
+                ],
+                "tryNext": {
+                  "name": "Skeledog",
+                  "level": 44,
+                  "map": "Victoria Road : Remains <Tomb> I"
+                }
+              },
+              "ap": [
+                {
+                  "from": 41,
+                  "to": 46,
+                  "text": "5 INT"
+                },
+                {
+                  "from": 47,
+                  "to": 49,
+                  "text": "5 LUK, for a Cromi at 50"
+                },
+                {
+                  "from": 50,
+                  "to": 50,
+                  "text": "5 INT"
+                }
+              ],
+              "points": [
+                {
+                  "from": 41,
+                  "to": 47,
+                  "id": 2301000,
+                  "target": 20,
+                  "text": "Teleport to 20 (20 points)"
+                },
+                {
+                  "from": 47,
+                  "to": 50,
+                  "id": 2301004,
+                  "target": 10,
+                  "text": "Holy Arrow to 10 (10 points)"
+                }
+              ],
+              "gear": [
+                {
+                  "slot": "Wand",
+                  "id": 1372006,
+                  "name": "Fairy Wand",
+                  "level": 40,
+                  "cozy": 655
+                },
+                {
+                  "slot": "Wand",
+                  "id": 1372007,
+                  "name": "Cromi",
+                  "level": 50,
+                  "cozy": 656,
+                  "up": true
+                },
+                {
+                  "slot": "Hat",
+                  "id": 1002146,
+                  "name": "Brown Guiltian",
+                  "level": 40,
+                  "cozy": 854
+                },
+                {
+                  "slot": "Overall",
+                  "id": 1050025,
+                  "name": "Blue Starlight",
+                  "level": 40,
+                  "cozy": 1133
+                },
+                {
+                  "slot": "Gloves",
+                  "id": 1082056,
+                  "name": "Blue Arten",
+                  "level": 40,
+                  "cozy": 1491
+                }
+              ],
+              "hours": 36.7,
+              "lemons": 22259
+            },
+            {
+              "road": "arrow",
+              "name": "Holy Arrow first",
+              "credit": {
+                "parts": [
+                  {
+                    "text": "Rimmah's road, from the Cleric who runs this site"
+                  }
+                ]
+              },
+              "train": {
+                "stages": [
+                  {
+                    "from": 40,
+                    "to": 41,
+                    "mob": "Zombie Lupin",
+                    "map": "Hidden Street : Monkey Swamp III",
+                    "mapId": 10003097,
+                    "expHour": 104500
+                  },
+                  {
+                    "from": 42,
+                    "to": 44,
+                    "mob": "Skeledog",
+                    "map": "Victoria Road : Remains <Tomb> I",
+                    "mapId": 10004134,
+                    "expHour": 115700
+                  },
+                  {
+                    "from": 45,
+                    "to": 50,
+                    "mob": "Wraith",
+                    "map": "Kerning City Subway : Line 2 <Area 3>",
+                    "mapId": 10003068,
+                    "expHour": 124500
+                  }
+                ],
+                "tryNext": {
+                  "name": "Skeledog",
+                  "level": 44,
+                  "map": "Victoria Road : Remains <Tomb> I"
+                }
+              },
+              "ap": [
+                {
+                  "from": 41,
+                  "to": 46,
+                  "text": "5 INT"
+                },
+                {
+                  "from": 47,
+                  "to": 49,
+                  "text": "5 LUK, for a Cromi at 50"
+                },
+                {
+                  "from": 50,
+                  "to": 50,
+                  "text": "5 INT"
+                }
+              ],
+              "points": [
+                {
+                  "from": 41,
+                  "to": 42,
+                  "id": 2301001,
+                  "target": 5,
+                  "text": "Heal to 5 (5 points)"
+                },
+                {
+                  "from": 42,
+                  "to": 49,
+                  "id": 2301000,
+                  "target": 20,
+                  "text": "Teleport to 20 (20 points)"
+                },
+                {
+                  "from": 49,
+                  "to": 50,
+                  "id": 2301001,
+                  "target": 10,
+                  "text": "Heal to 10 (5 points)"
+                }
+              ],
+              "gear": [
+                {
+                  "slot": "Wand",
+                  "id": 1372006,
+                  "name": "Fairy Wand",
+                  "level": 40,
+                  "cozy": 655
+                },
+                {
+                  "slot": "Wand",
+                  "id": 1372007,
+                  "name": "Cromi",
+                  "level": 50,
+                  "cozy": 656,
+                  "up": true
+                },
+                {
+                  "slot": "Hat",
+                  "id": 1002146,
+                  "name": "Brown Guiltian",
+                  "level": 40,
+                  "cozy": 854
+                },
+                {
+                  "slot": "Overall",
+                  "id": 1050025,
+                  "name": "Blue Starlight",
+                  "level": 40,
+                  "cozy": 1133
+                },
+                {
+                  "slot": "Gloves",
+                  "id": 1082056,
+                  "name": "Blue Arten",
+                  "level": 40,
+                  "cozy": 1491
+                }
+              ],
+              "hours": 38.8,
+              "lemons": 27397
+            },
+            {
+              "road": "meso",
+              "name": "Meso saver",
+              "credit": {
+                "parts": [
+                  {
+                    "text": "Grummash's Cleric Meso Management Guide",
+                    "link": "https://meowdb.com/msclassic/forum/guides/Grummash/cleric-meso-management-guide"
+                  }
+                ]
+              },
+              "train": {
+                "stages": [
+                  {
+                    "from": 40,
+                    "to": 41,
+                    "mob": "Jr. Wraith",
+                    "map": "Kerning City Subway : Line 2 <Area 1>",
+                    "mapId": 10003066,
+                    "expHour": 105600
+                  },
+                  {
+                    "from": 42,
+                    "to": 45,
+                    "mob": "Zombie Mushroom",
+                    "map": "Dungeon : Ant Tunnel III",
+                    "mapId": 10005062,
+                    "expHour": 110400
+                  },
+                  {
+                    "from": 46,
+                    "to": 50,
+                    "mob": "Wraith",
+                    "map": "Kerning City Subway : Line 2 <Area 3>",
+                    "mapId": 10003068,
+                    "expHour": 115100
+                  }
+                ],
+                "tryNext": {
+                  "name": "Skeledog",
+                  "level": 44,
+                  "map": "Victoria Road : Remains <Tomb> I"
+                }
+              },
+              "ap": [
+                {
+                  "from": 41,
+                  "to": 46,
+                  "text": "5 INT"
+                },
+                {
+                  "from": 47,
+                  "to": 49,
+                  "text": "5 LUK, for a Cromi at 50"
+                },
+                {
+                  "from": 50,
+                  "to": 50,
+                  "text": "5 INT"
+                }
+              ],
+              "points": [
+                {
+                  "from": 41,
+                  "to": 41,
+                  "id": 2301002,
+                  "target": 5,
+                  "text": "Invincible to 5 (2 points)"
+                },
+                {
+                  "from": 41,
+                  "to": 41,
+                  "id": 2301003,
+                  "target": 1,
+                  "text": "Bless to 1 (1 point)"
+                },
+                {
+                  "from": 42,
+                  "to": 48,
+                  "id": 2300000,
+                  "target": 20,
+                  "text": "MP Eater to 20 (19 points)"
+                },
+                {
+                  "from": 48,
+                  "to": 48,
+                  "id": 2301001,
+                  "target": 7,
+                  "text": "Heal to 7 (2 points)"
+                },
+                {
+                  "from": 49,
+                  "to": 50,
+                  "id": 2301004,
+                  "target": 27,
+                  "text": "Holy Arrow to 27 (6 points)"
+                }
+              ],
+              "gear": [
+                {
+                  "slot": "Wand",
+                  "id": 1372006,
+                  "name": "Fairy Wand",
+                  "level": 40,
+                  "cozy": 655
+                },
+                {
+                  "slot": "Wand",
+                  "id": 1372007,
+                  "name": "Cromi",
+                  "level": 50,
+                  "cozy": 656,
+                  "up": true
+                },
+                {
+                  "slot": "Hat",
+                  "id": 1002146,
+                  "name": "Brown Guiltian",
+                  "level": 40,
+                  "cozy": 854
+                },
+                {
+                  "slot": "Overall",
+                  "id": 1050025,
+                  "name": "Blue Starlight",
+                  "level": 40,
+                  "cozy": 1133
+                },
+                {
+                  "slot": "Gloves",
+                  "id": 1082056,
+                  "name": "Blue Arten",
+                  "level": 40,
+                  "cozy": 1491
+                }
+              ],
+              "hours": 42.2,
+              "lemons": 20099
+            }
+          ]
+        }
+      ],
+      "split": {
+        "fp": null,
+        "il": "They part at 30, when Beam first takes Thunder Bolt to 1 and Beam, then Teleport takes Teleport to 1.",
+        "cleric": "They part at 30, when Teleport first takes Teleport to 20 and Heal first takes Heal to 30."
+      },
+      "pick": {
+        "cleric": [
+          "heal",
+          "arrow"
+        ]
+      },
+      "foot": "Estimates from the game's numbers at the typical pace the Planner uses before a Grind run tunes it. The Planner gives the same guide for your own stats."
+    }
+  }
+}

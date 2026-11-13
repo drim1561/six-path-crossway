@@ -152,7 +152,7 @@ h1 { font-size: var(--tt-m); margin: 0; }
 .topbar .logo::before { left: 20px; right: 20px; top: -8px; }
 .logo b { font-weight: inherit; }
 .tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 0 14px auto; padding: 4px; border-radius: var(--r-pill); background-color: var(--surface); box-shadow: 0 0 0 2px var(--wood-o), inset 0 0 0 1px var(--mint-line); }
-.tabs button { display: flex; align-items: center; height: 34px; margin: 0; padding: 0 16px; background: none; background-color: var(--card); box-shadow: inset 0 0 0 1px var(--card-o); border: 0; border-radius: var(--r-pill); color: var(--ink); font: 700 var(--fs-md)/1 var(--font-body); white-space: nowrap; cursor: pointer; }
+.tabs button { display: flex; align-items: center; height: 34px; margin: 0; padding: 0 13px; background: none; background-color: var(--card); box-shadow: inset 0 0 0 1px var(--card-o); border: 0; border-radius: var(--r-pill); color: var(--ink); font: 700 var(--fs-md)/1 var(--font-body); white-space: nowrap; cursor: pointer; }
 .tabs button:hover { color: var(--num); box-shadow: inset 0 0 0 1px var(--mint-line); }
 .tabs button[aria-selected="true"], .tabs button[aria-selected="true"]:hover { background-color: var(--lime); color: var(--lime-ink); box-shadow: none; }
 .tabs button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
@@ -471,11 +471,47 @@ body.g-pip .credit, body.g-ov .credit, body.g-setwin .credit { display: none; }
   .b-dtabs { flex-wrap: wrap; row-gap: 2px; }
   .b-ev { grid-template-columns: 64px minmax(0, 1fr); }
 }
+/* Guides tab (guides.js): the Mage guide, 840 wide like How it works, columns side by side from 2 x 380 */
+#view-guides { max-width: 840px; width: calc(100% - 2 * var(--gap)); margin: var(--gap) auto; padding: 0; }
+#view-guides [hidden] { display: none !important; }
+#guides-root { display: grid; gap: var(--gap); }
+#view-guides .k-bar h2 { margin: 0; font: inherit; }
+#view-guides p { margin: 0; }
+#view-guides .k-pad { display: grid; gap: var(--gap); }
+#view-guides .small { font: 600 var(--fs-sm) var(--font-body); color: var(--muted); }
+#view-guides .k-bar small.small { color: var(--bar-muted); }
+#view-guides a { color: var(--focus); text-decoration: underline dotted; text-underline-offset: 3px; }
+#view-guides a:hover { text-decoration-style: solid; }
+.gd-lead { font: 600 var(--fs-md)/1.45 var(--font-body); }
+.gd-jobs { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: var(--gap); }
+.gd-job { display: grid; gap: 6px; align-content: start; }
+.gd-job h3, .gd-head h3 { margin: 0; font: 400 var(--tt-s) var(--font-title); }
+#gd-map .k-row > .gd-rh:last-child { display: grid; justify-items: end; font: 700 var(--n-s) var(--font-num); white-space: nowrap; }
+#gd-map .gd-first > :last-child:not(:first-child) { font: 700 var(--n-s) var(--font-num); }
+.gd-switch .k-btn[aria-pressed="true"], #gd-pick .k-btn[aria-pressed="true"] { --face: var(--lime); --face-hi: var(--lime-hi); --face-lo: var(--lime-lo); color: var(--lime-ink); }
+#gd-pick .k-btn small { color: inherit; font: inherit; opacity: .8; }
+#gd-jobline { font: 600 var(--fs-md)/1.45 var(--font-body); }
+.gd-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr)); gap: var(--gap); align-items: start; }
+.gd-col { display: grid; gap: var(--gap); min-width: 0; scroll-margin-top: var(--gap); }
+.gd-head { display: grid; gap: 2px; }
+.gd-group { display: grid; gap: 2px; }
+.gd-h { margin: 0; font: 400 var(--fs-md) var(--font-title); color: var(--num); }
+.gd-col .k-row { align-items: baseline; padding: 4px 4px 6px; }
+.gd-col .k-row > .gd-lv { flex: 0 0 6.5em; font: 600 var(--fs-sm) var(--font-body); color: var(--muted); }
+.gd-col .k-row > :nth-child(2) { font: 600 var(--fs-md)/1.35 var(--font-body); }
+.gd-col .k-row > :last-child:not(:first-child) { flex-shrink: 0; font: 700 var(--n-s) var(--font-num); white-space: nowrap; }
+.gd-col .k-row > .gd-txt:last-child { flex: 1 1 auto; margin-left: 0; text-align: left; font: 600 var(--fs-md)/1.35 var(--font-body); white-space: normal; }
+.gd-col .k-row .small { font-size: var(--fs-xs); }
+.gd-col .k-row > :nth-child(2) .small { display: block; }
+.gd-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gap); }
+.gd-tile .k { font: 600 var(--fs-sm) var(--font-body); }
+.gd-tile .v { margin-top: 2px; font: 700 var(--n-l)/1.1 var(--font-num); color: var(--num-big); }
+.gd-tile.lemon .v { color: var(--lemon-ink); }
 .linkish { background: none; border: 0; padding: 0; color: var(--focus); font: inherit; text-decoration: underline; cursor: pointer; }
 
 /* Grind tab (grind.js) */
 /* the tester link (?only=grind): just the Grind tab */
-body.only-grind #tab-timer, body.only-grind #tab-builds, body.only-grind #tab-appraiser { display: none; }
+body.only-grind #tab-timer, body.only-grind #tab-builds, body.only-grind #tab-guides, body.only-grind #tab-appraiser { display: none; }
 /* the Timer is off for now (window.BT_TIMER turns it on): its tab and its parts of How it works go */
 body.timer-off #tab-timer, body.timer-off .timer-only { display: none; }
 /* the Appraiser is closed while it gets its new look (window.BT_APPRAISER turns it on): its sign fades, its view is one
@@ -1652,7 +1688,8 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
   <nav class="tabs" role="tablist" aria-label="Pages">
     <button id="tab-how" type="button" role="tab" aria-controls="view-how" aria-selected="true">How it works</button>
     <button id="tab-grind" type="button" role="tab" aria-controls="view-grind" aria-selected="false">Grind</button>
-    <button id="tab-builds" type="button" role="tab" aria-controls="view-builds" aria-selected="false">Builds</button>
+    <button id="tab-builds" type="button" role="tab" aria-controls="view-builds" aria-selected="false">Planner</button>
+    <button id="tab-guides" type="button" role="tab" aria-controls="view-guides" aria-selected="false">Guides</button>
     <button id="tab-appraiser" type="button" role="tab" aria-controls="view-appraiser" aria-selected="false" aria-label="Appraiser, soon">Appraiser<span class="soon" aria-hidden="true">Soon</span></button>
     <button id="tab-timer" type="button" role="tab" aria-controls="view-timer" aria-selected="false">Timer</button>
   </nav>
@@ -1690,6 +1727,9 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
 <main id="view-builds" role="tabpanel" aria-labelledby="tab-builds" hidden>
   <div id="builds-root"><p class="empty">Loading the calculator...</p></div>
 </main>
+<main id="view-guides" role="tabpanel" aria-labelledby="tab-guides" hidden>
+  <div id="guides-root"><p class="empty">Loading the guide...</p></div>
+</main>
 <main id="view-appraiser" role="tabpanel" aria-labelledby="tab-appraiser" hidden>
   <div class="k-col appraiser-closed">
     <section class="k-win" aria-labelledby="closed-title">
@@ -1698,7 +1738,7 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
         <span class="closed-crew" aria-hidden="true"></span>
         <div class="closed-text">
           <h2 id="closed-title">This trail is still being cleared</h2>
-          <p>The Appraiser is closed while it gets its new look. Grind and Builds are open.</p>
+          <p>The Appraiser is closed while it gets its new look. Grind and Planner are open.</p>
           <a class="k-btn key" href="#grind">Back to Grind</a>
         </div>
       </div>
@@ -1772,7 +1812,7 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
   </div>
 
   <section>
-  <h3>Builds</h3>
+  <h3>Planner</h3>
   <p class="lead">Pick your class and type just your level to get a leveling guide: where to train, where your skill and ability points go, and what to wear and scroll. Skill paths compares two ways to spend your skill points, with the hours each one takes, and the Quests tab lists what to do next, from quests open now to ones coming up.</p>
   <div class="how-mock how-mock-b" role="img" aria-label="Example of a guide row: a monster, where to train, and EXP an hour">
     <div class="how-row"><span class="how-ring"><span class="how-mob how-mob-pig"></span></span><span class="how-name">Train here now<small>Example row</small></span><span class="how-num">112K<small>EXP an hour</small></span></div>
@@ -1826,7 +1866,7 @@ const CONFIG = {
   reportUrl: 'https://sixpathcrossway.pages.dev/api/report',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-13a',
+  version: '2026-11-13b',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
@@ -2447,8 +2487,8 @@ for (const [id, kind] of [['btn-spawned', 'spawn'], ['btn-killed', 'kill'], ['bt
 $('signin').addEventListener('click', () => signIn().catch(err => hint(err.message)));
 $('signout').addEventListener('click', () => api.signOut().catch(() => {}).then(() => setSession(null)));
 
-// The Builds tab is #builds, the Appraiser #appraiser, Grind #grind and How it works #how, so each can be linked; back and
-// forward switch views too.
+// The Planner tab is #builds, Guides #guides (a guide's job after it, #guides/mage/cleric), the Appraiser #appraiser,
+// Grind #grind and How it works #how, so each can be linked; back and forward switch views too.
 // The tester link: ?only=grind shows just the Grind tab in this browser while the Timer, Builds and Appraiser are worked
 // on; ?only=all brings them back. Kept on the device, since Discord sends a sign in back to the plain address; the
 // address is tidied straight away so sign in isn't sent back to the link itself.
@@ -2467,9 +2507,12 @@ document.body.classList.toggle('appraiser-off', !APPRAISER_ON);
 if (APPRAISER_ON) $('tab-appraiser').removeAttribute('aria-label');
 // the front page is How it works while the Timer is off; the tester link opens Grind wherever it lands, How it works aside
 function viewNow() {
-  const view = { '#how': 'how', '#builds': 'builds', '#appraiser': 'appraiser', '#grind': 'grind' }[location.hash] || (TIMER_ON ? 'timer' : 'how');
+  const view = { '#how': 'how', '#builds': 'builds', '#appraiser': 'appraiser', '#grind': 'grind' }[location.hash]
+    || (/^#guides(\/|$)/.test(location.hash) ? 'guides' : TIMER_ON ? 'timer' : 'how');
   return onlyGrind() && location.hash !== '#how' ? 'grind' : view;
 }
+// The guide's job from #guides/mage/<job>; anything else is Fire and Poison
+const guidesJob = () => { const j = location.hash.split('/')[2]; return ['fp', 'il', 'cleric'].includes(j) ? j : 'fp'; };
 let lastViewSent = null;
 // Anonymous button counts (names only, never anything typed or read): one delegated listener so the tabs' own code stays untouched.
 const TRACKED = [['#b-readbtn', 'read_from_game'], ['#b-savebtn', 'save_build'], ['#g-pop', 'pop_out'], ['#g-sharearea button', 'share_game_window'],
@@ -2485,7 +2528,7 @@ document.addEventListener('click', e => {
 }, true);
 function showView() {
   const view = viewNow();
-  for (const v of ['timer', 'builds', 'appraiser', 'grind', 'how']) {
+  for (const v of ['timer', 'builds', 'guides', 'appraiser', 'grind', 'how']) {
     $('view-' + v).hidden = v !== view;
     if ($('tab-' + v)) $('tab-' + v).setAttribute('aria-selected', String(v === view));
   }
@@ -2494,6 +2537,7 @@ function showView() {
     window.track('page_view', { page_path: '/' + view + location.search, page_title: view, app: APP ? 1 : 0 });
   }
   if (view === 'builds') loadBuilds();
+  if (view === 'guides') loadGuides().then(() => guidesView && guidesView.setJob(guidesJob()));
   if (view === 'appraiser' && APPRAISER_ON) loadAppraiser();
   if (view === 'grind') loadGrind();
   // The stage has no size while hidden, so the sprite is sized again when it shows.
@@ -2514,6 +2558,23 @@ function loadBuilds() {
     $('builds-root').replaceChildren(el('p', { class: 'empty' }, "The calculator didn't load. Try reloading the page."));
   });
   return buildsLoading;
+}
+// guides.js and its written out guide load the first time someone opens Guides; it needs no builds.js, the numbers are
+// in data/guides.json already (npm run boss:guides). Picking a job moves the hash, so a job can be linked.
+let guidesLoading = null, guidesView = null;
+function loadGuides() {
+  if (guidesLoading) return guidesLoading;
+  const script = new Promise((resolve, reject) => {
+    document.head.append(el('script', { src: 'guides.js', onload: resolve, onerror: () => reject(new Error('guides.js')) }));
+  });
+  const data = fetch('data/guides.json').then(r => { if (!r.ok) throw new Error('guides.json'); return r.json(); });
+  guidesLoading = Promise.all([script, data]).then(([, d]) => {
+    guidesView = window.Guides.mount($('guides-root'), { el, data: d, job: guidesJob(), onJob: id => { location.hash = '#guides/mage/' + id; } });
+  }).catch(() => {
+    guidesLoading = null; window.track('load_failed', { what: 'guides' });
+    $('guides-root').replaceChildren(el('p', { class: 'empty' }, "The guide didn't load. Try reloading the page."));
+  });
+  return guidesLoading;
 }
 // Same for appraiser.js, its selling price engine (appraiser-price.js) and its data.
 let appraiserLoading = null;
@@ -2585,6 +2646,8 @@ $('tab-appraiser').addEventListener('click', () => { if (location.hash !== '#app
 $('tab-grind').addEventListener('click', () => { if (location.hash !== '#grind') location.hash = '#grind'; });
 $('tab-how').addEventListener('click', () => { if (location.hash !== '#how') location.hash = '#how'; });
 $('tab-builds').addEventListener('click', () => { if (location.hash !== '#builds') location.hash = '#builds'; });
+// already on a guide, the tab keeps its job
+$('tab-guides').addEventListener('click', () => { if (!/^#guides(\/|$)/.test(location.hash)) location.hash = '#guides'; });
 $('tab-timer').addEventListener('click', () => { if (location.hash) history.pushState(null, '', location.pathname + location.search); showView(); });
 addEventListener('hashchange', showView);
 addEventListener('popstate', showView);

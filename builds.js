@@ -703,7 +703,8 @@ function foldStops(runs) {
   return { stops, gap, hours, mp };
 }
 // Every road for the class as cards, or null when it has none. opts.reach is the switch (monsters a cast, 1 to 4, else the
-// class's start), opts.pick the road the player picked (pressing a card's head), opts.full the full pass. Hours are grinding hours to the
+// class's start), opts.pick the road the player picked (pressing a card's head), opts.full the full pass, opts.target the level the
+// roads run to (roadTarget when not given; the Mage guide's bands stop at 40 and 50). Hours are grinding hours to the
 // target at the default clock. Kept for the last few forms and switch values: the guide reruns on every keystroke, and roads
 // are the slow part. The first pass times the guide roads; the full pass starts from it and adds our own roads and the SP
 // Reset line.
@@ -712,8 +713,9 @@ const setups = new WeakMap();
 function comparePaths(raw, clsId, data, opts) {
   if (data) DATA = data;
   const R = REACH[clsId], want = opts && opts.reach, full = !!(opts && opts.full), pick = opts && opts.pick;
+  const target = opts && Number.isInteger(opts.target) ? opts.target : null;
   const reach = R ? (Number.isInteger(want) && want >= 1 && want <= 4 ? want : R.start) : null;
-  const key = clsId + JSON.stringify(raw) + '|' + reach;
+  const key = clsId + JSON.stringify(raw) + '|' + reach + '|' + target;
   const memo = (k, make) => {
     if (!pathMemo.has(k)) { pathMemo.set(k, make()); if (pathMemo.size > 20) pathMemo.delete(pathMemo.keys().next().value); }
     return pathMemo.get(k);
@@ -722,7 +724,7 @@ function comparePaths(raw, clsId, data, opts) {
   // road it follows has to be the same in both
   const mids = (MODEL_ATTACKS[clsId] || []).map(modelId), rc0 = raw && typeof raw === 'object' ? recognize(raw, clsId) : null;
   const early = !!(rc0 && (mids.includes(rc0.road) || mids.includes(pick)));
-  const first = memo(key + '|first', () => comparePathsNow(raw, clsId, reach));
+  const first = memo(key + '|first', () => comparePathsNow(raw, clsId, reach, target));
   const withM = () => memo(key + '|models', () => first && withModels(first));
   const cp = full ? memo(key + '|full', () => first && { ...withM(), full: true, ...resetCands(withM(), first) }) : early ? withM() : first;
   if (!cp) return null;
@@ -763,11 +765,11 @@ function resetLine(raw, clsId, data, opts) {
   const cp = comparePaths(raw, clsId, data, { reach: opts && opts.reach, full: true });
   return cp ? pickReset(cp, (opts && opts.bar) || roadBar) : null;
 }
-function comparePathsNow(raw, clsId, reach) {
+function comparePathsNow(raw, clsId, reach, tgt) {
   const lv0 = Number(raw && raw.level), roads = ROADS[clsId];
   // from 70 there are no 2nd job points left to plan (the roads would read 0 hours to 70)
   if (!roads || !CLASSES[clsId] || !(lv0 >= 1) || lv0 >= NEXT_ADVANCE) return null;
-  const cls = CLASSES[clsId], target = roadTarget(lv0), levels = Array.from({ length: Math.max(0, target - lv0) }, (_, i) => lv0 + i);
+  const cls = CLASSES[clsId], target = tgt || roadTarget(lv0), levels = Array.from({ length: Math.max(0, target - lv0) }, (_, i) => lv0 + i);
   const L = DATA.lemon, recog = recognize(raw, clsId), v = validateStats(raw, clsId), cache = new Map();
   const levelOnly = !!v.levelOnly, slot = slotOf(v.stats, cls);
   const run = road => {
@@ -2901,7 +2903,7 @@ function mount(root, deps) {
 }
 const estimatedNote = () => E('p', { id: 'b-estimated', class: 'k-foot b-badge', hidden: '' }, E('b', {}, 'Estimated. '), "Damage for this weapon comes from meowdb's table and hasn't been checked against a real stat window yet.");
 
-window.Builds = { planSkills, skillsFor, skillsAt, comparePaths, resetLine, roadBar, modelRoads, MODEL_ATTACKS, roadLine, ROADS, roadIds, roadState, recognize, ZERO_OK, REACH, HOLD, ROAD_KILLS, roadTarget, mainAttack, crowdHits, rankWith, attackModel, statsAt, planAP, pathClass, firstJobSkills, indieMagic, roadStats, tuneSeconds, EXP_TABLE, STEP_SEC, expHour, hoursTo, healRange, HEAL, standingText, KILL_GAP, CLASSES, BRANCHES, branchOf, weaponsFor, mastery, physRange, spellRange, weaponAttackFromMax, WEAPONS, CHECKED_WEAPONS, windowRange, levelScale, hitChance, defend, elemMult, makeRng, castsToKill,
+window.Builds = { planSkills, skillsFor, skillsAt, slotOf, comparePaths, resetLine, roadBar, modelRoads, MODEL_ATTACKS, roadLine, ROADS, roadIds, roadState, recognize, ZERO_OK, REACH, HOLD, ROAD_KILLS, roadTarget, mainAttack, crowdHits, rankWith, attackModel, statsAt, planAP, pathClass, firstJobSkills, indieMagic, roadStats, tuneSeconds, EXP_TABLE, STEP_SEC, expHour, hoursTo, healRange, HEAL, standingText, KILL_GAP, CLASSES, BRANCHES, branchOf, weaponsFor, mastery, physRange, spellRange, weaponAttackFromMax, WEAPONS, CHECKED_WEAPONS, windowRange, levelScale, hitChance, defend, elemMult, makeRng, castsToKill,
   validateStats, rankMobs, buildGuide, pointsPlan, mount, fill, refresh, shrinkImage, take, classOf,
   dropGroups, findItems, droppers, meowMap, wearers, kindOf, gainRange, trusted, bestScroll, money, plural, mobFit };
 })();
