@@ -315,9 +315,10 @@ function measure(src, line, frameH) {
   let top = { s: 0, score: -1 };
   const tries = [];
   // A windowed game at 1366x768 or smaller draws at exactly 1:1 (Rimmah's shots of every resolution, 2026-11-13), but its
-  // share carries the title bar, so neither guess has to land near 1: try 1 last when neither did
+  // share carries the title bar, so neither guess has to land on 1: try 1 last when neither draws the level boxes at their
+  // own size (a 1024x768 window's share is 800 tall when its title bar is 32, 1.042, and that scan settled on the LV text)
   const guesses = [frameH / 768, line.digitH / 6.4];
-  if (!guesses.some(g => Math.abs(g - 1) < 0.06)) guesses.push(1);
+  if (!guesses.some(g => atBase('level', g))) guesses.push(1);
   for (const g0 of guesses) {
     const a = levelArea(line, g0), img = region(src, a.x, a.y, a.w, a.h), set = setAt('level', g0), t0 = set['0'];
     if (!t0) break;
@@ -881,11 +882,19 @@ function slotNumber(src, rect, sc, guardLeft) {
   let first = { score: -1 };
   for (const d of SLOT_KEYS) { const b = best(img, set, [d], 0, Math.min(8, img.w - set[d].w), 0, img.h - set[d].h); if (b.score > first.score) first = b; }
   if (first.score < NEXT) return null;
-  if (guardLeft) {
-    const w1 = set['1'].w, x1 = first.x - w1 - 2, x2 = first.x - w1 + 1;
-    if (x2 >= 0 && best(img, set, ['1', '1~'], Math.max(0, x1), x2, Math.max(0, first.y - 1), Math.min(img.h - set['1'].h, first.y + 1)).score >= SLOT_MORE) return null;
-  }
+  // the best first digit needn't be the leftmost: drawn 1:1 the 1 and the 0 of 100 both fit exactly and the 0 won, so 100
+  // read as 0 (Rimmah's Filter and Ideal windows, 2026-11-13). Grow left as the quickslot reader does
   const n = [first];
+  for (let k = 0; k < 3; k++) {
+    const f = n[0]; let lb = { score: -1 };
+    for (const d of SLOT_KEYS) { const t = set[d], c = best(img, set, [d], Math.max(0, f.x - t.w - 2), f.x - t.w + 2, Math.max(0, f.y - 1), Math.min(img.h - t.h, f.y + 1)); if (c.score > lb.score) lb = c; }
+    if (lb.score < NEXT) break;
+    n.unshift(lb);
+  }
+  if (guardLeft) {
+    const f = n[0], w1 = set['1'].w, x1 = f.x - w1 - 2, x2 = f.x - w1 + 1;
+    if (x2 >= 0 && best(img, set, ['1', '1~'], Math.max(0, x1), x2, Math.max(0, f.y - 1), Math.min(img.h - set['1'].h, f.y + 1)).score >= SLOT_MORE) return null;
+  }
   for (let k = 0; k < 4; k++) {
     const l = n[n.length - 1], r = best(img, set, SLOT_KEYS, l.x + l.t.w - 2, l.x + l.t.w + 2, l.y - 1, l.y + 1);
     if (r.score >= NEXT) { n.push(r); continue; }
@@ -1424,10 +1433,13 @@ function readMap(src, frameH, opts) {
   if (opts && opts.search === false) return { ok: false, reason: 'not there' };
   mapSpot = null;
   // the game is drawn from 1366 x 768 (or 1229 x 768 at 16:10, 1024 x 768 at 4:3), from 1280 x 720 on the Ideal UI Size and
-  // at 1280 x 720, and from 800 x 600, each stretched to the game's height
+  // at 1280 x 720, and from 800 x 600, each stretched to the game's height. On the Ideal UI Size a window taller than 768
+  // stretches only the world and draws every window 1:1 (Rimmah's 1920x1080 and 1920x1200 Ideal shots, 2026-11-13), so 1 last
   const g = gameRect(src) || { x: 0, y: 0, w: W, h: frameH }, tall = g.w / g.h < 1.4;
+  const scales = [g.h / 768, g.h / 720].concat(tall ? [g.h / 600] : []);
+  if (!scales.some(s => Math.abs(s - 1) < 0.03)) scales.push(1);
   let at = null;
-  for (const s of [g.h / 768, g.h / 720].concat(tall ? [g.h / 600] : [])) {
+  for (const s of scales) {
     const f = mapArea(src, s, g.x, g.y), rows = searchMaps(f);
     if (!at || rows[0].v > at.rows[0].v) at = { s, f, rows };
     if (at.rows[0].v >= MAP_GOOD) break;
