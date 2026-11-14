@@ -1056,7 +1056,8 @@ function mount(root, deps) {
   }
   function followMap(src, S, h) {
     if (!st.mapsReady) return;
-    const now = Date.now(), search = now >= (st.mapSearchAt || 0), r = S.readMap(src, h, { search });
+    // the EXP line and the stretch tell readMap where the game is, so a whole screen share with the game in a window reads too
+    const now = Date.now(), search = now >= (st.mapSearchAt || 0), r = S.readMap(src, h, { search, line: st.line, s: st.m && st.m.s });
     if (!r.ok) { if (search) st.mapSearchAt = now + MAP_SEARCH_MS; st.mapNext = null; return; }
     if (r.id === st.mapRead) { st.mapNext = null; return; }
     if (st.mapNext !== r.id) { st.mapNext = r.id; return; }

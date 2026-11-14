@@ -1339,13 +1339,12 @@ function mapDots(f) {
 // draws bars beside it) and under a window's title bar (a window share carries the title bar and a 1 px border, 28 to 37 rows
 // on the shares seen). The game is 16:9, 16:10, 4:3 or 5:4 wide and stands on its status bar, the lowest lit row, so the game's
 // top is its height above that, and a window's title bar is whatever is left over (5 to 80 rows). The top lit row only says
-// where a title bar starts: a dark scene can leave the game's own top rows black. A whole screen with a window on it fits none
-// of these: null, and the minimap is looked for at the share's corner (Rimmah's shots of every resolution, 2026-11-13: every
-// window and the 4:3 and 16:10 Full Screens missed their minimap)
+// where a title bar starts: a dark scene can leave the game's own top rows black (Rimmah's shots of every resolution,
+// 2026-11-13: every window and the 4:3 and 16:10 Full Screens missed their minimap). A whole screen with a window on it is lit
+// all round, so this gives null or the whole share, and windowAround finds the window instead
 const ASPECTS = [9 / 16, 10 / 16, 3 / 4, 4 / 5];
-function gameRect(src) {
-  const { w: W, h: H } = sizeOf(src), g = ctx2d(W, H); g.drawImage(src, 0, 0);
-  const d = g.getImageData(0, 0, W, H).data, lit = i => Math.max(d[i], d[i + 1], d[i + 2]) > 24;
+function gameRect(d, W, H) {
+  const lit = i => Math.max(d[i], d[i + 1], d[i + 2]) > 24;
   const colLit = x => { for (let y = 0; y < H; y += 3) if (lit((y * W + x) * 4)) return true; return false; };
   const rowLit = y => { for (let x = 0; x < W; x += 3) if (lit((y * W + x) * 4)) return true; return false; };
   let L = 0, R = W - 1, T = 0, B = H - 1;
@@ -1365,6 +1364,52 @@ function gameRect(src) {
   }
   if (fit) delete fit.rank;
   return fit;
+}
+// The game's picture placed by the EXP line (s, the HUD's stretch): the HUD's middle is 109 HUD pixels left of the line's [
+// (108.6 to 112.5 on every window and Full Screen share) and the first row under the game 33 under the line's top (31 to 34)
+const HUD_MID = 109, HUD_LOW = 33;
+function lineFits(g, line, s) {
+  return Math.abs(g.x + g.w / 2 - (line.ox - HUD_MID * s)) <= 6 + 3 * s && Math.abs(g.y + g.h - (line.y + HUD_LOW * s)) <= 4 + 3 * s;
+}
+// A whole screen shared with the game in a window on it (Rimmah's whole screen shots, 2026-11-14: no window size read a map,
+// and one with a lit taskbar read Wild Kargo off the desktop's corner). Round the HUD's middle, the window's sides are columns
+// where most rows step (a 1 px border, so the game starts after the last step of a run and ends before the first), each pair
+// centred on the HUD; its foot is the strongest row step under the status bar, and its top the game's height above that, at
+// whichever shape steps all round (a 1280 x 720 window's 4:3 guess also found a strong row, on the desktop above its title bar)
+function windowAround(d, W, H, line, s) {
+  const cx = line.ox - HUD_MID * s, yb = line.y + HUD_LOW * s, STRONG = 0.6;
+  const step = (i, j) => Math.abs(d[i] - d[j]) + Math.abs(d[i + 1] - d[j + 1]) + Math.abs(d[i + 2] - d[j + 2]) > 40;
+  const y1 = Math.max(1, Math.round(yb - 560 * s)), y2 = Math.min(H, Math.round(yb - 40 * s));
+  if (y2 - y1 < 40) return null;
+  const col = new Float32Array(W + 1); let rows = 0;
+  for (let y = y1; y < y2; y += 2) { rows++; const o = y * W * 4; for (let x = 1; x < W; x++) if (step(o + x * 4, o + x * 4 - 4)) col[x]++; }
+  const lefts = [0], rights = [W - 1];   // the share's own edges count, for a window that runs off it
+  for (let x = 1; x < W; x++) if (col[x] >= STRONG * rows) {
+    if (x < cx - 380 && col[x + 1] < STRONG * rows) lefts.push(x);
+    if (x > cx + 380 && col[x - 1] < STRONG * rows) rights.push(x - 1);
+  }
+  // how many of a row's pixels step from the row above (and of a column's from the one left of it); the share's own edge is
+  // nearly as good as a step, and past it there's nothing
+  const rowStep = (y, L, R) => { if (y === 0 || y === H) return 0.9; if (y < 0 || y > H) return 0; let n = 0, k = 0; for (let x = L; x <= R; x += 2) { k++; if (step((y * W + x) * 4, ((y - 1) * W + x) * 4)) n++; } return n / k; };
+  const colStep = (x, T, B) => { if (x === 0 || x === W) return 0.9; let n = 0, k = 0; for (let y = Math.max(1, T); y < Math.min(H, B); y += 3) { k++; if (step((y * W + x) * 4, (y * W + x - 1) * 4)) n++; } return k ? n / k : 0; };
+  let best = null;
+  for (const L of lefts) for (const R of rights) {
+    if (Math.abs((L + R + 1) / 2 - cx) > 6 + 3 * s) continue;
+    let B = 0, bv = -1;
+    for (let y = Math.round(yb - 4 - 3 * s); y <= Math.round(yb + 4 + 3 * s); y++) { const v = rowStep(y, L, R); if (v > bv) { bv = v; B = y; } }
+    const w = R - L + 1;
+    for (const a of ASPECTS) {
+      const T0 = B - Math.round(w * a);
+      if (T0 < -2) continue;
+      let T = T0, tv = -1;
+      for (let y = T0 - 2; y <= T0 + 2; y++) { const v = rowStep(y, L, R); if (v > tv) { tv = v; T = y; } }
+      const v = Math.min(bv, tv, (colStep(L, T, B) + colStep(R + 1, T, B)) / 2);
+      if (!best || v > best.v) best = { v, x: L, y: Math.max(0, T), w, h: B - T };
+    }
+  }
+  if (!best || best.v < STRONG) return null;
+  delete best.v;
+  return best;
 }
 function mapScore(f, t, list, ox, oy) {
   if (ox < 0 || oy < 0 || ox + t.w > MAP_W || oy + t.h > MAP_H) return -1;
@@ -1419,7 +1464,8 @@ function settleMap(f, a, twins) {
   return { top, also };
 }
 // { ok, id, score, also: maps it can't be told from }. Where it last was first, near twins included, since walking from one
-// into the other still scores high at the same spot (a few ms). opts.search false: stop there
+// into the other still scores high at the same spot (a few ms). opts.search false: stop there. opts.line (findExpLine's) and
+// opts.s (measure's stretch, else the line's digit height says) check where the game is, and find it on a whole screen share
 function readMap(src, frameH, opts) {
   if (!maps) return { ok: false, reason: 'no pictures' };
   const W = sizeOf(src).w;
@@ -1435,7 +1481,12 @@ function readMap(src, frameH, opts) {
   // the game is drawn from 1366 x 768 (or 1229 x 768 at 16:10, 1024 x 768 at 4:3), from 1280 x 720 on the Ideal UI Size and
   // at 1280 x 720, and from 800 x 600, each stretched to the game's height. On the Ideal UI Size a window taller than 768
   // stretches only the world and draws every window 1:1 (Rimmah's 1920x1080 and 1920x1200 Ideal shots, 2026-11-13), so 1 last
-  const g = gameRect(src) || { x: 0, y: 0, w: W, h: frameH }, tall = g.w / g.h < 1.4;
+  const H = sizeOf(src).h, cv = ctx2d(W, H); cv.drawImage(src, 0, 0);
+  const d = cv.getImageData(0, 0, W, H).data, line = opts && opts.line, hs = line && (opts.s || line.digitH / 6.8);
+  let g = gameRect(d, W, H);
+  if (line && !(g && lineFits(g, line, hs))) g = windowAround(d, W, H, line, hs) || g;
+  g = g || { x: 0, y: 0, w: W, h: frameH };
+  const tall = g.w / g.h < 1.4;
   const scales = [g.h / 768, g.h / 720].concat(tall ? [g.h / 600] : []);
   if (!scales.some(s => Math.abs(s - 1) < 0.03)) scales.push(1);
   let at = null;
