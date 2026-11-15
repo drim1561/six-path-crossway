@@ -1028,7 +1028,7 @@ function mount(root, deps) {
         const named = reading.counts.filter(c => c.id);
         st.potNone = !named.length; st.potCount = named.length;
         if (named.length) setCheck('potions', 'done', named.length + ' potion' + (named.length > 1 ? 's' : '') + ': ' + named.map(c => c.name).join(', '));
-        else setCheck('potions', '', 'No potions in your quickslots yet');
+        else setCheck('potions', '', 'No potions on your quickslot bar yet (potions only count from the bar at the bottom right)');
       }
     }
     if (reading.exp != null || reading.counts.length) {
