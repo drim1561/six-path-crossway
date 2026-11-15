@@ -107,8 +107,12 @@ const isGreen = (r, g, b) => g > 170 && b < 120 && g > r + 15 && r > 90;
 // A looser green for captures whose colours came out shifted (a Mac's colour managed screen share, 2026-11-11: a friend's
 // EXP bar was never found there while the white mesos box read fine). Only tried when the exact green finds nothing.
 const isGreenLoose = (r, g, b) => g > 130 && g > r + 12 && g > b + 55 && r >= 40;
+// A third, looser green only for the pair to the right of one the exact green found on a row: at a stretch like 1.389 (a
+// 1920x1080 window shared at 1922x1112, Rimmah's report 2026-11-15) the EXP closing bracket lands between two pixels and
+// blends to about 150,173,126, which fails both greens above while HP's and MP's brackets pass the exact one
+const isGreenLoosest = (r, g, b) => g > 130 && g > r + 12 && g > b + 35 && r >= 40;
 const greenBrackets = (img, w, h, loose) => {
-  const gm = new Uint8Array(w * h), test = loose ? isGreenLoose : isGreen;
+  const gm = new Uint8Array(w * h), test = loose === 2 ? isGreenLoosest : loose ? isGreenLoose : isGreen;
   for (let i = 0; i < w * h; i++) { const k = i * 4; gm[i] = test(img.data[k], img.data[k + 1], img.data[k + 2]) ? 1 : 0; }
   return components(gm, w, h, 6).filter(c => c.h >= 7 && c.w <= 6 && c.h >= 2 * c.w).sort((a, b) => a.x0 - b.x0);
 };
@@ -119,7 +123,7 @@ function findExpLine(src, fw, fh) {
   // the lowest, rightmost pair. row: only pairs on that row (the opening bracket's y), right of x
   const pick = (loose, row, right) => {
     const all = greenBrackets(img, img.w, img.h, loose), tol = loose ? 1 : 0;
-    const cs = row == null ? all : all.filter(q => Math.abs(q.y0 - row) <= 2 && q.x0 > right);
+    const cs = row == null ? all : all.filter(q => Math.abs(q.y0 - row) <= 2 && q.x0 > right && (loose !== 2 || q.x0 - right <= 300));
     // each bracket pairs with the next one on its own row: green elsewhere in the frame (a hanging vine in Damp Forest,
     // kev's 2026-11-13 report) can sit between the EXP brackets in x order, and pairing x order neighbours took HP's
     let o = null, c = null;
@@ -133,7 +137,7 @@ function findExpLine(src, fw, fh) {
   // HP, MP and EXP can share one row (UI Size Default in a 1920x1080 window), and the stretch there left only HP's
   // brackets the exact green (Rimmah's shots, 2026-11-13), so HP's numbers were taken for the EXP line. EXP is the
   // rightmost of the row, so the looser green gets a look to the right of what the exact one found
-  if (p) p = pick(true, p.o.y0, p.c.x1) || p;
+  if (p) { p = pick(true, p.o.y0, p.c.x1) || p; p = pick(2, p.o.y0, p.c.x1) || p; }
   else p = pick(true);
   if (!p) return null;
   const { o, c } = p, x = Math.max(0, o.x0 - 150), y = o.y0 + y0 - 6;
@@ -166,7 +170,7 @@ function readExp(src, line) {
 // side ('exp' | 'pct'), grid, aspect }] } (tools/make-exp-seeds.js learns from these)
 function expGlyphs(src, line) {
   const img = region(src, line.x, line.y, line.w, line.h), w = img.w, h = img.h, wm = whiteMap(img);
-  const gc = greenBrackets(img, w, h, !!line.loose);
+  const gc = greenBrackets(img, w, h, line.loose);
   if (gc.length < 2) return { ok: false, reason: 'EXP brackets not found' };
   const open = gc[gc.length - 2], close = gc[gc.length - 1];
   const yTop = Math.min(open.y0, close.y0), yBot = Math.max(open.y1, close.y1);
