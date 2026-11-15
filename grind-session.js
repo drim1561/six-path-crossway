@@ -27,7 +27,7 @@ function create({ mapId, t, prices, eat } = {}) {
   return { id: uuid(), mapId: mapId || null, t0: t, tLast: t, prices: prices || {}, eat: eat || null, mode: 'track', dated: true,
     level: null, levelStart: null, levels: 0, sizes: {}, last: null, pend: null,
     gainExp: 0, gainPct: 0, deaths: 0, lostExp: 0, lostPct: 0, activeMs: 0, lastValidT: null, expFrom: null, expTo: null,
-    slots: {}, retired: [], minutes: [], party: [], meso: null, boughtCost: 0 };
+    slots: {}, retired: [], minutes: [], party: [], meso: null, boughtCost: 0, town: { trips: 0, ms: 0, open: null } };
 }
 
 const minuteOf = (s, t) => Math.max(0, Math.floor((t - s.t0) / 60000));
@@ -183,6 +183,7 @@ function change(s, sl, t, d, t0) {
   } else if (d <= PICKUP) sl.found = (sl.found || 0) + d;   // picked up: stock that cost nothing
   else {   // a refill: back from town (or bought from a player)
     sl.bought += d; s.boughtCost = (s.boughtCost || 0) + d * (sl.price || 0); s.lastRefill = t;
+    if (s.expTo != null) { const tw = townIn(s); if (tw.open == null) tw.open = s.expTo; }   // no kill yet, no trip
     if (sl.id) {
       const y = { t: t0 || t, tBook: t, id: sl.id, n: d };
       (s.refills = s.refills || []).push(y);
@@ -654,7 +655,7 @@ function add(s, r) {
       if (s.lastValidT != null) { const dt = t - s.lastValidT; if (dt > 0 && dt <= CFG.maxGapMs) s.activeMs += dt; }
       s.lastValidT = t;
       // the EXP clock: where the active clock stood at the first kill and at the latest (a death isn't a kill)
-      if (e.dExp > 0 || e.dPct > 0) { if (s.expFrom == null) { s.expFrom = s.activeMs; s.expFirst = e.dExp; } s.expTo = s.activeMs; s.lastKillT = t; }
+      if (e.dExp > 0 || e.dPct > 0) { if (s.expFrom == null) { s.expFrom = s.activeMs; s.expFirst = e.dExp; } s.expTo = s.activeMs; s.lastKillT = t; { const tw = townIn(s); if (tw.open != null) { tw.ms += Math.max(0, s.activeMs - tw.open); tw.trips++; tw.open = null; } } }
       if (e.dExp) { b.exp += e.dExp; b.pct += e.dPct; b.idle = false; }
       if (e.dExp > 0) creditMap(s, e.dExp);
       if (e.died) b.died = true;
@@ -762,6 +763,21 @@ function stats(s, t, avgExpPerKill) {
 }
 
 /* ---------- the session result: was it positive or negative in mesos ---------- */
+
+// Town trips: from the last kill before a refill to the first kill after it, on the active clock (a share pause is not
+// in it). A refill before the first kill opens none. s.town is live only (toRow builds its own fields), and an older
+// session without it counts as none.
+function townIn(s) { return s.town || (s.town = { trips: 0, ms: 0, open: null }); }
+function townOf(s, t) {
+  const tw = s.town || { trips: 0, ms: 0, open: null };
+  if (tw.open == null) return { trips: tw.trips, ms: tw.ms };
+  return { trips: tw.trips + 1, ms: tw.ms + Math.max(0, s.activeMs - tw.open) };
+}
+// the Profit tile's parts, all from result()
+function profitOf(s, t) {
+  const o = result(s, t);
+  return { total: o.total, perHr: o.perHr, mesos: o.window ? o.pickedUp + o.sold - o.otherBuys : null, loot: o.loot ? o.loot.value : null, potions: o.potions, lootCounted: !!o.loot };
+}
 
 // Income is only known between looks, so every number is cut to one counted window: Just track runs from the first
 // meso look to the latest, Count my loot from the first full bag set to the latest (each set carries the meso total and
@@ -941,5 +957,5 @@ function wholeRows(minutes) {
   for (let i = 0; i < xs.length; i += 60) rows.push(xs.slice(i, i + 60));
   return rows;
 }
-window.GrindSession = { CFG, EXP_TABLE, levelOfExp, wholeRows, create, add, stats, countdown, countdowns, minuteOf, toRow, fromRow, mark, trade, keepMesos, rebase, lootOf, shopOf, learnPrice, result, usualOf, standing, inTown, bagListShows, pickMap, pickups, pickupCompare, pickNeedsFlip };
+window.GrindSession = { CFG, EXP_TABLE, levelOfExp, wholeRows, create, add, stats, countdown, countdowns, minuteOf, toRow, fromRow, mark, trade, keepMesos, rebase, lootOf, shopOf, learnPrice, result, townOf, profitOf, usualOf, standing, inTown, bagListShows, pickMap, pickups, pickupCompare, pickNeedsFlip };
 })();

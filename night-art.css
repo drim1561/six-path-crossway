@@ -8,6 +8,7 @@
   --night-dots: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAABCAYAAAD5PA/NAAAAEUlEQVR42mOIKk75D8IMUAAANOEEYUhjwwgAAAAASUVORK5CYII=");
   --night-crew: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABYAAAAMCAYAAABm+U3GAAAAf0lEQVR42mNgIANYKPD/R8cMlAKQIbO8BDAwRYbDDP3QpYKByTYc3dD/n68RZzi+MMPnUnRLUAwHMbqmL0DByIYTMhinq9ENDk3MwulqQhhnUNQHG+KMBJA4yNu4MM7II9ZgLSkuFANhfIoNprqLYWpuHl+AgQmmYWISOTFZGgA8QjbN1swF/AAAAABJRU5ErkJggg==");
   --night-shroom: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA8AAAAOCAYAAADwikbvAAAAeElEQVR42mNgwAK4hPj+o2MGQgCmUDopBgPjNQRZk/3mFRgY2RCsGmEKr/3/BMa4DEExgJBmZD6KZnSN2DC6YXADsNmKzyCsmnHZjs1WrE4nFmMNcRgG2XT/8zM4nr5/HXEJBp9molIZ2ZphBoA0wDDRGrGFAS41AIfvPy6b13IAAAAAAElFTkSuQmCC");
+  --night-shroom-stand: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA8AAAAOCAYAAADwikbvAAAAeElEQVR42mNgwAIsFPj/o2MGQgCmcJaXAAbGawiypg9dKhgY2RCsGmEK/3++Bsa4DEExgJBmZD6KZnSN2DC6YXADsNmKzyCsmnHZjs1WrE4nFmMNcRgG2fTt8V44PrmyhLgEg08zUamMbM0wA0AaYJhojdjCAJcaAJ8ZSnBhiI8kAAAAAElFTkSuQmCC");
 }
 .ns-trunk-left { width: 350px; height: 700px; background: no-repeat center bottom / 100% 100%; }
 .scene-on .ns-trunk-left { background-image: url("art/trunk-left.png"); }
@@ -27,3 +28,4 @@
 .scene-on .ns-ray-a { background-image: url("art/ray-a.png"); }
 .ns-ray-b { width: 560px; height: 560px; background: no-repeat center bottom / 100% 100%; }
 .scene-on .ns-ray-b { background-image: url("art/ray-b.png"); }
+.ns-shroom-stand { width: 15px; height: 14px; background: var(--night-shroom-stand) no-repeat center bottom / 100% 100%; }

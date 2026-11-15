@@ -11,8 +11,8 @@
 const MS = () => window.MapleScreen, GS = () => window.GrindSession;
 const MAP_SEARCH_MS = 5000;
 const KEY_OPEN = 'grind.open', KEY_LOCAL = 'grind.local', KEY_PRICES = 'grind.prices', KEY_HOME = 'grind.mesoHome';
-// (layoutSizes3: the Trail Signs panel is bigger (frame, bar and bigger numbers), so window sizes dragged before it start over)
-const KEY_LAYOUT = 'grind.layout', KEY_SIZES = 'grind.layoutSizes3', KEY_DETAIL = 'grind.detail', KEY_LOOT = 'grind.loot', KEY_POPOPEN = 'grind.popOpen', KEY_POPMESO = 'grind.popMesoHr', KEY_SEELAST = 'grind.seeLast', KEY_WINDOW = 'grind.expWindow', KEY_CLASS = 'grind.class';
+// (no window sizes are kept since round 2: the pop-out fits what it shows, so grind.layoutSizes3 is left behind, never read)
+const KEY_LAYOUT = 'grind.layout', KEY_DETAIL = 'grind.detail', KEY_LOOT = 'grind.loot', KEY_POPOPEN = 'grind.popOpen', KEY_POPMESO = 'grind.popMesoHr', KEY_WINDOW = 'grind.expWindow', KEY_CLASS = 'grind.class';
 // the app's overlay: See-through (25 to 100%, in fives) and Size (60 to 160%, in tens), kept on this device
 const KEY_SEE = 'grind.seeThrough', KEY_SCALE = 'grind.overlayScale';
 // the shop window is looked for over the whole frame this often (ticks) until it's been seen, then where it was each tick
@@ -172,6 +172,24 @@ function expPick(o, win, usual) {
   }
   const labels = [['5', '5m'], ['10', '10m'], ['run', 'run']].concat(o.markT ? [['since', 'since ' + timeOfDay(o.markT).replace(/\s*[AP]M$/i, '')]] : []);
   return { win: key, value, vs, windows: labels.map(([k, label]) => ({ key: k, label, on: k === key, off: k !== 'run' && !has(k) })) };
+}
+// kills a minute from EXP an hour and the map's average EXP a kill; every = seconds between kills. Null when either is missing or 0
+function killsPerMin(expHr, avgExp) {
+  if (!expHr || !avgExp) return null;
+  const perMin = expHr / 60 / avgExp;
+  return { perMin, every: 60 / perMin };
+}
+function fmtKills(perMin) { return perMin < 10 ? (Math.round(perMin * 10) / 10).toFixed(1) : String(Math.round(perMin)); }
+// the mushroom's one line, in order: out, low, level up inside 5 minutes. A saved session says nothing
+function shroomLine(tiles, saved, hrsToLevel) {
+  if (saved) return null;
+  const list = (tiles || []).filter(Boolean);
+  const out = list.find(t => t.cd ? t.cd.left <= 0 : t.count === 0);
+  if (out) return 'Out of ' + plural(out.name) + '!';
+  const low = list.find(t => potionTile(t, 0, false).low);
+  if (low) { const n = low.cd ? low.cd.left : low.count; return fmt(n) + ' ' + (n === 1 ? low.name : plural(low.name)) + ' left. Repot!'; }
+  if (hrsToLevel != null && hrsToLevel * 60 < 5) return 'Level up in ' + Math.max(1, Math.ceil(hrsToLevel * 60)) + ' min!';
+  return null;
 }
 // the session clock: active time, ticking between reads, still in a pause (GrindSession's maxGapMs)
 function elapsedSecs(s, now, live) {
@@ -399,20 +417,25 @@ function mount(root, deps) {
   // the pop out over the game: one panel (in the site's theme) built here and moved into the pop out window, in one of three layouts that
   // ⇆ Layout flips (kept on the device). EXP an hour leads every one, with four little columns (Mesos, EXP gained, Per 1%, Lv
   // in), a small timer tile for each potion being drunk (one or two), a top strip, and the one thing to do under them, only
-  // when it needs you. Tile (timers stacked on the right), Bar (one slim row) and Column (down the side). Each layout has its own window size for one potion tile and for two.
-  // Bar and Column are 35 and 34 wider for the flag button (2026-11-11h), so the text keeps its size; Tile's buttons row already had the room
+  // when it needs you. Tile (timers stacked on the right), Bar (one slim row) and Column (down the side). Each layout has its
+  // own window width for one potion tile and for two (Bar's second tile sits in the row, so it's wider, the mockup's 1158),
+  // and the window is as tall as the panel shows, plus ROOM above it (round 2: the window fits what's showing)
   const SP = {};
-  const LAYOUTS = { tile: { 1: [232, 480], 2: [232, 480] }, bar: { 1: [1020, 132], 2: [1140, 132] }, column: { 1: [312, 504], 2: [312, 596] } };
-  // the app's overlay window has a clear margin under the panel for the potion bubble (added after the Size, so it stays the same)
-  const BUBBLE_ROOM = 40;
-  const ORDER = Object.keys(LAYOUTS);
-  // anything not a layout now (a saved hero or corner) opens as Tile; sizes saved under hero or corner names are never looked up
+  const WIDTHS = { tile: { 1: 232, 2: 232 }, bar: { 1: 1093, 2: 1158 }, column: { 1: 312, 2: 312 } };
+  // the text is never bigger than the mockups' 14 px (times the app's Size): a layout whose lines are shorter than its width
+  // (Column) keeps the room beside them rather than taking a bigger font, one whose lines are longer (Tile) takes a smaller one
+  const FONT = 14;
+  // the space above the panel, for the mushroom and its bubble: on the site the pop-out's body color, in the app see-through
+  const ROOM = 30;
+  const ORDER = Object.keys(WIDTHS);
+  // anything not a layout now (a saved hero or corner) opens as Tile
   let layout = ORDER.includes(store.get(KEY_LAYOUT)) ? store.get(KEY_LAYOUT) : 'tile';
-  // the app's own (the site's pop-out can't be see-through, so there both stay at 100%): See-through fades the panel's
-  // background, never its text, pictures or buttons; Size scales the overlay window. Always on top and Clicks pass through
-  // are the app's, read from it at the start and each time Settings opens (its tray can change Clicks pass through)
+  // the app's own (the site's pop-out can't be see-through, so there both stay at 100%): See-through is how far the panel's
+  // bark, glass and moss fade while it's left alone (60% with nothing saved, a saved level kept), never its text, pictures
+  // or buttons; Size scales the overlay window. Always on top and Clicks pass through are the app's, read from it at the
+  // start and each time Settings opens (its tray can change Clicks pass through)
   const kept = (k, lo, hi, step, d) => { const v = Math.round(+store.get(k) / step) * step; return v >= lo && v <= hi ? v : d; };
-  let see = app ? kept(KEY_SEE, 25, 100, 5, 100) : 100, scale = app ? kept(KEY_SCALE, 60, 160, 10, 100) : 100;
+  let see = app ? kept(KEY_SEE, 25, 100, 5, 60) : 100, scale = app ? kept(KEY_SCALE, 60, 160, 10, 100) : 100;
   const prefs = { onTop: true, pass: false };
   let prefsAt = 0;   // when the app was last asked for them
   // a little column: label over number, a small line under
@@ -429,7 +452,7 @@ function mount(root, deps) {
     P.box = el('div', { class: 'g-pot none' },
       el('div', { class: 'g-vial' }, P.juice = el('div', { class: 'g-juice', hidden: '' }), P.img = el('img', { alt: '', hidden: '' })),
       el('div', { class: 'g-pwords' }, P.clock = el('span', { class: 'g-pclock' }, '··:··'),
-        P.left = el('div', { class: 'g-pleft', hidden: '' }, P.n = el('b', {}), P.verb = el('span', {}), P.lf = el('span', { class: 'g-plf' })),
+        P.left = el('div', { class: 'g-pleft', hidden: '' }, P.n = el('b', {}), P.verb = el('span', { class: 'g-pv' }), P.dot = el('span', { class: 'g-pdot' }), P.lf = el('span', { class: 'g-plf' })),
         P.cap = el('div', { class: 'g-pcap' })));
     return P;
   };
@@ -459,52 +482,67 @@ function mount(root, deps) {
   const segBtn = (w, ...kids) => el('button', { type: 'button', 'data-w': w, 'aria-pressed': 'false', onclick: () => pickWindow(w) }, ...kids);
   SP.segs = [segBtn('5', '5m'), segBtn('10', '10m'), segBtn('run', 'run'), segBtn('since', el('span', { class: 'g-sw' }, 'since '), SP.sinceAt = el('span', {}))];
   SP.segs[3].hidden = true;
+  // the window row (Rimmah, 2026-11-14): the window in words at rest ("last 5 min", "this run", "since 11:46"); the switch and ↻ come
+  // up under the mouse or keyboard focus and go back about 2 s after it leaves (the CSS), so the row never changes height
+  SP.winWords = el('span', { class: 'g-ww' });
+  SP.again = el('button', { type: 'button', class: 'g-again', title: 'Start fresh from now', 'aria-label': 'Start fresh from now', onclick: () => resetAverage() }, railIcon('reset'));
   const strip = el('div', { class: 'g-strip', id: 'g-strip', 'data-layout': layout, 'data-pots': '1', hidden: '' },
     el('div', { class: 'g-top' },
       // the light: is it ready, in a colour and two or three words (green reading, amber it wants something, red paused,
       // grey not running), with the bag's three tabs ticking off beside it during a flip
-      SP.lamp = el('span', { class: 'g-lamp idle', role: 'status' }, el('i', { class: 'g-dot', 'aria-hidden': 'true' }),
-        el('span', { class: 'g-lw' }, SP.lampT = el('span', { class: 'g-lt' }), SP.lampF = el('span', { class: 'g-flip', hidden: '' }))),
-      el('span', { class: 'g-el' }, SP.elMap = el('span', { class: 'g-elm' }), SP.elTime = el('span', { class: 'g-elt' })),
+      // the map and how long sit under it, in the same box (Bar stacks the two, the others lay them out as their own rows)
+      SP.who = el('span', { class: 'g-who' },
+        SP.lamp = el('span', { class: 'g-lamp idle', role: 'status' }, el('i', { class: 'g-dot', 'aria-hidden': 'true' }),
+          el('span', { class: 'g-lw' }, SP.lampT = el('span', { class: 'g-lt' }), SP.lampF = el('span', { class: 'g-flip', hidden: '' }))),
+        SP.el = el('span', { class: 'g-el' }, SP.elMap = el('span', { class: 'g-elm' }), SP.elTime = el('span', { class: 'g-elt' }))),
       el('span', { class: 'g-btns' },
         SP.moreBtn = el('button', { type: 'button', class: 'g-more k-sq', title: 'Show more', 'aria-label': 'Show more', 'aria-expanded': 'false', onclick: () => toggleOpen() }, railIcon('down')),
-        SP.seeBtn = app ? el('button', { type: 'button', class: 'g-see k-sq', title: 'See-through', 'aria-label': 'See-through', 'aria-pressed': 'false', onclick: () => toggleSee() }, '◐') : null,
         layWrap,
-        el('button', { type: 'button', class: 'g-reset k-sq', title: 'Reset average', 'aria-label': 'Reset average', onclick: () => resetAverage() }, railIcon('reset')),
-        SP.rep = deps.report ? el('button', { type: 'button', class: 'g-rep k-sq', title: 'Grind feeling wonky?', 'aria-label': 'Grind feeling wonky?', 'aria-pressed': 'false', onclick: () => toggleReport() }, railIcon('flag')) : null,
         SP.gear = el('button', { type: 'button', class: 'g-gear k-sq', title: 'Settings', 'aria-label': 'Settings', 'aria-pressed': 'false', onclick: () => toggleSettings() }, railIcon('gear')),
         // the app's overlay has no frame: ✕ closes just it and brings the main window up, the session goes on (Show the
         // overlay brings it back). The site's pop-out has the browser's own ✕
-        app ? el('button', { type: 'button', class: 'g-close k-sq', title: 'Back to the main window', 'aria-label': 'Back to the main window', onclick: () => backToMain() }, railIcon('close')) : null)),
+        app ? el('button', { type: 'button', class: 'g-close g-x k-sq', title: 'Back to the main window', 'aria-label': 'Back to the main window', onclick: () => backToMain() }, railIcon('close')) : null)),
     el('div', { class: 'g-body' },
       el('div', { class: 'g-k-exp' },
-        el('div', { class: 'g-kh' }, el('span', { class: 'g-kl' }, 'EXP an hour'), SP.seg = el('span', { class: 'g-seg', role: 'group', 'aria-label': 'EXP an hour over' }, SP.segs)),
+        SP.kh = el('div', { class: 'g-kh' }, el('span', { class: 'g-kl' }, 'EXP an hour'), SP.winRow = el('span', { class: 'g-win' }, SP.winWords, SP.seg = el('span', { class: 'g-seg', role: 'group', 'aria-label': 'EXP an hour over' }, SP.segs), SP.again)),
         el('div', { class: 'g-kv' }, SP.exp = el('span', { class: 'g-kn' }, '·'),
-          SP.expUs = el('span', { class: 'g-us', hidden: '' }, SP.expUn = el('span', {}), SP.expUw = el('span', { class: 'g-uw' })), SP.chip = el('span', { class: 'g-chip' }, SP.expD = el('span', { class: 'g-d' })))),
-      // closed: EXP an hour with its chip, Level in, Mesos, the timers. The ▾ button opens the rest (the little columns)
-      kTile('lv', 'Level in'), kTile('meso', 'Mesos'),
-      SP.grid = el('div', { class: 'g-grid' }, kTile('gain', 'EXP gained'), perTile(), kTile('pace', 'Pace')),
+          // the line under it: ▲ 4% (words, never a pill), "over usual" in Tile only, then "· usual 121K" everywhere else
+          SP.chip = el('span', { class: 'g-chip' }, SP.expD = el('span', { class: 'g-d' }), SP.expOv = el('span', { class: 'g-over' })),
+          SP.expUs = el('span', { class: 'g-us', hidden: '' }, SP.expUn = el('span', {})))),
+      // closed: EXP an hour with its line, Kills a minute, Lv in, Profit, the timers. The ▾ button opens the rest (the little columns)
+      kTile('kills', 'Kills a minute'), kTile('lv', 'Level in'), kTile('profit', 'Profit'),
+      SP.grid = el('div', { class: 'g-grid' }, kTile('gain', 'EXP gained'), kTile('ksf', 'Kills so far'), perTile(),
+        SP.partsBox = el('div', { class: 'g-parts' }, SP.profitParts = el('span', {})),
+        SP.town = el('div', { class: 'g-town', hidden: '' })),
       SP.tilesBox = el('div', { class: 'g-tiles' }, SP.pots[0].box, SP.quip = el('div', { class: 'g-quip', hidden: '' }, SP.quipB = el('b', {}), SP.quipS = el('span', {})))),
     SP.l3 = el('div', { class: 'g-l3 g-alert', hidden: '' }),
-    // a low or empty potion pops out as a bubble: below the panel in the app's clear margin, over its lower edge on the site
-    SP.bubble = el('div', { class: 'g-bubble', role: 'status', hidden: '' }),
-    // ornaments: grass along the frame's top edge and a mushroom in the bottom right corner, art that takes no clicks (the CSS places them)
-    el('span', { class: 'g-orn g-grass', 'aria-hidden': 'true' }), el('span', { class: 'g-orn g-shroom', 'aria-hidden': 'true' }));
+    // moss tufts along the frame's top, and the Orange Mushroom in the room above the panel's top left (clipped at the bark's
+    // inner edge) with its bubble: they come out with the one line worth saying (shroomLine) and never size the window
+    el('span', { class: 'g-moss k-moss', 'aria-hidden': 'true' }),
+    el('span', { class: 'g-omc', 'aria-hidden': 'true' }, el('span', { class: 'g-hop' }, SP.shroom = el('i', { class: 'g-om' }))),
+    SP.bubble = el('div', { class: 'g-bub', role: 'status' }));
   // Mesos: the run's total, or a small switch beside the label makes it the hour rate (kept on the device)
-  let mesoHr = store.get(KEY_POPMESO) === '1', lastO = null;
-  SP.mesoL.replaceChildren(el('span', {}, 'Mesos'), SP.mesoSw = el('button', { type: 'button', class: 'g-mesosw', 'aria-pressed': String(mesoHr),
-    onclick: () => { mesoHr = !mesoHr; store.set(KEY_POPMESO, mesoHr ? '1' : '0'); renderMeso(lastO || NO_RUN); } }, mesoHr ? 'An hour' : 'Total'));
-  function renderMeso(o) {
-    lastO = o;
+  let mesoHr = store.get(KEY_POPMESO) === '1', lastP = null;
+  SP.profitL.replaceChildren(el('span', {}, 'Profit'), SP.mesoSw = el('button', { type: 'button', class: 'g-mesosw', 'aria-pressed': String(mesoHr),
+    onclick: () => { mesoHr = !mesoHr; store.set(KEY_POPMESO, mesoHr ? '1' : '0'); renderMeso(lastP); } }, mesoHr ? 'An hour' : 'Total'));
+  // Profit: the session card's total (GrindSession.profitOf, so the two always agree), or an hour once 10 minutes are counted.
+  // Its small line says whether loot is in it
+  const sgnK = n => (n >= 0 ? '+' : '−') + fmtK(Math.abs(n));
+  function renderMeso(P) {
+    lastP = P;
     SP.mesoSw.setAttribute('aria-pressed', String(mesoHr));
     put(SP.mesoSw, mesoHr ? 'An hour' : 'Total');
-    SP.mesoSw.title = SP.mesoSw.ariaLabel = mesoHr ? 'Showing mesos an hour, show the total' : 'Showing the total, show mesos an hour';
-    const v = mesoHr ? o.mesosHr : o.mesosEarned;
-    put(SP.meso, v == null ? '·' : mesoHr ? (v >= 0 ? '+' : '−') + fmtK(Math.abs(v)) + '/hr' : signed(v));
+    SP.mesoSw.title = SP.mesoSw.ariaLabel = mesoHr ? 'Showing profit an hour, show the total' : 'Showing the total, show profit an hour';
+    const v = !P ? null : mesoHr ? P.perHr : P.total;
+    put(SP.profit, v == null ? '·' : mesoHr ? sgnK(v) + '/hr' : signed(v));
+    put(SP.profitSub, !P ? '' : P.lootCounted ? 'if you sold it all' : 'loot not counted');
+    // opened: the three parts it is made of (loot is a dot until a bag is counted)
+    const part = (k, v) => k + ' ' + (v == null ? '·' : sgnK(v));
+    put(SP.profitParts, !P ? '' : [part('mesos', P.mesos), part('loot', P.loot), part('potions', P.potions == null ? null : -P.potions)].join(' · '));
   }
   const potCount = () => +strip.dataset.pots || 1;
-  // ▾ opens the rest of the numbers (EXP gained, Per 1%, Pace, the small lines), ▴ tucks them away; kept per layout on the device.
-  // The window never resizes for it: fit() measures the panel open, so the text keeps its size either way
+  // ▾ opens the rest of the numbers (Profit's parts, EXP gained, Kills so far, Per 1%, In town), ▴ tucks them away; kept per layout on the device.
+  // The window grows and shrinks with it (fit()); the text keeps its size, set by the window's width
   const popOpen = () => { const o = jget(KEY_POPOPEN, {}); return o && typeof o === 'object' ? o : {}; };
   function syncOpen() {
     const on = !!popOpen()[layout];
@@ -517,46 +555,51 @@ function mount(root, deps) {
   function toggleOpen() {
     const o = popOpen(); o[layout] = !o[layout]; jset(KEY_POPOPEN, o);
     syncOpen();
+    overlay.fit();
   }
   syncOpen();
-  // the window the panel lives in; on the site a window dragged to a new size keeps that size for the layout and tile
-  // count it showed when it was dragged (the app's overlay can't be dragged: the page alone sizes it). The app's overlay
-  // and Settings are windows of their own, titled as the app's windows are
-  const overlay = window.GrindOverlay.create({ strip, home: root, app, title: app ? 'Six Path EXP Tracker overlay' : 'Grind', setTitle: 'Six Path EXP Tracker settings', hide: () => [SP.l3, strip.dataset.layout === 'column' && SP.lamp],
-    sizeKey: () => strip.dataset.layout + potCount(), reserve: app ? BUBBLE_ROOM : 0,
-    // fit() measures the panel open, so opening it changes nothing in the window
+  // the map and run time, then the window row, sit with the light in every layout (round 2, as the mockups draw them):
+  // Tile stacks them under the light, Column puts them on one row under it, and Bar stacks them in its first column
+  function placeEl() {
+    if (SP.el.parentNode !== SP.who || SP.winRow.parentNode !== SP.who) SP.who.append(SP.el, SP.winRow);
+  }
+  placeEl();
+  // the window the panel lives in, as wide as its layout and tile count (times the app's Size) and as tall as the panel
+  // shows: a window dragged to another size goes back. The app's overlay and Settings are windows of their own, titled
+  // as the app's windows are. The text is sized with the panel open (so ▾ and ▴ change only the height) and without the one
+  // thing to do (and Column's light, on its own plank), and the height without the one thing to do, so neither moves when
+  // it comes and goes
+  const overlay = window.GrindOverlay.create({ strip, home: root, app, title: app ? 'Six Path EXP Tracker overlay' : 'Grind', setTitle: 'Six Path EXP Tracker settings',
+    width: () => Math.round((WIDTHS[strip.dataset.layout] || WIDTHS[layout])[potCount() === 2 ? 2 : 1] * scale / 100), room: ROOM,
+    font: () => FONT * scale / 100,
     wide: () => { const was = strip.dataset.open; strip.dataset.open = '1'; return () => { strip.dataset.open = was; }; },
-    onResize: (w, h, key) => { const all = jget(KEY_SIZES, {}); all[key] = [Math.round(w), Math.round(h)]; jset(KEY_SIZES, all); },
+    hide: () => [SP.l3, strip.dataset.layout === 'column' && SP.lamp], alert: () => SP.l3,
     // the window closed (Settings with it, if it was open); the share and the session go on
     onClose: () => { SP.gear.setAttribute('aria-pressed', 'false'); showPop(); },
     // the app's Settings window closed by itself, as its × does
     onSettingsClose: () => SP.gear.setAttribute('aria-pressed', 'false'),
     // a button takes the click from the game only while clicks pass through. Asked only while the mouse is on a button: if
-    // the page has them off, the app is asked again (at most every 2 seconds), since its tray may have turned them on
-    passing: () => { if (!prefs.pass && Date.now() - prefsAt > 2000) readPrefs(); return prefs.pass; } });
-  // See-through on the panel (the app only): its backgrounds take the alpha, and at 60% or less its words and numbers get
-  // a dark shadow so they read over a bright map
+    // the page has them off, the app is asked again (at most every 2 seconds), since its tray may have turned them on.
+    // passing(false) only looks (the panel going solid under the mouse asks on every move)
+    passing: (ask = true) => { if (ask && !prefs.pass && Date.now() - prefsAt > 2000) readPrefs(); return prefs.pass; } });
+  // See-through on the panel (the app only): --g-see is the rest level, which the bark, glass, moss and cards fade to
+  // while the overlay is left alone (under the mouse or keyboard focus it's solid, g-solid from the overlay), and at 60%
+  // or less its words and numbers get a dark halo so they read over a bright map
   function applySee() {
     if (!app) return;
     strip.style.setProperty('--g-see', String(see / 100));
     strip.classList.toggle('g-faint', see <= 60);
-    SP.seeBtn.setAttribute('aria-pressed', String(see < 100));
   }
   applySee();
-  // ◐: one click between solid and the last See-through level below 100 (60 the first time), remembered on the device
-  function toggleSee() {
-    if (see >= 100) { const last = +store.get(KEY_SEELAST); setSee(last >= 25 && last < 100 ? last : 60); }
-    else { store.set(KEY_SEELAST, String(see)); setSee(100); }
-  }
   function setSee(v) {
     see = Math.max(25, Math.min(100, Math.round(+v / 5) * 5 || 100));
     store.set(KEY_SEE, String(see)); applySee(); syncSettings();
   }
-  // Size: the overlay window at its layout's size times the scale; the panel grows with its window (fit())
+  // Size: the overlay window at its layout's width times the scale; the panel's text grows with it and the window's height
+  // follows (fit())
   function setScale(v) {
     scale = Math.max(60, Math.min(160, Math.round(+v / 10) * 10 || 100));
     store.set(KEY_SCALE, String(scale)); syncSettings();
-    overlay.resize(...layoutSize(layout, potCount()));
     overlay.fit();
   }
   // a call to the app's bridge as a promise: a method this app doesn't have, or one that throws, is a rejection
@@ -696,8 +739,9 @@ function mount(root, deps) {
   let settings = null;
   const userNow = () => { const s = deps.session && deps.session(); return s ? { name: s.user_name, avatar: s.avatar || null } : null; };
   const settingsState = () => ({ layout, loot: lootOn, mapId, user: userNow(), see, scale, onTop: prefs.onTop, pass: prefs.pass });
-  // (g-pass on the panel: the app passes clicks through to the game, so ⇆'s row of layouts waits for the mouse on ⇆)
-  const syncSettings = () => { strip.classList.toggle('g-pass', !!app && prefs.pass); if (settings && overlay.settingsOpen()) settings.update(settingsState()); };
+  // (g-pass on the panel: the app passes clicks through to the game, so ⇆'s row of layouts waits for the mouse on ⇆, and
+  // the panel rests see-through even with the mouse on it)
+  const syncSettings = () => { strip.classList.toggle('g-pass', !!app && prefs.pass); overlay.solid(); if (settings && overlay.settingsOpen()) settings.update(settingsState()); };
   const siteLink = hash => location.origin + location.pathname + hash;
   // the site's Settings sits under the panel in the pop-out, so it needs one; the app's is a window of its own (opened
   // again, it comes to the front)
@@ -705,25 +749,29 @@ function mount(root, deps) {
     if (!overlay.win() && !app) return;
     if (!settings) settings = window.GrindSettings.build({ el, app, layouts: ORDER,
       onLayout: l => setLayout(l), onLoot: on => setLoot(on), onSignIn: () => signIn(), onSignOut: () => signOut(),
-      onProfile: () => openProfile(), links: { builds: siteLink('#builds') }, onClose: () => closeSettings(),
+      onProfile: () => openProfile(), onReport: deps.report ? () => toggleReport() : null, links: { builds: siteLink('#builds') }, onClose: () => closeSettings(),
       onSee: v => setSee(v), onSize: v => setScale(v), onTop: on => setPref('onTop', 'setOnTop', on), onPass: on => setPref('pass', 'setClickThrough', on) });
     readPrefs();   // the app's tray may have changed Clicks pass through since
     settings.update(settingsState());   // before it's measured: who is signed in changes its height
     if (overlay.showSettings(settings.el)) SP.gear.setAttribute('aria-pressed', 'true');
   }
-  function closeSettings() { overlay.hideSettings(); SP.gear.setAttribute('aria-pressed', 'false'); if (SP.rep) SP.rep.setAttribute('aria-pressed', 'false'); reportOpen = false; }
+  function closeSettings() { overlay.hideSettings(); SP.gear.setAttribute('aria-pressed', 'false'); reportOpen = false; }
   function toggleSettings() { if (overlay.settingsOpen() && !reportOpen) closeSettings(); else { if (reportOpen) closeSettings(); openSettings(); } }
   // The flag on the pop out: a small form in Settings' place (the pop out grows to hold it), so a report goes from the pop out itself
-  // while the game is in front. The pictures are taken at the press, before the form is on screen
+  // while the game is in front. The pictures are taken at the press, before the form is on screen. Settings stays until the
+  // form is ready, then the form takes its place in one go: the site's pop-out gives a press one resize, and closing Settings
+  // first would spend it on the panel alone and leave the form squeezed
   let reportOpen = false, reporting = false;
   function toggleReport() {
     if (reportOpen) { closeSettings(); return; }
     if (reporting || !deps.report || !overlay.win()) return;
-    if (overlay.settingsOpen()) closeSettings();
     reporting = true;
     Promise.resolve(deps.report(() => closeSettings(), sent => { if (sent) setStatus('Sent, thanks!'); })).then(f => {
-      if (!f || !overlay.showSettings(f.el)) return;
-      reportOpen = true; SP.rep.setAttribute('aria-pressed', 'true'); f.focus();
+      if (!f) return;
+      const shown = overlay.swapSettings(f.el);
+      SP.gear.setAttribute('aria-pressed', 'false');   // Settings is gone either way
+      if (!shown) return;
+      reportOpen = true; f.focus();
     }).catch(() => {}).then(() => { reporting = false; });
   }
   // Sign out from Settings: this device's sessions take over from the account's
@@ -1531,19 +1579,28 @@ function mount(root, deps) {
     if (potCount() !== n) {
       strip.dataset.pots = String(n);
       if (n === 2) SP.tilesBox.insertBefore(SP.pots[1].box, SP.quip); else SP.pots[1].box.remove();
-      overlay.resize(...layoutSize(layout, n));
       overlay.fit();
     }
+    SP.hrs = saved || !st.sharing ? null : o.hrsToLevel;   // the mushroom's level up line, kept for the clocks' ticks between reads (none once the share stops)
     renderClocks(now);
-    renderExp(s, o, saved, now);
+    const ep = renderExp(s, o, saved, now);
     const minus = v => v < 0 ? '−' : '';
-    renderMeso(o);
-    put(SP.mesoSub, o.profit != null ? minus(o.profit) + fmt(Math.abs(o.profit)) + ' after potions' : o.mesoLooks ? 'peek again later' : 'no peek yet');
+    renderMeso(s ? GS().profitOf(s, saved ? s.tLast : now) : null);
+    // Kills a minute: the number the switch shows, over the map's average EXP a kill. No map known, no average: a dot. A saved run has no window
+    const avg = s ? avgExp(s.mapId || mapId) : null, kp = !saved && avg ? killsPerMin(ep.value, avg) : null;
+    show(SP.killsBox, !saved);
+    put(SP.kills, kp ? fmtKills(kp.perMin) : '·');
+    put(SP.killsSub, saved ? '' : !avg ? 'pick the map' : kp ? '1 every ' + (kp.every < 100 ? Math.max(1, Math.round(kp.every)) + ' s' : Math.round(kp.every / 60) + ' min') : '');
+    // opened: kills so far (EXP gained over the same average), and the town trips once there has been one
+    put(SP.ksf, s && avg && o.exp > 0 ? fmt(Math.round(o.exp / avg)) : '·');
+    put(SP.ksfSub, s && avg ? fmt(Math.round(avg)) + ' EXP a kill here' : '');
+    const tw = s && !saved ? GS().townOf(s, now) : null;
+    show(SP.town, !!tw && tw.trips > 0);
+    put(SP.town, tw && tw.trips > 0 ? fmtDur(tw.ms / 60000) + ', ' + tw.trips + (tw.trips === 1 ? ' trip' : ' trips') + ', still counted' : '');
     put(SP.gain, s ? fmtK(o.exp) : '·');
     put(SP.gainSub, !s ? '' : minus(o.pct) + Math.abs(o.pct).toFixed(1) + '%' + (o.deaths ? ' · ' + o.deaths + ' death' + (o.deaths > 1 ? 's' : '') : s.level ? ' of Lv ' + s.level : ''));
     hoverText(SP.gainBox, o.deaths ? deathText(o) : '');
     renderPer(s, o, saved);
-    renderPace(s, o, saved);
     // the next level, live only
     show(SP.lvBox, !saved);
     put(SP.lvL, s && s.level ? 'Lv ' + (s.level + 1) + ' in' : 'Next level in');
@@ -1560,10 +1617,13 @@ function mount(root, deps) {
   }
   // the biggest number: the window picked, your usual beside it (a saved run says how long it ran over), the arrow, and under
   // them nothing (the trend line is gone). Before 2 minutes it's dots
+  const WIN_WORDS = { 5: 'last 5 min', 10: 'last 10 min', run: 'this run' };
   function renderExp(s, o, saved, now) {
     const usual = s && !saved ? GS().standing(lastRows, { mapId: s.mapId || mapId, exceptId: s.id, metric: 'expHr', value: null }).usual : null;
     const p = expPick(o, saved ? 'run' : s && sinceFor === s.id ? 'since' : expWin, usual);
-    show(SP.seg, !saved);
+    show(SP.winRow, !saved);
+    const on = p.windows.find(x => x.on);
+    put(SP.winWords, on ? WIN_WORDS[on.key] || on.label : '');
     for (const b of SP.segs) {
       const w = p.windows.find(x => x.key === b.dataset.w);
       show(b, !!w);
@@ -1572,15 +1632,17 @@ function mount(root, deps) {
       if (b.disabled !== w.off) b.disabled = w.off;
       if (w.key === 'since') { put(SP.sinceAt, w.label.replace(/^since /, '')); attr(b, 'aria-label', w.label); }
     }
-    const us = saved ? (o.expHr != null ? 'over ' + fmtDur(o.expMins) : '') : usual != null ? '/ ' + fmtK(usual) : '';
+    const us = saved ? (o.expHr != null ? 'over ' + fmtDur(o.expMins) : '') : usual != null ? (p.vs ? '· ' : '') + 'usual ' + fmtK(usual) : '';
     put(SP.exp, p.value != null ? fmtK(p.value) : '·');
     show(SP.expUs, !!us);
     put(SP.expUn, us);
-    put(SP.expUw, us && !saved ? ' usual' : '');
     // the pixel arrow and the percent, rewritten only when they change (nothing animates on a number update)
     const vsText = p.vs ? p.vs.text : '';
     if (SP.expD.dataset.t !== vsText) { SP.expD.dataset.t = vsText; arrowed(SP.expD, vsText); }
     attr(SP.expD, 'class', 'g-d' + (p.vs ? (p.vs.up ? ' up' : ' down') : ''));
+    put(SP.expOv, p.vs && usual != null && !saved ? (p.vs.up ? 'over usual' : 'under usual') : '');
+    attr(SP.expOv, 'class', 'g-over' + (p.vs ? (p.vs.up ? ' up' : ' down') : ''));
+    return p;
   }
   // Per 1%: how many of each potion on a tile go down for 1% (both Lemon ids count), the small line what 1% costs in potions;
   // one potion is against your usual at this map, two have no room for it
@@ -1598,24 +1660,9 @@ function mount(root, deps) {
     put(SP.perUs, usual != null ? '/ ' + perFmt(usual) : '');
     put(SP.perSub, o.per1 != null ? fmt(o.per1) + ' mesos' : '');
   }
-  // Pace: the card's Last 5 min comparison against your usual, surfaced as a KPI tile in Bar only (Tile and
-  // Column keep their four tiles and fixed window sizes). Rewritten only when it changes, so a redraw with nothing new
-  // never restarts an animation
-  function renderPace(s, o, saved) {
-    show(SP.paceBox, !saved);
-    if (saved) return;
-    const p = paceParts(o)[0], key = p.value + '|' + (p.vs || '');
-    if (SP.pace.dataset.t !== key) {
-      SP.pace.dataset.t = key;
-      arrowed(SP.pace, p.value + (p.vs ? ' ' : ''));
-      if (p.vs) { const a = el('span', { class: 'g-nvs ' + (p.up ? 'up' : 'down') }); arrowed(a, p.vs); SP.pace.append(a); }
-    }
-    put(SP.paceSub, p.value !== '·' ? 'last 5 min' : '');
-  }
   // every frame and every second between: the timer tiles (each a little glass that drains), the map and how long
   function renderClocks(now) {
     const s = stripSession(), saved = !!stripView();
-    let bubble = null;
     (SP.tiles || [null]).forEach((tile, i) => {
       const P = SP.pots[i], x = potionTile(tile, now, saved), pic = tile ? pictures.Icons[tile.id] : SP.main && pictures.Icons[SP.main.id];
       attr(P.box, 'class', 'g-pot ' + x.kind + (x.low ? ' low' : ''));
@@ -1623,47 +1670,35 @@ function mount(root, deps) {
       if (P.juice.style.height !== x.juice + '%') P.juice.style.height = x.juice + '%';
       picTo(P.img, pic, tile ? tile.name : SP.main ? SP.main.name : '');
       put(P.clock, x.clock);
-      show(P.left, !!x.n);
-      put(P.n, x.n); put(P.verb, x.verb ? ' ' + x.verb : ''); put(P.lf, x.left ? ' · ' + x.left : ''); put(P.cap, x.cap);
-      // Bar and two potion Tile have no room for these: they stay in the hover title
-      hoverText(P.box, [x.left, x.cap].filter(Boolean).join(' · '));
-      // the bubble names the first potion that is empty, else the first that is low (nothing for a saved session)
-      if (tile && !saved) {
-        const out = tile.cd ? tile.cd.left <= 0 : tile.count === 0;
-        if (out && !(bubble && bubble.out)) bubble = { out: true, name: tile.name };
-        else if (x.low && !bubble) bubble = { out: false, name: tile.name };
-      }
+      show(P.left, !!(x.n || x.left));
+      put(P.n, x.n); put(P.verb, x.verb ? ' ' + x.verb : ''); put(P.dot, x.n && x.left ? ' · ' : ''); put(P.lf, x.left); put(P.cap, x.cap);
+      // each layout shows only some of these (Tile and Column the clock and what's left, Bar the clock and how many drunk),
+      // so the whole line stays in the hover title
+      hoverText(P.box, [x.n && x.n + (x.verb ? ' ' + x.verb : ''), x.left, x.cap].filter(Boolean).join(' · '));
     });
-    const word = bubble ? bubble.name.charAt(0).toUpperCase() + bubble.name.slice(1).toLowerCase() + (bubble.out ? ' out' : ' low') : '';
-    SP.bubble.hidden = !bubble;
-    put(SP.bubble, word);
-    attr(SP.bubble, 'class', 'g-bubble' + (bubble && bubble.out ? ' out' : ''));
+    // the mushroom comes out with the one line worth saying (out, low, a level up inside 5 minutes; nothing for a saved
+    // run) and ducks back when it's no longer true. Its words stay while it ducks, so the bubble never empties on its way out
+    const line = shroomLine(SP.tiles, saved, st.sharing ? SP.hrs : null);   // a level up is only near while EXP is being read
+    if (line) put(SP.bubble, line);
+    if (strip.classList.contains('g-out') !== !!line) strip.classList.toggle('g-out', !!line);
     // no map known: the spot stays empty, and how long runs on its own
     const pm = s ? s.mapId || mapId : mapId;
     put(SP.elMap, pm ? panelMap(pm) : '');
     put(SP.elTime, (pm ? ' · ' : '') + fmtDur(s ? elapsedSecs(s, now, !saved && st.sharing) / 60 : 0));
   }
-  // a layout picked (from ⇆ Layout's row, or its picture in Settings): the panel fades out, takes the new layout at its
-  // own window size for the tiles shown (the overlay resizes its window when the browser lets it), fades back in, and is
-  // kept for next time. The pick counts at once, so a second pick straight after wins
+  // a layout picked (from ⇆ Layout's row, or its picture in Settings): the panel fades out, takes the new layout, and the
+  // window fits it (the overlay resizes its window when the browser lets it), fades back in, and is kept for next time.
+  // The pick counts at once, so a second pick straight after wins
   let swapT = null;
   function setLayout(l) {
-    if (!LAYOUTS[l]) return;
+    if (!WIDTHS[l]) return;
     layout = l; syncSettings(); litRow();
     strip.classList.add('g-swap');
     clearTimeout(swapT);
     swapT = setTimeout(() => {
-      strip.dataset.layout = layout; strip.classList.remove('g-swap'); store.set(KEY_LAYOUT, layout); syncOpen();
-      overlay.resize(...layoutSize(layout, potCount()));
+      strip.dataset.layout = layout; placeEl(); strip.classList.remove('g-swap'); store.set(KEY_LAYOUT, layout); syncOpen();
       overlay.fit();
     }, 150);
-  }
-  // a layout's window size with n potion tiles: on the site where it was last dragged to, or its own (sizes kept before
-  // the panel had potion tiles, under the layout's name alone, are left behind); in the app always its own, as its
-  // overlay can't be dragged (a size an older page kept there is left behind). Times the app's Size (100% on the site)
-  function layoutSize(l, n) {
-    const s = app ? null : jget(KEY_SIZES, {})[l + n], base = s && s[0] >= 120 && s[1] >= 50 ? s : LAYOUTS[l][n], k = scale / 100;
-    return [Math.round(base[0] * k), Math.round(base[1] * k) + (app ? BUBBLE_ROOM : 0)];
   }
   /* ----- the whole session: one strip in This run, a cell a minute, a row an hour ----- */
   // Each cell is that minute's EXP in six strengths of the lead number's color (idle minutes faint). One hour or less is one strip with
@@ -1714,8 +1749,7 @@ function mount(root, deps) {
   /* ----- the pop out over the game: the slim strip moves into a small window that stays on top; the card stays here ----- */
   // in the app the overlay opens by itself when the share starts (and from Show the overlay), in the last layout
   function popOut() {
-    const [w0, h0] = layoutSize(layout, potCount());
-    return overlay.open(w0, h0).then(() => showPop(),
+    return overlay.open().then(() => showPop(),
       e => setStatus(e.message !== 'no-window' ? "Couldn't pop out: " + e.message
         : app ? "Couldn't open the overlay. Restart the app and try again." : "Your browser can't pop out a window. Use Edge or Chrome on a computer."));
   }
@@ -2052,7 +2086,9 @@ function mount(root, deps) {
     overlay: () => (overlay.win() ? Promise.resolve() : popOut()).then(() => !!overlay.win()),
     setCheck, save: () => save(true), load: row => { viewing = GS().fromRow(row, eatCfg()); render(); }, capture: () => capture, mesoLine, lootReady: () => lootReady,
     // a session carried in whole (the page tests' mockup session), as if it had been read here
-    use: x => { session = x; viewing = null; if (!session.eat) session.eat = eatCfg(); session.mode = lootOn ? 'loot' : 'track'; render(); } };
+    use: x => { session = x; viewing = null; if (!session.eat) session.eat = eatCfg(); session.mode = lootOn ? 'loot' : 'track'; render(); },
+    // a share stood in for (no frames, no checks), for a test whose run carried in with use() is being read, as a level up line needs
+    sharing: on => { st.sharing = !!on; render(); } };
   // what a Something off? report carries from this tab (index.html keeps it), and the pop out to draw beside the page
   const reporter = {
     report: () => ({ sharing: st.sharing, ticks: st.ticks, reads: st.reads, frame: [st.fw, st.fh],
@@ -2072,5 +2108,5 @@ function mount(root, deps) {
   return reporter;
 }
 
-window.Grind = { mount, perFmt, perLine, runRow, railIcon, RAIL_ICONS, pixelSvg, arrowed, fmtK, clock, health, potionTile, potionTiles, expPick, elapsedSecs, lifetime, lootItem, eatLines };
+window.Grind = { mount, perFmt, perLine, runRow, railIcon, RAIL_ICONS, pixelSvg, arrowed, fmtK, clock, health, potionTile, potionTiles, expPick, killsPerMin, fmtKills, shroomLine, elapsedSecs, lifetime, lootItem, eatLines };
 })();

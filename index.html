@@ -112,6 +112,8 @@ window.BT_ERRORS = [];
   --j-meat-t: #f2a57e;
   --logo: #fff3d6;
   --logo-e: #3a2414;
+  /* the pop-out mushroom's bubble: cream paper, brown words */
+  --bub: #fff6df; --bub-ink: #3a2414;
   --receipt: #f6ecd0;
   --receipt-ink: #33261a;
   --receipt-muted: #5a4630;
@@ -125,7 +127,7 @@ window.BT_ERRORS = [];
   --btn-line: var(--btn-lo); --btn-k: var(--btn-lo); --btn-k-ink: var(--btn-ink); --now: var(--bad);
   --halo: #04110f;
   --gap: 12px;
-  --r-frame: 26px 30px 24px 28px; --r-glass: 17px 20px 15px 18px; --r-card: 12px; --r-btn: 14px 16px 18px 15px; --r-pill: 999px;
+  --r-frame: 26px 30px 24px 28px; --r-glass: 17px 20px 15px 18px; --r-card: 12px; --r-btn: 14px 16px 18px 15px; --r-pill: 999px; --r-bub: 12px 12px 12px 3px;
   --fs-xs: 13px; --fs-tag: 14px; --fs-sm: 15px; --fs-md: 17px; --fs-lg: 19px;
   --tt-s: 19px; --tt-m: 24px; --tt-l: 30px; --tt-logo: 36px;
   --n-s: 17px; --n-m: 25px; --n-l: 36px; --n-xl: 50px;
@@ -925,9 +927,9 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 .g-tradebox { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 6px; font-size: var(--fs-sm); }
 .g-tradebox input { width: 7em; padding: 3px 6px; font: inherit; font-family: var(--font-num); }
 #g-trade button { font-size: var(--fs-sm); }
-/* the pop out panel: the same Window as the site (the frame art, a wood title bar, parchment), in the site's theme: the pop-out and the
-   app's overlay copy these rules by their text and take the page's theme when it changes. No scroll bars in the pop out: the
-   text fits the window instead */
+/* the pop out panel: night glass in a bark frame, in the site's theme: the pop-out and the app's overlay copy these rules by
+   their text and take the page's theme when it changes. No scroll bars in the pop out: the window fits the panel
+   (grind-overlay.js fit(): the panel and a room above it, #view-grind's padding top, where the mushroom comes out) */
 html:has(body.g-pip), body.g-pip { overflow: hidden; scrollbar-width: none; }
 body.g-pip { margin: 0; padding: 0; background: var(--wood-o); }
 body.g-pip::-webkit-scrollbar { display: none; }
@@ -941,40 +943,70 @@ body.g-ov::-webkit-scrollbar { display: none; }
 body.g-ov #view-grind { max-width: none; }
 body.g-ov .g-strip { cursor: grab; user-select: none; }
 body.g-ov .g-strip.g-moving { cursor: grabbing; }
-/* every size is in em off the panel's font size, which the window's fit() sets so the layout fills it: dragging the pop out
-   bigger makes it all bigger, and a small window shrinks it rather than scrolling. The text sizes follow Rimmah's:
+/* every size is in em off the panel's font size, which the window's fit() sets so the layout fills its width (the app's Size
+   makes it all bigger), and the window takes the height that gives. The text sizes follow Rimmah's:
    text 1, small .88, numbers 1.47, the lead number 2.94, a clock 1.59, the title bar 1.41 (at 17px that's 17, 15, 25, 50,
    27 and 24). --u is one art pixel in CSS pixels at the panel's size (2 at 17px), whole, so the lines and the art stay
    crisp: the title bar is 16 of them */
 @property --u { syntax: '<length>'; inherits: true; initial-value: 2px; }
-/* See-through (the app only): --g-see on the panel is the alpha every ground in it is drawn with (the window's, the cards',
-   the glasses', the switch's); words, pictures, juice, the title bar and the buttons stay solid. Without it (the
-   site) it's 1, a solid panel. The pop out copies these rules by their text. The window's font size is 1rem only for the
-   page's own sake: fit() sets it in pixels the moment the panel moves into a window, whatever the browser's default is */
-.g-strip { --pots: 1; --u: round(.125em, 1px); position: relative; display: grid; gap: .45em; font-family: var(--font-body); font-synthesis: none; font-size: 1rem; font-weight: 600; line-height: 1.5; color: var(--ink);
-  border: 8px solid transparent; border-width: round(.5em, 4px); padding: 0 .6em .6em; background-color: color-mix(in srgb, var(--surface) calc(var(--g-see, 1) * 100%), transparent); background-clip: border-box; transition: opacity .15s ease; }
-/* night glass: the pane is plain glass edge to edge with square corners and no bark frame (it arrives in round 2 with the new layouts). The 8px border stays, transparent, so nothing inside moves; the glass is drawn under it */
+/* See-through (the app only): --g-see on the panel is the rest level from the slider (60% with nothing saved), the alpha
+   the glass, the cards and the switch are drawn with; the moss fades to it and the bark a little more (about 50% at 60%,
+   solid at 100%: the 1.36 power on .g-strip::before, which grind-ui.test.js's atRest reads from that rule). Words,
+   pictures, juice, the mushroom and the buttons stay solid. Under the mouse or keyboard focus
+   (g-solid, from the overlay, never while clicks pass through) it's 1, easing between the two. Without it (the site) it's
+   1, a solid panel. The pop out copies these rules by their text. The window's font size is 1rem only for the page's own
+   sake: fit() sets it in pixels the moment the panel moves into a window, whatever the browser's default is */
+@property --g-see { syntax: '<number>'; inherits: true; initial-value: 1; }
+.g-strip.g-solid { --g-see: 1 !important; }
+body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
+.g-strip { --pots: 1; --u: round(.125em, 1px); position: relative; isolation: isolate; display: grid; gap: .45em; font-family: var(--font-body); font-synthesis: none; font-size: 1rem; font-weight: 600; line-height: 1.5; color: var(--ink);
+  border: 8px solid transparent; border-width: round(.5em, 4px); padding: .45em .6em .6em; transition: opacity .15s ease; }
+/* the frame: bark round the glass (night art's bark, a lit top edge, a dark line round it) in the panel's transparent
+   border, and the glass inside it, a pane with a mint edge and a soft glow. Both are layers under the panel's own boxes
+   (isolation keeps them in it), so nothing inside moves and fit() still measures the panel. Without the pictures the
+   bark is its plain colour */
+.g-strip::before { content: ""; position: absolute; inset: calc(-1 * var(--fw)); z-index: -2; border-radius: var(--r-frame); pointer-events: none; background-color: var(--wood-lo); background-image: var(--night-bark, none); background-size: 230px auto; background-repeat: repeat; background-position: 0 0; box-shadow: 0 0 0 2px var(--wood-o), inset 0 3px 0 color-mix(in srgb, var(--btn-hi) 40%, transparent); opacity: pow(var(--g-see, 1), 1.36); }
+.g-strip::after { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: var(--r-glass); pointer-events: none; background-color: color-mix(in srgb, var(--surface) calc(var(--g-see, 1) * 100%), transparent); box-shadow: 0 0 0 2px var(--wood-o), inset 0 0 0 1px var(--mint-line), inset 0 0 30px var(--card); }
 /* faded to 60% or less: a halo (--halo: near black) under every word and number,
    so they read over a bright map */
 .g-strip.g-faint { text-shadow: 0 0 .3em var(--halo), 0 0 .15em var(--halo); }
 .g-strip[data-pots="2"] { --pots: 2; }
 /* a layout picked: the panel fades out, takes the new layout, and fades back in */
 .g-strip.g-swap { opacity: 0; }
-/* ornaments, inside the window's rectangle: moss tufts along the top edge and a mushroom in the
-   bottom right corner. Art at one art pixel to --u, taking no clicks; the layouts keep their words
-   and buttons clear of them */
+/* ornaments (Now grinding's stage on the page keeps its mushroom here): art at one art pixel to --u, taking no clicks */
 .g-strip { --fw: round(.5em, 4px); }
 .g-orn { position: absolute; z-index: 2; pointer-events: none; image-rendering: pixelated; background-repeat: no-repeat; }
-.g-grass { left: 0; right: 0; top: calc(-1 * var(--fw)); height: calc(5 * var(--u)); background: var(--night-moss) 0 0 / calc(64 * var(--u)) calc(7 * var(--u)) repeat-x; }
 .g-shroom { right: calc(-1 * var(--fw)); bottom: calc(-1 * var(--fw)); width: calc(15 * var(--u)); height: calc(14 * var(--u)); background: var(--night-shroom) 0 0 / 100% 100%; }
-@media (prefers-reduced-motion: reduce) { .g-strip { transition: none; } }
+/* the pop-out's moss: tufts along the bark's top edge, over the frame and clear of the words, with the kit's gaps (its span
+   also wears the kit's k-moss). Longhands: the pop out copies these rules by their text */
+.g-moss { position: absolute; z-index: 2; pointer-events: none; image-rendering: pixelated; top: calc(-1 * var(--fw) - 4 * var(--u)); height: calc(7 * var(--u)); left: calc(56px - var(--fw)); right: calc(20px - var(--fw)); background-image: var(--night-moss, none); background-position: 0 0; background-size: calc(64 * var(--u)) calc(7 * var(--u)); background-repeat: repeat-x; opacity: var(--g-see, 1); }
+/* the Orange Mushroom: it lives in the room above the panel's top left, in a box that clips it at the bark's inner edge
+   (the glass's top), so when it ducks it goes down behind the frame. It comes out (g-out on the panel) only with the one
+   line worth saying (Grind.shroomLine): a hop up with a little overshoot, the bubble pops in just after, and while it's
+   out it breathes. Hidden it sits translated down out of its box with nothing running; it gets its own layer only while
+   it's out. None of it sizes the window (fit() measures the panel). Its box is the room tall (--room, from the overlay, so
+   it follows grind.js's ROOM). It faces its bubble, on its right, so it's mirrored, and breathes mirrored */
+.g-omc { position: absolute; z-index: 3; left: calc(-1 * var(--fw)); bottom: 100%; width: 52px; height: calc(var(--fw) + var(--room, 30px)); overflow: hidden; pointer-events: none; }
+.g-hop { display: block; position: absolute; left: 4px; bottom: -4px; transform: translateY(110%); transition: transform .33s cubic-bezier(.3, 1.5, .5, 1); }
+.g-out .g-hop { transform: none; will-change: transform; }
+.g-om { display: block; width: 45px; height: 42px; background-image: var(--night-shroom-stand, none); background-position: 0 0; background-size: 100% 100%; background-repeat: no-repeat; image-rendering: pixelated; transform-origin: 50% 100%; transform: scaleX(-1); }
+.g-out .g-om { animation: g-breathe 2.6s ease-in-out infinite; }
+@keyframes g-breathe { 0%, 100% { transform: scaleX(-1); } 50% { transform: scale(-1.05, .95); } }
+/* its bubble: cream with brown words, beside its head in the room above the panel, never over the numbers. Hidden it keeps
+   its words (they stay while the mushroom ducks) and is out of the reading order. Its words are the panel's size (1em, so
+   --fw is the panel's here too) */
+.g-bub { position: absolute; z-index: 4; left: calc(46px - var(--fw)); top: calc(-1 * var(--fw) - 28px); max-width: calc(100% + 2 * var(--fw) - 50px); box-sizing: border-box; padding: 4px 10px; border-radius: var(--r-bub); background-color: var(--bub); color: var(--bub-ink); box-shadow: 0 2px 3px color-mix(in srgb, var(--page) 55%, transparent); font-size: 1em; font-weight: 700; line-height: 1.25; text-shadow: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;
+  opacity: 0; visibility: hidden; transform: scale(.4); transform-origin: 0 100%; transition: opacity .2s, transform .26s cubic-bezier(.3, 1.5, .5, 1), visibility 0s .26s; }
+.g-out .g-bub { opacity: 1; visibility: visible; transform: none; transition: opacity .2s .18s, transform .26s .18s cubic-bezier(.3, 1.5, .5, 1), visibility 0s 0s; }
+@media (prefers-reduced-motion: reduce) { .g-hop, .g-bub { transition: none !important; } .g-om { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { .g-strip, body.g-ov .g-strip { transition: none; } }
 .g-strip button:focus-visible { outline: .14em solid var(--focus); outline-offset: .1em; }
-.g-top button:focus-visible { outline-color: var(--accent); }
-/* the title bar: the wordmark (not in Bar or Column), the map and how long, the buttons at the right end. It spans the
-   panel's width over the padding. The map gives way before the panel does: fit() measures its longest line, so a long map
-   name would shrink everything else (its box is one width whatever it says, and it ends in dots) */
-.g-top { display: flex; align-items: center; gap: .6em; min-width: 0; height: calc(16 * var(--u)); margin: 0 -.6em; padding: 0 .6em; background-color: var(--wood-lo); background-image: var(--night-bark); background-position: 0 0; background-size: 230px auto; background-repeat: repeat; box-shadow: inset 0 calc(-1 * var(--u)) 0 var(--wood-o); color: var(--bar-ink); white-space: nowrap; }
-.g-el { display: flex; flex: none; width: 11em; font-size: .88em; font-weight: 600; color: var(--bar-muted); }
+/* the top row: the light, the map and how long, the buttons at the right end, on the glass like the rest (the bark is the
+   frame round it). The map gives way before the panel does: fit() measures its longest line, so a long map name would
+   shrink everything else (its box is one width whatever it says, and it ends in dots) */
+.g-top { display: flex; align-items: center; gap: .6em; min-width: 0; height: calc(16 * var(--u)); color: var(--ink); white-space: nowrap; }
+.g-who { display: contents; }
+.g-el { display: flex; flex: none; width: 11em; font-size: .88em; font-weight: 600; color: var(--muted); }
 .g-elm { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .g-elt { flex: none; white-space: pre; }
 .g-btns { position: relative; flex: none; display: flex; gap: .3em; margin-left: auto; }
@@ -985,7 +1017,6 @@ body.g-ov .g-strip.g-moving { cursor: grabbing; }
 /* the pictures follow the button: 2 CSS pixels to the art pixel while u is 2, 1 once the panel is dragged small (u rounds down), so they never spill out of their 14u square */
 .g-strip .k-sq svg { width: calc(9 * var(--u)); height: calc(9 * var(--u)); }
 .g-strip .k-sq svg[viewBox="0 0 7 7"] { width: calc(7 * var(--u)); height: calc(7 * var(--u)); }
-.g-btns .g-rep[aria-pressed="true"] { --face: var(--lime); --face-hi: var(--lime-hi); --face-lo: var(--lime-lo); color: var(--lime-ink); }
 /* the pop out's report form (flag.js quick): sits where Settings does, the same bark strip and glass */
 .gq { container-type: inline-size; background: var(--surface); color: var(--ink); font-family: var(--font-body); font-size: var(--fs-md); font-weight: 600; line-height: 1.4; }
 .gq-h { display: flex; align-items: center; height: 32px; padding: 0 12px; background-color: var(--wood-lo); background-image: var(--night-bark); background-position: 0 0; background-size: 230px auto; background-repeat: repeat; box-shadow: inset 0 -2px 0 var(--wood-o); color: var(--bar-ink); }
@@ -1020,25 +1051,47 @@ body.g-ov .g-strip.g-moving { cursor: grabbing; }
 .g-k-exp { grid-area: exp; min-width: 0; }
 .g-kh { display: flex; align-items: center; gap: .5em; white-space: nowrap; }
 .g-kh .g-kl { font-family: var(--font-title); font-size: 1.12em; font-weight: 400; line-height: 1.3; color: var(--ink); }
-.g-seg { display: inline-flex; margin-left: auto; font-size: .88em; line-height: 1.25; }
+.g-seg { display: inline-flex; font-size: .88em; line-height: 1.25; }
 .g-seg button { margin: 0 0 0 calc(-1 * var(--u)); padding: 0 .4em; border: var(--u) solid var(--seg-e); border-radius: 0; background: none; color: var(--ink); font-family: inherit; font-size: 1em; font-weight: 700; line-height: inherit; white-space: nowrap; cursor: pointer; }
 .g-seg button:first-child { margin-left: 0; }
 .g-seg button:hover:not(:disabled):not([aria-pressed="true"]) { background-color: var(--div); }
 .g-seg button[aria-pressed="true"] { background-color: var(--lime); color: var(--lime-ink); }
 .g-seg button:disabled { color: var(--muted); cursor: default; }
+/* the window row: the window in words at rest; the switch and ↻ (Start fresh from now) take the same cell under the mouse or
+   keyboard focus and go back about 2 s after it leaves. The cell is as wide and tall as the larger of the two, so the row never
+   changes size. While the app passes clicks through to the game (g-pass) the row stays words */
+.g-strip .g-win { display: inline-grid; grid-template-columns: auto auto; align-items: center; column-gap: .3em; margin-left: auto; }
+.g-ww { grid-area: 1 / 1; justify-self: end; font-size: .88em; font-weight: 700; line-height: 1.25; color: var(--muted); white-space: nowrap; transition: opacity .15s ease 2s; }
+.g-strip .g-win .g-seg { grid-area: 1 / 1; margin-left: 0; opacity: 0; pointer-events: none; transition: opacity .15s ease 2s; }
+.g-again { grid-area: 1 / 2; display: grid; place-items: center; width: 1.6em; height: 1.6em; padding: 0; border: var(--u) solid var(--seg-e); border-radius: 50%; background: none; color: var(--ink); font-family: inherit; font-size: .88em; font-weight: 700; line-height: 1; cursor: pointer; opacity: 0; pointer-events: none; transition: opacity .15s ease 2s; }
+.g-again svg { width: calc(9 * max(1px, round(.09em, 1px))); height: calc(9 * max(1px, round(.09em, 1px))); }
+.g-again:hover { background-color: var(--div); }
+.g-strip:not(.g-pass) .g-win:hover .g-seg, .g-strip:not(.g-pass) .g-win:hover .g-again, .g-strip:not(.g-pass) .g-win:focus-within .g-seg, .g-strip:not(.g-pass) .g-win:focus-within .g-again { opacity: 1; pointer-events: auto; transition-delay: 0s; }
+.g-strip:not(.g-pass) .g-win:hover .g-ww, .g-strip:not(.g-pass) .g-win:focus-within .g-ww { opacity: 0; transition-delay: 0s; }
+@media (prefers-reduced-motion: reduce) { .g-ww, .g-strip .g-win .g-seg, .g-again { transition: none; } }
 .g-kv { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 .4em; }
 .g-kn { font-family: var(--font-num); font-weight: 700; font-size: 1.47em; line-height: 1.2; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .g-k-exp .g-kn { font-size: 2.94em; line-height: 1.05; color: var(--num-big); }
 .g-us { font-family: var(--font-num); font-weight: 700; font-size: 1.47em; font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
 .g-d { display: inline-flex; align-items: center; gap: .25em; font-family: var(--font-num); font-weight: 700; font-size: 1.47em; white-space: nowrap; }
 .g-d:empty { display: none; }
-/* the arrow against your usual, in a small bordered chip beside the lead number; nothing to say, no chip */
-.g-chip { display: inline-flex; align-items: center; padding: 0 .35em; border: var(--u) solid var(--seg-e); border-radius: var(--r-card); background-color: color-mix(in srgb, var(--card) calc(var(--g-see, 1) * 100%), transparent); }
+/* the arrow against your usual, beside the lead number with no border or fill; nothing to say, nothing shown */
+.g-chip { display: inline-flex; align-items: center; }
 .g-chip:has(> .g-d:empty) { display: none; }
-.g-chip .g-d { font-size: 1.1em; line-height: 1.25; }
-/* closed: the rest (EXP gained, Per 1%, Pace and the small lines) waits behind the ▾ button */
-.g-strip[data-open="0"] :is(.g-grid, .g-k-meso .g-ks, .g-k-lv .g-ks, .g-quip) { display: none; }
-.g-k-lv { grid-area: lv; } .g-k-meso { grid-area: meso; }
+/* the line under the big number: words and a pixel arrow, never a pill; ▲ in the good color, ▼ in the bad one */
+.g-kv > .g-kn { flex: 0 0 100%; }
+.g-k-exp :is(.g-d, .g-over) { font-size: .94em; line-height: 1.25; }
+.g-k-exp .g-us { font-family: var(--font-body); font-size: .88em; font-weight: 600; }
+/* "over usual" (not g-ov: that is the app overlay's body class) */
+.g-over { display: none; font-family: var(--font-body); font-weight: 600; white-space: nowrap; }
+.g-over:empty { display: none !important; }
+.g-strip[data-layout="tile"] .g-over { display: inline; margin-left: .3em; }
+.g-strip[data-layout="tile"] .g-k-exp .g-us { display: none; }
+.g-parts, .g-town { grid-column: 1 / -1; font-size: .88em; line-height: 1.25; color: var(--muted); min-width: 0; }
+.g-parts { white-space: normal; }
+/* closed: the rest (Profit's parts, EXP gained, Kills so far, Per 1%, In town) waits behind the ▾ button */
+.g-strip[data-open="0"] .g-body :is(.g-grid, .g-quip) { display: none; }
+.g-k-kills { grid-area: kills; } .g-k-lv { grid-area: lv; } .g-k-profit { grid-area: profit; }
 .g-strip .up { color: var(--good); } .g-strip .down { color: var(--bad); }
 /* the four little columns: label over number with a small line under */
 .g-strip .g-grid { grid-area: grid; display: flex; justify-content: space-between; gap: .3em .8em; min-width: 0; }
@@ -1047,7 +1100,7 @@ body.g-ov .g-strip.g-moving { cursor: grabbing; }
 .g-k .g-kn { color: var(--ink); }
 .g-mesosw { margin-left: .5em; padding: 0 .4em; border: var(--u) solid var(--seg-e); border-radius: var(--r-card); background: none; color: var(--ink); font-family: inherit; font-size: 1em; font-weight: 700; line-height: 1.2; white-space: nowrap; cursor: pointer; }
 .g-mesosw:hover { background-color: var(--div); }
-.g-k-meso .g-kn { color: var(--good); } .g-k-gain .g-kn, .g-k-lv .g-kn { color: var(--exp); }
+.g-k-profit .g-kn { color: var(--good); } .g-k-gain .g-kn, .g-k-lv .g-kn { color: var(--exp); }
 .g-ppr { display: flex; align-items: center; gap: .3em; color: var(--ink); }
 .g-perp { display: inline-flex; align-items: center; gap: .3em; }
 .g-perp + .g-perp { margin-left: .3em; }
@@ -1090,14 +1143,6 @@ body.g-ov .g-strip.g-moving { cursor: grabbing; }
 .g-strip:not([data-layout="tile"]) .g-quip { display: none; }
 /* the alert: the one thing to do, only when something needs you, in the panel's small text, a Card on its state's ground:
    plain paper, amber to wait, red when it's stuck */
-/* the potion bubble: a low or empty potion pops out. In the app it hangs in the window's clear margin under the panel; on the
-   site there is no room outside the window, so it sits over the panel's lower edge. It takes no room and no clicks */
-.g-bubble { position: absolute; z-index: 3; left: 1em; bottom: calc(var(--fw, .5em) + .4em); max-width: calc(100% - 2em); box-sizing: border-box; padding: 4px 11px; border-radius: var(--r-card); background: var(--due-bg); color: var(--due-fg); border: 2px solid var(--card-o); font-size: var(--fs-xs); font-weight: 700; line-height: 1.25; box-shadow: 0 .2em .6em var(--win-shadow); pointer-events: none; transform-origin: 14px 0; animation: g-pop .28s cubic-bezier(.3, 1.5, .5, 1); }
-.g-bubble.out { background: var(--over-bg); color: var(--over-fg); }
-.g-bubble::before { content: ""; position: absolute; top: -7px; left: 12px; width: 10px; height: 10px; background: inherit; border-left: 2px solid var(--card-o); border-top: 2px solid var(--card-o); transform: rotate(45deg); }
-body.g-ov .g-bubble { bottom: auto; top: calc(100% + var(--fw, .5em) + 8px); }
-@keyframes g-pop { from { opacity: 0; transform: translateY(-6px) scale(.6); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .g-bubble { animation: none; } }
 .g-alert { min-width: 0; padding: .1em .6em; background-color: color-mix(in srgb, var(--card) calc(var(--g-see, 1) * 100%), transparent); border: var(--u) solid var(--card-o); box-shadow: inset 0 var(--u) 0 var(--card-hi), inset 0 calc(-1 * var(--u)) 0 var(--card-lo); color: var(--ink); font-size: .88em; line-height: 1.3; display: flow-root; }
 .g-alert.wait { background-color: color-mix(in srgb, var(--due-bg) calc(var(--g-see, 1) * 100%), transparent); color: var(--due-fg); }
 .g-alert.bad { background-color: color-mix(in srgb, var(--over-bg) calc(var(--g-see, 1) * 100%), transparent); color: var(--over-fg); }
@@ -1122,99 +1167,130 @@ body.g-ov .g-bubble { bottom: auto; top: calc(100% + var(--fw, .5em) + 8px); }
 .g-flip b::before { content: '… '; }
 .g-flip b.fix::before { content: '! '; }
 .g-flip b.done::before { content: '✓ '; }
-.g-strip:not([data-layout="column"]) .g-top:has(.g-flip:not([hidden])) .g-el { display: none; }
-/* Column: the light takes a plank of its own under the map and the buttons */
-.g-strip:is([data-layout="column"], [data-layout="tile"]) .g-top { flex-wrap: wrap; height: auto; row-gap: 0; background-repeat: repeat; }
-.g-strip:is([data-layout="column"], [data-layout="tile"]) .g-top > * { height: calc(16 * var(--u)); }
-.g-strip:is([data-layout="column"], [data-layout="tile"]) .g-top > :is(.g-el, .g-lamp, .g-btns) { align-items: center; }
+/* Column and Tile: the light takes a plank of its own under the buttons, the map and the window row under it */
+.g-strip:is([data-layout="column"], [data-layout="tile"]) .g-top { flex-wrap: wrap; height: auto; row-gap: 0; }
+.g-strip:is([data-layout="column"], [data-layout="tile"]) .g-top > .g-btns, .g-strip:is([data-layout="column"], [data-layout="tile"]) .g-top :is(.g-el, .g-lamp) { height: calc(16 * var(--u)); align-items: center; }
 .g-strip:is([data-layout="column"], [data-layout="tile"]) .g-lamp { order: 3; flex: none; width: 100%; }
 .g-strip:is([data-layout="column"], [data-layout="tile"]) .g-lw { flex: 1 1 0; width: 0; }
-/* while it shows, the window stays as it is and so does the size of the text (fit() measures the panel without it). Its room
-   comes from the small lines under the numbers, which step aside in Tile and Column; Bar's is further down */
-.g-strip:is([data-layout="tile"], [data-layout="column"]):has(> .g-l3:not([hidden])) .g-ks { display: none; }
-/* the layouts. Tile: one narrow column, EXP an hour with its chip, Level in, Mesos, the timers as one small row each, and
-   when opened the rest in a little grid; the alert last. The panel itself is the grid here (.g-body steps out of the way) */
-.g-strip[data-layout="tile"] { grid-template: "top" auto "exp" auto "lv" auto "meso" auto "grid" auto "tiles" auto "alert" 1fr / minmax(0, 1fr); gap: .35em; }
+/* while it shows, the size of the text stays as it is (fit() measures the panel without it), and so does the window while the
+   room it frees is enough: the small lines under the numbers step aside in Tile and Column, EXP an hour's arrow and usual with
+   them, and in Tile the window row too (its own row there, beside the map in Column); Bar's is further down. One that needs
+   more grows the window */
+.g-strip:is([data-layout="tile"], [data-layout="column"]):has(> .g-l3:not([hidden])) :is(.g-ks, .g-chip, .g-k-exp .g-us) { display: none; }
+.g-strip[data-layout="tile"]:has(> .g-l3:not([hidden])) .g-win { display: none; }
+/* the layouts. Tile: one narrow column. The light, the map and how long, the window row, then EXP an hour with Kills a
+   minute beside it, Level in, Profit, the timers side by side, and when opened the rest in a little grid; the alert last.
+   The panel itself is the grid here (.g-body steps out of the way) */
+.g-strip[data-layout="tile"] { grid-template: "top top" auto "exp kills" auto "lv lv" auto "profit profit" auto "grid grid" auto "tiles tiles" auto "alert alert" 1fr / minmax(0, 1fr) minmax(0, 1fr); gap: .35em .6em; }
 .g-strip[data-layout="tile"] .g-body { display: contents; }
 .g-strip[data-layout="tile"] .g-top { grid-area: top; margin-bottom: .15em; }
 .g-strip[data-layout="tile"] .g-l3 { grid-area: alert; align-self: end; }
-.g-strip[data-layout="tile"] .g-uw { display: none; }
-.g-strip[data-layout="tile"] .g-el { display: none; }
-.g-strip[data-layout="tile"] .g-k-pace .g-ks { display: none; }
-.g-strip[data-layout="tile"] .g-kh { flex-wrap: wrap; row-gap: 0; }
-.g-strip[data-layout="tile"] .g-seg { margin-left: 0; }
-.g-strip[data-layout="tile"] .g-kh:has([data-w="since"]:not([hidden])) { display: grid; justify-items: start; gap: .1em 0; }
-.g-strip[data-layout="tile"] .g-k-exp .g-kn { font-size: 2.4em; }
-.g-strip[data-layout="tile"] .g-k-lv, .g-strip[data-layout="tile"] .g-k-meso { grid-template-columns: minmax(0, 1fr) auto; column-gap: .5em; align-items: baseline; }
-.g-strip[data-layout="tile"] :is(.g-k-lv, .g-k-meso) .g-kl { grid-column: 1; grid-row: 1; }
-.g-strip[data-layout="tile"] :is(.g-k-lv, .g-k-meso) .g-kn { grid-column: 2; grid-row: 1; }
-.g-strip[data-layout="tile"] :is(.g-k-lv, .g-k-meso) .g-ks { grid-column: 1 / -1; grid-row: 2; }
+/* the map and how long on a row of their own under the light, the window row under them. Neither takes width of its own
+   (the title bar's wrapped rows would add up in fit()'s measure); the switch fits Tile's width at any text size it gets */
+.g-strip[data-layout="tile"] .g-el { order: 4; flex: none; width: 100%; contain: inline-size; }
+.g-strip[data-layout="tile"] .g-win { order: 5; width: 100%; justify-content: start; margin-left: 0; contain: inline-size; }
+.g-strip[data-layout="tile"] .g-ww { justify-self: start; }
+.g-strip[data-layout="tile"] .g-chip { flex-wrap: wrap; column-gap: .3em; }
+.g-strip[data-layout="tile"] .g-over { margin-left: 0; }
+.g-strip[data-layout="tile"] :is(.g-k-lv, .g-k-profit) { grid-template-columns: minmax(0, 1fr) auto; column-gap: .5em; align-items: baseline; }
+.g-strip[data-layout="tile"] :is(.g-k-lv, .g-k-profit) .g-kl { grid-column: 1; grid-row: 1; }
+.g-strip[data-layout="tile"] :is(.g-k-lv, .g-k-profit) .g-kn { grid-column: 2; grid-row: 1; }
+.g-strip[data-layout="tile"] :is(.g-k-lv, .g-k-profit) .g-ks { grid-column: 1 / -1; grid-row: 2; }
 .g-strip[data-layout="tile"] .g-grid { display: grid; grid-template-columns: repeat(2, auto); justify-content: start; gap: .2em 1.4em; }
-.g-strip[data-layout="tile"] .g-tiles { gap: .3em; }
-.g-strip[data-layout="tile"] .g-pot { padding: .2em .5em; column-gap: .4em; }
-.g-strip[data-layout="tile"] .g-vial { width: 1.5em; height: 2.1em; }
-.g-strip[data-layout="tile"] .g-vial img { height: 1.15em; }
-.g-strip[data-layout="tile"] .g-pclock { font-size: 1.3em; }
-/* closed, a timer is its clock and what went down; the caption comes with ▾ (a low one always shows) */
-.g-strip[data-layout="tile"][data-open="0"] .g-pot:not(.low) .g-pcap { display: none; }
-/* Column: EXP an hour, the timers, the numbers */
-.g-strip:is([data-layout="column"]) .g-body { grid-template: "exp" auto "lv" auto "meso" auto "tiles" auto "grid" auto / minmax(0, 1fr); }
+/* the one potion Tile's line from the session card takes no width of its own: it wraps in the half it has */
+.g-strip[data-layout="tile"] .g-quip { contain: inline-size; white-space: normal; }
+/* Column: the light, the map and how long on the window row's left, then EXP an hour with Kills a minute beside it, Level in,
+   Profit, the timers side by side, the numbers */
+.g-strip:is([data-layout="column"]) .g-body { grid-template: "exp kills" auto "lv lv" auto "profit profit" auto "tiles tiles" auto "grid grid" auto / minmax(0, 1fr) minmax(0, 1fr); }
 /* Column: no wordmark, no word usual. A row is the site's row: the name with its small line under it on the left, the number on the right, a dashed line under */
 .g-strip[data-layout="column"] { gap: .55em; }
-/* Column ends in right aligned numbers, where the mushroom stands: its floor is lifted to clear it */
-.g-strip:is([data-layout="column"]) { padding-bottom: max(.6em, calc(10 * var(--u))); }
-/* a window taller than the panel: the spare room goes to the body, between its blocks, and never under the title bar */
+/* a panel held taller than it needs (its height without the alert, fit()): the spare room goes to the body, between its
+   blocks, and never under the title bar */
 .g-strip:is([data-layout="column"]) { grid-template-rows: auto 1fr; }
 .g-strip[data-layout="column"] .g-body { row-gap: .55em; }
-.g-strip[data-layout="column"] .g-uw { display: none; }
-.g-strip[data-layout="column"] .g-el { width: 9em; }
-/* its switch goes under the label, not beside it (the column is narrow) */
-.g-strip[data-layout="column"] .g-kh { display: grid; justify-items: start; gap: .1em 0; }
-.g-strip[data-layout="column"] .g-seg { margin-left: 0; }
+.g-strip[data-layout="column"] .g-el { order: 4; flex: 1 1 0; width: 0; min-width: 0; contain: inline-size; }
+.g-strip[data-layout="column"] .g-win { order: 4; flex: none; margin-left: .6em; }
 .g-strip[data-layout="column"] .g-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: .35em; }
-.g-strip[data-layout="column"] .g-body > .g-k { grid-column: 1; }
 .g-strip[data-layout="column"] .g-k { grid-template-columns: minmax(0, 1fr) auto; column-gap: .5em; padding-bottom: .3em; background: var(--night-dots) left bottom / calc(4 * var(--u)) var(--u) repeat-x; }
-.g-strip[data-layout="column"] .g-grid .g-k:last-child { padding-bottom: 0; background: none; }
+.g-strip[data-layout="column"] .g-grid .g-k:has(+ .g-parts) { padding-bottom: 0; background: none; }
 .g-strip[data-layout="column"] .g-kl { grid-column: 1; grid-row: 1; color: var(--ink); }
 .g-strip[data-layout="column"] .g-ks { grid-column: 1; grid-row: 2; }
 .g-strip[data-layout="column"] .g-k .g-kn { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
-/* better or worse than your usual sits up beside EXP an hour, which leaves the big number its own line */
-.g-strip[data-layout="column"] .g-k-exp { position: relative; }
-.g-strip[data-layout="column"] .g-chip { position: absolute; top: 0; right: 0; font-size: 1.1em; }
-/* Bar: one slim row, EXP an hour with "an hour / your usual" under it and its switch beside it, the columns with no small
-   lines, the timers with no caption and no what's left, and the buttons at the right end; the alert goes under. It has no
-   title bar, just the glass */
-.g-strip[data-layout="bar"] { display: flex; flex-wrap: wrap; align-items: center; gap: 0 .6em; padding: .25em .77em; }
-.g-strip[data-layout="bar"] .g-body { flex: 1 1 0; display: grid; grid-template: "exp lv meso tiles" auto "grid grid grid grid" auto / auto auto auto auto; align-items: center; justify-content: space-between; gap: .35em .6em; }
-.g-strip[data-layout="bar"] .g-k-exp, .g-strip[data-layout="bar"] .g-tiles { align-self: stretch; }
-.g-strip[data-layout="bar"] { align-content: center; }
-/* (its title bar is no box: the light goes to the left end, the buttons to the right) */
-.g-strip[data-layout="bar"] .g-top { display: contents; }
-.g-strip[data-layout="bar"] .g-btns { order: 1; align-self: flex-start; margin-left: 0; }
-.g-strip[data-layout="bar"] .g-lamp { order: -1; flex: none; width: 8.4em; font-size: .9em; align-self: stretch; padding-right: .6em; border-right: var(--u) solid var(--div); color: var(--ink); }
+/* Tile and Column, as their mockups draw them: EXP an hour and Kills a minute side by side, a line between, the two numbers
+   the same size. The big number counts in fit()'s measure (a huge one brings the font down instead of spilling out of its
+   half); the words of its small line take no width of their own and wrap in the half: Tile's "▲ 4% over usual" on the
+   whole line, Column's "· usual 121K" in what the arrow leaves. A grid, not the wrapping row: a wrapping row's widest is all
+   its items end to end */
+.g-strip:is([data-layout="tile"], [data-layout="column"]) .g-kv { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; column-gap: .3em; }
+.g-strip:is([data-layout="tile"], [data-layout="column"]) .g-kv > .g-kn { grid-column: 1 / -1; }
+.g-strip[data-layout="tile"] .g-chip { grid-column: 1 / -1; min-width: 0; contain: inline-size; }
+.g-strip[data-layout="column"] .g-chip { grid-column: 1; }
+.g-strip[data-layout="column"] .g-k-exp .g-us { grid-column: 2; min-width: 0; white-space: normal; contain: inline-size; }
+.g-strip:is([data-layout="tile"], [data-layout="column"]) .g-k.g-k-kills { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; padding: 0 0 0 .6em; border-left: var(--u) solid var(--div); background: none; }
+.g-strip:is([data-layout="tile"], [data-layout="column"]) .g-k.g-k-kills > * { grid-column: 1; grid-row: auto; align-self: auto; }
+.g-strip:is([data-layout="tile"], [data-layout="column"]) :is(.g-kh .g-kl, .g-k-kills .g-kl) { font-family: var(--font-body); font-size: .88em; font-weight: 700; line-height: 1.25; color: var(--ink); }
+.g-strip:is([data-layout="tile"], [data-layout="column"]) :is(.g-k-exp, .g-k-kills) .g-kn { font-size: 2.4em; line-height: 1.05; color: var(--num-big); }
+.g-strip[data-layout="column"] :is(.g-k-exp, .g-k-kills) .g-kn { font-size: 2.57em; }
+/* up to two timers side by side in one row (the one potion Tile shares it with a line from the session card). Even
+   columns as a grid, so fit()'s measure takes the wider timer twice (a 1:23:45 clock in one half shrinks the text, not
+   the clock's half) */
+.g-strip:is([data-layout="tile"], [data-layout="column"]) .g-tiles { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: .3em; }
+.g-strip:is([data-layout="tile"], [data-layout="column"]) .g-pot { padding: .2em .5em; column-gap: .4em; }
+.g-strip:is([data-layout="tile"], [data-layout="column"]) .g-vial { width: 1.5em; height: 2.1em; }
+.g-strip:is([data-layout="tile"], [data-layout="column"]) .g-vial img { height: 1.15em; }
+.g-strip:is([data-layout="tile"], [data-layout="column"]) .g-pclock { font-size: 1.3em; }
+/* a timer is its clock and what's left (how many went down, while nothing's left to count); how many went down and the
+   caption are in its hover title, and the mushroom says when one runs low. Before the first potion it keeps its caption */
+.g-strip:is([data-layout="tile"], [data-layout="column"]) .g-pleft:not(:has(> .g-plf:empty)) :is(b, .g-pv, .g-pdot) { display: none; }
+.g-strip:is([data-layout="tile"], [data-layout="column"]) .g-pot:not(.none) .g-pcap { display: none; }
+.g-strip:is([data-layout="tile"], [data-layout="column"]) .g-pcap { contain: inline-size; overflow: hidden; text-overflow: ellipsis; }
+/* Bar (round 2): one grid. A narrow first column (the light, the map and time under it, the window row under that), four even
+   columns (EXP an hour, Kills a minute, Level in, Profit), the potions, then the buttons as a 2 x 2 of 32 px. Opened, the rest
+   is a second row under the same columns: In town under the light, EXP gained, Kills so far, Per 1%, and Profit's parts under
+   Profit and the potions. The title bar, the body and the opened grid are no boxes (display: contents), so all of it is
+   placed on the panel's own grid. No title bar, just the glass; the alert goes under. EXP an hour's column grows past 13em
+   when its line under the number is longer (a huge "over usual"), so the window's font comes down to fit it instead of the
+   line spilling out of its column */
+.g-strip[data-layout="bar"] { display: grid; grid-template-columns: auto minmax(13em, max-content) repeat(3, 13em) auto auto; align-items: stretch; align-content: center; gap: .35em 0; padding: .25em .77em; }
+.g-strip[data-layout="bar"] :is(.g-top, .g-body, .g-kh) { display: contents; }
+.g-strip[data-layout="bar"][data-open="1"] .g-grid { display: contents; }
+.g-strip[data-layout="bar"] .g-who { grid-area: 1 / 1; display: flex; flex-direction: column; justify-content: center; font-size: .9em; padding-right: .6em; border-right: var(--u) solid var(--div); color: var(--ink); }
+.g-strip[data-layout="bar"] .g-lamp { flex: none; width: auto; min-width: 0; font-size: 1em; }
+.g-strip[data-layout="bar"] .g-el { width: auto; min-width: 0; font-size: 1em; color: var(--muted); contain: inline-size; }
 .g-strip[data-layout="bar"] .g-lw { flex-direction: column; align-items: flex-start; gap: 0; }
 .g-strip[data-layout="bar"] .g-lt { max-width: 100%; white-space: normal; }
+/* the window row is small print like the rest of the Bar's (.88 of the panel), not .9 of the light's size: at the Bar's 14 px
+   the smaller one fell under 11 px */
+.g-strip[data-layout="bar"] .g-who .g-win { align-self: flex-start; margin-left: 0; font-size: calc(1em / .9); }
 /* Bar and Column have the least room beside the words: a tab done is only its tick, one to go only its name */
 .g-strip:is([data-layout="bar"], [data-layout="column"]) .g-flip { gap: .45em; }
 .g-strip:is([data-layout="bar"], [data-layout="column"]) .g-flip b:not(.done, .fix)::before { content: none; }
 .g-strip:is([data-layout="bar"], [data-layout="column"]) .g-flip b.fix::before { content: '!'; }
 .g-strip:is([data-layout="bar"], [data-layout="column"]) .g-flip b.done::before { content: '✓'; }
 .g-strip:is([data-layout="bar"], [data-layout="column"]) .g-flip b.done span { display: none; }
-.g-strip[data-layout="bar"] :is(.g-el, .g-uw, .g-ks, .g-pcap, .g-plf) { display: none; }
-.g-strip[data-layout="bar"] .g-k-exp { flex: none; display: grid; grid-template-columns: auto auto; align-items: center; column-gap: .6em; }
-.g-strip[data-layout="bar"] .g-kh { display: contents; }
+/* Bar: the closed row, each in its column; the opened row under the same ones (the left edges match) */
+.g-strip[data-layout="bar"] .g-k-exp { grid-area: 1 / 2; display: grid; grid-template-columns: auto; align-content: center; padding-left: .6em; }
+.g-strip[data-layout="bar"] .g-k-kills { grid-area: 1 / 3; } .g-strip[data-layout="bar"] .g-k-lv { grid-area: 1 / 4; } .g-strip[data-layout="bar"] .g-k-profit { grid-area: 1 / 5; }
+.g-strip[data-layout="bar"] .g-tiles { grid-area: 1 / 6; }
+.g-strip[data-layout="bar"] .g-btns { grid-area: 1 / 7; display: grid; grid-template-columns: repeat(2, 32px); grid-auto-rows: 32px; gap: .3em; align-self: center; margin-left: .6em; padding-left: .6em; border-left: var(--u) solid var(--div); }
+.g-strip[data-layout="bar"] .g-btns .k-sq { width: 32px; height: 32px; }
+.g-strip[data-layout="bar"] .g-k-gain { grid-area: 2 / 2; } .g-strip[data-layout="bar"] .g-k-ksf { grid-area: 2 / 3; } .g-strip[data-layout="bar"] .g-k-per { grid-area: 2 / 4; }
+.g-strip[data-layout="bar"] .g-parts { grid-area: 2 / 5 / auto / span 2; white-space: normal; }
+.g-strip[data-layout="bar"] .g-town { grid-area: 2 / 1; padding-right: .6em; }
+.g-strip[data-layout="bar"] :is(.g-k-gain, .g-k-ksf, .g-k-per, .g-parts, .g-town) { padding-top: .2em; border-top: var(--u) solid var(--div); }
+.g-strip[data-layout="bar"] :is(.g-k-gain, .g-k-ksf, .g-k-per, .g-parts) { padding-left: .6em; }
+/* the small lines: Kills a minute and Profit keep theirs (pick the map, loot not counted); the rest stay hidden */
+.g-strip[data-layout="bar"] :is(.g-pcap, .g-plf, .g-pdot, .g-k-lv .g-ks, .g-k-gain .g-ks, .g-k-ksf .g-ks, .g-k-per .g-ks) { display: none; }
 .g-strip[data-layout="bar"] .g-kh .g-kl { display: none; }
-.g-strip[data-layout="bar"] .g-seg { grid-column: 2; grid-row: 1; margin-left: 0; }
 .g-strip[data-layout="bar"] .g-kv { grid-column: 1; grid-row: 1; display: grid; grid-template-columns: auto auto 1fr; gap: 0 .3em; font-size: .88em; font-weight: 700; line-height: 1.25; color: var(--muted); }
 .g-strip[data-layout="bar"] .g-kv::before { content: 'an hour'; grid-row: 2; }
 .g-strip[data-layout="bar"] .g-k-exp .g-kn { grid-column: 1 / -1; grid-row: 1; font-size: 2em; line-height: 1.05; }
 .g-strip[data-layout="bar"] .g-us { grid-row: 2; font-family: var(--font-body); font-size: 1em; font-weight: 700; }
-.g-strip[data-layout="bar"] .g-chip { grid-row: 2; font-size: .95em; }
-.g-strip[data-layout="bar"] :is(.g-k-lv, .g-k-meso, .g-tiles) { align-self: stretch; padding-left: .6em; border-left: var(--u) solid var(--div); }
-.g-strip[data-layout="bar"] :is(.g-k-lv, .g-k-meso) { align-content: center; }
-.g-strip[data-layout="bar"] .g-k-lv { box-sizing: border-box; width: 7.6em; }
-/* opened: the rest wraps onto a second row of the panel (its window reserves the room) */
-.g-strip[data-layout="bar"] .g-grid { grid-area: grid; width: 0; min-width: 100%; align-items: center; justify-content: flex-start; gap: .3em 1.4em; padding-top: .2em; border-top: var(--u) solid var(--div); }
+/* the chip and its percent keep their line's size (.88 of the panel): at the Bar's 14 px a smaller one fell under 11 px */
+.g-strip[data-layout="bar"] .g-chip { grid-row: 2; }
+.g-strip[data-layout="bar"] .g-k-exp :is(.g-d, .g-over) { font-size: 1em; }
+.g-strip[data-layout="bar"] :is(.g-k-kills, .g-k-lv, .g-k-profit, .g-tiles) { align-self: stretch; padding-left: .6em; border-left: var(--u) solid var(--div); }
+.g-strip[data-layout="bar"] :is(.g-k-kills, .g-k-lv, .g-k-profit) { align-content: center; }
 .g-strip[data-layout="bar"] .g-tiles { display: flex; gap: .6em; }
 .g-strip[data-layout="bar"] .g-k .g-kn { font-size: 1.15em; }
 .g-strip[data-layout="bar"] .g-ppr .g-us { font-size: .8em; }
@@ -1229,7 +1305,7 @@ body.g-ov .g-bubble { bottom: auto; top: calc(100% + var(--fw, .5em) + 8px); }
 .g-strip:is([data-layout="column"], [data-layout="tile"]) .g-seg:has([data-w="since"]:not([hidden])) button { padding-inline: .4em; }
 /* Bar's alert: one line in what's left of its 80 pixels, the tiles' second line making room */
 .g-strip[data-layout="bar"]:has(> .g-l3:not([hidden])) .g-pleft { display: none; }
-.g-strip[data-layout="bar"] .g-alert { order: 2; flex-basis: 100%; padding: 0 .5em; border: 0; background: none; box-shadow: none; color: var(--ink); overflow: hidden; white-space: nowrap; }
+.g-strip[data-layout="bar"] .g-alert { grid-area: 3 / 1 / auto / -1; padding: 0 .5em; border: 0; background: none; box-shadow: none; color: var(--ink); overflow: hidden; white-space: nowrap; }
 /* Settings (grind-settings.js), opened by ⚙ Settings on the top strip: under the panel inside the pop-out, which grows to
    fit it. On the glass in the site's theme (the tokens, no colors of its own): a bark title bar, wood sign buttons, flat
    switches. Its sections stack as in the mockup, and sit side by side when the window is wide. Fonts as longhands, as on
@@ -1241,6 +1317,7 @@ html:has(body.g-pip #g-set), html:has(body.g-pip .gq) { overflow-y: auto; }
 .g-set-x { flex: none; }
 .g-set-body { display: grid; box-shadow: inset 0 4px 0 var(--pad-shade); }
 .g-set-sec { min-width: 0; padding: 12px 14px; }
+.g-set-foot { display: flex; padding: 10px 14px 14px; border-top: 2px dotted var(--dot); }
 .g-set-sec + .g-set-sec { border-top: 2px dotted var(--dot); }
 /* a wide window: Overlay and Tracking side by side with You along the bottom; wider still, all three in a row */
 @container (min-width: 600px) {
@@ -1602,6 +1679,8 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
 /* kit: k-grass */
 /* moss tufts with gaps on part of the top edge, never a full line. Only Now grinding, the Builds character window and the logo wear it. No fallback color: it is only decoration */
 .k-grass::after, .logo::before { content: ""; position: absolute; left: 22px; right: 22px; top: -22px; height: 14px; z-index: 2; background-image: var(--night-moss); background-size: 128px 14px; background-repeat: repeat-x; image-rendering: pixelated; -webkit-mask-image: linear-gradient(90deg, var(--num) 0 34%, transparent 44% 58%, var(--num) 70%, transparent 80%); mask-image: linear-gradient(90deg, var(--num) 0 34%, transparent 44% 58%, var(--num) 70%, transparent 80%); pointer-events: none; }
+/* the same gaps on a moss strip of its own (the pop-out's .g-moss), placed by its own rule */
+.k-moss { -webkit-mask-image: linear-gradient(90deg, var(--num) 0 34%, transparent 44% 58%, var(--num) 70%, transparent 80%); mask-image: linear-gradient(90deg, var(--num) 0 34%, transparent 44% 58%, var(--num) 70%, transparent 80%); }
 
 /* kit: k-pad */
 .k-pad { padding: var(--gap); }
@@ -1893,7 +1972,7 @@ const CONFIG = {
   reportUrl: 'https://sixpathcrossway.pages.dev/api/report',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-14b',
+  version: '2026-11-14c',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };

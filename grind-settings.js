@@ -7,7 +7,7 @@
 //   picture: the little SVG of a layout (⇆ Layout's row on the panel uses them too)
 //   updateLine: the app's update check in words (the main window's version line)
 //   o = { el, app, layouts, onLayout(l), onLoot(on), onSignIn(), onSignOut(), onProfile(),
-//         links: { builds }, onClose(), onSee(v), onSize(scale), onTop(on), onPass(on) }; user { name, avatar }
+//         links: { builds }, onClose(), onReport() or null, onSee(v), onSize(scale), onTop(on), onPass(on) }; user { name, avatar }
 //   or null. With o.app (the app's bridge): See-through (25 to 100%), Size (60 to 160% by 10), Always on top of the game
 //   and Clicks pass through to the game. This map and the app's version are on the page (Rimmah, 2026-11-04)
 (function () {
@@ -106,7 +106,9 @@ function build(o) {
       section('g-set-tr', 'Tracking',
         el('div', { class: 'g-set-row' }, el('span', { class: 'g-set-lbl' }, 'Count my loot', el('small', {}, 'Flip through Equip, Use and Etc at the start and the end')), loot)),
       section('g-set-you', 'You', who,
-        el('div', { class: 'g-set-links' }, btn('Open my profile', () => o.onProfile(), 'k'), btn('Builds ↗', open(o.links.builds))))));
+        el('div', { class: 'g-set-links' }, btn('Open my profile', () => o.onProfile(), 'k'), btn('Builds ↗', open(o.links.builds))))),
+    // the foot: a report goes from here (the pop out used to have a flag of its own), only where the page can send one
+    o.onReport ? el('footer', { class: 'g-set-foot' }, el('button', { type: 'button', id: 'g-set-wonky', class: 'g-set-btn k-btn sm', onclick: () => o.onReport() }, 'Feeling wonky?')) : null);
 
   let userKey;   // who You was last drawn for, so a picture isn't fetched again on every update
   function update(s) {
