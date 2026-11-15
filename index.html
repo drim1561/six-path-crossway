@@ -586,6 +586,33 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 .g-at-stat .g-ts { min-width: 0; overflow-wrap: anywhere; }
 /* no boxes, as in the pop-out (Rimmah, 2026-11-15): the words and the picture each keep their own spot, one faint line between */
 #view-grind { --at-line: color-mix(in srgb, var(--card-o) 75%, transparent); }
+/* the pop-out's look on the whole Grind page (Rimmah, 2026-11-15): mossy stone buttons (the one amber main button stays), a soft
+   round light with no pill, one faint line between rows where the dashes and dots were, no boxes, numbers in even columns */
+#view-grind :is(.k-btn:not(.key), .k-sq) { --face: var(--stone); --face-hi: var(--stone-hi); --face-lo: var(--stone-lo); --mossy: var(--stone-moss); color: var(--ink); }
+#view-grind :is(.k-btn:not(.key), .k-sq)[aria-pressed="true"] { --face: var(--lime); --face-hi: var(--lime-hi); --face-lo: var(--lime-lo); --mossy: var(--lime-hi); color: var(--lime-ink); }
+#view-grind :is(.k-btn:not(.key), .k-sq)::after { background-image: none; box-shadow: 0 var(--ledge) 0 var(--face-lo), 0 0 0 2px var(--wood-o), inset 0 3px 0 var(--mossy), inset 0 5px 0 color-mix(in srgb, var(--wood-o) 30%, transparent); }
+#view-grind :is(.k-btn:not(.key), .k-sq):hover::after { box-shadow: 0 var(--ledge) 0 var(--face-lo), 0 0 0 2px var(--wood-o), inset 0 3px 0 var(--mossy), inset 0 0 0 99px color-mix(in srgb, var(--face-hi) 28%, transparent); }
+#view-grind .g-pill { --lamp: var(--lime); gap: 9px; padding: 3px 4px; background: none; box-shadow: none; color: var(--ink); }
+#view-grind .g-pill.wait { --lamp: var(--lamp-wait); } #view-grind .g-pill.bad { --lamp: var(--lamp-bad); } #view-grind .g-pill.off { --lamp: var(--lamp-idle); }
+#view-grind .g-pill::before { width: 10px; height: 10px; opacity: 1; animation: none; background-color: var(--lamp); box-shadow: inset 2px 2px 4px var(--lamp-hi), 0 0 4px var(--lamp), 0 0 14px 4px color-mix(in srgb, var(--lamp) 40%, transparent); }
+#view-grind .g-pill.off::before { box-shadow: inset 2px 2px 4px var(--lamp-hi); }
+#view-grind :is(.k-row, .k-dash, .g-bagcheck li) { background-image: none; border-bottom: 1px solid var(--at-line); }
+#view-grind :is(.k-rows > .k-row:last-child, .k-dash:last-child, .g-drops .k-row.last) { border-bottom: 0; }
+#view-grind .g-tots { border-block: 1px solid var(--at-line); }
+#view-grind :is(.g-nums, .g-res-lead, .g-sc-big) { padding-inline: 4px; background: none; border: 0; border-bottom: 1px solid var(--at-line); border-radius: 0; }
+#view-grind #g-pots td { border-top: 1px solid var(--at-line); }
+#view-grind .g-res-nudge { padding: 8px 4px; border: 0; border-block: 1px solid var(--at-line); }
+#view-grind .g-at-sw button { margin: 0 2px 3px 0; min-height: 25px; border: 0; border-radius: var(--r-btn); --ledge: 3px; background-color: var(--stone); color: var(--ink); box-shadow: 0 var(--ledge) 0 var(--stone-lo), 0 0 0 2px var(--wood-o), inset 0 3px 0 var(--stone-moss), inset 0 5px 0 color-mix(in srgb, var(--wood-o) 30%, transparent); }
+#view-grind .g-at-sw button:hover { background-color: color-mix(in srgb, var(--stone-hi) 28%, var(--stone)); }
+#view-grind .g-at-sw button:active { --ledge: 1px; transform: translateY(2px); }
+#view-grind .g-classpick { padding: 2px 0; border: 0; }
+#view-grind .g-classpick .g-pickt { border-bottom: 1px dashed var(--muted); }
+#view-grind .g-classpick::after { right: 0; }
+#view-grind .g-classpick .g-pickt { padding-right: 18px; }
+#view-grind .g-print { padding: 0 4px; background: none; border: 0; box-shadow: none; }
+#view-grind .g-print .g-note { color: var(--muted); }
+#view-grind .g-at-dots i { width: 7px; height: 7px; border-radius: 50%; }
+#view-grind :is(.g-tv, .k-row > :last-child, .g-run b) { font-variant-numeric: tabular-nums; }
 .g-at-pic { min-width: 0; }
 .g-at-stat:not(.bare) .g-at-words { align-self: stretch; padding-right: var(--gap); border-right: 1px solid var(--at-line); }
 /* the podium: three steps on one floor, first place in the middle on the gold one */
@@ -2054,7 +2081,7 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-15b',
+  version: '2026-11-15c',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
