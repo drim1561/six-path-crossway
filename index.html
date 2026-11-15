@@ -584,7 +584,10 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 .g-at-stat.bare { grid-template-columns: minmax(0, 1fr); }
 .g-at-words { display: flex; flex-direction: column; justify-content: center; gap: 6px; min-width: 0; }
 .g-at-stat .g-ts { min-width: 0; overflow-wrap: anywhere; }
+/* no boxes, as in the pop-out (Rimmah, 2026-11-15): the words and the picture each keep their own spot, one faint line between */
+#view-grind { --at-line: color-mix(in srgb, var(--card-o) 75%, transparent); }
 .g-at-pic { min-width: 0; }
+.g-at-stat:not(.bare) .g-at-words { align-self: stretch; padding-right: var(--gap); border-right: 1px solid var(--at-line); }
 /* the podium: three steps on one floor, first place in the middle on the gold one */
 .g-at-pod { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 132px); grid-template-rows: 1fr auto auto auto; justify-content: center; column-gap: var(--gap); }
 .g-at-step { display: grid; grid-row: 1 / -1; grid-template-rows: subgrid; justify-items: center; min-width: 0; text-align: center; }
@@ -655,7 +658,7 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 .g-at-li[hidden] { display: none; }
 .g-at-li > span { flex: none; }
 .g-at-li b { font-weight: 700; text-align: right; }
-.g-at-tab .g-at-card { display: grid; align-content: center; justify-items: center; gap: 6px; min-width: 0; padding: 4px 12px; text-align: center; }
+.g-at-tab .g-at-card { display: grid; align-content: center; justify-items: center; gap: 6px; min-width: 0; padding: 4px 12px; text-align: center; color: var(--ink); border-left: 1px solid var(--at-line); }
 .g-at-card h3 { margin: 0; font: 400 var(--tt-m)/1.2 var(--font-title); color: var(--ink); }
 .g-at-stamps { display: grid; grid-template-columns: repeat(5, 44px); gap: 4px 8px; }
 .g-at-stamps .g-at-stamp { width: 44px; height: 44px; background-size: 44px 44px; }
@@ -678,7 +681,8 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 @container (max-width: 860px) {
   .g-at-stage, .g-at-tab, .g-at-stat { grid-template-columns: minmax(0, 1fr); }
   .g-at-tab { grid-template-rows: auto 1fr; }
-  .g-at-tab .g-at-card { padding-block: 6px; }
+  .g-at-tab .g-at-card { padding-block: 6px 7px; border-left: 0; border-top: 1px solid var(--at-line); }
+  .g-at-stat:not(.bare) .g-at-words { padding-right: 0; border-right: 0; }
 }
 /* a phone: each sign over its picture, smaller trees to keep the window short, and a tighter bill */
 @container (max-width: 520px) {
@@ -931,6 +935,7 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 .g-recpad > .g-note:empty { display: none; }
 .g-tots { display: flex; flex-wrap: wrap; gap: 0 12px; border-block: 2px dotted var(--dot); }
 .g-tot { flex: 1 1 150px; padding: 8px 4px; min-width: 0; }
+.g-tot + .g-tot { padding-left: 12px; border-left: 1px solid var(--at-line); }
 .g-tot .g-tv { margin-top: 4px; font: 700 var(--n-m)/1.15 var(--font-num); color: var(--num); white-space: nowrap; }
 .g-tot .g-tv.b { color: var(--exp); } .g-tot .g-tv.y { color: var(--num-big); } .g-tot .g-tv.g { color: var(--good); }
 .g-tsub { margin-top: 2px; font: 600 var(--fs-sm) var(--font-body); color: var(--muted); }

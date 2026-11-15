@@ -238,7 +238,7 @@ function build({ el, pics, mapName, mobName, sprites, mesos, claims }) {
   const pickRow = el('div', { class: 'g-at-pick', role: 'group', 'aria-label': 'Your reward', hidden: '' }, picks.lemon, picks.meat);
   const nameIn = el('input', { type: 'text', class: 'g-at-ign', maxlength: '12', autocomplete: 'off', 'aria-label': 'Your character name', placeholder: 'Your character name' });   // joins the card only while it asks: Grind has nothing to type otherwise
   const claimBtn = el('button', { type: 'button', class: 'k-btn key sm g-at-claim', hidden: '' }, 'Claim it');
-  const card = el('div', { class: 'k-card g-at-card' }, cardName, stamps, line, pickRow, claimBtn, joke);
+  const card = el('div', { class: 'g-at-card' }, cardName, stamps, line, pickRow, claimBtn, joke);
 
   // Monsters felled, Potions per level and Maps visited: a label, a big number and two small lines on the left, a picture on the right
   // (left out when there is nothing to draw, and then the words have the view to themselves)
