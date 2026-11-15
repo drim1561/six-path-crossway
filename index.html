@@ -579,9 +579,39 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 .g-at-dots { display: flex; gap: 5px; }
 .g-at-dots i { width: 8px; height: 8px; background: var(--bar-muted); opacity: .6; }
 .g-at-dots i.on { background: var(--lime); opacity: 1; }
-/* Monsters felled, Potions per level, Maps visited: one big number and two small lines on the paper */
-.g-at-stat { display: flex; flex-direction: column; justify-content: center; gap: 6px; height: 100%; min-height: 222px; box-shadow: inset 0 4px 0 var(--pad-shade); }
+/* Monsters felled, Potions per level, Maps visited: one big number and two small lines on the left, a picture on the right (bare: no picture) */
+.g-at-stat { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr); align-items: center; gap: var(--gap); height: 100%; min-height: 222px; box-shadow: inset 0 4px 0 var(--pad-shade); }
+.g-at-stat.bare { grid-template-columns: minmax(0, 1fr); }
+.g-at-words { display: flex; flex-direction: column; justify-content: center; gap: 6px; min-width: 0; }
 .g-at-stat .g-ts { min-width: 0; overflow-wrap: anywhere; }
+.g-at-pic { min-width: 0; }
+/* the podium: three steps on one floor, first place in the middle on the gold one */
+.g-at-pod { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 132px); grid-template-rows: 1fr auto auto auto; justify-content: center; column-gap: var(--gap); }
+.g-at-step { display: grid; grid-row: 1 / -1; grid-template-rows: subgrid; justify-items: center; min-width: 0; text-align: center; }
+.g-at-mob { grid-row: 1; align-self: end; background-position: 0 0; background-repeat: no-repeat; image-rendering: pixelated; }
+.g-at-block { grid-row: 2; align-self: end; display: grid; place-items: center; width: 100%; background: var(--wood) var(--night-bark) 0 0 / 160px auto; box-shadow: inset 0 3px 0 var(--btn-hi), inset 0 -3px 0 var(--wood-lo); color: var(--btn-ink); font: 700 var(--fs-lg)/1 var(--font-num); }
+.g-at-step.p1 .g-at-block { background: var(--accent); box-shadow: inset 0 3px 0 var(--key-hi), inset 0 -3px 0 var(--key-lo); color: var(--key-ink); }
+.g-at-who { grid-row: 3; max-width: 100%; margin-top: 6px; overflow: hidden; font: 700 var(--fs-md)/1.3 var(--font-body); text-overflow: ellipsis; white-space: nowrap; }
+.g-at-step .g-ts { grid-row: 4; color: var(--muted); }
+/* one level's shopping list: the receipt's paper, a row a potion */
+.g-at-shopw { justify-self: center; width: min(100%, 380px); box-shadow: 0 .3em .9em var(--win-shadow); }
+.g-at-rec.g-at-shop { height: auto; padding-bottom: 10px; }
+.g-at-rows { display: grid; }
+.g-at-row { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto 5.5em; align-items: center; gap: 0 8px; padding: 3px 0; background: var(--night-dots) left bottom / 8px 2px repeat-x; font: 700 var(--fs-md)/1.45 var(--font-body); }
+.g-at-row img { display: block; width: auto; height: 22px; image-rendering: pixelated; }
+.g-at-rx { color: var(--receipt-muted); font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.g-at-row b { font: 700 var(--fs-lg)/1.45 var(--font-num); font-variant-numeric: tabular-nums; text-align: right; }
+.g-at-row.tot { grid-template-columns: minmax(0, 1fr) auto; background: none; }
+.g-at-row.tot .g-at-rn { font: 400 var(--tt-s)/1.25 var(--font-title); }
+/* the trail: a wooden sign a map, in the order they were first trained. The favorite is gold, the newest is lit */
+.g-at-trail { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px var(--gap); }
+.g-at-way { display: grid; justify-items: center; max-width: 100%; padding: 4px 12px 6px; background: var(--wood) var(--night-bark) 0 0 / 160px auto; box-shadow: inset 0 2px 0 var(--btn-hi), inset 0 -3px 0 var(--wood-lo); color: var(--btn-ink); text-align: center; }
+.g-at-way b { max-width: 100%; overflow: hidden; font: 700 var(--fs-sm)/1.3 var(--font-body); text-overflow: ellipsis; white-space: nowrap; }
+.g-at-way small { font: 600 var(--fs-tag)/1.2 var(--font-body); color: inherit; }
+.g-at-way.fav { padding: 8px 16px 10px; background: var(--accent); box-shadow: inset 0 2px 0 var(--key-hi), inset 0 -3px 0 var(--key-lo); color: var(--key-ink); }
+.g-at-way.fav b { font-size: var(--fs-lg); }
+.g-at-way.new { box-shadow: inset 0 2px 0 var(--btn-hi), inset 0 -3px 0 var(--wood-lo), 0 0 0 2px var(--glow), 0 0 14px var(--glow); }
+.g-at-more { font: 600 var(--fs-sm) var(--font-body); color: var(--muted); }
 .g-at-faces { display: grid; min-width: 0; container-type: inline-size; }
 .g-at-face { grid-area: 1 / 1; min-width: 0; opacity: 0; visibility: hidden; transition: opacity .4s steps(4), visibility 0s linear .4s; }
 .g-at-face.on { opacity: 1; visibility: visible; transition: opacity .4s steps(4); }
@@ -608,7 +638,7 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 .g-at-ghost.flip { transform: scaleX(-1); }
 .g-at-halo { position: absolute; image-rendering: pixelated; }
 /* the Tab: a piece of paper in both themes, with a torn foot (the clip takes its shadow, so the shadow is on the box around it) */
-.g-at-tab { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: var(--gap); height: 100%; box-shadow: inset 0 4px 0 var(--pad-shade); }
+.g-at-tab { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: var(--gap); height: 100%; box-shadow: inset 0 4px 0 var(--pad-shade); }
 .g-at-recw { min-width: 0; box-shadow: 0 .3em .9em var(--win-shadow); }
 .g-at-rec { display: grid; align-content: start; gap: 3px; height: 100%; padding: 8px 16px 18px; background: var(--receipt); color: var(--receipt-ink); font: 600 var(--fs-sm) var(--font-body); }
 .g-at-rech { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0 12px; padding-bottom: 5px; background: var(--night-dots) left bottom / 8px 2px repeat-x; }
@@ -625,7 +655,7 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 .g-at-li[hidden] { display: none; }
 .g-at-li > span { flex: none; }
 .g-at-li b { font-weight: 700; text-align: right; }
-.g-at-tab .g-at-card { display: grid; align-content: center; justify-items: center; gap: 6px; min-width: 0; padding: 6px 12px; text-align: center; }
+.g-at-tab .g-at-card { display: grid; align-content: center; justify-items: center; gap: 6px; min-width: 0; padding: 4px 12px; text-align: center; }
 .g-at-card h3 { margin: 0; font: 400 var(--tt-m)/1.2 var(--font-title); color: var(--ink); }
 .g-at-stamps { display: grid; grid-template-columns: repeat(5, 44px); gap: 4px 8px; }
 .g-at-stamps .g-at-stamp { width: 44px; height: 44px; background-size: 44px 44px; }
@@ -634,10 +664,21 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 .g-at-next { font: 700 var(--fs-md) var(--font-body); }
 .g-at-togo { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
 .g-at-card small { font: 600 var(--fs-sm) var(--font-body); color: var(--muted); }
+.g-at-card small.bad { color: var(--ink); }
+/* a full card: pick the reward, then claim it */
+.g-at-pick { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.g-at-opt { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 10px; border: 2px solid var(--card-o); border-radius: var(--r-card); background: none; color: var(--ink); font: 700 var(--fs-sm)/1 var(--font-body); cursor: pointer; }
+.g-at-opt img { width: auto; height: 20px; image-rendering: pixelated; }
+.g-at-opt[aria-pressed="true"] { border-color: var(--lime); box-shadow: inset 0 0 0 1px var(--lime); }
+.g-at-opt:focus-visible, .g-at-ign:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.g-at-ign { width: 12em; max-width: 100%; min-height: 30px; padding: 0 8px; border: 2px solid var(--card-o); border-radius: var(--r-card); background: var(--card); color: var(--ink); font: 700 var(--fs-sm) var(--font-body); text-align: center; }
+.g-at-card .g-at-claim { margin-top: 0; }
+.g-at-claim:disabled { opacity: .6; cursor: default; }
 /* narrower: the Lemons over the Meat, each on a stage of its own so the trees have ground under them, and the receipt over the card */
 @container (max-width: 860px) {
-  .g-at-stage, .g-at-tab { grid-template-columns: minmax(0, 1fr); }
+  .g-at-stage, .g-at-tab, .g-at-stat { grid-template-columns: minmax(0, 1fr); }
   .g-at-tab { grid-template-rows: auto 1fr; }
+  .g-at-tab .g-at-card { padding-block: 6px; }
 }
 /* a phone: each sign over its picture, smaller trees to keep the window short, and a tighter bill */
 @container (max-width: 520px) {
@@ -2004,6 +2045,8 @@ const CONFIG = {
   supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtbm9tb2l3anRhb3J2bGppc3F1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMwNTkyODUsImV4cCI6MjEwODYzNTI4NX0.43QM25wqDaU5XIcZ235_A0UiMT_EmcUMCOumICu4fyY',
   // Something off? reports go to functions/api/report.js on the Cloudflare copy (the GitHub Pages copy posts there too)
   reportUrl: 'https://sixpathcrossway.pages.dev/api/report',
+  // a claimed Frequent Eater card is told to functions/api/claim.js, which posts it to Rimmah's private #claims
+  claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
   version: '2026-11-15b',
@@ -2220,7 +2263,7 @@ function makeSupabaseApi(cfg) {
     return { getSession: async () => null, token: async () => null, onAuth() {}, signIn: down, signOut: down, list: down, subscribe: () => () => {},
       post: down, remove: down, hide: down, unhide: down, block: down, isAdmin: async () => false,
       listBuilds: down, saveBuild: down, deleteBuild: down, uploadShot: down, removeShot: down, shotUrl: () => '', hideBuild: down,
-      listGrind: down, getGrind: down, saveGrind: down, deleteGrind: down,
+      listGrind: down, getGrind: down, saveGrind: down, deleteGrind: down, listClaims: down, claimCard: down,
       listQuestDone: down, addQuestDone: down, removeQuestDone: down,
       listPriceReports: down, addPriceReport: down, deletePriceReport: down, listPriceHistory: down, savePriceHistory: down };
   }
@@ -2349,6 +2392,18 @@ function makeSupabaseApi(cfg) {
     },
     async saveGrind(row) { check(await sb.from('grind_sessions').upsert(row, { onConflict: 'id' })); },
     async deleteGrind(id) { check(await sb.from('grind_sessions').delete().eq('id', id)); },
+    // The Frequent Eater card (supabase/eater-claims.sql): the player's own claims. The database counts the eating itself and says no in
+    // its own words (a raise is code P0001), which the card shows as they are
+    async listClaims() {
+      const { data, error } = await sb.from('eater_claims').select('card_no,reward,ign,created_at').order('card_no');
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    async claimCard(row) {
+      const { data, error } = await sb.from('eater_claims').insert({ card_no: row.card_no, reward: row.reward, ign: row.ign }).select('card_no,reward,ign,created_at').single();
+      if (error) throw Object.assign(new Error(error.message), { db: error.code === 'P0001' });
+      return data;
+    },
   };
 }
 
@@ -2360,6 +2415,9 @@ const api = window.BT_API || makeSupabaseApi(CONFIG);
 const TIMER_ON = window.BT_TIMER === true;
 // the Appraiser is closed for now (window.BT_APPRAISER turns it on): no loading, a closed card, its sign faded
 const APPRAISER_ON = window.BT_APPRAISER === true;
+// the Frequent Eater card pays out during the beta (window.BT_CLAIMS = false turns it off): a full card can be claimed for a stack
+// of potions in game. Ending the beta is making this false; the card then only counts
+const CLAIMS_ON = window.BT_CLAIMS !== false;
 const $ = id => document.getElementById(id);
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
@@ -2750,7 +2808,8 @@ function loadGrind() {
     reporters.grind = window.Grind.mount($('grind-root'), { api, store, el, data, pictures, session: () => state.session, signIn: () => signIn(),
       signOut: () => api.signOut().catch(() => {}).then(() => setSession(null)), app: APP,
       // the flag on the pop out: the small report form, its pictures taken now
-      report: (close, done) => loadFlag().then(() => window.Flag.quick({ api, el, config: CONFIG, view: 'grind', reporter: reporters.grind, game: window.Reader && window.Reader.grab ? window.Reader.grab() : null, gameAt: null, session: state.session, onDone: sent => { done(sent); close(); } })), appDownload: CONFIG.appDownload });
+      report: (close, done) => loadFlag().then(() => window.Flag.quick({ api, el, config: CONFIG, view: 'grind', reporter: reporters.grind, game: window.Reader && window.Reader.grab ? window.Reader.grab() : null, gameAt: null, session: state.session, onDone: sent => { done(sent); close(); } })), appDownload: CONFIG.appDownload,
+      claimsOn: CLAIMS_ON, claimUrl: CONFIG.claimUrl });
   }).catch(() => {
     grindLoading = null; window.track('load_failed', { what: 'grind' });
     $('grind-root').replaceChildren(el('p', { class: 'empty' }, "The grind tracker didn't load. Try reloading the page."));

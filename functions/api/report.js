@@ -7,8 +7,8 @@
 // page (JPEG), popout and game (PNG). The answer is { ok: true } or { error } with words the panel shows as they are.
 
 // The same project and public key the page carries in CONFIG; the database rules are what protect the data.
-const SUPABASE_URL = 'https://umnomoiwjtaorvljisqu.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtbm9tb2l3anRhb3J2bGppc3F1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMwNTkyODUsImV4cCI6MjEwODYzNTI4NX0.43QM25wqDaU5XIcZ235_A0UiMT_EmcUMCOumICu4fyY';
+export const SUPABASE_URL = 'https://umnomoiwjtaorvljisqu.supabase.co';
+export const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtbm9tb2l3anRhb3J2bGppc3F1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMwNTkyODUsImV4cCI6MjEwODYzNTI4NX0.43QM25wqDaU5XIcZ235_A0UiMT_EmcUMCOumICu4fyY';
 
 // Bytes, except text (characters). A Discord webhook message tops out around 10 MB, so one message stays under 9.
 export const CAPS = { text: 1000, details: 200000, page: 2000000, popout: 1000000, game: 9000000, message: 9000000, perHour: 5 };
@@ -30,7 +30,7 @@ const SAY = {
 };
 
 // sixpathcrossway.pages.dev, its preview deploys, and the GitHub Pages copy
-function allowed(origin) {
+export function allowed(origin) {
   if (!origin) return false;
   let u;
   try { u = new URL(origin); } catch (e) { return false; }
@@ -38,11 +38,11 @@ function allowed(origin) {
   const h = u.hostname;
   return h === 'sixpathcrossway.pages.dev' || h.endsWith('.sixpathcrossway.pages.dev') || h === 'drim1561.github.io';
 }
-const cors = origin => ({ 'access-control-allow-origin': origin, vary: 'Origin' });
+export const cors = origin => ({ 'access-control-allow-origin': origin, vary: 'Origin' });
 const answer = (status, body, origin) => Response.json(body, { status, headers: origin ? cors(origin) : {} });
 
 // The name the site shows for a signed in player, the same order as the page's who(); null when the token is no good.
-async function whoIs(token, fetchFn) {
+export async function whoIs(token, fetchFn) {
   if (!token) return null;
   try {
     const r = await fetchFn(SUPABASE_URL + '/auth/v1/user', { headers: { apikey: SUPABASE_ANON_KEY, authorization: 'Bearer ' + token } });

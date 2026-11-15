@@ -234,7 +234,7 @@ function lifetime(rows, o) {
     best: { expHr: null, longest: null, lemons: null, cheap1: null }, days: 0, streak: 0, daysList: [] };
   // Monsters felled (an estimate: a run's EXP over what one monster on its map gives on average, weighted by spawn count), Potions per
   // level (potions drunk over the levels' worth of EXP, runs of BEST_MIN or more) and Maps visited
-  const kill = { n: 0, skipped: 0, by: {} }, per = { used: 0, pct: 0 };
+  const kill = { n: 0, skipped: 0, by: {} }, per = { used: 0, pct: 0, lemon: [0, 0], meat: [0, 0], other: [0, 0] };
   let perBest = null, perWorst = null;
   const maps = {}, byDay = {}, drank = {}, top = (k, v, row, low) => { const b = L.best[k]; if (!b || (low ? v < b.v : v > b.v)) L.best[k] = { v, row }; };
   for (const r of rows) {
@@ -244,11 +244,13 @@ function lifetime(rows, o) {
     if (r.level_start != null) L.levelFrom = L.levelFrom == null ? r.level_start : Math.min(L.levelFrom, r.level_start);
     if (r.level_end != null) L.levelTo = L.levelTo == null ? r.level_end : Math.max(L.levelTo, r.level_end);
     let cost = 0, lemons = 0, meat = 0;
+    const kinds = { lemon: [0, 0], meat: [0, 0], other: [0, 0] };   // this run's [potions, mesos at the shop price] by kind
     for (const p of r.potions || []) {
       const c = p.used * (p.price || 0), g = o.lemon.includes(p.id) ? L.lemon : o.meat.includes(p.id) ? L.meat : L.other;
       g.used += p.used; g.cost += c; cost += c;
       g.bought += p.bought || 0; g.spent += (p.bought || 0) * (p.price || 0);   // only what a run saw bought: the All time tab's receipt
       if (g === L.lemon) lemons += p.used; else if (g === L.meat) meat += p.used;
+      const kd = kinds[g === L.lemon ? 'lemon' : g === L.meat ? 'meat' : 'other']; kd[0] += p.used || 0; kd[1] += c || 0;
     }
     // per 1% only over the sessions that drank them, so a session on other potions doesn't thin it out
     if (lemons && pct > 0) L.lemon.pct += pct;
@@ -258,7 +260,10 @@ function lifetime(rows, o) {
     if (r.result != null) L.profit = (L.profit || 0) + r.result;
     else if (r.mesos_earned != null) L.profit = (L.profit || 0) + r.mesos_earned - cost;
     // a run saved with no map counts everywhere else, but it isn't a map
-    if (r.map_id != null) { const m = maps[r.map_id] || (maps[r.map_id] = { id: r.map_id, mins: 0, exp: 0, expMins: 0 }); m.mins += mins; m.exp += exp; m.expMins += expMins; }
+    if (r.map_id != null) {
+      const m = maps[r.map_id] || (maps[r.map_id] = { id: r.map_id, mins: 0, exp: 0, expMins: 0, first: Infinity }); m.mins += mins; m.exp += exp; m.expMins += expMins;
+      m.first = Math.min(m.first, Date.parse(r.started_at));   // the trail of signs goes in first trained order
+    }
     if (expMins >= BEST_MIN) top('expHr', exp / (expMins / 60), r);
     if (mins > 0) top('longest', mins, r);
     if (lemons) top('lemons', lemons, r);
@@ -274,6 +279,7 @@ function lifetime(rows, o) {
     let used = 0; for (const p of r.potions || []) used += p.used || 0;
     if (mins >= BEST_MIN && pct > 0) {
       per.used += used; per.pct += pct;
+      for (const k of ['lemon', 'meat', 'other']) { per[k][0] += kinds[k][0]; per[k][1] += kinds[k][1]; }
       if (pct >= 0.3 && used > 0) { const v = used / (pct / 100); if (!perBest || v < perBest.v) perBest = { v, row: r }; if (!perWorst || v > perWorst.v) perWorst = { v, row: r }; }
     }
     const began = Date.parse(r.started_at), k = dayKey(began);
@@ -283,9 +289,13 @@ function lifetime(rows, o) {
   for (const g of [L.lemon, L.meat]) { g.per1 = g.pct ? g.used / g.pct : null; delete g.pct; }
   for (const id of Object.keys(drank)) if (!L.thirst || drank[id] > L.thirst.n) L.thirst = { id: +id, n: drank[id] };
   L.maps = Object.values(maps).map(m => Object.assign(m, { expHr: m.expMins ? m.exp / (m.expMins / 60) : null })).sort((a, b) => b.mins - a.mins);
-  const killTop = Object.keys(kill.by).sort((a, b) => kill.by[b] - kill.by[a])[0];
-  L.kills = { n: kill.n, skipped: kill.skipped, top: killTop != null ? { id: +killTop, n: kill.by[killTop] } : null };
-  L.potionsPer = per.pct > 0 && perBest ? { n: per.used / (per.pct / 100), best: perBest, worst: perWorst } : null;
+  // the three monsters on the podium, most kills first
+  const killTops = Object.keys(kill.by).sort((a, b) => kill.by[b] - kill.by[a]).slice(0, 3).map(id => ({ id: +id, n: kill.by[id] }));
+  L.kills = { n: kill.n, skipped: kill.skipped, top: killTops[0] || null, tops: killTops };
+  // one level's shopping list: each kind's potions and mesos over the same levels as the big number, so the counts add up to it
+  const lv = per.pct / 100, perKind = k => ({ n: per[k][0] / lv, mesos: per[k][1] / lv });
+  L.potionsPer = per.pct > 0 && perBest ? { n: per.used / lv, best: perBest, worst: perWorst,
+    list: { lemon: perKind('lemon'), meat: perKind('meat'), other: perKind('other'), mesos: (per.lemon[1] + per.meat[1] + per.other[1]) / lv } } : null;
   const totMins = L.maps.reduce((a, m) => a + m.mins, 0);
   let newest = null;
   for (const r of rows) if (r.map_id != null) { const t = Date.parse(r.started_at); if (!newest || t > newest.t) newest = { id: r.map_id, t }; }
@@ -873,7 +883,18 @@ function mount(root, deps) {
   if (lootOn) loadLoot();
   // All time (grind-alltime.js): Lemons and Meat in a window of their own at the top, shown once something has been eaten; the rest of it is
   // Your runs and Your record, further down
-  const alltime = window.GrindAllTime.build({ el, store, pics: { lemon: picOf(LEMON_IDS), meat: picOf(MEAT_IDS) }, mapName: id => shortMap(id), mobName: id => (data.mobs[id] || ['a monster'])[0] });
+  // the Frequent Eater card's claims (supabase/eater-claims.sql): the player's own rows, read with the saved runs. A claim saves its row,
+  // then tells functions/api/claim.js, which reads the row back itself and posts it to Rimmah; the row is the record, so a post that
+  // fails changes nothing here
+  let claimRows = [];
+  const claims = { on: deps.claimsOn !== false && !!api.claimCard, signedIn: () => signedIn(), ign: () => store.get('bt.ign') || '', setIgn: name => store.set('bt.ign', name),
+    claim: row => api.claimCard(row).then(saved => {
+      claimRows = claimRows.concat(saved || Object.assign({ created_at: new Date().toISOString() }, row));
+      if (deps.claimUrl && api.token) Promise.resolve().then(() => api.token()).then(token => fetch(deps.claimUrl, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token, card_no: row.card_no }) })).catch(() => {});
+      renderLife();
+    }) };
+  const alltime = window.GrindAllTime.build({ el, store, pics: { lemon: picOf(LEMON_IDS), meat: picOf(MEAT_IDS) }, mapName: id => shortMap(id), mobName: id => (data.mobs[id] || ['a monster'])[0],
+    sprites: () => mobSprites, mesos: fmtK, claims });
   // Your runs, then Your record: two Windows. Runs are rows (five, then show more); the record is the five totals in a band, the most
   // trained maps as rows with their hours, Personal bests, then the days
   const runsWin = el('section', { class: 'k-win g-win', id: 'g-runs', hidden: '' }, el('div', { class: 'k-bar' }, el('h2', {}, 'Your runs')),
@@ -2010,8 +2031,9 @@ function mount(root, deps) {
     // signed in: the account's sessions plus any the account didn't take yet, which are kept on this device
     const local = jget(KEY_LOCAL, []);
     const got = signedIn() ? api.listGrind().catch(() => []).then(rows => rows.concat(local.filter(l => !rows.some(r => r.id === l.id)))) : Promise.resolve(local);
-    return got.then(rows => {
-      lastRows = rows;
+    const mine = signedIn() && claims.on ? api.listClaims().catch(() => []) : Promise.resolve([]);
+    return Promise.all([got, mine]).then(([rows, cl]) => {
+      lastRows = rows; claimRows = cl;
       renderLife();
       render();   // the band's usual and the card's level come from these rows
       listRuns();
@@ -2054,7 +2076,7 @@ function mount(root, deps) {
       try { const r = GS().toRow(session); rows = rows.filter(x => x.id !== r.id).concat(r.active_min > 0 ? [r] : []); } catch (e) { /* not started yet */ }
     }
     const L = lifetime(rows, { now: Date.now(), lemon: LEMON_IDS, meat: MEAT_IDS, mobs: data.mobs, maps: data.maps });
-    alltime.update(L, { since: 'since you started tracking' + (signedIn() ? '' : ', on this device') + ' · ' + L.sessions + ' run' + (L.sessions === 1 ? '' : 's') });
+    alltime.update(L, { since: 'since you started tracking' + (signedIn() ? '' : ', on this device') + ' · ' + L.sessions + ' run' + (L.sessions === 1 ? '' : 's'), claims: claimRows });
     record.hidden = !L.sessions; life.hidden = runsWin.hidden && record.hidden;
     alltime.el.hidden = !(L.lemon.used || L.meat.used);   // a new player with nothing eaten doesn't see it
     LF.other.textContent = L.other.used ? 'Plus ' + fmt(L.other.used) + ' other potions, ' + fmtK(L.other.cost) + ' mesos of them.' : '';
@@ -2086,7 +2108,7 @@ function mount(root, deps) {
   // what the card needs comes after the page is up, each on its own: one that fails leaves the card as it was
   const dataFile = f => fetch('data/' + f).then(r => { if (!r.ok) throw new Error(f); return r.json(); });
   dataFile('grind-drops.json').then(D => { drops = D; fillClass(D); render(); }, () => {});
-  dataFile('mob-sprites.json').then(S => { mobSprites = S; render(); }, () => {});
+  dataFile('mob-sprites.json').then(S => { mobSprites = S; render(); renderLife(); }, () => {});
   loadSheet().catch(() => {});
   if (session) setStatus('Carrying on your session from ' + timeOfDay(session.t0) + (app ? '. Press Start to carry on.' : '. Share the game window to keep going.'));
   window.Grind.debug = { noteFrame, session: () => session, state: () => ({ reads: st.reads, ticks: st.ticks, line: st.line, m: st.m, level: st.level }),

@@ -1,16 +1,25 @@
 // All time on the Grind tab: every Lemon and Meat eaten since you started tracking, and three more all time numbers, in one window that
-// steps through five views with one Next button (2026-11-09, always opens on the Orchard).
+// steps through five views with one Next button (2026-11-09; since 2026-11-15 it opens on the Potion Shop, the Orchard comes last).
 // The Orchard: a tree for every 100 Lemons and a ghost Ribbon Pig for every 50 Meat, and ten little ones turn into one big one (a run
 // eats about 440 Lemons an hour, so a regular outgrows any stage of little trees within weeks). The Tab: a shop receipt of what was
-// bought, eaten and spent, and a stamp card that gets you nothing. Bought is only what a run saw, so Eaten can pass it: a run that
-// starts with a full bag buys nothing. Then Monsters felled (an estimate), Potions per level and Maps visited, small cards of numbers
-// from lifetime(). First the words and sums, as pure functions; then build, which draws it.
-// window.GrindAllTime = { SWAP_MS, tiers, treeWords, pigWords, stampsOf, stampKinds, build }
+// bought, eaten and spent, and the Frequent Eater card: a stamp for every 1,000 eaten, and a full card of ten can be claimed for a
+// stack of potions from REWARD_FROM in game while claims are on (the beta). Bought is only what a run saw, so Eaten can pass it: a run that
+// starts with a full bag buys nothing. Then Monsters felled (an estimate, with a podium of the top three), Potions per level (with one
+// level's shopping list) and Maps visited (with a trail of signs), numbers from lifetime(). First the words and sums, as pure functions; then build, which draws it.
+// window.GrindAllTime = { SWAP_MS, tiers, treeWords, pigWords, stampKinds, cardOf, trailOf, podiumOf, checkedEaten, looksOff, build }
 (function () {
 'use strict';
 
-const TREE = 100, GHOST = 50, STAMP = 200, CARD = 10;
+const TREE = 100, GHOST = 50, STAMP = 1000, CARD = 10, CARD_EATS = STAMP * CARD;
+// A claim's count (supabase/eater-claims.sql mirrors checkedEaten): a run's Lemons and Meat count up to CLAIM_CAP a minute. The fastest real
+// drinking on record is 41 Lemons in 5.55 minutes (7.4 a minute, the 2026-10-31 Tomb replay) and All time's usual is about 440 an hour
+// (7.3 a minute), so 20 leaves room for two potions on the go and then some. CLAIM_SLACK_MIN: how late a run's first save can be
+const CLAIM_CAP = 20, CLAIM_SLACK_MIN = 5;
 const SWAP_MS = 15000;
+// who hands over a claimed card's potions, and how many
+const REWARD_FROM = 'Rimmah', REWARD_N = 100;
+// the podium: how tall each place's step is, and the most room a monster's picture gets
+const STEP_H = { 1: 56, 2: 40, 3: 28 }, MOB_H = 72, MOB_W = 104;
 // past what the stage can hold the art stops growing, and the number on the sign carries on
 const BIG_TREES_MAX = 35, BIG_GHOSTS_MAX = 12;
 // Ribbon Pig's first walking frame (data/mob-sprites.json)
@@ -40,11 +49,52 @@ function pigWords(n) {
   if (!t.big) return t.little + (t.little === 1 ? ' Ribbon Pig' : ' Ribbon Pigs') + ' gone. One left';
   return t.big + (t.big === 1 ? ' big ghost' : ' big ghosts') + (t.little ? ', ' + t.little + ' little' : '') + '. One pig left';
 }
-// the stamp card: how many on this card, how many cards are full, how far to the next stamp
-function stampsOf(eaten) {
-  const got = Math.floor(eaten / STAMP);
-  return { on: got % CARD, cards: Math.floor(got / CARD), next: (got + 1) * STAMP - eaten, first: got === 0 };
+// the Frequent Eater card: a stamp for every 1,000 eaten, ten to a card. claimed: how many cards this player has claimed. A full card
+// that isn't claimed is 'full'; otherwise it's the next card filling, 'claimed' once there's a claim to show. When the total falls under
+// what was claimed (only so many runs load), no stamp shows and the way to go grows: never a negative, never a second claim
+function cardOf(eaten, claimed) {
+  claimed = claimed || 0;
+  const no = claimed + 1;
+  if (Math.floor(eaten / CARD_EATS) > claimed) return { state: 'full', no, on: CARD, toGo: 0 };
+  return { state: claimed ? 'claimed' : 'filling', no, on: Math.max(0, Math.min(CARD - 1, Math.floor((eaten - claimed * CARD_EATS) / STAMP))), toGo: no * CARD_EATS - eaten };
 }
+// Maps visited's trail: at most max signs (the favorite, the newest, then the most trained), in the order they were first trained.
+// maps: lifetime()'s, each { id, mins, first }. A favorite that is also the newest is the favorite
+function trailOf(maps, favId, newestId, max) {
+  max = max || 8;
+  const tot = maps.reduce((a, m) => a + m.mins, 0), rank = m => m.id === favId ? 0 : m.id === newestId ? 1 : 2;
+  const keep = maps.slice().sort((a, b) => rank(a) - rank(b) || b.mins - a.mins).slice(0, max).sort((a, b) => a.first - b.first);
+  return { signs: keep.map(m => ({ id: m.id, share: tot ? m.mins / tot : 0, fav: m.id === favId, newest: m.id === newestId && m.id !== favId })), more: maps.length - keep.length };
+}
+// the podium's steps left to right: second, first in the middle, third. Fewer monsters, fewer steps
+function podiumOf(tops) {
+  return [[1, 2], [0, 1], [2, 3]].filter(([i]) => tops && tops[i]).map(([i, place]) => ({ id: tops[i].id, n: tops[i].n, place }));
+}
+// what a claim may count, from saved runs as the database holds them (created_at is the database's own clock, at a run's first save).
+// A run counts when it gained EXP and has active minutes. Its time runs from its start, but never from before the run before it ended
+// (runs can't overlap) nor from more than slackMin before it was first saved (a run saved while it happened was saved in its first
+// minutes; one pasted in afterwards gets the slack and no more), up to its end or now. Lemons and Meat count up to cap a minute of that.
+// o: { lemon, meat, cap, slackMin, now }. Returns { eaten, hours, runs, perHour, top3 } (top3: what the three biggest runs added)
+function checkedEaten(rows, o) {
+  const slack = o.slackMin * 60000, ids = o.lemon.concat(o.meat), each = [];
+  const runs = rows.map(r => ({ r, a: Date.parse(r.started_at), b: Math.min(Date.parse(r.ended_at), o.now), c: Date.parse(r.created_at) }))
+    .filter(x => x.r.exp > 0 && x.r.active_min > 0 && isFinite(x.a) && isFinite(x.b) && isFinite(x.c))
+    .sort((p, q) => p.a - q.a || p.c - q.c);
+  let end = -Infinity, eaten = 0, mins = 0;
+  for (const x of runs) {
+    const m = Math.min(x.r.active_min, (x.b - Math.max(x.a, end, x.c - slack)) / 60000);
+    end = Math.max(end, x.b);
+    if (!(m > 0)) continue;
+    let ate = 0;
+    for (const p of x.r.potions || []) if (ids.includes(+p.id) && p.used > 0) ate += +p.used;
+    const n = Math.min(Math.floor(ate), Math.floor(o.cap * m));
+    eaten += n; mins += m; each.push(n);
+  }
+  each.sort((p, q) => q - p);
+  return { eaten, hours: mins / 60, runs: each.length, perHour: mins ? eaten / (mins / 60) : 0, top3: each.slice(0, 3).reduce((a, n) => a + n, 0) };
+}
+// worth a second look before handing anything over: drinking within 20% of the cap, or most of the total from three runs
+const looksOff = (c, cap) => c.perHour >= 0.8 * cap * 60 || c.top3 > c.eaten / 2;
 // which picture each stamp gets: Meat as often as Meat is eaten, the same stamps every time
 function stampKinds(lemon, meat, n) {
   const share = meat / (lemon + meat || 1), steps = i => Math.floor(i * share + 1e-9);
@@ -138,12 +188,16 @@ const TORN = (() => {
   return 'polygon(0 0, 100% 0, ' + teeth.join(', ') + ')';
 })();
 
-// build({ el, store, pics: { lemon, meat }, mapName }): the window, hidden until something has been eaten. update(L, { since }): L is
-// lifetime()'s, since the bar's small line. Called every few seconds through a run, so each part draws again only when it changes
-function build({ el, pics, mapName, mobName }) {
+// build({ el, pics: { lemon, meat }, mapName, mobName, sprites, mesos, claims }): the window, hidden until something has been eaten.
+// sprites(): data/mob-sprites.json's { id: [w, h, frames] } once it has loaded. mesos: a number in few characters. claims: { on,
+// signedIn(), ign(), setIgn(name), claim({ card_no, reward, ign }) -> Promise } (left out, the card only counts).
+// update(L, { since, claims }): L is lifetime()'s, since the bar's small line, claims the player's claim rows [{ card_no, reward,
+// created_at }]. Called every few seconds through a run, so each part draws again only when it changes
+function build({ el, pics, mapName, mobName, sprites, mesos, claims }) {
   const put = (node, text) => { if (node.textContent !== text) node.textContent = text; };
+  const short = mesos || fmt, C = claims || { on: false };
 
-  const FACES = ['orchard', 'tab', 'kills', 'potions', 'maps'];
+  const FACES = ['tab', 'kills', 'potions', 'maps', 'orchard'];
   const dots = el('span', { class: 'g-at-dots', 'aria-hidden': 'true' }, FACES.map(() => el('i', {})));
   const nextBtn = el('button', { type: 'button', class: 'g-at-go' }, 'Next');
   const note = el('small', {});
@@ -176,24 +230,37 @@ function build({ el, pics, mapName, mobName }) {
     el('table', { class: 'g-at-bill' },
       el('thead', {}, el('tr', {}, el('th', { scope: 'col', 'aria-label': 'Potion' }), el('th', { scope: 'col' }, 'Bought'), el('th', { scope: 'col' }, 'Eaten'), el('th', { scope: 'col' }, 'Mesos'))), bill),
     spot.el, sitting.el);
+  // the card's parts are made once and shown or hidden, so a name being typed stays through a redraw
   const cardName = el('h3', {}), stamps = el('div', { class: 'g-at-stamps' }), toGo = el('span', { class: 'g-at-togo' }), toWhat = el('span', {}), joke = el('small', {});
-  const card = el('div', { class: 'k-card g-at-card' }, cardName, stamps, el('div', { class: 'g-at-next' }, toGo, toWhat), joke);
+  const line = el('div', { class: 'g-at-next' }, toGo, toWhat);
+  const pickBtn = kind => el('button', { type: 'button', class: 'g-at-opt', 'data-reward': kind, 'aria-pressed': 'false' }, pics[kind] ? el('img', { src: pics[kind], alt: '' }) : null, REWARD_N + (kind === 'lemon' ? ' Lemons' : ' Meat'));
+  const picks = { lemon: pickBtn('lemon'), meat: pickBtn('meat') };
+  const pickRow = el('div', { class: 'g-at-pick', role: 'group', 'aria-label': 'Your reward', hidden: '' }, picks.lemon, picks.meat);
+  const nameIn = el('input', { type: 'text', class: 'g-at-ign', maxlength: '12', autocomplete: 'off', 'aria-label': 'Your character name', placeholder: 'Your character name' });   // joins the card only while it asks: Grind has nothing to type otherwise
+  const claimBtn = el('button', { type: 'button', class: 'k-btn key sm g-at-claim', hidden: '' }, 'Claim it');
+  const card = el('div', { class: 'k-card g-at-card' }, cardName, stamps, line, pickRow, claimBtn, joke);
 
-  // Monsters felled, Potions per level and Maps visited: a label, a big number and two small lines each
-  const statFace = kind => {
-    const s = { label: el('div', { class: 'g-tl' }), n: el('div', { class: 'g-tn' }), a: el('div', { class: 'g-ts' }), b: el('div', { class: 'g-ts' }) };
-    s.el = el('div', { class: 'g-at-face', 'data-face': kind }, el('div', { class: 'k-pad g-at-stat' }, s.label, s.n, s.a, s.b));
+  // Monsters felled, Potions per level and Maps visited: a label, a big number and two small lines on the left, a picture on the right
+  // (left out when there is nothing to draw, and then the words have the view to themselves)
+  const statFace = (kind, pic) => {
+    const s = { label: el('div', { class: 'g-tl' }), n: el('div', { class: 'g-tn' }), a: el('div', { class: 'g-ts' }), b: el('div', { class: 'g-ts' }), pic };
+    s.pad = el('div', { class: 'k-pad g-at-stat bare' }, el('div', { class: 'g-at-words' }, s.label, s.n, s.a, s.b), pic);
+    s.el = el('div', { class: 'g-at-face', 'data-face': kind }, s.pad);
+    s.show = on => { pic.hidden = !on; s.pad.classList.toggle('bare', !on); };
     return s;
   };
-  const killsFace = statFace('kills'), potionsFace = statFace('potions'), mapsFace = statFace('maps');
+  const killsFace = statFace('kills', el('div', { class: 'g-at-pic g-at-pod', hidden: '' }));
+  const shopRows = el('div', { class: 'g-at-rows' });
+  const potionsFace = statFace('potions', el('div', { class: 'g-at-pic g-at-shopw', hidden: '' }, el('div', { class: 'g-at-rec g-at-shop' }, el('div', { class: 'g-at-rech' }, el('h3', {}, 'One level\'s shopping list')), shopRows)));
+  const mapsFace = statFace('maps', el('div', { class: 'g-at-pic g-at-trail', hidden: '' }));
   const faces = [
-    el('div', { class: 'g-at-face', 'data-face': 'orchard' }, stage),
     el('div', { class: 'g-at-face', 'data-face': 'tab' }, el('div', { class: 'k-pad g-at-tab' }, el('div', { class: 'g-at-recw' }, receipt), card)),
     killsFace.el, potionsFace.el, mapsFace.el,
+    el('div', { class: 'g-at-face', 'data-face': 'orchard' }, stage),
   ];
   const root = el('section', { class: 'k-win', id: 'g-alltime', hidden: '' }, bar, el('div', { class: 'g-at-faces' }, faces));
 
-  // the swap: always opens on the Orchard, then steps on every SWAP_MS while it's there to be seen. It holds under the mouse or the keyboard,
+  // the swap: always opens on the Potion Shop, then steps on every SWAP_MS while it's there to be seen. It holds under the mouse or the keyboard,
   // stops for good once you press Next, and never swaps by itself for someone who asked for less motion. All five views share a grid cell,
   // so nothing below moves
   let at = 0, held = false, picked = false;
@@ -214,7 +281,7 @@ function build({ el, pics, mapName, mobName }) {
     show((at + 1) % faces.length);
   }, SWAP_MS);
 
-  let groveDrew = null, penDrew = null, tabDrew = null;
+  let groveDrew = null, penDrew = null, tabDrew = null, cardDrew = null, podDrew = null, shopDrew = null, trailDrew = null;
   function drawGrove(n) {
     const G = groveOf(n), key = JSON.stringify(G);
     if (key === groveDrew) return;
@@ -237,7 +304,7 @@ function build({ el, pics, mapName, mobName }) {
     low.replaceChildren(...G.low.flatMap(ghost));
   }
   function drawTab(L) {
-    const lemon = L.lemon, meat = L.meat, eaten = lemon.used + meat.used, S = stampsOf(eaten), thirst = L.thirst, best = L.best && L.best.lemons;
+    const lemon = L.lemon, meat = L.meat, eaten = lemon.used + meat.used, thirst = L.thirst, best = L.best && L.best.lemons;
     const key = JSON.stringify([lemon.used, lemon.bought, lemon.spent, meat.used, meat.bought, meat.spent, L.first, thirst, best && best.v]);
     if (key === tabDrew) return;
     tabDrew = key;
@@ -250,17 +317,105 @@ function build({ el, pics, mapName, mobName }) {
     if (thirst) spot.v.textContent = mapName(thirst.id) + ' · ' + fmt(thirst.n) + (thirst.n === 1 ? ' Lemon' : ' Lemons');
     sitting.el.hidden = !best;
     if (best) sitting.v.textContent = fmt(best.v) + (best.v === 1 ? ' Lemon' : ' Lemons') + ' · ' + day(Date.parse(best.row.started_at));
-    cardName.textContent = 'Frequent Eater card' + (S.cards ? ' no. ' + (S.cards + 1) : '');
-    const kinds = stampKinds(lemon.used, meat.used, S.on);
-    stamps.replaceChildren(...Array.from({ length: CARD }, (_, i) => {
-      const pic = i < S.on ? pics[kinds[i]] : null;
-      return el('span', { class: 'k-ring g-at-stamp' + (i < S.on ? '' : ' off') }, pic ? el('img', { src: pic, alt: '' }) : null);
-    }));
-    toGo.textContent = fmt(S.next);
-    toWhat.textContent = ' more to your ' + (S.first ? 'first' : 'next') + ' stamp';
-    joke.textContent = S.cards ? 'You filled ' + S.cards + (S.cards === 1 ? ' card' : ' cards') + '. That got you absolutely nothing.' : 'One stamp for every ' + STAMP + ' Lemons or Meat. Ten stamps gets you absolutely nothing.';
   }
+  // The Frequent Eater card. With claims off it only counts: every 10,000 is a card filled, for nothing. With claims on a full card
+  // waits to be claimed, one at a time, and the count of claims (the database's) says which card this is
+  const PER = 'One stamp for every ' + fmt(STAMP) + ' Lemons or Meat. ';
+  const prize = kind => REWARD_N + (kind === 'meat' ? ' Meat' : ' Lemons');
+  let pick = 'lemon', busy = false, oops = '', asking = false, lastL = null, lastRows = [];
+  function drawCard(L, rows) {
+    lastL = L; lastRows = rows || [];
+    const lemon = L.lemon.used, meat = L.meat.used, eaten = lemon + meat, signed = !!(C.on && C.signedIn());
+    const key = JSON.stringify([lemon, meat, C.on, signed, lastRows.map(r => [r.card_no, r.reward, r.created_at]), pick, busy, oops, asking]);
+    if (key === cardDrew) return;
+    cardDrew = key;
+    const filled = C.on ? lastRows.length : Math.floor(eaten / CARD_EATS), S = cardOf(eaten, filled);
+    const last = C.on && lastRows.length ? lastRows.reduce((a, r) => r.card_no > a.card_no ? r : a) : null;
+    // the claimed card stays up until the next one has a stamp. A total that fell under its claim (only the newest runs load) shows the next card, empty
+    const justClaimed = S.state === 'claimed' && S.on === 0 && S.toGo <= CARD_EATS;
+    const no = justClaimed ? S.no - 1 : S.no, on = justClaimed ? CARD : S.on, full = S.state === 'full';
+    cardName.textContent = 'Frequent Eater card' + (no > 1 ? ' no. ' + no : '') + (full ? ' · full!' : justClaimed ? ' · claimed' : '');
+    const kinds = stampKinds(lemon, meat, on);
+    stamps.replaceChildren(...Array.from({ length: CARD }, (_, i) => {
+      const pic = i < on ? pics[kinds[i]] : null;
+      return el('span', { class: 'k-ring g-at-stamp' + (i < on ? '' : ' off') }, pic ? el('img', { src: pic, alt: '' }) : null);
+    }));
+    const found = last ? 'Find ' + REWARD_FROM + ' in game for your ' + prize(last.reward) : '', when = last ? 'Claimed on ' + day(Date.parse(last.created_at)) + '.' : '';
+    const can = full && signed;
+    line.hidden = full;
+    toGo.textContent = justClaimed ? '' : fmt(S.toGo);
+    toWhat.textContent = justClaimed ? found : ' more to a full card';
+    pickRow.hidden = !can || asking;
+    if (can && asking) { if (!nameIn.parentNode) card.insertBefore(nameIn, claimBtn); } else if (nameIn.parentNode) nameIn.remove();
+    claimBtn.hidden = !can;
+    claimBtn.disabled = busy;
+    claimBtn.textContent = busy ? 'Claiming' : 'Claim it';
+    for (const k in picks) { picks[k].setAttribute('aria-pressed', String(k === pick)); picks[k].disabled = busy; }
+    joke.classList.toggle('bad', can && !!oops);
+    joke.textContent = !C.on ? (filled ? 'You filled ' + filled + (filled === 1 ? ' card' : ' cards') + '. That got you absolutely nothing.' : PER + 'Ten stamps gets you absolutely nothing.')
+      : can ? oops      // the name box says what it wants, so asking adds no line and the card keeps its height
+      : full ? 'Sign in with Discord to claim.'
+      : justClaimed ? when
+      : S.state === 'claimed' ? found + '. ' + when
+      : PER + 'A full card gets you ' + REWARD_N + ' Lemons or Meat from ' + REWARD_FROM + ', in game. Beta only.';
+    joke.hidden = !joke.textContent;
+  }
+  const redraw = () => { if (lastL) drawCard(lastL, lastRows); };
+  for (const k in picks) picks[k].addEventListener('click', () => { pick = k; redraw(); });
+  function claimNow() {
+    if (busy || !lastL) return;
+    let ign = (C.ign() || '').trim();
+    if (!ign) {
+      ign = nameIn.value.trim().slice(0, 12);
+      if (!ign) { asking = true; oops = ''; redraw(); nameIn.focus(); return; }
+      C.setIgn(ign);
+    }
+    busy = true; oops = ''; asking = false; redraw();
+    // the claim's own row comes back through update's claims; a no from the database is said in its own words
+    Promise.resolve().then(() => C.claim({ card_no: lastRows.length + 1, reward: pick, ign }))
+      .then(() => { busy = false; }, e => { busy = false; oops = e && e.db && e.message ? e.message : 'Couldn\'t claim it. Try again in a minute.'; })
+      .then(redraw);
+  }
+  claimBtn.addEventListener('click', claimNow);
+  nameIn.addEventListener('keydown', e => { if (e.key === 'Enter') claimNow(); });
+
   const first = n => 'about ' + fmt(n >= 1000 ? Math.round(n / 100) * 100 : Math.max(10, Math.round(n / 10) * 10));
+  // the podium: the top three by kills, first in the middle on the tallest step. A monster with no picture keeps its step
+  function drawPodium(K) {
+    const steps = K && K.n > 0 ? podiumOf(K.tops || (K.top ? [K.top] : [])) : [], S = (sprites && sprites()) || {};
+    const key = JSON.stringify([steps, steps.map(s => S[s.id] || 0)]);
+    if (key === podDrew) return;
+    podDrew = key;
+    killsFace.show(steps.length > 0);
+    killsFace.pic.replaceChildren(...steps.map(s => {
+      const sp = S[s.id], k = sp ? Math.min(1, MOB_H / sp[1], MOB_W / sp[0]) : 0;
+      const mob = sp ? el('div', { class: 'g-at-mob', 'aria-hidden': 'true', style: 'width:' + Math.round(sp[0] * k) + 'px;height:' + Math.round(sp[1] * k) + 'px;background-image:url(sprites/mobs/' + s.id + '.png);background-size:' + Math.round(sp[0] * k) * sp[2] + 'px ' + Math.round(sp[1] * k) + 'px' }) : null;
+      return el('div', { class: 'g-at-step p' + s.place }, mob, el('div', { class: 'g-at-block', style: 'height:' + STEP_H[s.place] + 'px' }, String(s.place)),
+        el('div', { class: 'g-at-who' }, mobName(s.id)), el('div', { class: 'g-ts' }, first(s.n)));
+    }));
+  }
+  // one level's shopping list: each kind of potion a level takes and what it costs at the shop
+  function drawShop(P) {
+    const list = P && P.list, rows = list ? [['Lemons', pics.lemon, list.lemon], ['Meat', pics.meat, list.meat], ['Other potions', null, list.other]].filter(r => r[2] && Math.round(r[2].n) > 0) : [];
+    const key = JSON.stringify([rows.map(r => [r[0], r[2]]), list && list.mesos]);
+    if (key === shopDrew) return;
+    shopDrew = key;
+    potionsFace.show(rows.length > 0);
+    shopRows.replaceChildren(...rows.map(([name, pic, g]) => el('div', { class: 'g-at-row' },
+      el('span', { class: 'g-at-ico' }, pic ? el('img', { src: pic, alt: '' }) : null), el('span', { class: 'g-at-rn' }, name), el('span', { class: 'g-at-rx' }, 'x ' + fmt(g.n)), el('b', {}, short(g.mesos)))),
+      el('div', { class: 'g-at-row tot' }, el('span', { class: 'g-at-rn' }, 'A level costs you'), el('b', {}, short(list ? list.mesos : 0) + ' mesos')));
+  }
+  // the trail: a sign for each map in the order it was first trained, the favorite in gold, the newest lit
+  function drawTrail(L) {
+    const V = L.visited, T = V && V.n && L.maps ? trailOf(L.maps, V.fav.id, V.newest && V.newest.id) : { signs: [], more: 0 };
+    const key = JSON.stringify(T);
+    if (key === trailDrew) return;
+    trailDrew = key;
+    mapsFace.show(T.signs.length > 0);
+    mapsFace.pic.replaceChildren(...T.signs.map(s => el('div', { class: 'g-at-way' + (s.fav ? ' fav' : s.newest ? ' new' : '') }, el('b', {}, mapName(s.id)),
+      s.fav ? el('small', {}, Math.round(s.share * 100) + '% of your hours') : s.newest ? el('small', {}, 'newest') : null)),
+      ...(T.more > 0 ? [el('small', { class: 'g-at-more' }, 'and ' + T.more + ' more')] : []));
+  }
   function drawStats(L) {
     const K = L.kills, P = L.potionsPer, V = L.visited, put2 = (f, label, n, a, b) => { put(f.label, label); put(f.n, n); put(f.a, a); put(f.b, b); };
     if (K && K.n > 0) put2(killsFace, 'Monsters felled', first(K.n), K.top ? 'Mostly ' + mobName(K.top.id) + ', ' + first(K.top.n) : '', K.skipped ? K.skipped + (K.skipped === 1 ? ' run' : ' runs') + ' with no map left out' : 'An estimate from your EXP');
@@ -274,10 +429,11 @@ function build({ el, pics, mapName, mobName }) {
     put(note, (o && o.since) || '');
     put(lemonSign.n, fmt(L.lemon.used)); put(lemonSign.words, treeWords(L.lemon.used));
     put(meatSign.n, fmt(L.meat.used)); put(meatSign.words, pigWords(L.meat.used));
-    drawGrove(L.lemon.used); drawPen(L.meat.used); drawTab(L); drawStats(L);
+    drawGrove(L.lemon.used); drawPen(L.meat.used); drawTab(L); drawCard(L, o && o.claims); drawStats(L);
+    drawPodium(L.kills); drawShop(L.potionsPer); drawTrail(L);
   }
   return { el: root, update };
 }
 
-window.GrindAllTime = { SWAP_MS, tiers, treeWords, pigWords, stampsOf, stampKinds, build };
+window.GrindAllTime = { SWAP_MS, REWARD_FROM, STAMP, CARD, CARD_EATS, CLAIM_CAP, CLAIM_SLACK_MIN, tiers, treeWords, pigWords, stampKinds, cardOf, trailOf, podiumOf, checkedEaten, looksOff, build };
 })();
