@@ -88,6 +88,7 @@ window.BT_ERRORS = [];
   --key-lo: #a8640f;
   --key-ink: #2b1d02;
   --lime: #c8f56a; --lime-hi: #e6ffa8; --lime-lo: #86b030; --lime-ink: #16360a;
+  --stone: #315a48; --stone-hi: #4f8266; --stone-lo: #14302a; --stone-moss: #9fd96a;
   --glow: #ffd98a; --fly: #fff7b0;
   --ground: #1c4412; --ground-line: #2f6a1e;
   --credit: #9fc4b3;
@@ -104,8 +105,6 @@ window.BT_ERRORS = [];
   --pill-ink-y: #d8f0c8;
   --win-shadow: rgba(0,0,0,.55);
   --pad-shade: rgba(0,0,0,.2);
-  --glass: #0e1915;
-  --glass-e: #6e5a3c;
   --j-lemon: #d4a52e;
   --j-lemon-t: #ffe27c;
   --j-meat: #c76b3f;
@@ -999,6 +998,8 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
   opacity: 0; visibility: hidden; transform: scale(.4); transform-origin: 0 100%; transition: opacity .2s, transform .26s cubic-bezier(.3, 1.5, .5, 1), visibility 0s .26s; }
 .g-out .g-bub { opacity: 1; visibility: visible; transform: none; transition: opacity .2s .18s, transform .26s .18s cubic-bezier(.3, 1.5, .5, 1), visibility 0s 0s; }
 @media (prefers-reduced-motion: reduce) { .g-hop, .g-bub { transition: none !important; } .g-om { animation: none !important; } }
+/* the site's pop-out has no room above the panel (grind.js ROOM), so no mushroom, bubble or moss there: only the app has them */
+.g-strip.g-noroom :is(.g-omc, .g-bub, .g-moss) { display: none; }
 @media (prefers-reduced-motion: reduce) { .g-strip, body.g-ov .g-strip { transition: none; } }
 .g-strip button:focus-visible { outline: .14em solid var(--focus); outline-offset: .1em; }
 /* the top row: the light, the map and how long, the buttons at the right end, on the glass like the rest (the bark is the
@@ -1028,7 +1029,12 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
 .gq-msg:empty { display: none; }
 .gq-sent .gq-msg { color: var(--ink); }
 .gq-row { display: flex; justify-content: flex-end; gap: 8px; }
-.g-btns .g-gear[aria-pressed="true"] { --face: var(--lime); --face-hi: var(--lime-hi); --face-lo: var(--lime-lo); color: var(--lime-ink); }
+/* the pop-out's buttons are mossy stones: the kit's square in flat stone, no bark, a strip of moss along the top with its shadow
+   under it. Lit (Settings open) the stone turns lime and the moss its pale tip */
+.g-strip .g-btns .k-sq { --face: var(--stone); --face-hi: var(--stone-hi); --face-lo: var(--stone-lo); --mossy: var(--stone-moss); color: var(--ink); }
+.g-strip .g-btns .k-sq::after { background-image: none; box-shadow: 0 var(--ledge) 0 var(--face-lo), 0 0 0 var(--u) var(--wood-o), inset 0 calc(2 * var(--u)) 0 var(--mossy), inset 0 calc(3 * var(--u)) 0 color-mix(in srgb, var(--wood-o) 30%, transparent); }
+.g-strip .g-btns .k-sq:hover::after { box-shadow: 0 var(--ledge) 0 var(--face-lo), 0 0 0 var(--u) var(--wood-o), inset 0 calc(2 * var(--u)) 0 var(--mossy), inset 0 0 0 99px color-mix(in srgb, var(--face-hi) 28%, transparent); }
+.g-strip .g-btns .g-gear[aria-pressed="true"] { --face: var(--lime); --face-hi: var(--lime-hi); --face-lo: var(--lime-lo); --mossy: var(--lime-hi); color: var(--lime-ink); }
 /* ⇆ Layout's row: the three layouts as pictures with their names over the panel, under the buttons (beside them in Bar,
    which has no room under), the one showing lit. Solid whatever See-through says: it's only there while it's being used.
    While clicks pass through to the game (g-pass) it waits for the mouse on ⇆ to hold them (g-hold) */
@@ -1088,7 +1094,10 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
 .g-strip[data-layout="tile"] .g-over { display: inline; margin-left: .3em; }
 .g-strip[data-layout="tile"] .g-k-exp .g-us { display: none; }
 .g-parts, .g-town { grid-column: 1 / -1; font-size: .88em; line-height: 1.25; color: var(--muted); min-width: 0; }
-.g-parts { white-space: normal; }
+/* Profit's parts: Mesos, Loot and Potions, each a word over its number, three even columns */
+.g-parts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 .4em; text-align: center; white-space: nowrap; }
+.g-part { display: grid; justify-items: center; min-width: 0; }
+.g-pn { font-family: var(--font-num); font-size: 1.3em; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; color: var(--ink); }
 /* closed: the rest (Profit's parts, EXP gained, Kills so far, Per 1%, In town) waits behind the ▾ button */
 .g-strip[data-open="0"] .g-body :is(.g-grid, .g-quip) { display: none; }
 .g-k-kills { grid-area: kills; } .g-k-lv { grid-area: lv; } .g-k-profit { grid-area: profit; }
@@ -1106,30 +1115,26 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
 .g-perp + .g-perp { margin-left: .3em; }
 .g-ppr img { width: auto; height: .8em; image-rendering: pixelated; }
 .g-ppr .g-us { font-family: var(--font-body); font-size: .68em; }
-/* the timer tile, one design in every layout: a Card on its potion's ground (Lemons yellow, Meat roast, the rest the Soon
-   blue, the Due amber under 5 minutes) with a square little glass that drains beside the words, flat juice and a lighter top
-   line, and the potion's picture in it. The ground fades with See-through, the juice and the picture never do */
+/* the timer, one design in every layout: the potion's picture beside its clock and what's left, with no box, ring or
+   ground of its own (Rimmah, 2026-11-15: boxes read blocky), only a faint line from its neighbour. Under 5 minutes the
+   clock turns amber and the picture shakes */
 .g-tiles { grid-area: tiles; display: grid; grid-auto-rows: minmax(0, 1fr); gap: .5em; min-width: 0; }
-.g-pot { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: .6em; min-width: 0; padding: .35em .7em; overflow: hidden; color: var(--ink);
-  background-color: color-mix(in srgb, var(--card) calc(var(--g-see, 1) * 100%), transparent); border: var(--u) solid var(--card-o); box-shadow: inset 0 var(--u) 0 var(--card-hi), inset 0 calc(-1 * var(--u)) 0 var(--card-lo); }
-.g-vial { position: relative; width: 2em; height: 3.3em; display: grid; place-items: center; overflow: hidden; background-color: color-mix(in srgb, var(--glass) calc(var(--g-see, 1) * 100%), transparent); border: var(--u) solid var(--glass-e); }
-.g-juice { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background-color: var(--j-lemon); }
+.g-pot { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: .6em; min-width: 0; padding: .4em .8em; overflow: hidden; color: var(--ink); }
+.g-vial { position: relative; width: 2em; height: 3.3em; display: grid; place-items: center; overflow: hidden; }
+.g-juice { display: none; position: absolute; left: 0; right: 0; bottom: 0; height: 0; background-color: var(--j-lemon); }
 .g-juice::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: var(--u); background-color: var(--j-lemon-t); animation: g-ripple 1.6s steps(1) infinite; }
 .g-vial img { position: relative; width: auto; height: 1.55em; image-rendering: pixelated; animation: g-bob 2.6s steps(1) infinite; }
 .g-pwords { display: grid; align-content: center; min-width: 0; }
-.g-pclock { font-family: var(--font-num); font-weight: 700; font-size: 1.59em; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.g-pclock { font-family: var(--font-num); font-weight: 700; font-size: 1.7em; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .g-pleft, .g-pcap { font-size: .88em; font-weight: 600; line-height: 1.25; white-space: nowrap; }
 .g-pleft b { font-family: var(--font-num); font-weight: 700; font-variant-numeric: tabular-nums; }
-.g-pot.lemon { background-color: color-mix(in srgb, var(--lemon) calc(var(--g-see, 1) * 100%), transparent); color: var(--lemon-ink); }
 .g-pot.lemon .g-juice { background-color: var(--j-lemon); }
 .g-pot.lemon .g-juice::before { background-color: var(--j-lemon-t); }
-.g-pot.meat { background-color: color-mix(in srgb, var(--meat) calc(var(--g-see, 1) * 100%), transparent); color: var(--meat-ink); }
 .g-pot.meat .g-juice { background-color: var(--j-meat); }
 .g-pot.meat .g-juice::before { background-color: var(--j-meat-t); }
-.g-pot.other { background-color: color-mix(in srgb, var(--soon-bg) calc(var(--g-see, 1) * 100%), transparent); color: var(--soon-fg); }
 .g-pot.other .g-juice { background-color: var(--soon-bar); }
 .g-pot.other .g-juice::before { background-color: color-mix(in srgb, var(--soon-bar) 60%, var(--bar-ink)); }
-.g-pot.low { background-color: color-mix(in srgb, var(--due-bg) calc(var(--g-see, 1) * 100%), transparent); color: var(--due-fg); }
+.g-pot.low .g-pclock { color: var(--lamp-wait); }
 .g-pot.low .g-vial img { animation: g-shake .5s steps(1) infinite; }
 /* the motion is whole pixels: the juice's top line takes two frames, the potion bobs one art pixel and shakes one when low */
 @keyframes g-ripple { 0% { transform: translateY(0); } 50% { transform: translateY(var(--u)); } }
@@ -1137,7 +1142,7 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
 @keyframes g-shake { 0% { transform: translateX(calc(-1 * var(--u))); } 50% { transform: translateX(var(--u)); } }
 @media (prefers-reduced-motion: reduce) { .g-strip .g-vial img, .g-strip .g-pot, .g-strip .g-juice::before { animation: none !important; } }
 /* one potion in Tile: a line from the session card in the spare slot */
-.g-quip { display: grid; align-content: center; min-width: 0; padding: .35em .7em; background-color: color-mix(in srgb, var(--card) calc(var(--g-see, 1) * 100%), transparent); border: var(--u) solid var(--card-o); box-shadow: inset 0 var(--u) 0 var(--card-hi), inset 0 calc(-1 * var(--u)) 0 var(--card-lo); color: var(--ink); white-space: nowrap; }
+.g-quip { display: grid; align-content: center; justify-items: center; text-align: center; min-width: 0; padding: .3em .7em; color: var(--ink); white-space: nowrap; }
 .g-quip b { font-family: var(--font-title); font-size: 1.12em; font-weight: 400; color: var(--num-big); }
 .g-quip span { font-size: .88em; font-weight: 600; color: var(--muted); }
 .g-strip:not([data-layout="tile"]) .g-quip { display: none; }
@@ -1152,12 +1157,13 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
 .g-alert button { padding: 0 .6em; border: var(--u) solid var(--wood-o); border-radius: 0; background-color: var(--btn); box-shadow: inset 0 var(--u) 0 var(--btn-hi), inset 0 calc(-1 * var(--u)) 0 var(--btn-lo); color: var(--btn-ink); font-family: inherit; font-size: 1em; font-weight: 700; line-height: inherit; cursor: pointer; }
 .g-l3b { display: flex; gap: .4em; }
 .g-l3b button { float: none; margin-left: 0; }
-/* the light, first in the title bar (Bar: at the left end): a square lamp in its state's colour and two or three words,
+/* the light, first in the title bar (Bar: at the left end): a soft round light glowing in its state's colour (grey has no glow) and two or three words,
    green reading everything, amber it wants something (EXP still counts), red paused, grey not running. Its box takes no
    room of its own in the title bar (fit() measures the panel's longest line): it has what the title bar has left, and
    the wordmark and the map step aside for words that ask for something */
 .g-lamp { display: flex; align-items: center; gap: .45em; flex: 1 1 0; width: 0; min-width: calc(5 * var(--u)); font-size: .88em; font-weight: 700; line-height: 1.25; white-space: nowrap; }
-.g-dot { flex: none; width: calc(5 * var(--u)); height: calc(5 * var(--u)); background-color: var(--lamp, var(--lamp-idle)); box-shadow: 0 0 0 var(--u) var(--wood-o), inset var(--u) var(--u) 0 var(--lamp-hi); }
+.g-dot { flex: none; width: calc(5 * var(--u)); height: calc(5 * var(--u)); margin-inline: calc(2 * var(--u)); border-radius: 50%; background-color: var(--lamp, var(--lamp-idle));
+  box-shadow: inset var(--u) var(--u) calc(2 * var(--u)) var(--lamp-hi), 0 0 calc(2 * var(--u)) var(--lamp, transparent), 0 0 calc(7 * var(--u)) calc(2 * var(--u)) color-mix(in srgb, var(--lamp, transparent) 40%, transparent); }
 .g-lamp.ok { --lamp: var(--lime); } .g-lamp.wait { --lamp: var(--lamp-wait); } .g-lamp.bad { --lamp: var(--lamp-bad); }
 .g-lw { display: flex; align-items: baseline; gap: .7em; min-width: 0; overflow: hidden; }
 .g-lt { overflow: hidden; text-overflow: ellipsis; }
@@ -1167,11 +1173,16 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
 .g-flip b::before { content: '… '; }
 .g-flip b.fix::before { content: '! '; }
 .g-flip b.done::before { content: '✓ '; }
-/* Column and Tile: the light takes a plank of its own under the buttons, the map and the window row under it */
-.g-strip:is([data-layout="column"], [data-layout="tile"]) .g-top { flex-wrap: wrap; height: auto; row-gap: 0; }
-.g-strip:is([data-layout="column"], [data-layout="tile"]) .g-top > .g-btns, .g-strip:is([data-layout="column"], [data-layout="tile"]) .g-top :is(.g-el, .g-lamp) { height: calc(16 * var(--u)); align-items: center; }
-.g-strip:is([data-layout="column"], [data-layout="tile"]) .g-lamp { order: 3; flex: none; width: 100%; }
-.g-strip:is([data-layout="column"], [data-layout="tile"]) .g-lw { flex: 1 1 0; width: 0; }
+/* Column and Tile: two rows with no spare room. The light beside the buttons, the map and how long beside the window row.
+   The light and the map take no width of their own (fit() measures the panel's longest line): the light's words wrap to a
+   second line when they're long, the map ends in dots */
+.g-strip:is([data-layout="column"], [data-layout="tile"]) .g-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .15em .6em; height: auto; }
+.g-strip:is([data-layout="column"], [data-layout="tile"]) .g-lamp { grid-area: 1 / 1; flex: none; width: auto; min-height: calc(14 * var(--u)); contain: inline-size; font-size: .9em; }
+.g-strip:is([data-layout="column"], [data-layout="tile"]) .g-lw { flex: 1 1 0; width: 0; flex-wrap: wrap; row-gap: 0; }
+.g-strip:is([data-layout="column"], [data-layout="tile"]) .g-lt { white-space: normal; }
+.g-strip:is([data-layout="column"], [data-layout="tile"]) .g-btns { grid-area: 1 / 2; margin-left: 0; justify-self: end; }
+.g-strip:is([data-layout="column"], [data-layout="tile"]) .g-el { grid-area: 2 / 1; width: auto; min-width: 0; contain: inline-size; }
+.g-strip:is([data-layout="column"], [data-layout="tile"]) .g-win { grid-area: 2 / 2; margin-left: 0; justify-self: end; }
 /* while it shows, the size of the text stays as it is (fit() measures the panel without it), and so does the window while the
    room it frees is enough: the small lines under the numbers step aside in Tile and Column, EXP an hour's arrow and usual with
    them, and in Tile the window row too (its own row there, beside the map in Column); Bar's is further down. One that needs
@@ -1181,64 +1192,73 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
 /* the layouts. Tile: one narrow column. The light, the map and how long, the window row, then EXP an hour with Kills a
    minute beside it, Level in, Profit, the timers side by side, and when opened the rest in a little grid; the alert last.
    The panel itself is the grid here (.g-body steps out of the way) */
-.g-strip[data-layout="tile"] { grid-template: "top top" auto "exp kills" auto "lv lv" auto "profit profit" auto "grid grid" auto "tiles tiles" auto "alert alert" 1fr / minmax(0, 1fr) minmax(0, 1fr); gap: .35em .6em; }
+.g-strip[data-layout="tile"] { grid-template: "top top" auto "exp kills" auto "lv profit" auto "grid grid" auto "tiles tiles" auto "alert alert" 1fr / minmax(0, 1fr) minmax(0, 1fr); gap: 0; }
 .g-strip[data-layout="tile"] .g-body { display: contents; }
-.g-strip[data-layout="tile"] .g-top { grid-area: top; margin-bottom: .15em; }
-.g-strip[data-layout="tile"] .g-l3 { grid-area: alert; align-self: end; }
-/* the map and how long on a row of their own under the light, the window row under them. Neither takes width of its own
-   (the title bar's wrapped rows would add up in fit()'s measure); the switch fits Tile's width at any text size it gets */
-.g-strip[data-layout="tile"] .g-el { order: 4; flex: none; width: 100%; contain: inline-size; }
-.g-strip[data-layout="tile"] .g-win { order: 5; width: 100%; justify-content: start; margin-left: 0; contain: inline-size; }
-.g-strip[data-layout="tile"] .g-ww { justify-self: start; }
+.g-strip[data-layout="tile"] .g-top { grid-area: top; margin-bottom: .3em; }
+.g-strip[data-layout="tile"] .g-l3 { grid-area: alert; align-self: end; margin-top: .4em; }
 .g-strip[data-layout="tile"] .g-chip { flex-wrap: wrap; column-gap: .3em; }
 .g-strip[data-layout="tile"] .g-over { margin-left: 0; }
-.g-strip[data-layout="tile"] :is(.g-k-lv, .g-k-profit) { grid-template-columns: minmax(0, 1fr) auto; column-gap: .5em; align-items: baseline; }
-.g-strip[data-layout="tile"] :is(.g-k-lv, .g-k-profit) .g-kl { grid-column: 1; grid-row: 1; }
-.g-strip[data-layout="tile"] :is(.g-k-lv, .g-k-profit) .g-kn { grid-column: 2; grid-row: 1; }
-.g-strip[data-layout="tile"] :is(.g-k-lv, .g-k-profit) .g-ks { grid-column: 1 / -1; grid-row: 2; }
-.g-strip[data-layout="tile"] .g-grid { display: grid; grid-template-columns: repeat(2, auto); justify-content: start; gap: .2em 1.4em; }
+/* Tile: every number in its own spot, two across (Level in beside Profit), the opened three across with Profit's parts
+   under. No boxes: one faint line between neighbours, left edges on the panel's own */
+.g-strip[data-layout="tile"] .g-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; border-top: var(--u) solid var(--g-line); }
+.g-strip[data-layout="tile"] :is(.g-k-exp, .g-k-lv, .g-k-gain) { padding-left: 0; }
+.g-strip[data-layout="tile"] :is(.g-k-kills, .g-k-profit, .g-k-per) { padding-right: 0; }
+.g-strip[data-layout="tile"] :is(.g-k-kills, .g-k-profit, .g-k-ksf, .g-k-per) { border-left: var(--u) solid var(--g-line); }
+.g-strip[data-layout="tile"] :is(.g-k-lv, .g-k-profit, .g-parts, .g-town, .g-tiles) { border-top: var(--u) solid var(--g-line); }
+.g-strip[data-layout="tile"] .g-grid .g-k { padding-inline: .5em; }
+.g-strip[data-layout="tile"] .g-grid .g-k-gain { padding-left: 0; } .g-strip[data-layout="tile"] .g-grid .g-k-per { padding-right: 0; }
+/* the small lines take no width of their own (three tiles of "107 EXP a kill here" end to end would shrink all the text):
+   they wrap inside their tile */
+.g-strip[data-layout="tile"] .g-ks { justify-self: stretch; contain: inline-size; white-space: normal; }
+/* the opened three are narrow: label and number only, like Bar's */
+.g-strip[data-layout="tile"] .g-grid .g-ks { display: none; }
+/* Per 1% with two potions: the two counts wrap inside the tile, one under the other, and take no width of their own */
+.g-strip[data-layout="tile"] .g-ppr { justify-self: stretch; flex-wrap: wrap; row-gap: 0; contain: inline-size; }
 /* the one potion Tile's line from the session card takes no width of its own: it wraps in the half it has */
 .g-strip[data-layout="tile"] .g-quip { contain: inline-size; white-space: normal; }
 /* Column: the light, the map and how long on the window row's left, then EXP an hour with Kills a minute beside it, Level in,
    Profit, the timers side by side, the numbers */
 .g-strip:is([data-layout="column"]) .g-body { grid-template: "exp kills" auto "lv lv" auto "profit profit" auto "tiles tiles" auto "grid grid" auto / minmax(0, 1fr) minmax(0, 1fr); }
-/* Column: no wordmark, no word usual. A row is the site's row: the name with its small line under it on the left, the number on the right, a dashed line under */
-.g-strip[data-layout="column"] { gap: .55em; }
+/* Column: no wordmark, no word usual. Each row is a line of its own, a faint line over it: the name with its small line under it on the left, the number on the right */
+.g-strip[data-layout="column"] { gap: .4em; }
 /* a panel held taller than it needs (its height without the alert, fit()): the spare room goes to the body, between its
    blocks, and never under the title bar */
 .g-strip:is([data-layout="column"]) { grid-template-rows: auto 1fr; }
-.g-strip[data-layout="column"] .g-body { row-gap: .55em; }
-.g-strip[data-layout="column"] .g-el { order: 4; flex: 1 1 0; width: 0; min-width: 0; contain: inline-size; }
-.g-strip[data-layout="column"] .g-win { order: 4; flex: none; margin-left: .6em; }
-.g-strip[data-layout="column"] .g-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: .35em; }
-.g-strip[data-layout="column"] .g-k { grid-template-columns: minmax(0, 1fr) auto; column-gap: .5em; padding-bottom: .3em; background: var(--night-dots) left bottom / calc(4 * var(--u)) var(--u) repeat-x; }
-.g-strip[data-layout="column"] .g-grid .g-k:has(+ .g-parts) { padding-bottom: 0; background: none; }
+.g-strip[data-layout="column"] .g-body { gap: 0; }
+.g-strip[data-layout="column"] .g-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; }
+.g-strip[data-layout="column"] :is(.g-k, .g-k-exp, .g-parts, .g-town) { padding-inline: 0; }
+.g-strip[data-layout="column"] .g-k.g-k-kills { padding-left: .7em; border-left: var(--u) solid var(--g-line); }
+.g-strip[data-layout="column"] :is(.g-k-lv, .g-k-profit, .g-grid > *, .g-tiles) { border-top: var(--u) solid var(--g-line); }
+.g-strip[data-layout="column"] .g-k { grid-template-columns: minmax(0, 1fr) auto; column-gap: .5em; align-items: center; }
 .g-strip[data-layout="column"] .g-kl { grid-column: 1; grid-row: 1; color: var(--ink); }
 .g-strip[data-layout="column"] .g-ks { grid-column: 1; grid-row: 2; }
 .g-strip[data-layout="column"] .g-k .g-kn { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
-/* Tile and Column, as their mockups draw them: EXP an hour and Kills a minute side by side, a line between, the two numbers
+/* Tile and Column: EXP an hour and Kills a minute side by side, a line between, the two numbers
    the same size. The big number counts in fit()'s measure (a huge one brings the font down instead of spilling out of its
    half); the words of its small line take no width of their own and wrap in the half: Tile's "▲ 4% over usual" on the
    whole line, Column's "· usual 121K" in what the arrow leaves. A grid, not the wrapping row: a wrapping row's widest is all
    its items end to end */
 .g-strip:is([data-layout="tile"], [data-layout="column"]) .g-kv { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; column-gap: .3em; }
 .g-strip:is([data-layout="tile"], [data-layout="column"]) .g-kv > .g-kn { grid-column: 1 / -1; }
-.g-strip[data-layout="tile"] .g-chip { grid-column: 1 / -1; min-width: 0; contain: inline-size; }
+.g-strip[data-layout="tile"] .g-chip { grid-column: 1 / -1; justify-self: stretch; min-width: 0; contain: inline-size; }
 .g-strip[data-layout="column"] .g-chip { grid-column: 1; }
 .g-strip[data-layout="column"] .g-k-exp .g-us { grid-column: 2; min-width: 0; white-space: normal; contain: inline-size; }
-.g-strip:is([data-layout="tile"], [data-layout="column"]) .g-k.g-k-kills { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; padding: 0 0 0 .6em; border-left: var(--u) solid var(--div); background: none; }
+.g-strip:is([data-layout="tile"], [data-layout="column"]) .g-k.g-k-kills { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; }
 .g-strip:is([data-layout="tile"], [data-layout="column"]) .g-k.g-k-kills > * { grid-column: 1; grid-row: auto; align-self: auto; }
 .g-strip:is([data-layout="tile"], [data-layout="column"]) :is(.g-kh .g-kl, .g-k-kills .g-kl) { font-family: var(--font-body); font-size: .88em; font-weight: 700; line-height: 1.25; color: var(--ink); }
 .g-strip:is([data-layout="tile"], [data-layout="column"]) :is(.g-k-exp, .g-k-kills) .g-kn { font-size: 2.4em; line-height: 1.05; color: var(--num-big); }
 .g-strip[data-layout="column"] :is(.g-k-exp, .g-k-kills) .g-kn { font-size: 2.57em; }
+.g-strip[data-layout="tile"] .g-kn.g-long { font-size: 1.2em; line-height: 1.47; }
 /* up to two timers side by side in one row (the one potion Tile shares it with a line from the session card). Even
    columns as a grid, so fit()'s measure takes the wider timer twice (a 1:23:45 clock in one half shrinks the text, not
    the clock's half) */
-.g-strip:is([data-layout="tile"], [data-layout="column"]) .g-tiles { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: .3em; }
-.g-strip:is([data-layout="tile"], [data-layout="column"]) .g-pot { padding: .2em .5em; column-gap: .4em; }
-.g-strip:is([data-layout="tile"], [data-layout="column"]) .g-vial { width: 1.5em; height: 2.1em; }
-.g-strip:is([data-layout="tile"], [data-layout="column"]) .g-vial img { height: 1.15em; }
-.g-strip:is([data-layout="tile"], [data-layout="column"]) .g-pclock { font-size: 1.3em; }
+.g-strip:is([data-layout="tile"], [data-layout="column"]) .g-tiles { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 0; padding-top: .3em; }
+.g-strip:is([data-layout="tile"], [data-layout="column"]) .g-pot { padding: .3em .7em; column-gap: .4em; justify-content: start; grid-template-columns: auto auto; }
+.g-strip:is([data-layout="tile"], [data-layout="column"]) .g-tiles > :first-child { padding-left: 0; }
+.g-strip:is([data-layout="tile"], [data-layout="column"]) .g-tiles > :not([hidden]) ~ * { border-left: var(--u) solid var(--g-line); }
+.g-strip:is([data-layout="tile"], [data-layout="column"]) .g-vial { width: auto; min-width: 1.5em; height: 2.1em; }
+.g-strip:is([data-layout="tile"], [data-layout="column"]) .g-vial img { height: 1.5em; }
+.g-strip:is([data-layout="tile"], [data-layout="column"]) .g-pclock { font-size: 1.45em; }
 /* a timer is its clock and what's left (how many went down, while nothing's left to count); how many went down and the
    caption are in its hover title, and the mushroom says when one runs low. Before the first potion it keeps its caption */
 .g-strip:is([data-layout="tile"], [data-layout="column"]) .g-pleft:not(:has(> .g-plf:empty)) :is(b, .g-pv, .g-pdot) { display: none; }
@@ -1251,10 +1271,10 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
    placed on the panel's own grid. No title bar, just the glass; the alert goes under. EXP an hour's column grows past 13em
    when its line under the number is longer (a huge "over usual"), so the window's font comes down to fit it instead of the
    line spilling out of its column */
-.g-strip[data-layout="bar"] { display: grid; grid-template-columns: auto minmax(13em, max-content) repeat(3, 13em) auto auto; align-items: stretch; align-content: center; gap: .35em 0; padding: .25em .77em; }
+.g-strip[data-layout="bar"] { display: grid; grid-template-columns: auto minmax(13.1em, max-content) repeat(3, 13.1em) auto auto; align-items: stretch; align-content: center; gap: 0; padding: .4em .7em; }
 .g-strip[data-layout="bar"] :is(.g-top, .g-body, .g-kh) { display: contents; }
 .g-strip[data-layout="bar"][data-open="1"] .g-grid { display: contents; }
-.g-strip[data-layout="bar"] .g-who { grid-area: 1 / 1; display: flex; flex-direction: column; justify-content: center; font-size: .9em; padding-right: .6em; border-right: var(--u) solid var(--div); color: var(--ink); }
+.g-strip[data-layout="bar"] .g-who { grid-area: 1 / 1; display: flex; flex-direction: column; justify-content: center; font-size: .9em; color: var(--ink); }
 .g-strip[data-layout="bar"] .g-lamp { flex: none; width: auto; min-width: 0; font-size: 1em; }
 .g-strip[data-layout="bar"] .g-el { width: auto; min-width: 0; font-size: 1em; color: var(--muted); contain: inline-size; }
 .g-strip[data-layout="bar"] .g-lw { flex-direction: column; align-items: flex-start; gap: 0; }
@@ -1269,16 +1289,28 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
 .g-strip:is([data-layout="bar"], [data-layout="column"]) .g-flip b.done::before { content: '✓'; }
 .g-strip:is([data-layout="bar"], [data-layout="column"]) .g-flip b.done span { display: none; }
 /* Bar: the closed row, each in its column; the opened row under the same ones (the left edges match) */
-.g-strip[data-layout="bar"] .g-k-exp { grid-area: 1 / 2; display: grid; grid-template-columns: auto; align-content: center; padding-left: .6em; }
+.g-strip[data-layout="bar"] .g-k-exp { grid-area: 1 / 2; display: grid; grid-template-columns: auto; align-content: center; }
 .g-strip[data-layout="bar"] .g-k-kills { grid-area: 1 / 3; } .g-strip[data-layout="bar"] .g-k-lv { grid-area: 1 / 4; } .g-strip[data-layout="bar"] .g-k-profit { grid-area: 1 / 5; }
 .g-strip[data-layout="bar"] .g-tiles { grid-area: 1 / 6; }
-.g-strip[data-layout="bar"] .g-btns { grid-area: 1 / 7; display: grid; grid-template-columns: repeat(2, 32px); grid-auto-rows: 32px; gap: .3em; align-self: center; margin-left: .6em; padding-left: .6em; border-left: var(--u) solid var(--div); }
+.g-strip[data-layout="bar"] .g-btns { grid-area: 1 / 7; display: grid; grid-template-columns: repeat(2, 32px); grid-auto-rows: 32px; gap: .3em; align-self: center; margin-left: .7em; }
 .g-strip[data-layout="bar"] .g-btns .k-sq { width: 32px; height: 32px; }
 .g-strip[data-layout="bar"] .g-k-gain { grid-area: 2 / 2; } .g-strip[data-layout="bar"] .g-k-ksf { grid-area: 2 / 3; } .g-strip[data-layout="bar"] .g-k-per { grid-area: 2 / 4; }
-.g-strip[data-layout="bar"] .g-parts { grid-area: 2 / 5 / auto / span 2; white-space: normal; }
-.g-strip[data-layout="bar"] .g-town { grid-area: 2 / 1; padding-right: .6em; }
-.g-strip[data-layout="bar"] :is(.g-k-gain, .g-k-ksf, .g-k-per, .g-parts, .g-town) { padding-top: .2em; border-top: var(--u) solid var(--div); }
-.g-strip[data-layout="bar"] :is(.g-k-gain, .g-k-ksf, .g-k-per, .g-parts) { padding-left: .6em; }
+.g-strip[data-layout="bar"] .g-parts { grid-area: 2 / 5 / auto / -1; white-space: normal; }
+.g-strip[data-layout="bar"] .g-town { grid-area: 2 / 1; }
+/* no boxes anywhere (Rimmah, 2026-11-15: outlined tiles read blocky): every number keeps its own spot and one padding,
+   with one faint line between neighbours. In Tile and Column .g-who is no box, so it takes nothing there */
+.g-strip { --g-line: color-mix(in srgb, var(--card-o) 75%, transparent); }
+.g-strip :is(.g-who, .g-k, .g-k-exp, .g-parts, .g-town) { padding: .35em .7em; }
+.g-strip[data-layout="bar"] :is(.g-k, .g-k-exp, .g-parts, .g-town) { align-content: center; padding: .3em .8em; }
+.g-strip[data-layout="bar"] .g-who { padding: .3em .8em .3em 0; }
+.g-strip[data-layout="bar"] :is(.g-k, .g-k-exp, .g-parts, .g-tiles) { border-left: var(--u) solid var(--g-line); }
+.g-strip[data-layout="bar"] :is(.g-k-gain, .g-k-ksf, .g-k-per, .g-parts, .g-town) { border-top: var(--u) solid var(--g-line); }
+.g-strip[data-layout="bar"] .g-pot + .g-pot { border-left: var(--u) solid var(--g-line); }
+.g-strip[data-layout="bar"] :is(.g-parts, .g-town) { display: grid; }
+/* no hole in the opened row: the left tile takes both rows until In town shows under it, and Profit's parts run to the
+   right edge, under the potions and the buttons */
+.g-strip[data-layout="bar"][data-open="1"]:has(.g-town[hidden]) .g-who { grid-row: 1 / span 2; }
+.g-strip[data-layout="bar"] .g-ww { justify-self: start; }
 /* the small lines: Kills a minute and Profit keep theirs (pick the map, loot not counted); the rest stay hidden */
 .g-strip[data-layout="bar"] :is(.g-pcap, .g-plf, .g-pdot, .g-k-lv .g-ks, .g-k-gain .g-ks, .g-k-ksf .g-ks, .g-k-per .g-ks) { display: none; }
 .g-strip[data-layout="bar"] .g-kh .g-kl { display: none; }
@@ -1289,20 +1321,22 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
 /* the chip and its percent keep their line's size (.88 of the panel): at the Bar's 14 px a smaller one fell under 11 px */
 .g-strip[data-layout="bar"] .g-chip { grid-row: 2; }
 .g-strip[data-layout="bar"] .g-k-exp :is(.g-d, .g-over) { font-size: 1em; }
-.g-strip[data-layout="bar"] :is(.g-k-kills, .g-k-lv, .g-k-profit, .g-tiles) { align-self: stretch; padding-left: .6em; border-left: var(--u) solid var(--div); }
-.g-strip[data-layout="bar"] :is(.g-k-kills, .g-k-lv, .g-k-profit) { align-content: center; }
-.g-strip[data-layout="bar"] .g-tiles { display: flex; gap: .6em; }
-.g-strip[data-layout="bar"] .g-k .g-kn { font-size: 1.15em; }
+.g-strip[data-layout="bar"] .g-tiles { display: flex; gap: 0; align-self: stretch; }
+.g-strip[data-layout="bar"] .g-k .g-kn { font-size: 1.7em; line-height: 1.1; }
+.g-strip[data-layout="bar"] :is(.g-k .g-kl, .g-ks, .g-kv) { font-size: 1em; }
 .g-strip[data-layout="bar"] .g-ppr .g-us { font-size: .8em; }
-.g-strip[data-layout="bar"] .g-pot { flex: none; padding: .2em .5em; column-gap: .4em; }
-.g-strip[data-layout="bar"] .g-vial { width: 1.5em; height: 2.1em; }
-.g-strip[data-layout="bar"] .g-vial img { height: 1.15em; }
-.g-strip[data-layout="bar"] .g-pclock { font-size: 1.3em; }
+/* a timer is its picture and its clock: no pill, no box, no glass ring round the picture */
+.g-strip[data-layout="bar"] .g-pot { flex: none; padding: .3em .8em; column-gap: .5em; }
+.g-strip[data-layout="bar"] .g-vial { width: auto; min-width: 1.5em; height: 2.1em; }
+.g-strip[data-layout="bar"] .g-vial img { height: 1.6em; }
+.g-strip[data-layout="bar"] .g-pclock { font-size: 1.45em; }
 /* the fourth choice after Reset average has to fit too: Bar and Column drop the word since, Bar the words an hour, and
    Column's switch closes up */
 .g-strip:is([data-layout="bar"], [data-layout="column"], [data-layout="tile"]) .g-sw { display: none; }
 .g-strip[data-layout="bar"]:has(.g-seg [data-w="since"]:not([hidden])) .g-kv::before { display: none; }
 .g-strip:is([data-layout="column"], [data-layout="tile"]) .g-seg:has([data-w="since"]:not([hidden])) button { padding-inline: .4em; }
+/* Tile is the narrow one: its switch closes up further, so the time beside it is never cut */
+.g-strip[data-layout="tile"] .g-seg:has([data-w="since"]:not([hidden])) button { padding-inline: .2em; }
 /* Bar's alert: one line in what's left of its 80 pixels, the tiles' second line making room */
 .g-strip[data-layout="bar"]:has(> .g-l3:not([hidden])) .g-pleft { display: none; }
 .g-strip[data-layout="bar"] .g-alert { grid-area: 3 / 1 / auto / -1; padding: 0 .5em; border: 0; background: none; box-shadow: none; color: var(--ink); overflow: hidden; white-space: nowrap; }
@@ -1972,7 +2006,7 @@ const CONFIG = {
   reportUrl: 'https://sixpathcrossway.pages.dev/api/report',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-15a',
+  version: '2026-11-15b',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };

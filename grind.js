@@ -139,7 +139,9 @@ function potionTiles(slots, cds, prevKeys = [], t) {
     }
   }
   for (const cd of cds || []) { const g = kinds[potionKey(cd.id, cd.name)]; if (g && !g.cd) { g.cd = cd; g.id = cd.id; g.name = cd.name; } }
-  let top = Object.values(kinds).sort((a, b) => a.cd && b.cd ? a.cd.secs - b.cd.secs : a.cd ? -1 : b.cd ? 1 : b.used - a.used).slice(0, 2);
+  // Lemons and Meat anchor the timers; other potions (Sap, Red, Blue...) only show when neither is being used
+  const all = Object.values(kinds), anchored = all.filter(g => g.kind !== 'other');
+  let top = (anchored.length ? anchored : all).sort((a, b) => a.cd && b.cd ? a.cd.secs - b.cd.secs : a.cd ? -1 : b.cd ? 1 : b.used - a.used).slice(0, 2);
   const [a, b] = top;
   if (a && b && a.cd && b.cd && !a.cd.low && !b.cd.low && b.cd.secs - a.cd.secs < SWAP_GAP && prevKeys[0] === b.key) top = [b, a];
   return top.length ? top.map(g => ({ key: g.key, kind: g.kind, id: g.id, name: g.name, used: g.used, count: g.cd ? g.cd.left : g.count, full: g.full, cd: g.cd, fresh: g.fresh })) : [null];
@@ -421,12 +423,14 @@ function mount(root, deps) {
   // own window width for one potion tile and for two (Bar's second tile sits in the row, so it's wider, the mockup's 1158),
   // and the window is as tall as the panel shows, plus ROOM above it (round 2: the window fits what's showing)
   const SP = {};
-  const WIDTHS = { tile: { 1: 232, 2: 232 }, bar: { 1: 1093, 2: 1158 }, column: { 1: 312, 2: 312 } };
+  const WIDTHS = { tile: { 1: 264, 2: 264 }, bar: { 1: 1093, 2: 1158 }, column: { 1: 344, 2: 344 } };
   // the text is never bigger than the mockups' 14 px (times the app's Size): a layout whose lines are shorter than its width
   // (Column) keeps the room beside them rather than taking a bigger font, one whose lines are longer (Tile) takes a smaller one
-  const FONT = 14;
-  // the space above the panel, for the mushroom and its bubble: on the site the pop-out's body color, in the app see-through
-  const ROOM = 30;
+  const FONT = 16;
+  // the space above the panel, for the mushroom and its bubble. Only the app has it (see-through there). On the site it was a
+  // dark empty band over the panel (Rimmah, 2026-11-15), so the site's pop-out has no room and no mushroom (g-noroom)
+  // window.BT_POPROOM === true gives the site the room too, so the tests can check the mushroom in a browser
+  const ROOMY = !!app || window.BT_POPROOM === true, ROOM = ROOMY ? 30 : 0;
   const ORDER = Object.keys(WIDTHS);
   // anything not a layout now (a saved hero or corner) opens as Tile
   let layout = ORDER.includes(store.get(KEY_LAYOUT)) ? store.get(KEY_LAYOUT) : 'tile';
@@ -512,7 +516,7 @@ function mount(root, deps) {
       // closed: EXP an hour with its line, Kills a minute, Lv in, Profit, the timers. The ▾ button opens the rest (the little columns)
       kTile('kills', 'Kills a minute'), kTile('lv', 'Level in'), kTile('profit', 'Profit'),
       SP.grid = el('div', { class: 'g-grid' }, kTile('gain', 'EXP gained'), kTile('ksf', 'Kills so far'), perTile(),
-        SP.partsBox = el('div', { class: 'g-parts' }, SP.profitParts = el('span', {})),
+        SP.partsBox = el('div', { class: 'g-parts' }, ...[['pMesos', 'Mesos'], ['pLoot', 'Loot'], ['pPots', 'Potions']].map(([k, w]) => el('div', { class: 'g-part' }, el('span', { class: 'g-pl' }, w), SP[k] = el('b', { class: 'g-pn' }, '·')))),
         SP.town = el('div', { class: 'g-town', hidden: '' })),
       SP.tilesBox = el('div', { class: 'g-tiles' }, SP.pots[0].box, SP.quip = el('div', { class: 'g-quip', hidden: '' }, SP.quipB = el('b', {}), SP.quipS = el('span', {})))),
     SP.l3 = el('div', { class: 'g-l3 g-alert', hidden: '' }),
@@ -521,6 +525,7 @@ function mount(root, deps) {
     el('span', { class: 'g-moss k-moss', 'aria-hidden': 'true' }),
     el('span', { class: 'g-omc', 'aria-hidden': 'true' }, el('span', { class: 'g-hop' }, SP.shroom = el('i', { class: 'g-om' }))),
     SP.bubble = el('div', { class: 'g-bub', role: 'status' }));
+  if (!ROOMY) strip.classList.add('g-noroom');
   // Mesos: the run's total, or a small switch beside the label makes it the hour rate (kept on the device)
   let mesoHr = store.get(KEY_POPMESO) === '1', lastP = null;
   SP.profitL.replaceChildren(el('span', {}, 'Profit'), SP.mesoSw = el('button', { type: 'button', class: 'g-mesosw', 'aria-pressed': String(mesoHr),
@@ -534,11 +539,14 @@ function mount(root, deps) {
     put(SP.mesoSw, mesoHr ? 'An hour' : 'Total');
     SP.mesoSw.title = SP.mesoSw.ariaLabel = mesoHr ? 'Showing profit an hour, show the total' : 'Showing the total, show profit an hour';
     const v = !P ? null : mesoHr ? P.perHr : P.total;
-    put(SP.profit, v == null ? '·' : mesoHr ? sgnK(v) + '/hr' : signed(v));
-    put(SP.profitSub, !P ? '' : P.lootCounted ? 'if you sold it all' : 'loot not counted');
-    // opened: the three parts it is made of (loot is a dot until a bag is counted)
-    const part = (k, v) => k + ' ' + (v == null ? '·' : sgnK(v));
-    put(SP.profitParts, !P ? '' : [part('mesos', P.mesos), part('loot', P.loot), part('potions', P.potions == null ? null : -P.potions)].join(' · '));
+    const pv = v == null ? '·' : mesoHr ? sgnK(v) + '/hr' : signed(v);
+    put(SP.profit, pv);
+    // a million or more is a long number: Tile draws it smaller in its half, so the whole panel's text doesn't shrink for it
+    SP.profit.classList.toggle('g-long', pv.length >= 10);
+    put(SP.profitSub, !P ? '' : P.lootCounted ? 'with loot' : 'loot not counted');
+    // opened: the three parts it is made of, each a word over its number (loot is a dot until a bag is counted)
+    const part = (e, v) => put(e, !P || v == null ? '·' : sgnK(v));
+    part(SP.pMesos, P && P.mesos); part(SP.pLoot, P && P.loot); part(SP.pPots, !P || P.potions == null ? null : -P.potions);
   }
   const potCount = () => +strip.dataset.pots || 1;
   // ▾ opens the rest of the numbers (Profit's parts, EXP gained, Kills so far, Per 1%, In town), ▴ tucks them away; kept per layout on the device.
@@ -983,7 +991,7 @@ function mount(root, deps) {
     if (!st.homeTried) { st.homeTried = true; const hm = jget(KEY_HOME, null); if (hm && hm.w === w && hm.h === h && hm.box && !S.mesoHome()) S.mesoHome(hm.box); }
     let mesos = null;
     const home = S.mesoHome(), lost = lootOn && home && !st.mesoOpen && Date.now() - (st.mesoSeen || -Infinity) < LOST_MS,
-      search = st.ticks % (home && !lost ? MESO_SEARCH_EVERY : 3) === 1;
+      search = st.ticks % (home && !lost && !st.mesoUnclear ? MESO_SEARCH_EVERY : 3) === 1;   // unclear at its spot: look around soon
     if (home || search) {
       const mr = S.readMesos(src, { search });
       st.mesoOpen = mr.reason !== 'no inventory';

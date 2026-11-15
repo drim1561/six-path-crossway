@@ -830,11 +830,14 @@ function classifyMeso(q) {
 // so something shaped like it (a sign beside a cloud) is never asked about
 function readMesos(src, opts) {
   const home = atHome(src);
-  if (home) { const r = mesoTotal(src, home); if (r.ok) lastBox = home; return r; }
-  if (opts && opts.search === false) return { ok: false, reason: 'no inventory' };
+  // a remembered spot that's 3 px off still finds the label but cuts a digit, so a read that fails there goes on to
+  // the search when one is allowed (it stayed on Mouse off mesos for good); a real tooltip fails the search too
+  const miss = home ? mesoTotal(src, home) : null;
+  if (miss && miss.ok) { lastBox = home; return miss; }
+  if (opts && opts.search === false) return miss || { ok: false, reason: 'no inventory' };
   const r = scanBoxes(src, b => { const r = mesoTotal(src, b); return r.ok ? r : null; });
   if (r) { lastBox = r.box; return r; }
-  return { ok: false, reason: 'no inventory' };
+  return miss || { ok: false, reason: 'no inventory' };
 }
 function mesoTotal(src, box) {
   const gs = mesoGlyphs(src, box).filter(q => q.h >= 0.25 * q.tall);
