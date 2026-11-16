@@ -586,9 +586,13 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 .g-at-dots i { width: 8px; height: 8px; background: var(--bar-muted); opacity: .6; }
 .g-at-dots i.on { background: var(--lime); opacity: 1; }
 /* Monsters felled, Potions per level, Maps visited: one big number and two small lines on the left, a picture on the right (bare: no picture) */
-.g-at-stat { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr); align-items: center; gap: var(--gap); height: 100%; min-height: 222px; box-shadow: inset 0 4px 0 var(--pad-shade); }
-.g-at-stat.bare { grid-template-columns: minmax(0, 1fr); }
-.g-at-words { display: flex; flex-direction: column; justify-content: center; gap: 6px; min-width: 0; }
+.g-at-stat { display: flex; flex-direction: column; justify-content: center; height: 100%; box-shadow: inset 0 4px 0 var(--pad-shade); }
+.g-at-srow { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; align-items: center; gap: var(--gap); padding: 3px 4px; border-bottom: 1px solid var(--at-line); }
+.g-at-srow:last-child { border-bottom: 0; }
+.g-at-sico { display: grid; place-items: center; min-width: 0; }
+.g-at-sico img { display: block; width: auto; height: 28px; image-rendering: pixelated; }
+.g-at-srow .g-tn { text-align: right; font-variant-numeric: tabular-nums; }
+.g-at-words { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-width: 0; }
 .g-at-stat .g-ts { min-width: 0; overflow-wrap: anywhere; }
 /* no boxes, as in the pop-out (Rimmah, 2026-11-15): the words and the picture each keep their own spot, one faint line between */
 #view-grind { --at-line: color-mix(in srgb, var(--card-o) 75%, transparent); }
@@ -620,7 +624,6 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 #view-grind .g-at-dots i { width: 7px; height: 7px; border-radius: 50%; }
 #view-grind :is(.g-tv, .k-row > :last-child, .g-run b) { font-variant-numeric: tabular-nums; }
 .g-at-pic { min-width: 0; }
-.g-at-stat:not(.bare) .g-at-words { align-self: stretch; padding-right: var(--gap); border-right: 1px solid var(--at-line); }
 /* the podium: three steps on one floor, first place in the middle on the gold one */
 .g-at-pod { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 132px); grid-template-rows: 1fr auto auto auto; justify-content: center; column-gap: var(--gap); }
 .g-at-step { display: grid; grid-row: 1 / -1; grid-template-rows: subgrid; justify-items: center; min-width: 0; text-align: center; }
@@ -712,13 +715,14 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 .g-at-claim:disabled { opacity: .6; cursor: default; }
 /* narrower: the Lemons over the Meat, each on a stage of its own so the trees have ground under them, and the receipt over the card */
 @container (max-width: 860px) {
-  .g-at-stage, .g-at-tab, .g-at-stat { grid-template-columns: minmax(0, 1fr); }
+  .g-at-stage, .g-at-tab { grid-template-columns: minmax(0, 1fr); }
   .g-at-tab { grid-template-rows: auto 1fr; }
   .g-at-tab .g-at-card { padding-block: 6px 7px; border-left: 0; border-top: 1px solid var(--at-line); }
-  .g-at-stat:not(.bare) .g-at-words { padding-right: 0; border-right: 0; }
 }
 /* a phone: each sign over its picture, smaller trees to keep the window short, and a tighter bill */
 @container (max-width: 520px) {
+  .g-at-srow { grid-template-columns: minmax(0, 1fr) auto; }
+  .g-at-sico { display: none; }
   .g-at-half { display: grid; min-height: 0; }
   .g-at-stage .g-at-sign { position: relative; left: auto; top: auto; width: auto; max-width: none; margin: 12px 12px 0; }
   .g-at-trees, .g-at-penart { position: relative; inset: auto; }
@@ -2122,7 +2126,7 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-15d',
+  version: '2026-11-15e',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };

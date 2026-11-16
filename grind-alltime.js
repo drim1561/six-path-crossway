@@ -1,5 +1,5 @@
 // All time on the Grind tab: every Lemon and Meat eaten since you started tracking, and three more all time numbers, in one window that
-// steps through five views with one Next button (2026-11-09; since 2026-11-15 it opens on the Potion Shop, the Orchard comes last).
+// steps through three views (the Potion Shop, Your grind, the Orchard) with one Next button (2026-11-09; since 2026-11-15 it opens on the Potion Shop, the Orchard comes last).
 // The Orchard: a tree for every 100 Lemons and a ghost Ribbon Pig for every 50 Meat, and ten little ones turn into one big one (a run
 // eats about 440 Lemons an hour, so a regular outgrows any stage of little trees within weeks). The Tab: a shop receipt of what was
 // bought, eaten and spent, and the Frequent Eater card: a stamp for every 1,000 eaten, and a full card of ten can be claimed for a
@@ -240,28 +240,24 @@ function build({ el, pics, mapName, mobName, sprites, mesos, claims }) {
   const claimBtn = el('button', { type: 'button', class: 'k-btn key sm g-at-claim', hidden: '' }, 'Claim it');
   const card = el('div', { class: 'g-at-card' }, cardName, stamps, line, pickRow, claimBtn, joke);
 
-  // Monsters felled, Potions per level and Maps visited: a label, a big number and two small lines on the left, a picture on the right
-  // (left out when there is nothing to draw, and then the words have the view to themselves)
-  const statFace = (kind, pic) => {
-    const s = { label: el('div', { class: 'g-tl' }), n: el('div', { class: 'g-tn' }), a: el('div', { class: 'g-ts' }), b: el('div', { class: 'g-ts' }), pic };
-    s.pad = el('div', { class: 'k-pad g-at-stat bare' }, el('div', { class: 'g-at-words' }, s.label, s.n, s.a, s.b), pic);
-    s.el = el('div', { class: 'g-at-face', 'data-face': kind }, s.pad);
-    s.show = on => { pic.hidden = !on; s.pad.classList.toggle('bare', !on); };
+  // Monsters felled, Potions per level and Maps visited are one view, Your grind: three rows in the pop-out's row pattern
+  // (a picture, a name with one quiet line under it, the number on the right), one faint line between them
+  const statRow = () => {
+    const s = { ico: el('span', { class: 'g-at-sico' }), label: el('div', { class: 'g-tl' }), a: el('div', { class: 'g-ts' }), b: el('div', { class: 'g-ts' }), n: el('div', { class: 'g-tn' }) };
+    s.el = el('div', { class: 'g-at-srow' }, s.ico, el('div', { class: 'g-at-words' }, s.label, s.a, s.b), s.n);
     return s;
   };
-  const killsFace = statFace('kills', el('div', { class: 'g-at-pic g-at-pod', hidden: '' }));
-  const shopRows = el('div', { class: 'g-at-rows' });
-  const potionsFace = statFace('potions', el('div', { class: 'g-at-pic g-at-shopw', hidden: '' }, el('div', { class: 'g-at-rec g-at-shop' }, el('div', { class: 'g-at-rech' }, el('h3', {}, 'One level\'s shopping list')), shopRows)));
-  const mapsFace = statFace('maps', el('div', { class: 'g-at-pic g-at-trail', hidden: '' }));
+  const killsFace = statRow(), potionsFace = statRow(), mapsFace = statRow();
+  const statsFace = el('div', { class: 'g-at-face', 'data-face': 'stats' }, el('div', { class: 'k-pad g-at-stat' }, killsFace.el, potionsFace.el, mapsFace.el));
   const faces = [
     el('div', { class: 'g-at-face', 'data-face': 'tab' }, el('div', { class: 'k-pad g-at-tab' }, el('div', { class: 'g-at-recw' }, receipt), card)),
-    killsFace.el, potionsFace.el, mapsFace.el,
+    statsFace,
     el('div', { class: 'g-at-face', 'data-face': 'orchard' }, stage),
   ];
   const root = el('section', { class: 'k-win', id: 'g-alltime', hidden: '' }, bar, el('div', { class: 'g-at-faces' }, faces));
 
   // the swap: always opens on the Potion Shop, then steps on every SWAP_MS while it's there to be seen. It holds under the mouse or the keyboard,
-  // stops for good once you press Next, and never swaps by itself for someone who asked for less motion. All five views share a grid cell,
+  // stops for good once you press Next, and never swaps by itself for someone who asked for less motion. All three views share a grid cell,
   // so nothing below moves
   let at = 0, held = false, picked = false;
   const show = i => {
@@ -281,7 +277,7 @@ function build({ el, pics, mapName, mobName, sprites, mesos, claims }) {
     show((at + 1) % faces.length);
   }, SWAP_MS);
 
-  let groveDrew = null, penDrew = null, tabDrew = null, cardDrew = null, podDrew = null, shopDrew = null, trailDrew = null;
+  let groveDrew = null, penDrew = null, tabDrew = null, cardDrew = null, icoDrew = null;
   function drawGrove(n) {
     const G = groveOf(n), key = JSON.stringify(G);
     if (key === groveDrew) return;
@@ -380,47 +376,21 @@ function build({ el, pics, mapName, mobName, sprites, mesos, claims }) {
   nameIn.addEventListener('keydown', e => { if (e.key === 'Enter') claimNow(); });
 
   const first = n => 'about ' + fmt(n >= 1000 ? Math.round(n / 100) * 100 : Math.max(10, Math.round(n / 10) * 10));
-  // the podium: the top three by kills, first in the middle on the tallest step. A monster with no picture keeps its step
-  function drawPodium(K) {
-    const steps = K && K.n > 0 ? podiumOf(K.tops || (K.top ? [K.top] : [])) : [], S = (sprites && sprites()) || {};
-    const key = JSON.stringify([steps, steps.map(s => S[s.id] || 0)]);
-    if (key === podDrew) return;
-    podDrew = key;
-    killsFace.show(steps.length > 0);
-    killsFace.pic.replaceChildren(...steps.map(s => {
-      const sp = S[s.id], k = sp ? Math.min(1, MOB_H / sp[1], MOB_W / sp[0]) : 0;
-      const mob = sp ? el('div', { class: 'g-at-mob', 'aria-hidden': 'true', style: 'width:' + Math.round(sp[0] * k) + 'px;height:' + Math.round(sp[1] * k) + 'px;background-image:url(sprites/mobs/' + s.id + '.png);background-size:' + Math.round(sp[0] * k) * sp[2] + 'px ' + Math.round(sp[1] * k) + 'px' }) : null;
-      return el('div', { class: 'g-at-step p' + s.place }, mob, el('div', { class: 'g-at-block', style: 'height:' + STEP_H[s.place] + 'px' }, String(s.place)),
-        el('div', { class: 'g-at-who' }, mobName(s.id)), el('div', { class: 'g-ts' }, first(s.n)));
-    }));
-  }
-  // one level's shopping list: each kind of potion a level takes and what it costs at the shop
-  function drawShop(P) {
-    const list = P && P.list, rows = list ? [['Lemons', pics.lemon, list.lemon], ['Meat', pics.meat, list.meat], ['Other potions', null, list.other]].filter(r => r[2] && Math.round(r[2].n) > 0) : [];
-    const key = JSON.stringify([rows.map(r => [r[0], r[2]]), list && list.mesos]);
-    if (key === shopDrew) return;
-    shopDrew = key;
-    potionsFace.show(rows.length > 0);
-    shopRows.replaceChildren(...rows.map(([name, pic, g]) => el('div', { class: 'g-at-row' },
-      el('span', { class: 'g-at-ico' }, pic ? el('img', { src: pic, alt: '' }) : null), el('span', { class: 'g-at-rn' }, name), el('span', { class: 'g-at-rx' }, 'x ' + fmt(g.n)), el('b', {}, short(g.mesos)))),
-      el('div', { class: 'g-at-row tot' }, el('span', { class: 'g-at-rn' }, 'A level costs you'), el('b', {}, short(list ? list.mesos : 0) + ' mesos')));
-  }
-  // the trail: a sign for each map in the order it was first trained, the favorite in gold, the newest lit
-  function drawTrail(L) {
-    const V = L.visited, T = V && V.n && L.maps ? trailOf(L.maps, V.fav.id, V.newest && V.newest.id) : { signs: [], more: 0 };
-    const key = JSON.stringify(T);
-    if (key === trailDrew) return;
-    trailDrew = key;
-    mapsFace.show(T.signs.length > 0);
-    mapsFace.pic.replaceChildren(...T.signs.map(s => el('div', { class: 'g-at-way' + (s.fav ? ' fav' : s.newest ? ' new' : '') }, el('b', {}, mapName(s.id)),
-      s.fav ? el('small', {}, Math.round(s.share * 100) + '% of your hours') : s.newest ? el('small', {}, 'newest') : null)),
-      ...(T.more > 0 ? [el('small', { class: 'g-at-more' }, 'and ' + T.more + ' more')] : []));
+  // the row pictures: the monster killed most (its first walk frame), and a Lemon for the potions
+  function drawIcons(L) {
+    const K = L.kills, top = K && K.n > 0 && K.top ? K.top.id : null, S = (sprites && sprites()) || {}, sp = top != null ? S[top] : null;
+    const key = JSON.stringify([top, sp]);
+    if (key === icoDrew) return;
+    icoDrew = key;
+    const k = sp ? Math.min(1, MOB_H / sp[1], MOB_W / sp[0]) : 0;
+    killsFace.ico.replaceChildren(...(sp ? [el('div', { class: 'g-at-mob', 'aria-hidden': 'true', style: 'width:' + Math.round(sp[0] * k) + 'px;height:' + Math.round(sp[1] * k) + 'px;background-image:url(sprites/mobs/' + top + '.png);background-size:' + Math.round(sp[0] * k) * sp[2] + 'px ' + Math.round(sp[1] * k) + 'px' })] : []));
+    potionsFace.ico.replaceChildren(...(pics.lemon ? [el('img', { src: pics.lemon, alt: '' })] : []));
   }
   function drawStats(L) {
     const K = L.kills, P = L.potionsPer, V = L.visited, put2 = (f, label, n, a, b) => { put(f.label, label); put(f.n, n); put(f.a, a); put(f.b, b); };
     if (K && K.n > 0) put2(killsFace, 'Monsters felled', first(K.n), K.top ? 'Mostly ' + mobName(K.top.id) + ', ' + first(K.top.n) : '', K.skipped ? K.skipped + (K.skipped === 1 ? ' run' : ' runs') + ' with no map left out' : 'An estimate from your EXP');
     else put2(killsFace, 'Monsters felled', '·', 'Shows up after a run on a map the game can name', K && K.skipped ? K.skipped + (K.skipped === 1 ? ' run' : ' runs') + ' with no map left out' : '');
-    if (P) put2(potionsFace, 'Potions per level', fmt(P.n), 'on average, every kind of potion', 'Best run ' + fmt(P.best.v) + ' at ' + mapName(P.best.row.map_id) + '. Worst run ' + fmt(P.worst.v) + ' at ' + mapName(P.worst.row.map_id) + '.');
+    if (P) put2(potionsFace, 'Potions per level', fmt(P.n), 'on average, every kind of potion' + (P.list && P.list.mesos ? ', about ' + short(P.list.mesos) + ' mesos a level' : ''), 'Best run ' + fmt(P.best.v) + ' at ' + mapName(P.best.row.map_id) + '. Worst run ' + fmt(P.worst.v) + ' at ' + mapName(P.worst.row.map_id) + '.');
     else put2(potionsFace, 'Potions per level', '·', 'Shows up after runs of 10 minutes or more', '');
     if (V && V.n) put2(mapsFace, 'Maps visited', fmt(V.n), 'Favorite: ' + mapName(V.fav.id) + ' (' + Math.round(V.fav.share * 100) + '% of your hours)', V.newest ? 'Newest: ' + mapName(V.newest.id) : '');
     else put2(mapsFace, 'Maps visited', '·', 'Shows up after a run on a map the game can name', '');
@@ -430,7 +400,7 @@ function build({ el, pics, mapName, mobName, sprites, mesos, claims }) {
     put(lemonSign.n, fmt(L.lemon.used)); put(lemonSign.words, treeWords(L.lemon.used));
     put(meatSign.n, fmt(L.meat.used)); put(meatSign.words, pigWords(L.meat.used));
     drawGrove(L.lemon.used); drawPen(L.meat.used); drawTab(L); drawCard(L, o && o.claims); drawStats(L);
-    drawPodium(L.kills); drawShop(L.potionsPer); drawTrail(L);
+    drawIcons(L);
   }
   return { el: root, update };
 }
