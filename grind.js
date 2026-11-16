@@ -508,7 +508,10 @@ function mount(root, deps) {
       // the map and how long sit under it, in the same box (Bar stacks the two, the others lay them out as their own rows)
       SP.who = el('span', { class: 'g-who' },
         SP.lamp = el('span', { class: 'g-lamp idle', role: 'status' }, el('i', { class: 'g-dot', 'aria-hidden': 'true' }),
-          el('span', { class: 'g-lw' }, SP.lampT = el('span', { class: 'g-lt' }), SP.lampF = el('span', { class: 'g-flip', hidden: '' }))),
+          el('span', { class: 'g-lw' }, SP.lampT = el('span', { class: 'g-lt' }))),
+        // flipping the bag: a little light for each tab on a row of its own (grey to go, amber scroll on, lime seen), where the
+        // map and how long sit otherwise (Rimmah, 2026-11-16: the ticks beside the words were bunched up and cut off)
+        SP.lampF = el('span', { class: 'g-flip', role: 'status', hidden: '' }),
         SP.el = el('span', { class: 'g-el' }, SP.elMap = el('span', { class: 'g-elm' }), SP.elTime = el('span', { class: 'g-elt' }))),
       el('span', { class: 'g-btns' },
         SP.moreBtn = el('button', { type: 'button', class: 'g-more k-sq', title: 'Show more', 'aria-label': 'Show more', 'aria-expanded': 'false', onclick: () => toggleOpen() }, railIcon('down')),
@@ -740,6 +743,9 @@ function mount(root, deps) {
   // device: the next visit starts blank again
   function putMap(id) { mapId = +id; mapSel.value = String(mapId); mapPick.sync(); st.mapHere = mapId; showMap(); }
   function setMap(id) { putMap(id); if (session) GS().pickMap(session, mapId); render(); }
+  // the map the live numbers go by: where the game is now (the pick follows the minimap), not the map the run has the most EXP on
+  // (that one is what the run saves under and ranks at). A saved run looked at keeps its own map
+  const mapOfNow = s => (s && s !== session ? s.mapId : mapId || (s && s.mapId) || null);
   // Your class, for the card's For you row: a small pick under the map's, filled when the drops arrive. Kept on the device once
   // picked; until then it follows the Builds tab's class (the app has no Builds tab in its storage, so there it starts unset)
   let classId = '';
@@ -1436,7 +1442,7 @@ function mount(root, deps) {
       guard('the band', () => renderNow(null)); guard('the Now grinding card', () => renderCard()); guard('the pop-out panel', () => renderStrip());
       overlay.fit(); return;
     }
-    const t = viewing ? s.tLast : Date.now(), o = GS().stats(s, t, avgExp(s.mapId || mapId)), R = GS().result(s, t);
+    const t = viewing ? s.tLast : Date.now(), o = GS().stats(s, t, avgExp(mapOfNow(s))), R = GS().result(s, t);
     renderResult(s, R);
     guard('the session card', () => renderSessionCard(s, o, R));
     V.expHr.textContent = o.expHr != null ? fmtK(o.expHr) : '·';
@@ -1469,7 +1475,7 @@ function mount(root, deps) {
     if (!viewing && Date.now() - lifeAt > 5000) renderLife();
     // the panel follows the live run, whatever the page is looking at: its own numbers when that isn't the page's run
     guard('the pop-out panel', () => {
-      const ps = stripSession(), po = ps === s ? o : ps ? GS().stats(ps, Date.now(), avgExp(ps.mapId || mapId)) : null;
+      const ps = stripSession(), po = ps === s ? o : ps ? GS().stats(ps, Date.now(), avgExp(mapOfNow(ps))) : null;
       renderStrip(po, ps === s ? mains : ps ? mainPotions(ps, po) : []);
     });
     overlay.fit();
@@ -1565,7 +1571,9 @@ function mount(root, deps) {
     if (SP.lampSays !== lampKey) {
       SP.lampSays = lampKey;
       SP.lamp.className = 'g-lamp ' + lamp[0]; SP.lampT.textContent = lamp[1];
-      SP.lampF.hidden = !tabs; SP.lampF.replaceChildren(...(tabs || []).map(({ tab, state }) => el('b', { class: state }, el('span', {}, tab))));
+      SP.lampF.hidden = !tabs;
+      SP.lampF.replaceChildren(...(tabs || []).map(({ tab, state }) => { const says = tab + (state === 'done' ? ': seen' : state === 'fix' ? ': scroll to its top and bottom' : ': not seen yet');
+        return el('b', { class: state, title: says, 'aria-label': says }, el('i', { 'aria-hidden': 'true' }), el('span', {}, tab)); }));
     }
     // the alert under the numbers is only for what needs a button: a mesos jump to answer, and Find my game again when it's stuck
     const alertSays = (key, draw) => { if (SP.l3Says !== key) { SP.l3Says = key; draw(); } };
@@ -1625,7 +1633,7 @@ function mount(root, deps) {
     const minus = v => v < 0 ? '−' : '';
     renderMeso(s ? GS().profitOf(s, saved ? s.tLast : now) : null);
     // Kills a minute: the number the switch shows, over the map's average EXP a kill. No map known, no average: a dot. A saved run has no window
-    const avg = s ? avgExp(s.mapId || mapId) : null, kp = !saved && avg ? killsPerMin(ep.value, avg) : null;
+    const avg = s ? avgExp(mapOfNow(s)) : null, kp = !saved && avg ? killsPerMin(ep.value, avg) : null;
     show(SP.killsBox, !saved);
     put(SP.kills, kp ? fmtKills(kp.perMin) : '·');
     put(SP.killsSub, saved ? '' : !avg ? 'pick the map' : kp ? '1 every ' + (kp.every < 100 ? Math.max(1, Math.round(kp.every)) + ' s' : Math.round(kp.every / 60) + ' min') : '');
@@ -1657,7 +1665,7 @@ function mount(root, deps) {
   // them nothing (the trend line is gone). Before 2 minutes it's dots
   const WIN_WORDS = { 5: 'last 5 min', 10: 'last 10 min', run: 'this run' };
   function renderExp(s, o, saved, now) {
-    const usual = s && !saved ? GS().standing(lastRows, { mapId: s.mapId || mapId, exceptId: s.id, metric: 'expHr', value: null }).usual : null;
+    const usual = s && !saved ? GS().standing(lastRows, { mapId: mapOfNow(s), exceptId: s.id, metric: 'expHr', value: null }).usual : null;
     const p = expPick(o, saved ? 'run' : s && sinceFor === s.id ? 'since' : expWin, usual);
     show(SP.winRow, !saved);
     const on = p.windows.find(x => x.on);
@@ -1693,7 +1701,7 @@ function mount(root, deps) {
       put(P.n, t && o.pct >= 0.3 ? perFmt(t.used / o.pct) : '·');
     });
     const t = tiles.length === 1 && s && !saved ? tiles[0] : null;
-    const usual = t ? GS().standing(lastRows, { mapId: s.mapId || mapId, exceptId: s.id, metric: 'potPer1', potIds: t.kind === 'lemon' ? LEMON_IDS : t.kind === 'meat' ? MEAT_IDS : [t.id], value: null }).usual : null;
+    const usual = t ? GS().standing(lastRows, { mapId: mapOfNow(s), exceptId: s.id, metric: 'potPer1', potIds: t.kind === 'lemon' ? LEMON_IDS : t.kind === 'meat' ? MEAT_IDS : [t.id], value: null }).usual : null;
     show(SP.perUs, usual != null);
     put(SP.perUs, usual != null ? '/ ' + perFmt(usual) : '');
     put(SP.perSub, o.per1 != null ? fmt(o.per1) + ' mesos' : '');
@@ -1720,7 +1728,7 @@ function mount(root, deps) {
     if (line) put(SP.bubble, line);
     if (strip.classList.contains('g-out') !== !!line) strip.classList.toggle('g-out', !!line);
     // no map known: the spot stays empty, and how long runs on its own
-    const pm = s ? s.mapId || mapId : mapId;
+    const pm = mapOfNow(s);
     put(SP.elMap, pm ? panelMap(pm) : '');
     put(SP.elTime, (pm ? ' · ' : '') + fmtDur(s ? elapsedSecs(s, now, !saved && st.sharing) / 60 : 0));
   }
@@ -1758,7 +1766,7 @@ function mount(root, deps) {
   }
   // average EXP a minute solo against partied on this map, from this session and the sessions kept on this device
   function compareParty(s) {
-    const map = s.mapId || mapId, pools = { 1: [], more: {} };
+    const map = mapOfNow(s), pools = { 1: [], more: {} };
     const minutesOf = [s.minutes].concat(jget(KEY_LOCAL, []).filter(r => map != null && r.map_id === map && r.id !== s.id && r.minutes).map(r => GS().fromRow(r).minutes));
     for (const list of minutesOf) for (const m of list) {
       if (!(m.exp > 0) || !m.party) continue;
@@ -1856,7 +1864,7 @@ function mount(root, deps) {
     V.res.hidden = false;
     const has = !!R.window, loot = R.mode === 'loot';
     // the same small line as the pop-out's Profit tile; a saved run has no age to tell
-    V.resBar.textContent = !has ? '' : GS().profitWords({ lootCounted: !!R.loot, lootTabs: R.loot ? (R.loot.tabs == null ? 3 : R.loot.tabs) : null, lookT: viewing || !s.meso || !s.meso.last ? null : s.meso.last.t }, Date.now());
+    V.resBar.textContent = !has ? '' : GS().profitWords({ lootCounted: !!R.loot, lootTabs: R.loot ? (R.loot.tabs == null ? 3 : R.loot.tabs) : null, lootOn: viewing ? undefined : s.mode === 'loot', lootStarted: !!(s.bag && s.bag.startT), lookT: viewing || !s.meso || !s.meso.last ? null : s.meso.last.t }, Date.now());
     V.resTotal.textContent = has ? money(R.total) : '·'; V.resTotal.className = 'g-res-total ' + (has ? tone(R.total) : '');
     V.resPill.textContent = R.verdict || 'Counting'; V.resPill.className = 'g-res-pill ' + (R.verdict === 'Profitable' ? 'up' : R.verdict === 'Losing' ? 'down' : '');
     V.resHr.textContent = has && R.perHr != null ? moneyK(R.perHr) + ' an hour · ' + fmtDur(R.window.mins) : 'no hourly number yet';
@@ -1884,7 +1892,7 @@ function mount(root, deps) {
       let P = null, key = L ? 'empty' : 'wait';
       const pk = pickBlock(s);
       if (L && L.items.length) {
-        const C = drops ? window.GrindNow.dropColumns(mobsOf(s.mapId || mapId).sort((x, y) => y.count - x.count).map(m => m.id), drops, id => (data.mobs[id] || [''])[0], classId, levelNow()) : null;
+        const C = drops ? window.GrindNow.dropColumns(mobsOf(mapOfNow(s)).sort((x, y) => y.count - x.count).map(m => m.id), drops, id => (data.mobs[id] || [''])[0], classId, levelNow()) : null;
         P = window.GrindNow.pickedRows(L, C ? window.GrindNow.wantedOf(C) : [], lootIdx || { cells: {} }, lootOpen ? Infinity : PICKED_SHOWN, drops);
         key = JSON.stringify([P.rows, P.more, lootOpen, L.best && L.best.key, !!lootImg, drops && drops.date]);
       }
@@ -1994,7 +2002,7 @@ function mount(root, deps) {
   // usual, EXP gained, mesos with the verdict, the Lemon and Meat counts for the whole session (and the main potion, when
   // it's something else), and the next level
   function bandParts(s, o, mains, R) {
-    const usual = GS().standing(lastRows, { mapId: s.mapId || mapId, exceptId: s.id, metric: 'expHr', value: null }).usual;
+    const usual = GS().standing(lastRows, { mapId: mapOfNow(s), exceptId: s.id, metric: 'expHr', value: null }).usual;
     const pick = expPick(o, 'run', usual), dur = fmtDur(o.mins), min = /^(\d+) min$/.exec(dur), main = mains[0];
     const count = (ids, name) => ({ pic: ids.find(id => pictures.Icons[id]), name, n: ids.reduce((a, id) => a + usedOf(s, id), 0) });
     return [{ cls: 't', v: min ? min[1] : dur, label: min ? 'min' : '' },
@@ -2126,8 +2134,10 @@ function mount(root, deps) {
     setCheck, save: () => save(true), load: row => { viewing = GS().fromRow(row, eatCfg()); render(); }, capture: () => capture, mesoLine, lootReady: () => lootReady,
     // a session carried in whole (the page tests' mockup session), as if it had been read here
     use: x => { session = x; viewing = null; if (!session.eat) session.eat = eatCfg(); session.mode = lootOn ? 'loot' : 'track'; render(); },
-    // a share stood in for (no frames, no checks), for a test whose run carried in with use() is being read, as a level up line needs
-    sharing: on => { st.sharing = !!on; render(); } };
+    // a share stood in for (no frames, no checks; read: with every reading check passed, so the light gets past Looking for game), for a test whose run carried in with use() is being read, as a level up line needs
+    // the minimap read as another map (what followMap does with a new read)
+    mapRead: id => { putMap(id); render(); },
+    sharing: (on, read) => { st.sharing = !!on; if (read) for (const k of ['exp', 'level', 'size', 'counts']) st.h[k].ok = Date.now(); render(); } };
   // what a Something off? report carries from this tab (index.html keeps it), and the pop out to draw beside the page
   const reporter = {
     report: () => ({ sharing: st.sharing, ticks: st.ticks, reads: st.reads, frame: [st.fw, st.fh],

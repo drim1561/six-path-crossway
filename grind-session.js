@@ -819,12 +819,15 @@ function townOf(s, t) {
 function profitOf(s, t) {
   const o = result(s, t);
   return { total: o.total, perHr: o.perHr, mesos: o.window ? o.pickedUp + o.sold - o.otherBuys : null, loot: o.loot ? o.loot.value : null, potions: o.potions, lootCounted: !!o.loot,
-    lootTabs: o.loot ? o.loot.tabs : null, lookT: s.meso && s.meso.last ? s.meso.last.t : null };
+    lootTabs: o.loot ? o.loot.tabs : null, lootOn: s.mode === 'loot', lootStarted: !!(s.bag && s.bag.startT), lookT: s.meso && s.meso.last ? s.meso.last.t : null };
 }
-// the small line under Profit: how much of the loot is in it, and from 5 minutes how old it is
+// the small line under Profit: how much of the loot is in it, and from 5 minutes how old it is. With no loot in it yet it
+// says why and what adds it (Rimmah, 2026-11-16: loot not counted sat there after the flip with no way to tell why): the
+// switch is off, the bag hasn't been flipped, or it has and loot comes in with the next look at the bag (a row seen twice)
 function profitWords(P, now) {
   if (!P) return '';
-  const base = !P.lootCounted ? 'loot not counted' : P.lootTabs >= 3 ? 'with loot' : P.lootTabs > 0 ? 'loot from ' + P.lootTabs + ' of 3 tabs' : 'some loot counted';
+  const none = P.lootOn === false ? 'mesos only' : P.lootOn && !P.lootStarted ? 'flip your bag to add loot' : P.lootOn ? 'open your bag to add loot' : 'loot not counted';
+  const base = !P.lootCounted ? none : P.lootTabs >= 3 ? 'with loot' : P.lootTabs > 0 ? 'loot from ' + P.lootTabs + ' of 3 tabs' : 'some loot counted';
   const age = P.lookT != null && now != null ? now - P.lookT : 0;
   return base + (age >= 300000 ? ', ' + Math.floor(age / 60000) + ' min ago' : '');
 }
