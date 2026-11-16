@@ -287,8 +287,18 @@ function takeShop(s, t, r) {
   S.seen = t; v.t1 = t;
   // a step only between two totals both read in this visit; the step into it (from the last inventory look) is ordinary
   const inside = v.looked, from = takeMesos(s, t, r.shop, inside);
-  if (from !== undefined && s.meso.last.t === t) { if (inside && from != null) v.steps.push({ t, d: r.shop - from }); v.looked = true; }
+  if (from !== undefined && s.meso.last.t === t) { if (inside && from != null) { v.steps.push({ t, d: r.shop - from }); if (r.shop - from > 0) bankSale(s, r.shop - from); } v.looked = true; }
   else if (s.meso && s.meso.last && s.meso.last.v === r.shop) v.looked = true;
+}
+// A sale closes the bag's stretch (Count my loot): what the rows came to so far is banked, less the mesos the sale
+// brought in, and the rows are forgotten, so the next sighting of each row is its new start. Sold goes up by what loot
+// goes down, and Profit doesn't move; an item kept through the sale stays counted in banked
+function bankSale(s, d) {
+  const B = s.bag;
+  if (s.mode !== 'loot' || !B || B.v !== 2) return;
+  const L = lootOf(s);
+  B.banked = (L ? L.value : B.banked || 0) - d;
+  for (const tab of BAG_TABS) { B.tabs[tab].rows = []; B.tabs[tab].fullT = null; }
 }
 function closeVisit(s, v) { s.shop.open = false; v.t1 = Math.max(v.t1, s.shop.seen || v.t1); }
 // y: the refill's entry in s.refills, marked as bought at the shop so it never undoes a trade
@@ -392,13 +402,16 @@ function etcOf(s) {
 
 // A tab is read a page (6 rows of 5 slots) at a time while the player scrolls. Its scrollbar only says whether a page is
 // the top or the bottom (the thumb is a fixed size), so pages are lined up by the rows they share. A page counts once
-// two reads of it agree, and never with an unsure slot in it. A tab is a full look once one run of lined up pages holds
-// both its top and its bottom, all in one opening of the bag (closing it starts over; gone for CLOSE_MS or less is the
-// same opening, since an item's tooltip over the meso box hides the inventory for a look or two while it stays open).
-// Once Equip, Use and Etc are each full since the last set they make a set; the first set and the latest are the ends
-// loot is counted between.
+// two reads of it agree, and a row with an unsure slot in it is skipped. The tracker remembers every row of every tab:
+// what it held when first seen (a) and when last seen (b), across openings of the bag, so a quick look at one page
+// counts for its rows and nothing is thrown away when the bag shuts. A tab's length is known once one run of lined up
+// pages holds both its top and its bottom; loot starts counting once all three tabs have a length (startT).
+// s.bag = { v: 2, open, banked, startT, tabs: { Equip, Use, Etc } }, a tab = { pend, len, strips, rows, items, fullT },
+// rows[i] = { a, ta, b, tb } (row strings from pageOf), fullT: when every row last had a look since the last sale.
 // Slots come from grind.js as { r, c, n, key, name, price, kind, rank, pot } (pot: the potion ids sharing the picture).
-const BAG_TABS = ['Equip', 'Use', 'Etc'], PAGE_ROWS = 6, PAGE_COLS = 5, EMPTY_ROW = '||||', CLOSE_MS = 5000, BAG_TICKS_MS = 8000;
+const BAG_TABS = ['Equip', 'Use', 'Etc'], PAGE_ROWS = 6, PAGE_COLS = 5, EMPTY_ROW = '||||', BAG_TICKS_MS = 8000;
+const newTab = () => ({ pend: null, len: null, strips: [], rows: [], items: {}, fullT: null });
+const newBag = () => ({ v: 2, open: false, banked: 0, startT: null, tabs: { Equip: newTab(), Use: newTab(), Etc: newTab() } });
 function pageOf(bag) {
   const rows = Array.from({ length: PAGE_ROWS }, () => Array(PAGE_COLS).fill('')), items = {};
   const unsure = new Set();
@@ -443,71 +456,125 @@ function join(a, b, k) {
   }
   return { rows, top: a.top || b.top, bottom: a.bottom || b.bottom, items: Object.assign({}, a.items, b.items) };
 }
-function takeBag(s, t, r) {
-  const B = s.bag || (s.bag = { acc: {}, done: {}, first: null, last: null, sets: 0 });
-  // closing the bag ends the flip: what it saw of each tab, and tabs it finished, don't carry into the next opening
-  if (r.bagOpen === false) { if (B.open) B.closedT = t; B.open = false; return; }
-  if (!B.open) {
-    if (B.closedT == null || t - B.closedT > CLOSE_MS) { B.acc = {}; B.done = {}; B.openT = t; }
-    B.open = true;
+// the pictures in a row, slot by slot (counts left out)
+const rowKeys = row => row.split('|').map(x => x ? x.slice(0, x.lastIndexOf(':')) : '').join('|');
+// where a middle page sits in a tab of known length: the one offset where every row both the page and the memory know
+// holds the same pictures slot by slot (counts may have moved), with at least one item among them; else null
+function placeMid(T, pg) {
+  let found = null, n = 0;
+  for (let k = 1; k <= T.len - PAGE_ROWS - 1; k++) {
+    let same = true, solid = false;
+    for (let j = 0; j < pg.rows.length && same; j++) {
+      const R = T.rows[k + j], y = pg.rows[j];
+      if (!R || y == null) continue;
+      const kx = rowKeys(R.b);
+      if (kx !== rowKeys(y)) same = false;
+      else if (kx !== EMPTY_ROW) solid = true;
+    }
+    if (same && solid) { found = k; n++; }
   }
+  return n === 1 ? found : null;
+}
+function takeBag(s, t, r) {
+  if (!s.bag || s.bag.v !== 2) s.bag = newBag();   // a run carried over with the old shape starts fresh
+  const B = s.bag;
+  if (r.bagOpen === false) { B.open = false; return; }
+  B.open = true;
   const bag = r.bag;
   if (!bag || !BAG_TABS.includes(bag.tab)) return;
-  const A = B.acc[bag.tab] || (B.acc[bag.tab] = { pend: null, strips: [] });
-  const pg = pageOf(bag);
+  // not while the shop is open: its sales move rows about, and a row read half way through one would count twice
+  if (s.shop && s.shop.open && t - s.shop.seen <= SHOP_GONE_MS) return;
+  const T = B.tabs[bag.tab], pg = pageOf(bag);
   const sig = pg.rows.join('/') + (pg.top ? 'T' : '') + (pg.bottom ? 'B' : '');
-  if (A.pend !== sig) { A.pend = sig; return; }
-  // agreed: line it up with every run of pages this opening has seen of the tab, joining runs it bridges
-  let cur = pg;
-  const strips = A.strips.slice();
-  for (let i = 0; i < strips.length;) {
-    const k = fit(strips[i], cur), k2 = k == null ? fit(cur, strips[i]) : null;
-    if (k == null && k2 == null) { i++; continue; }
-    cur = k != null ? join(strips[i], cur, k) : join(cur, strips[i], k2);
-    strips.splice(i, 1); i = 0;
+  if (T.pend !== sig) { T.pend = sig; return; }
+  Object.assign(T.items, pg.items);
+  if (T.len == null) {
+    // no length yet: line the page up with every run of pages seen of the tab, joining runs it bridges
+    let cur = pg;
+    const strips = T.strips.slice();
+    for (let i = 0; i < strips.length;) {
+      const k = fit(strips[i], cur), k2 = k == null ? fit(cur, strips[i]) : null;
+      if (k == null && k2 == null) { i++; continue; }
+      cur = k != null ? join(strips[i], cur, k) : join(cur, strips[i], k2);
+      strips.splice(i, 1); i = 0;
+    }
+    strips.push(cur); T.strips = strips.slice(-8);   // a bag left open while looting: each count change is a new run
+    if (!(cur.top && cur.bottom) || cur.rows.includes(null)) return;   // every row known, top to bottom
+    T.len = cur.rows.length; T.rows = cur.rows.map(row => ({ a: row, ta: t, b: row, tb: t })); T.fullT = t; T.strips = [];
+    if (B.startT == null && BAG_TABS.every(tab => B.tabs[tab].len != null)) B.startT = t;
+    return;
   }
-  strips.push(cur); A.strips = strips.slice(-8);   // a bag left open while looting: each count change is a new run
-  if (!(cur.top && cur.bottom) || cur.rows.includes(null)) return;   // every row known, top to bottom
-  const items = {};
-  for (const row of cur.rows) for (const x of row.split('|')) {
-    if (!x) continue;
-    const i = x.lastIndexOf(':'), k = x.slice(0, i), it = items[k] || (items[k] = Object.assign({ n: 0 }, cur.items[k]));
-    it.n += +x.slice(i + 1);
+  const k = pg.top ? 0 : pg.bottom ? T.len - PAGE_ROWS : placeMid(T, pg);
+  if (k == null) return;
+  // Against what the rows held at their last look, slot by slot. A slot it couldn't name on one read and could on the
+  // other is a read put right, so it takes the name (never loot). One item where another was means the tab was laid out
+  // anew (gathered, sorted, dragged about): what the tab came to so far is banked and its rows start over from this
+  // look, since items changing places are no loot
+  const unk = bag.tab + '?', keyOf = x => x.slice(0, x.lastIndexOf(':')), named = (x, key) => key + x.slice(x.lastIndexOf(':'));
+  let moved = false;
+  for (let j = 0; j < pg.rows.length; j++) {
+    const R = T.rows[k + j];
+    if (pg.rows[j] == null || !R) continue;
+    const x = R.b.split('|'), y = pg.rows[j].split('|'), a = R.a.split('|');
+    for (let c = 0; c < y.length; c++) {
+      if (!x[c] || !y[c] || keyOf(x[c]) === keyOf(y[c])) continue;
+      if (keyOf(y[c]) === unk) y[c] = named(y[c], keyOf(x[c]));
+      else if (keyOf(x[c]) === unk) { x[c] = named(x[c], keyOf(y[c])); if (a[c] && keyOf(a[c]) === unk) a[c] = named(a[c], keyOf(y[c])); }
+      else moved = true;
+    }
+    pg.rows[j] = y.join('|'); R.b = x.join('|'); R.a = a.join('|');
   }
-  B.done[bag.tab] = { t, items };
-  if (!BAG_TABS.every(tab => B.done[tab])) return;
-  const fresh = s.meso && s.meso.last && s.meso.last.t >= B.openT ? s.meso.last : null;
-  if (!fresh) return;   // waits in this opening for the meso box to read
-  const all = {}; let tSet = 0;
-  for (const tab of BAG_TABS) {
-    const d = B.done[tab]; tSet = Math.max(tSet, d.t);
-    for (const [k, it] of Object.entries(d.items)) { const x = all[k] || (all[k] = Object.assign({}, it, { n: 0 })); x.n += it.n; }
+  if (moved) {
+    const L = lootOf(s);
+    T.rows = []; T.fullT = null;
+    if (L) B.banked = (B.banked || 0) + L.value - lootOf(s).value;
   }
-  // the set keeps where the session stood then (for the counted window) and the meso total last agreed
-  const set = { t: tSet, items: all, at: snap(s, tSet), meso: { v: fresh.v, t: fresh.t }, bought: boughtNow(s) };
-  if (!B.first) B.first = set;
-  B.last = set; B.sets++; B.done = {};
+  for (let j = 0; j < pg.rows.length; j++) {
+    const row = pg.rows[j], i = k + j;
+    if (row == null || i < 0 || i >= T.len) continue;
+    const R = T.rows[i] || (T.rows[i] = { a: row, ta: t, b: row, tb: t });
+    R.b = row; R.tb = t;
+  }
+  let all = true;
+  for (let i = 0; i < T.len; i++) if (!T.rows[i]) all = false;
+  if (all) T.fullT = t;
 }
-// loot between the first set and the latest, at the NPC price: { value, items (best drop first, then by value), best,
-// from, to }, or null until two sets a minute apart. Pictures shared with a quickslot potion are left out (the
-// quickslots count those). Best drop: scrolls by grade, then equips, then other Use items, by price; never Etc
+// which tabs have a length (the three ticks of the start flip)
+function bagTabs(s) {
+  const B = s && s.bag, o = {};
+  for (const tab of BAG_TABS) o[tab] = !!(B && B.v === 2 && B.tabs[tab].len != null);
+  return o;
+}
+// loot since the start flip, at the NPC price: { value, items (best drop first, then by value), best, banked, tabs }, or
+// null until all three tabs have a length. Every row counts what it held at its latest look minus its first; banked is
+// what earlier stretches came to, less what was sold (Task 3). tabs: how many tabs have had every row looked at since
+// the last sale. Pictures shared with a quickslot potion are left out (the quickslots count those). Best drop: scrolls
+// by grade, then equips, then other Use items, by price; never Etc
 const BEST_KIND = { scroll: 3, equip: 2, use: 1 };
 function lootOf(s) {
   const B = s.bag;
-  if (!B || !B.first || !B.last || B.last.t - B.first.t < 60000) return null;
+  if (!B || B.v !== 2 || B.startT == null) return null;
   const pots = new Set();
   for (const sl of Object.values(s.slots).concat(s.retired || [])) if (sl.id) pots.add(+sl.id);
+  const n = {}, meta = {};
+  const count = (row, sign) => { for (const x of row.split('|')) { if (!x) continue; const i = x.lastIndexOf(':'), k = x.slice(0, i); n[k] = (n[k] || 0) + sign * +x.slice(i + 1); } };
+  let tabs = 0;
+  for (const tab of BAG_TABS) {
+    const T = B.tabs[tab];
+    if (T.fullT != null) tabs++;
+    Object.assign(meta, T.items);
+    for (const R of T.rows) if (R) { count(R.b, 1); count(R.a, -1); }
+  }
   const items = [];
-  for (const k of new Set(Object.keys(B.first.items).concat(Object.keys(B.last.items)))) {
-    const a = B.first.items[k], b = B.last.items[k], it = b || a;
-    if ((it.pot || []).some(id => pots.has(+id))) continue;
-    const n = (b ? b.n : 0) - (a ? a.n : 0);
-    if (n) items.push({ key: k, name: it.name, n, price: it.price || 0, value: n * (it.price || 0), kind: it.kind, rank: it.rank || 0 });
+  for (const k of Object.keys(n)) {
+    const it = meta[k] || {};
+    if (!n[k] || (it.pot || []).some(id => pots.has(+id))) continue;
+    items.push({ key: k, name: it.name, n: n[k], price: it.price || 0, value: n[k] * (it.price || 0), kind: it.kind, rank: it.rank || 0 });
   }
   const best = items.filter(i => i.n > 0 && BEST_KIND[i.kind])
     .sort((x, y) => BEST_KIND[y.kind] - BEST_KIND[x.kind] || (x.kind === 'scroll' ? y.rank - x.rank : 0) || y.price - x.price)[0] || null;
   items.sort((x, y) => (x === best ? -1 : y === best ? 1 : y.value - x.value));
-  return { value: items.reduce((a, i) => a + i.value, 0), items, best, from: B.first.t, to: B.last.t };
+  return { value: (B.banked || 0) + items.reduce((a, i) => a + i.value, 0), items, best, banked: B.banked || 0, tabs };
 }
 
 /* ---------- pace: the last 5 and 10 minutes, and since a reset (live only, a saved row leaves them out) ---------- */
@@ -520,7 +587,13 @@ function usedById(s) {
 }
 // where the session stood at t: EXP and percent gained, active time, and each potion drunk so far (costed later, at the
 // prices as they are then, so a corrected price counts for the windows too)
-const snap = (s, t) => ({ t, exp: s.gainExp, pct: s.gainPct, active: s.activeMs, used: usedById(s) });
+// found: quickslot potions picked up so far, by item id (stock that cost nothing)
+function foundById(s) {
+  const by = {};
+  for (const sl of Object.values(s.slots).concat(s.retired || [])) if (sl.id && sl.found) by[sl.id] = (by[sl.id] || 0) + sl.found;
+  return by;
+}
+const snap = (s, t) => ({ t, exp: s.gainExp, pct: s.gainPct, active: s.activeMs, used: usedById(s), found: foundById(s) });
 // a snapshot every 10 seconds, kept back to one older than the longest window
 function keepTrail(s, t) {
   const tr = s.trail || (s.trail = []);
@@ -593,42 +666,10 @@ function pickups(s) {
   const K = s.pick || { items: {}, unnamed: { Equip: 0, Use: 0, Etc: 0 }, equips: 0, mesos: { sum: 0, unsure: 0 }, lines: 0, lastLineT: null };
   return { items: Object.values(K.items).map(x => Object.assign({}, x)), unnamed: Object.assign({}, K.unnamed), equips: K.equips, mesos: Object.assign({}, K.mesos), lines: K.lines, lastLineT: K.lastLineT };
 }
-// lines against the bag: items (not equips, not quickslot potions) gained between the first bag look and the latest
-function pickupCompare(s) {
-  const B = s.bag;
-  if (!B || !B.first || !B.last || B.first === B.last) return null;
-  const pots = new Set();
-  for (const sl of Object.values(s.slots).concat(s.retired || [])) if (sl.id) pots.add(+sl.id);
-  let inBag = 0;
-  for (const k of new Set(Object.keys(B.first.items).concat(Object.keys(B.last.items)))) {
-    const a = B.first.items[k], b = B.last.items[k], it = b || a;
-    if (it.kind === 'equip' || (it.pot || []).some(id => pots.has(+id))) continue;
-    inBag += Math.max(0, (b ? b.n : 0) - (a ? a.n : 0));
-  }
-  // sales at an NPC shop between the two looks leave the bag without a line to show for it, so the two can't be compared
-  if (((s.shop && s.shop.visits) || []).some(v => v.t1 >= B.first.t && v.t0 <= B.last.t)) return null;
-  const fromLines = countedBy(s, B.last.t) - countedBy(s, B.first.t);
-  const gap = Math.abs(inBag - fromLines);
-  return { fromLines, inBag, differs: gap > 0, unreliable: gap > 3 && gap > inBag / 4 };
-}
-// Does the bag need a look? Yes with no start look, when the lines can't be trusted (they differ from the bag by more than a
-// quarter and 3, and the last look is over 2 minutes old), or when EXP or mesos moved since the last line and the last look
-// but no line has been seen for 2 minutes (the strip may be covered). o: { sinceT: when a line (of any kind) was last seen,
-// or tracking began; movedT: when EXP or mesos last moved, or null }
-const PICK_QUIET_MS = 120000;
-function pickNeedsFlip(s, t, o) {
-  const B = s.bag;
-  if (!B || !B.sets || !B.last) return true;
-  // a strip that never read a line (covered, or a setup it doesn't fit) can't be told from quiet lines: no nagging
-  // the end look: with only a start look, a trip to town is the usual end of a run, so ask once there
-  if (o && o.inTown && B.sets < 2) return true;
-  const c = pickupCompare(s);
-  if (c && c.unreliable && s.pick && s.pick.lines && t - B.last.t > PICK_QUIET_MS) return true;
-  if (!(o && o.sinceT)) return false;
-  const since = Math.max(o.sinceT, B.last.t);
-  // EXP is stamped a tick or two after the line that came with the kill, so only movement well after the last line counts
-  return !!(o && o.movedT) && o.movedT > since + 5000 && t - since > PICK_QUIET_MS;
-}
+// Lines against the bag, and whether the bag needs a look: parked. Both leaned on the old first and latest bag sets;
+// they get rebuilt on the bag's rows when the pickup line reader comes back (it is switched off)
+function pickupCompare() { return null; }
+function pickNeedsFlip() { return false; }
 
 function add(s, r) {
   const t = r.t;
@@ -773,45 +814,54 @@ function townOf(s, t) {
   if (tw.open == null) return { trips: tw.trips, ms: tw.ms };
   return { trips: tw.trips + 1, ms: tw.ms + Math.max(0, s.activeMs - tw.open) };
 }
-// the Profit tile's parts, all from result()
+// the Profit tile's parts, all from result(). lootTabs: how many tabs have had every row looked at since the last
+// sale (null without loot); lookT: the latest meso look, which is how old the number is
 function profitOf(s, t) {
   const o = result(s, t);
-  return { total: o.total, perHr: o.perHr, mesos: o.window ? o.pickedUp + o.sold - o.otherBuys : null, loot: o.loot ? o.loot.value : null, potions: o.potions, lootCounted: !!o.loot };
+  return { total: o.total, perHr: o.perHr, mesos: o.window ? o.pickedUp + o.sold - o.otherBuys : null, loot: o.loot ? o.loot.value : null, potions: o.potions, lootCounted: !!o.loot,
+    lootTabs: o.loot ? o.loot.tabs : null, lookT: s.meso && s.meso.last ? s.meso.last.t : null };
+}
+// the small line under Profit: how much of the loot is in it, and from 5 minutes how old it is
+function profitWords(P, now) {
+  if (!P) return '';
+  const base = !P.lootCounted ? 'loot not counted' : P.lootTabs >= 3 ? 'with loot' : P.lootTabs > 0 ? 'loot from ' + P.lootTabs + ' of 3 tabs' : 'some loot counted';
+  const age = P.lookT != null && now != null ? now - P.lookT : 0;
+  return base + (age >= 300000 ? ', ' + Math.floor(age / 60000) + ' min ago' : '');
 }
 
-// Income is only known between looks, so every number is cut to one counted window: Just track runs from the first
-// meso look to the latest, Count my loot from the first full bag set to the latest (each set carries the meso total and
-// where the session stood). Picked up is what's left of mesos earned once the shop is taken out, so the tiles add up:
-// picked up + sold at the shop - other shop buys + loot kept - potions drunk = the session's total. The Lemon and Meat
-// tiles use the window too, or the whole session until there is one. A saved session returns the card it saved.
+// Income is only known between looks, so every number is cut to one counted window: from the first meso look to the
+// latest, in both modes. Count my loot adds the bag's loot as it stands (lootOf: every row's latest look against its
+// first, plus what sales banked) once a row has been seen twice or a sale has banked something. Picked up is what's
+// left of mesos earned once the shop is taken out, so the tiles add up: picked up + sold at the shop - other shop buys
+// + loot kept - potions drunk = the session's total. A quickslot potion picked up in the window comes off the potion
+// cost at its shop price (you drink it), never below zero. The Lemon and Meat tiles use the window too, or the whole
+// session until there is one. A saved session returns the card it saved.
 function result(s, t) {
   if (s.savedCard) return s.savedCard;
-  const mode = s.mode === 'loot' ? 'loot' : 'track', m = s.meso, B = s.bag;
+  const mode = s.mode === 'loot' ? 'loot' : 'track', m = s.meso;
   let a = null, b = null;
-  const sets = mode === 'loot' && B && B.first && B.last && B.last.t - B.first.t >= 60000 && B.first.meso && B.last.meso;
-  if (sets) {
-    a = { t: B.first.t, at: B.first.at, v: B.first.meso.v, mt: B.first.meso.t, bought: B.first.bought };
-    b = { t: B.last.t, at: B.last.at, v: B.last.meso.v, mt: B.last.meso.t, bought: B.last.bought };
-  // the meso looks' window: Just track's, and Count my loot's until its bag has two sets (Rimmah: the mesos already seen
-  // count meanwhile, loot left out)
-  } else if (m && m.first && m.last && m.last.t - m.first.t >= 60000 && m.first.at && m.last.at) { a = m.first; b = m.last; }
+  if (m && m.first && m.last && m.last.t - m.first.t >= 60000 && m.first.at && m.last.at) { a = m.first; b = m.last; }
   const A = a ? a.at : { active: 0, pct: 0, used: {} }, Z = b ? b.at : snap(s, t);
   const secs = (Z.active - A.active) / 1000, pct = Z.pct - A.pct;
   const drunk = id => Math.max(0, ((Z.used || {})[id] || 0) - ((A.used || {})[id] || 0));
   const eatOf = ids => { const n = ids.reduce((x, id) => x + drunk(id), 0); return { n, cost: ids.reduce((x, id) => x + drunk(id) * priceOf(s, +id), 0), everySec: n ? secs / n : null, perPct: n && pct >= 0.3 ? n / pct : null }; };
   const E = s.eat || { lemon: [], meat: [], meatHp: 0 }, ids = Object.keys(Z.used || {}), others = ids.filter(id => !E.lemon.includes(+id) && !E.meat.includes(+id));
-  const o = { mode, window: null, pickedUp: null, sold: null, otherBuys: null, potions: null, loot: null, total: null, perHr: null, verdict: null,
+  const o = { mode, window: null, pickedUp: null, sold: null, otherBuys: null, potions: null, found: null, loot: null, total: null, perHr: null, verdict: null,
     mesosOnly: null, flipped: false, perPct: null, eat: { lemon: eatOf(E.lemon), meat: Object.assign(eatOf(E.meat), { hp: 0 }) }, other: eatOf(others) };
   o.eat.meat.hp = o.eat.meat.n * (E.meatHp || 0);
   if (!a) return o;
   o.window = { from: a.t, to: b.t, mins: secs / 60, sessionMins: s.activeMs / 60000 };
   const traded = ((m && m.trades) || []).filter(x => x.t > a.t && x.t <= b.t).reduce((x, y) => x + y.amount, 0);
-  // the shop cut by when each end's meso total was read (a set's total is read before its flip ends)
-  const earned = (b.v - a.v) + spentBetween(s, a, b) - traded, sh = shopOf(s, a.mt != null ? a.mt : a.t, b.mt != null ? b.mt : b.t);
+  const earned = (b.v - a.v) + spentBetween(s, a, b) - traded, sh = shopOf(s, a.t, b.t);
   o.sold = sh.sold; o.otherBuys = sh.other;
   o.pickedUp = earned - sh.sold + sh.other;
-  o.potions = ids.reduce((x, id) => x + drunk(id) * priceOf(s, +id), 0);
-  if (sets) o.loot = lootOf(s);
+  const cost = ids.reduce((x, id) => x + drunk(id) * priceOf(s, +id), 0);
+  const got = Object.keys(Z.found || {}).reduce((x, id) => x + Math.max(0, (Z.found[id] || 0) - ((A.found || {})[id] || 0)) * priceOf(s, +id), 0);
+  o.found = Math.min(cost, got); o.potions = cost - o.found;
+  if (mode === 'loot') {
+    const L = lootOf(s), B = s.bag;
+    if (L && (L.banked !== 0 || BAG_TABS.some(tab => B.tabs[tab].rows.some(R => R && R.tb > R.ta)))) o.loot = L;
+  }
   o.mesosOnly = o.pickedUp + o.sold - o.otherBuys - o.potions;
   o.total = o.mesosOnly + (o.loot ? o.loot.value : 0);
   o.perHr = o.window.mins >= RATE_MIN ? o.total / (o.window.mins / 60) : null;
@@ -820,20 +870,12 @@ function result(s, t) {
   o.perPct = pct >= 1 ? o.total / pct : null;
   return o;
 }
-// Count my loot's "In town? Flip through your bag": a refill since the latest bag set, and no kill since the refill (back
-// to killing, the player has left town; asking all the way to the end flip never went away)
-function inTown(s) {
-  return !!s.lastRefill && (!s.bag || !s.bag.last || s.lastRefill > s.bag.last.t) && !(s.lastKillT > s.lastRefill);
-}
-// Count my loot's Equip, Use and Etc list: a to do until the first full flip, three ticks for a moment after a flip, and back
-// only while a later flip is under way (the bag open, or gone for CLOSE_MS or less, with pages read and no set yet this opening)
+// Count my loot's Equip, Use and Etc list: a to do until the start flip (all three tabs have a length), three ticks for a
+// moment after it, then gone for good: later looks count without it
 function bagListShows(s, t) {
   const B = s && s.bag;
-  if (!B || !B.sets) return true;
-  if (t - B.last.t < BAG_TICKS_MS) return true;
-  if (B.last.t >= B.openT) return false;
-  if (!B.open && !(B.closedT != null && t - B.closedT <= CLOSE_MS)) return false;
-  return BAG_TABS.some(tab => B.done[tab] || (B.acc[tab] && B.acc[tab].strips.length));
+  if (!B || B.v !== 2 || B.startT == null) return true;
+  return t - B.startT < BAG_TICKS_MS;
 }
 // the player's usual mesos an hour on a map: earlier saved sessions there, counted the same way, 10 minutes or longer;
 // none until there are 3
@@ -914,7 +956,7 @@ function toRow(s) {
   const card = result(s, s.tLast);
   if (card.loot && card.loot.items.length > 40) card.loot = Object.assign({}, card.loot, { items: card.loot.items.slice(0, 40) });
   return { id: s.id, map_id: s.mapId, started_at: iso(s.t0), ended_at: iso(s.tLast), level_start: s.levelStart, level_end: s.level,
-    // counted with loot only once the bag had two sets; before that the Just track way (the usual compares like with like)
+    // counted with loot only once the bag had some to count; before that the Just track way (the usual compares like with like)
     loot_mode: card.mode === 'loot' && !card.loot ? 'track' : card.mode, result: card.total, result_min: card.window ? Math.round(card.window.mins * 1000) / 1000 : null, card,
     // active minutes to 0.001 (a coarser cut shifts the rates of a short session)
     exp: Math.round(s.gainExp), pct: r2(s.gainPct), active_min: Math.round(s.activeMs / 60) / 1000, exp_min: Math.round(expMsOf(s) / 60) / 1000, deaths: s.deaths, potions,
@@ -957,5 +999,5 @@ function wholeRows(minutes) {
   for (let i = 0; i < xs.length; i += 60) rows.push(xs.slice(i, i + 60));
   return rows;
 }
-window.GrindSession = { CFG, EXP_TABLE, levelOfExp, wholeRows, create, add, stats, countdown, countdowns, minuteOf, toRow, fromRow, mark, trade, keepMesos, rebase, lootOf, shopOf, learnPrice, result, townOf, profitOf, usualOf, standing, inTown, bagListShows, pickMap, pickups, pickupCompare, pickNeedsFlip };
+window.GrindSession = { CFG, EXP_TABLE, levelOfExp, wholeRows, create, add, stats, countdown, countdowns, minuteOf, toRow, fromRow, mark, trade, keepMesos, rebase, lootOf, bagTabs, profitWords, shopOf, learnPrice, result, townOf, profitOf, usualOf, standing, bagListShows, pickMap, pickups, pickupCompare, pickNeedsFlip };
 })();

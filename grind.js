@@ -16,7 +16,8 @@ const KEY_LAYOUT = 'grind.layout', KEY_DETAIL = 'grind.detail', KEY_LOOT = 'grin
 // the app's overlay: See-through (25 to 100%, in fives) and Size (60 to 160%, in tens), kept on this device
 const KEY_SEE = 'grind.seeThrough', KEY_SCALE = 'grind.overlayScale';
 // the shop window is looked for over the whole frame this often (ticks) until it's been seen, then where it was each tick
-const SHOP_SEARCH_EVERY = 6;
+const SHOP_SEARCH_EVERY = 6, SHOP_SEARCH_TOWN = 2, SHOP_QUIET_MS = 20000;   // the whole frame search for a shop: every 3 s where the minimap names no map (a town) and no kill
+// came for 20 s (every 8 s found the Perion store 9 s late and booked its sales as pickups, Excavation run, 2026-11-15), every 8 s otherwise: it's the heaviest thing a tick does
 // sessions kept on this device for all time: up to 200, the newest 20 with their minutes (the charts), older ones without
 const LOCAL_MAX = 200, LOCAL_MINUTES = 20;
 const RESUME_MS = 30 * 60000, SAVE_MS = 60000, LEVEL_EVERY = 20, ICON_EVERY = 40, MESO_SEARCH_EVERY = 40, LOST_MS = 15000, BAG_NEAR_MS = 5000;
@@ -101,12 +102,12 @@ function health(f) {
   if (C.level.state === 'bad') return say('bad', "Can't read level", "Can't read your level. Try Find my game again");
   if (f.exp.ok == null || f.size.ok == null) return say('wait', 'Looking for game', 'Looking for your game…');
   if (f.potNone) return say('wait', 'No quickslot potions', 'Put the potions you drink on your quickslots so they count');
-  // Count my loot (f.loot: { on, pictures, sets, refillAfter }): a flip through the bag also reads the mesos, so it comes
-  // first, once the item pictures are in (a flip before then reads nothing)
+  // Count my loot (f.loot: { on, pictures, started, needsFlip }): the start flip through the bag also reads the mesos,
+  // so it comes first, once the item pictures are in (a flip before then reads nothing). After it nothing asks for the
+  // bag again: every row seen from then on counts (the forgiving bag, 2026-11-15), so a refill is just a refill
   if (f.loot && f.loot.on && f.loot.pictures === false) return say('wait', 'Loading pictures', 'Loading the item pictures for Count my loot');
   // flip: the pop out's light shows the three tabs' own checkmarks beside its words (bagTabStates in renderHealth)
-  if (f.loot && f.loot.on && !f.loot.sets) return say('wait', 'Flip your bag', 'Open your bag and flip through Equip, Use and Etc, scrolling to the bottom of each', { flip: true });
-  if (f.loot && f.loot.on && f.loot.refillAfter) return say('wait', 'Flip your bag', 'In town? Flip through your bag so your loot counts', { flip: true });
+  if (f.loot && f.loot.on && !f.loot.started) return say('wait', 'Flip your bag', 'Open your bag and flip through Equip, Use and Etc, scrolling to the bottom of each', { flip: true });
   // with the pickup lines on, the bag is only asked for again when they can't be trusted (loot.needsFlip)
   if (f.loot && f.loot.on && f.loot.needsFlip) return say('wait', 'Flip your bag', "Flip through your bag again, the pickup lines can't be trusted for now", { flip: true });
   if (f.meso.unclear) return say('wait', 'Mouse off mesos', "Can't read your meso total clearly yet. Move the mouse off it");
@@ -553,7 +554,7 @@ function mount(root, deps) {
     put(SP.profit, pv);
     // a million or more is a long number: Tile draws it smaller in its half, so the whole panel's text doesn't shrink for it
     SP.profit.classList.toggle('g-long', pv.length >= 10);
-    put(SP.profitSub, !P ? '' : P.lootCounted ? 'with loot' : 'loot not counted');
+    put(SP.profitSub, GS().profitWords(P, Date.now()));
     // opened: the three parts it is made of, each a word over its number (loot is a dot until a bag is counted)
     const part = (e, v) => put(e, !P || v == null ? '·' : sgnK(v));
     part(SP.pMesos, P && P.mesos); part(SP.pLoot, P && P.loot); part(SP.pPots, !P || P.potions == null ? null : -P.potions);
@@ -1135,6 +1136,7 @@ function mount(root, deps) {
     if (!st.mapsReady) return;
     // the EXP line and the stretch tell readMap where the game is, so a whole screen share with the game in a window reads too
     const now = Date.now(), search = now >= (st.mapSearchAt || 0), r = S.readMap(src, h, { search, line: st.line, s: st.m && st.m.s });
+    st.mapOk = r.ok;   // no map to read is a town (or a covered minimap): where the shops are
     if (!r.ok) { if (search) st.mapSearchAt = now + MAP_SEARCH_MS; st.mapNext = null; return; }
     if (r.id === st.mapRead) { st.mapNext = null; return; }
     if (st.mapNext !== r.id) { st.mapNext = r.id; return; }
@@ -1174,7 +1176,7 @@ function mount(root, deps) {
     }
     if (session) {
       const shome = S.shopHome();
-      if (quick ? shome && st.shopOpen : shome || st.ticks % SHOP_SEARCH_EVERY === 2) {
+      if (quick ? shome && st.shopOpen : shome || st.ticks % (st.mapOk || (session.lastKillT && Date.now() - session.lastKillT < SHOP_QUIET_MS) ? SHOP_SEARCH_EVERY : SHOP_SEARCH_TOWN) === 0) {
         const sr = S.readShop(src, { search: !quick && (!shome || st.ticks % MESO_SEARCH_EVERY === 2) });
         if (sr.ok) { GS().add(session, { t: Date.now(), shop: sr.value, shopOpen: true }); st.shopOpen = true; }
         else if (st.shopOpen && sr.reason === 'no shop') { st.shopOpen = false; GS().add(session, { t: Date.now(), shopOpen: false }); }
@@ -1522,8 +1524,8 @@ function mount(root, deps) {
     const h = lastHealth = health({ t: Date.now(), app: !!app, sharing: st.sharing, stopped: !!st.stopped, hasSession: !!s, exp: st.h.exp, level: st.h.level, levelNow: st.level,
       size: st.h.size, counts: st.h.counts, potNone: st.potNone, potCount: st.potCount, killed: !!s && (s.gainExp > 0 || s.gainPct > 0),
       meso: { at: s && s.meso && s.meso.last ? s.meso.last.t : null, unclear: !!(st.mesoOpen && st.mesoUnclear) },
-      loot: { on: lootOn, pictures: lootReady, sets: s && s.bag ? s.bag.sets : 0, refillAfter: !!s && !PICKUPS && GS().inTown(s),
-        needsFlip: st.needsFlip = PICKUPS && !!s && lootOn && GS().pickNeedsFlip(s, Date.now(), { sinceT: st.lineT, movedT: st.movedT, inTown: GS().inTown(s) }) } });
+      loot: { on: lootOn, pictures: lootReady, started: !!(s && s.bag && s.bag.startT),
+        needsFlip: st.needsFlip = PICKUPS && !!s && lootOn && GS().pickNeedsFlip(s, Date.now(), { sinceT: st.lineT, movedT: st.movedT }) } });
     // the pill over the buttons goes by what the core numbers need (mesos only ever ask)
     const core = ['exp', 'level', 'potions'].map(k => h.checks[k].state);
     const ps = !st.sharing ? 'idle' : core.includes('bad') ? 'bad' : core.every(x => x === 'ok') ? 'ok' : 'wait';
@@ -1846,7 +1848,8 @@ function mount(root, deps) {
   function renderResult(s, R) {
     V.res.hidden = false;
     const has = !!R.window, loot = R.mode === 'loot';
-    V.resBar.textContent = loot ? 'counted from your first flip through the bag to your latest' : '';
+    // the same small line as the pop-out's Profit tile; a saved run has no age to tell
+    V.resBar.textContent = !has ? '' : GS().profitWords({ lootCounted: !!R.loot, lootTabs: R.loot ? (R.loot.tabs == null ? 3 : R.loot.tabs) : null, lookT: viewing || !s.meso || !s.meso.last ? null : s.meso.last.t }, Date.now());
     V.resTotal.textContent = has ? money(R.total) : '·'; V.resTotal.className = 'g-res-total ' + (has ? tone(R.total) : '');
     V.resPill.textContent = R.verdict || 'Counting'; V.resPill.className = 'g-res-pill ' + (R.verdict === 'Profitable' ? 'up' : R.verdict === 'Losing' ? 'down' : '');
     V.resHr.textContent = has && R.perHr != null ? moneyK(R.perHr) + ' an hour · ' + fmtDur(R.window.mins) : 'no hourly number yet';
@@ -1854,16 +1857,16 @@ function mount(root, deps) {
     const usual = has && R.perHr != null ? GS().usualOf(lastRows, { mapId: s.mapId, mode: R.mode, exceptId: s.id }) : null;
     const short = has && R.window.mins < R.window.sessionMins - 1;
     const bits = [usual != null && Math.abs(R.perHr - usual) >= 1 ? fmtK(Math.abs(R.perHr - usual)) + ' an hour ' + (R.perHr >= usual ? 'better' : 'worse') + ' than your usual ' + shortMap(s.mapId) + '.' : '',
-      short ? 'Counted over ' + Math.round(R.window.mins) + ' of your ' + Math.round(R.window.sessionMins) + ' minutes. ' + (loot ? 'Flip through your bag before you stop to count it all.' : 'Open your inventory before you stop to count it all.') : '',
+      short ? 'Counted over ' + Math.round(R.window.mins) + ' of your ' + Math.round(R.window.sessionMins) + ' minutes. ' + (loot ? 'Open your bag before you stop to count it all.' : 'Open your inventory before you stop to count it all.') : '',
       // a saved session can't take another look: it says why it has no total instead of asking for one
       has ? '' : viewing ? (loot ? 'Its bag was never looked through twice, so it has no total' : 'Its inventory was never opened twice, so it has no total')
-        : loot ? 'No total yet, it counts from two flips through your bag' : 'No total yet, it counts from two looks at your inventory'].filter(Boolean);
+        : loot ? 'No total yet, it counts from two looks at your bag' : 'No total yet, it counts from two looks at your inventory'].filter(Boolean);
     V.resSub.textContent = bits.join(' '); V.resSub.hidden = !bits.length;
     const rowOf = (label, v, sub, off) => el('div', { class: 'k-row' }, el('span', { class: 'g-nl' }, label, sub ? el('small', {}, sub) : null),
       el('span', { class: 'g-nv ' + (off ? 'quiet' : tone(v)) }, off ? 'Not counted' : money(v)));
     V.resRows.replaceChildren(rowOf('Mesos picked up', R.pickedUp), rowOf('Sold at the NPC', R.sold, R.otherBuys ? 'bought ' + fmt(R.otherBuys) + ' besides potions' : ''),
-      // with one flip so far the mesos seen are counted, and the loot waits for the next flip
-      rowOf("Your bag's change, at NPC prices", R.loot ? R.loot.value : null, loot && !R.loot && has ? (viewing ? 'its bag was looked through once' : 'counts at your next flip') : '', !loot),
+      // until a bag row has been seen twice the mesos seen are counted and the loot waits
+      rowOf("Your bag's change, at NPC prices", R.loot ? R.loot.value : null, loot && !R.loot && has ? (viewing ? 'its bag was looked through once' : 'counts once a bag row is seen twice') : '', !loot),
       rowOf('Potions', R.potions == null ? null : -R.potions));
     V.resOther.textContent = R.other && R.other.n ? 'Plus ' + fmt(R.other.n) + ' other potions, ' + fmt(R.other.cost) + ' mesos of them.' : '';
     V.resOther.hidden = !V.resOther.textContent;
@@ -1897,7 +1900,7 @@ function mount(root, deps) {
             const day = drops && drops.date && new Date(drops.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             after.push(el('p', { class: 'g-note g-credit' }, 'Prices from ', el('a', { href: 'https://cozy.markets/', target: '_blank', rel: 'noopener' }, 'Cozy Market'), day ? ', ' + day + '.' : '.'));
           }
-          after.push(el('p', { class: 'g-note' }, 'Flip through Equip, Use and Etc to update it.'));
+          after.push(el('p', { class: 'g-note' }, 'Open your bag on Equip, Use or Etc to update it.'));
         }
         V.resLoot.replaceChildren(el('div', { class: 'g-res-h' }, 'What you picked up'), ...(list.length ? [el('div', { class: 'k-rows' }, ...list)] : []), ...after, ...pk.nodes);
       }
@@ -1908,13 +1911,12 @@ function mount(root, deps) {
     V.resLines.replaceChildren(...lines); V.resLines.hidden = !lines.length;
     V.resNudge.hidden = loot || !!viewing;
   }
-  // the three tabs' state during a flip-through: seen in full (with when), part way (needs a slower scroll), or not
-  // yet. Shared by the main card's checklist (renderBag) and the pop out's chips (renderHealth).
+  // the three tabs' state: seen in full (with when), part way (pages seen but not yet both its top and its bottom, so
+  // it needs a scroll), or not yet. A tab stays ticked across bag openings. Shared by the main card's checklist (renderBag) and the pop out's chips (renderHealth).
   function bagTabStates(B) {
     return ['Equip', 'Use', 'Etc'].map(tab => {
-      const A = B && B.acc[tab], full = B && B.done[tab] ? B.done[tab].t : B && B.last ? B.last.t : null;
-      // pages of a tab not finished in this opening, unless this opening already made a set (they're left from it)
-      const part = !!(A && A.strips.length) && !(B && B.done[tab]) && !(B && B.last && B.last.t >= B.openT);
+      const T = B && B.v === 2 ? B.tabs[tab] : null, full = T && T.len != null ? T.fullT || B.startT || Date.now() : null;
+      const part = !!T && T.len == null && T.strips.length > 0;
       return { tab, state: part ? 'fix' : full ? 'done' : '', full };
     });
   }
@@ -1923,8 +1925,8 @@ function mount(root, deps) {
     const B = session && session.bag;
     bagCheck.hidden = !lootOn || !GS().bagListShows(session, Date.now());
     if (!lootOn) return;
-    // the list goes once a flip is done, so its time stays in Notices
-    if (B && B.last && st.bagNoted !== B.last.t) { st.bagNoted = B.last.t; st.noted.bag = null; noteOf('bag', 'done', 'Bag counted: Equip, Use and Etc', B.last.t); }
+    // the list goes once the start flip is done, so its time stays in Notices
+    if (B && B.startT && st.bagNoted !== B.startT) { st.bagNoted = B.startT; st.noted.bag = null; noteOf('bag', 'done', 'Bag counted: Equip, Use and Etc', B.startT); }
     for (const { tab, state, full } of bagTabStates(B)) {
       const li = bagCheck.querySelector('[data-k="bag-' + tab + '"]');
       li.className = state;
@@ -2127,9 +2129,9 @@ function mount(root, deps) {
       can: { share: !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia), frames: typeof MediaStreamTrackProcessor === 'function', popout: !!window.documentPictureInPicture, platform: (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '' },
       slots: st.slots, mesos: st.mesos == null ? null : st.mesos, mesoHome: MS().mesoHome(), checks: lastHealth, recent: st.recent.slice(), drawError,
       map: mapId, session: session ? GS().stats(session, Date.now(), avgExp(session.mapId || mapId)) : null, popout: overlay.win() ? { layout } : null,
-      // Count my loot: the switch, how far each tab's flip got, the bag sets, shop visits and prices learned
-      loot: { on: lootOn, mode: session ? session.mode : null, pictures: lootReady, sets: session && session.bag ? session.bag.sets : 0,
-        acc: session && session.bag ? Object.fromEntries(Object.entries(session.bag.acc).map(([k, a]) => [k, a.strips.map(x => ({ rows: x.rows.length, top: x.top, bottom: x.bottom }))])) : null,
+      // Count my loot: the switch, the start flip, what sales banked, each tab's rows and how many were seen twice, shop visits and prices learned
+      loot: { on: lootOn, mode: session ? session.mode : null, pictures: lootReady, started: !!(session && session.bag && session.bag.startT), banked: session && session.bag ? session.bag.banked : null,
+        tabs: session && session.bag && session.bag.tabs ? Object.fromEntries(Object.entries(session.bag.tabs).map(([k, T]) => [k, { len: T.len, seen: T.rows.filter(r => r && r.tb > r.ta).length, strips: T.strips.length }])) : null,
         shop: session && session.shop ? { open: session.shop.open, visits: session.shop.visits.length } : null, learned: session ? session.learned || [] : [],
         needsFlip: !!st.needsFlip, pickups: PICKUPS && session ? GS().pickups(session) : null } }),
     popout: () => overlay.win() ? overlay.win().document.body : null,

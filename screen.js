@@ -1232,11 +1232,16 @@ function shopBox(src, x0, y0, s) {
   const white = (x, y) => { const k = (y * W + x) * 4; return Math.min(d[k], d[k + 1], d[k + 2]) >= 236; };
   // two rows 1.5 base px inside the box's top and bottom edges (the digits sit between them)
   const midY = Math.round(img.h / 2), yA = Math.round(6 + 1.5 * s), yB = Math.round(6 + (SHOP.bh - 1.5) * s);
-  let a = -1;
-  for (let x = 0; x < 20 && x < W; x++) if (white(x, yA) && white(x, yB)) { a = x; break; }
+  // the first white run as wide as the box: at a big stretch the box's thin white frame comes first, a dark gap left of the
+  // field, and stopping at it lost the shop (2560x1440, 2026-11-15)
+  let a = -1, b = -1;
+  for (let x = 0; x < 20 && x < W; x++) {
+    if (!white(x, yA) || !white(x, yB)) continue;
+    let e = x; while (e + 1 < W && white(e + 1, yA)) e++;
+    if (Math.abs((e - x + 1) / s - SHOP.bw) <= 8) { a = x; b = e; break; }
+    x = e;
+  }
   if (a < 0) return null;
-  let b = a; while (b + 1 < W && white(b + 1, yA)) b++;
-  if (Math.abs((b - a + 1) / s - SHOP.bw) > 8) return null;
   let top = yA, bot = top;
   while (top > 0 && white(a + 2, top - 1)) top--;
   while (bot + 1 < img.h && white(a + 2, bot + 1)) bot++;
