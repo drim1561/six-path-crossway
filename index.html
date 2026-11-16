@@ -1221,6 +1221,7 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
 .g-over:empty { display: none !important; }
 .g-strip[data-layout="tile"] .g-over { display: inline; margin-left: .3em; }
 .g-strip[data-layout="tile"] .g-k-exp .g-us { display: none; }
+.g-strip[data-layout="tile"] .g-k-exp .g-us.wait { display: inline; grid-column: 1 / -1; min-width: 0; white-space: normal; contain: inline-size; }
 .g-parts, .g-town { grid-column: 1 / -1; font-size: .88em; line-height: 1.25; color: var(--muted); min-width: 0; }
 /* Profit's parts: Mesos, Loot and Potions, each a word over its number, three even columns */
 .g-parts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 .4em; text-align: center; white-space: nowrap; }
@@ -2201,7 +2202,7 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-16k',
+  version: '2026-11-16l',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };

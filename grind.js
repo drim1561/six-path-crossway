@@ -1356,6 +1356,14 @@ function mount(root, deps) {
       if (app) { setStatus('Found MapleStory. Grind away, nothing to type.'); if (!overlay.win()) popOut(); return; }
       setStatus(WATCHING);
     } });
+  // a browser that can't share a window (phones, old browsers) hides the button, so say why; Firefox and Safari share and
+  // read right (tests/browsers.test.js) but have no frame reader, so a hidden tab may stop reading, and some have no pop-out
+  // window, so they get a softer line (a friend's Firefox failed until he moved to Edge)
+  if (!app) {
+    const md = navigator.mediaDevices;
+    if (!(md && md.getDisplayMedia)) setStatus('This browser can\'t share a window. Use Chrome or Edge on a computer.');
+    else if (typeof MediaStreamTrackProcessor !== 'function') setStatus('Chrome or Edge on a computer works best. This browser may stop reading while its tab is in the background' + (window.documentPictureInPicture ? '.' : ', and it can\'t pop out.'));
+  }
   // before sharing, Share game window is the main button; once sharing it's Pop out, and Stop sits after where Share was
   for (const b of shareArea.querySelectorAll('button')) b.classList.add('k-btn');
   const shareBtn = shareArea.querySelector('#g-share'), shareWords = t => { shareBtn.lastChild.textContent = t; };
@@ -1672,9 +1680,13 @@ function mount(root, deps) {
       if (b.disabled !== w.off) b.disabled = w.off;
       if (w.key === 'since') { put(SP.sinceAt, w.label.replace(/^since /, '')); attr(b, 'aria-label', w.label); }
     }
-    const us = saved ? (o.expHr != null ? 'over ' + fmtDur(o.expMins) : '') : usual != null ? (p.vs ? '· ' : '') + 'usual ' + fmtK(usual) : '';
+    // a live run with no EXP gained yet has nothing to measure: say so instead of leaving a bare dot (a 16d report read the bare
+    // dots as "no numbers are populating"); .wait lets Tile, which hides the usual, show these words
+    const waiting = !saved && !!s && p.value == null && !(o.exp > 0);
+    const us = waiting ? 'waiting for your first kill' : saved ? (o.expHr != null ? 'over ' + fmtDur(o.expMins) : '') : usual != null ? (p.vs ? '· ' : '') + 'usual ' + fmtK(usual) : '';
     put(SP.exp, p.value != null ? fmtK(p.value) : '·');
     show(SP.expUs, !!us);
+    attr(SP.expUs, 'class', 'g-us' + (waiting ? ' wait' : ''));
     put(SP.expUn, us);
     // the pixel arrow and the percent, rewritten only when they change (nothing animates on a number update)
     const vsText = p.vs ? p.vs.text : '';
