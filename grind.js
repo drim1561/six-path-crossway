@@ -1350,6 +1350,13 @@ function mount(root, deps) {
       if (app) { setStatus('Found MapleStory. Grind away, nothing to type.'); if (!overlay.win()) popOut(); return; }
       setStatus(WATCHING);
     } });
+  // a browser that can't share a window (phones, old browsers) hides the button, so say why; Firefox and Safari share but
+  // have no frame reader or pop-out window, so they get a softer line (a friend's Firefox failed until he moved to Edge)
+  if (!app) {
+    const md = navigator.mediaDevices;
+    if (!(md && md.getDisplayMedia)) setStatus('This browser can\'t share a window. Use Chrome or Edge on a computer.');
+    else if (typeof MediaStreamTrackProcessor !== 'function') setStatus('Chrome or Edge on a computer works best. This browser can share, but may stall in the background and can\'t pop out.');
+  }
   // before sharing, Share game window is the main button; once sharing it's Pop out, and Stop sits after where Share was
   for (const b of shareArea.querySelectorAll('button')) b.classList.add('k-btn');
   const shareBtn = shareArea.querySelector('#g-share'), shareWords = t => { shareBtn.lastChild.textContent = t; };
