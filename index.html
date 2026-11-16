@@ -1613,14 +1613,23 @@ body:not(.timer-off) #view-how .timer-only, body:not(.appraiser-off) #view-how .
 .examples code { justify-self: start; }
 .smallprint { padding-top: var(--gap); background: var(--night-dots) left top / 8px 2px repeat-x; }
 /* How it works: a hero stage and example cards drawn from the site's own pictures */
-.how-stage { position: relative; height: 70px; overflow: hidden; display: flex; align-items: flex-end; gap: 28px; padding: 0 var(--gap) 12px; isolation: isolate; border: 2px solid var(--card-o); border-radius: var(--r-card); image-rendering: pixelated; }
-.how-stage::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 8px; z-index: -1; border-top: 4px solid var(--ground-line); background-color: var(--ground); }
+.how-stage { position: relative; height: 90px; overflow: hidden; isolation: isolate; border: 2px solid var(--card-o); border-radius: var(--r-card); image-rendering: pixelated; }
+.how-stage::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 24px; z-index: -1; background: url(sprites/grass.png) 0 0 repeat-x; }
+.how-stage > * { position: absolute; bottom: 10px; left: 100%; animation: how-cross 7s linear infinite; }
+.how-stage > .how-mob-pig { left: calc(100% + 70px); animation: how-walk .35s steps(3) infinite, how-cross 7s linear infinite; }
+.how-stage > .how-mob-ribbon { left: calc(100% + 170px); animation: how-walk .4s steps(3) infinite, how-cross 7s linear infinite; }
+.how-mob-snail { width: 38px; height: 26px; background-image: url(sprites/mobs/2.png); background-size: 190px 26px; --how-sheet: -190px; }
+.how-stage > .how-mob-snail { animation: how-walk 1.2s steps(5) infinite, how-cross 56s linear -20s infinite; }
+.how-stage > .how-roll { bottom: 1px; }
+.how-roll .how-lemon { display: block; animation: how-spin .6s linear infinite, how-bob .3s ease-in-out infinite alternate; }
+@keyframes how-cross { to { transform: translateX(-1000px); } }
+@keyframes how-spin { to { rotate: -360deg; } }
+@keyframes how-bob { to { translate: 0 -5px; } }
 .how-mob { display: block; flex: none; background-repeat: no-repeat; image-rendering: pixelated; animation: how-walk .7s steps(3) infinite; }
 .how-mob-pig { width: 68px; height: 46px; background-image: url(sprites/mobs/8.png); background-size: 204px 46px; --how-sheet: -204px; }
 .how-mob-ribbon { width: 68px; height: 50px; background-image: url(sprites/mobs/10.png); background-size: 204px 50px; --how-sheet: -204px; }
 @keyframes how-walk { to { background-position: var(--how-sheet) 0; } }
 .how-lemon { display: inline-block; flex: none; width: 38px; height: 38px; background: url(data/loot-icons.png) -190px -722px no-repeat; image-rendering: pixelated; }
-.how-stage .how-lemon { align-self: flex-end; margin-bottom: 0; }
 .how-mock { display: grid; gap: var(--gap); padding: var(--gap); background: var(--card); border: 2px solid var(--card-o); border-radius: var(--r-card); max-width: 420px; min-width: 0; }
 .how-row { display: flex; align-items: center; gap: var(--gap); min-width: 0; padding-bottom: 8px; background: var(--night-dots) left bottom / 8px 2px repeat-x; }
 .how-row:last-child { padding-bottom: 0; background: none; }
@@ -1656,7 +1665,7 @@ body:not(.timer-off) #view-how .timer-only, body:not(.appraiser-off) #view-how .
 .how-card .how-num { display: flex; align-items: center; gap: 6px; }
 .how-acts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap); }
 .how-acts .k-btn { margin-top: 0; }
-@media (prefers-reduced-motion: reduce) { .how-mob { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .how-mob, .how-stage > *, .how-stage > .how-mob, .how-roll .how-lemon { animation: none; } .how-stage > .how-roll { left: 250px; } .how-stage > .how-mob-pig { left: 320px; } .how-stage > .how-mob-ribbon { left: 420px; } .how-stage > .how-mob-snail { left: 600px; } }
 .pill { font: 700 var(--fs-sm) var(--font-body); padding: 3px 9px; border-radius: var(--r-pill); justify-self: start; white-space: nowrap; }
 .pill-due { background: var(--due-bg); color: var(--due-fg); }
 .pill-soon { background: var(--soon-bg); color: var(--soon-fg); }
@@ -2003,7 +2012,7 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
   <div class="how-hero">
     <h2>A fan made helper for MapleStory Classic</h2>
     <p class="lead testing-only">It's in testing, so tell us when something looks off.</p>
-    <div class="how-stage" aria-hidden="true"><span class="how-mob how-mob-pig"></span><span class="how-mob how-mob-ribbon"></span><span class="how-lemon"></span><span class="how-lemon"></span></div>
+    <div class="how-stage" aria-hidden="true"><span class="how-mob how-mob-snail"></span><span class="how-roll"><span class="how-lemon"></span></span><span class="how-mob how-mob-pig"></span><span class="how-mob how-mob-ribbon"></span></div>
   </div>
 
   <div class="how-trail">
@@ -2142,7 +2151,7 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-16a',
+  version: '2026-11-16b',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
