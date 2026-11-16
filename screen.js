@@ -140,6 +140,14 @@ function findExpLine(src, fw, fh) {
   if (p) { p = pick(true, p.o.y0, p.c.x1) || p; p = pick(2, p.o.y0, p.c.x1) || p; }
   else p = pick(true);
   if (!p) return null;
+  // one bracket alone to the right of the pair, on its row: the pair's "closing" bracket was really EXP's opening one.
+  // With no exact pair, the looser green paired MP's ] with EXP's [ because EXP's ] had blended into the bar (Rimmah's
+  // 1920x1080 window at the Swamp of Despair, 2026-11-16: the light stayed on Looking for game)
+  const lone = loose => {
+    const r = greenBrackets(img, img.w, img.h, loose).filter(q => Math.abs(q.y0 - p.o.y0) <= 2 && q.x0 > p.c.x1 && q.x0 - p.c.x1 <= 200 && Math.abs(q.h - p.c.h) <= 2);
+    return r.length === 1 ? { o: p.c, c: r[0], loose } : null;
+  };
+  p = lone(true) || lone(2) || p;
   const { o, c } = p, x = Math.max(0, o.x0 - 150), y = o.y0 + y0 - 6;
   return { x, y, w: Math.min(fw - x, (c.x1 - o.x0) + 160), h: o.h + 12, digitH: o.h, loose: p.loose, ox: o.x0 };
 }
