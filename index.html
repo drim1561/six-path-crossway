@@ -197,6 +197,13 @@ body.appraiser-off #tab-appraiser .soon, body.guides-off #tab-guides .soon { dis
 .ns-ray-a { left: 18%; }
 .ns-ray-b { left: 52%; animation-delay: -4s; }
 .ns-fly { width: 6px; height: 6px; border-radius: 50%; background: var(--fly); box-shadow: 0 0 10px 4px var(--fly); animation: ns-drift var(--t, 9s) ease-in-out infinite alternate, ns-blink 3.2s ease-in-out infinite; }
+/* the green Slimes on the forest floor: a clipped box over the walk strip (sprites/mobs/7.png, 7 frames of 72 by 84), still for most of a
+   cycle, then one hop. Dimmed by opacity alone so the green never reads as the lime "on" light. */
+.ns-slime { bottom: 0; width: 72px; height: 84px; overflow: hidden; opacity: .45; transform-origin: 50% 100%; transform: scale(var(--s, .62)); }
+.ns-slime.flip { transform: scale(calc(var(--s, .62) * -1), var(--s, .62)); }
+.ns-slime > i { display: block; width: 504px; height: 84px; background-size: 504px 84px; image-rendering: pixelated; animation: ns-hop var(--t, 8s) steps(7) infinite; animation-delay: var(--at, 0s); }
+.scene-on .ns-slime > i { background-image: url(sprites/mobs/7.png); }
+@keyframes ns-hop { 0%, 84% { transform: translateX(0); } 100% { transform: translateX(-504px); } }
 /* idle: the window has no focus or the page is hidden (set beside the load handler), so the scene freezes in place and costs nothing */
 .scene-still #night-scene *, .scene-still #night-scene *::before { animation-play-state: paused; }
 @keyframes ns-glow { 50% { opacity: .4; } }
@@ -1937,7 +1944,8 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
 </head>
 <body>
 <div id="night-scene" aria-hidden="true"><i class="ns-far-left"></i><i class="ns-far-right"></i><i class="ns-ray-a"></i><i class="ns-ray-b"></i><i class="ns-trunk-left"></i><i class="ns-trunk-right"></i><i class="ns-trunk-inner-left"></i><i class="ns-trunk-inner-right"></i><i class="ns-treehouse"><i class="ns-glow"></i></i>
-  <i class="ns-fly" style="left:120px;top:90px;--x:40px;--y:-30px;--t:8s"></i><i class="ns-fly" style="right:200px;top:260px;--x:-36px;--y:44px;--t:11s"></i><i class="ns-fly" style="left:48%;top:14px;--x:24px;--y:12px;--t:7s"></i><i class="ns-fly" style="left:90px;bottom:150px;--x:44px;--y:-26px;--t:10s"></i><i class="ns-fly" style="right:130px;bottom:90px;--x:-20px;--y:-50px;--t:9s"></i></div>
+  <i class="ns-fly" style="left:120px;top:90px;--x:40px;--y:-30px;--t:8s"></i><i class="ns-fly" style="right:200px;top:260px;--x:-36px;--y:44px;--t:11s"></i><i class="ns-fly" style="left:48%;top:14px;--x:24px;--y:12px;--t:7s"></i><i class="ns-fly" style="left:90px;bottom:150px;--x:44px;--y:-26px;--t:10s"></i><i class="ns-fly" style="right:130px;bottom:90px;--x:-20px;--y:-50px;--t:9s"></i>
+  <i class="ns-slime" style="left:28px"><i></i></i><i class="ns-slime flip" style="right:max(16%,260px);--s:.7;--t:11s;--at:-4s"><i></i></i><i class="ns-slime" style="left:36%;--s:.4;--t:14s;--at:-9s;opacity:.28"><i></i></i></div>
 <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-MDNKTKB5" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 <div id="testing" class="testing"><p>Trail under construction. Grind and Your Path are in testing, nothing is fully launched. See something odd?</p><button id="testing-report" class="k-btn sm" type="button">Report a problem</button></div>
 <header class="topbar"><div class="in">
@@ -2151,7 +2159,7 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-16c',
+  version: '2026-11-16d',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
