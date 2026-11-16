@@ -2151,7 +2151,7 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-16b',
+  version: '2026-11-16c',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
@@ -2767,6 +2767,8 @@ async function setSession(s) {
   if (TIMER_ON) render();
   if (window.Builds && window.Builds.refresh) window.Builds.refresh();
   if (window.Appraiser && window.Appraiser.refresh) window.Appraiser.refresh();
+  // Grind's runs, record and All time are the player's: signing in or out anywhere on the page lists them again
+  if (reporters.grind && reporters.grind.refresh) reporters.grind.refresh();
 }
 
 async function send(channel, kind, at) {
@@ -2790,7 +2792,12 @@ for (const [id, kind] of [['btn-spawned', 'spawn'], ['btn-killed', 'kill'], ['bt
   $(id).addEventListener('click', () => send(state.channel, kind, null).catch(err => hint(err.message)));
 }
 $('signin').addEventListener('click', () => signIn().catch(err => hint(err.message)));
-$('signout').addEventListener('click', () => api.signOut().catch(() => {}).then(() => setSession(null)));
+// a build loaded from My builds is that player's character: it leaves the Your Path form with them (Your Path not opened yet: straight from the device)
+function dropMine() {
+  if (window.Builds && window.Builds.signedOut) return window.Builds.signedOut();
+  try { const f = JSON.parse(store.get('bt.calc')); if (f && f.from === 'mine') { store.set('bt.calc', JSON.stringify({ cls: f.cls, v: {}, s: {} })); store.set('bt.ign', ''); } } catch { /* nothing kept */ }
+}
+$('signout').addEventListener('click', () => api.signOut().catch(() => {}).then(() => { dropMine(); setSession(null); }));
 
 // Your Path (the Planner) is #builds, Guides #guides (a guide's job after it, #guides/mage/cleric), the Appraiser #appraiser,
 // Grind #grind and How it works #how, so each can be linked; back and forward switch views too.

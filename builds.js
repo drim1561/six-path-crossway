@@ -2836,6 +2836,9 @@ function refresh() {
   renderSave(); loadList(); renderMine(); renderGuide();
 }
 
+// The header's Sign out: a build loaded from My builds is that player's character, so it leaves the form with them.
+function signedOut() { if (ui.root && ui.form && ui.form.from === 'mine') newBuild(); }
+
 function mount(root, deps) {
   ui.root = root; ui.deps = deps; ui.data = deps.data; DATA = deps.data;
   ui.editing = null; ui.loaded = null; ui.mineRows = null; ui.done = {}; ui.fresh = { build: null, ids: new Set() }; ui.busy = new Set(); ui.tickNote = null; ui.qArgs = null; ui.limited = false; ui.lastIgn = ''; try { ui.lastIgn = ui.deps.store.get('bt.ign') || ''; } catch { /* no saved name */ } ui.listGen = 0; ui.who = null; ui.filter = { cls: '', minLv: '', maxLv: '', sort: 'level' };
@@ -2904,6 +2907,6 @@ function mount(root, deps) {
 const estimatedNote = () => E('p', { id: 'b-estimated', class: 'k-foot b-badge', hidden: '' }, E('b', {}, 'Estimated. '), "Damage for this weapon comes from meowdb's table and hasn't been checked against a real stat window yet.");
 
 window.Builds = { planSkills, skillsFor, skillsAt, slotOf, comparePaths, resetLine, roadBar, modelRoads, MODEL_ATTACKS, roadLine, ROADS, roadIds, roadState, recognize, ZERO_OK, REACH, HOLD, ROAD_KILLS, roadTarget, mainAttack, crowdHits, rankWith, attackModel, statsAt, planAP, pathClass, firstJobSkills, indieMagic, roadStats, tuneSeconds, EXP_TABLE, STEP_SEC, expHour, hoursTo, healRange, HEAL, standingText, KILL_GAP, CLASSES, BRANCHES, branchOf, weaponsFor, mastery, physRange, spellRange, weaponAttackFromMax, WEAPONS, CHECKED_WEAPONS, windowRange, levelScale, hitChance, defend, elemMult, makeRng, castsToKill,
-  validateStats, rankMobs, buildGuide, pointsPlan, mount, fill, refresh, shrinkImage, take, classOf,
+  validateStats, rankMobs, buildGuide, pointsPlan, mount, fill, refresh, signedOut, shrinkImage, take, classOf,
   dropGroups, findItems, droppers, meowMap, wearers, kindOf, gainRange, trusted, bestScroll, money, plural, mobFit };
 })();

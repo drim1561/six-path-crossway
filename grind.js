@@ -2136,6 +2136,9 @@ function mount(root, deps) {
         needsFlip: !!st.needsFlip, pickups: PICKUPS && session ? GS().pickups(session) : null } }),
     popout: () => overlay.win() ? overlay.win().document.body : null,
   };
+  // the player signed in or out somewhere else on the page (the header's button): the runs listed are theirs, so list again
+  reporter.refresh = () => listSessions();
+  window.Grind.debug.refresh = reporter.refresh;
   window.Grind.debug.report = reporter.report;
   return reporter;
 }
