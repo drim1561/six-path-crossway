@@ -4,7 +4,7 @@
 // pictures (data/grind-pictures.json, from npm run boss:grind) are stretched the same way and slid across the frame,
 // scored by masked correlation. Shrinking the frame instead loses the one pixel wide digit strokes.
 // The EXP line keeps Repot Run Live's reader (exp-tracker/live/index.html), with digit examples drawn from the client's font.
-// window.MapleScreen = { load, findExpLine, readExp, measure, readLevel, readCounts, readIcon, readParty }
+// window.MapleScreen = { load, findExpLine, readExp, measure, readLevel, readCounts, slotBar, readIcon, readParty }
 (function () {
 'use strict';
 
@@ -208,7 +208,7 @@ function expGlyphs(src, line) {
 
 /* ---------- the client's pictures, stretched ---------- */
 
-const raw = { count: {}, level: {}, icon: {}, party: null };
+const raw = { count: {}, level: {}, icon: {}, bar: {}, party: null };
 const DIGITS = '0123456789'.split('');
 // count digits also come shifted half a pixel across: after the stretch a slot sits at a fractional pixel, and a thin 1
 // scores 0.8 at the wrong phase against 0.95 at the right one. A key's first character is its digit.
@@ -222,7 +222,7 @@ const LEVEL_KEYS = SLOT_KEYS;
 function load(pics) {
   const img = u => new Promise(res => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = u; });
   const jobs = [];
-  for (const [set, key] of [['ItemNo', 'count'], ['LevelNo', 'level'], ['Icons', 'icon']]) {
+  for (const [set, key] of [['ItemNo', 'count'], ['LevelNo', 'level'], ['Icons', 'icon'], ['SlotBar', 'bar']]) {
     for (const [k, u] of Object.entries(pics[set] || {})) jobs.push(img(u).then(i => { if (i) raw[key][k] = i; }));
   }
   if (pics.InvBg) jobs.push(img(pics.InvBg).then(i => { raw.inv = i; }));
@@ -474,6 +474,21 @@ function fineCounts(src, line, s) {
     if (few > top.score) top.score = few;
   }
   return { sc: top.sc, score: top.score };
+}
+// the arrow at the top right of the quickslot bar, which opens and closes it: 'hidden' (it points up, the bar is closed),
+// 'shown' (it points down), or null when neither is clear. A closed bar has no numbers to read, which isn't a share too small
+// to read (Rimmah, 2026-11-16: the light went red with the bar closed and stayed red after it opened). It sits 340 to 362
+// base pixels right of atX and 29 to 34 above the EXP line on every frame we have
+const BAR_AT = { x: 325, y: -48, w: 60, h: 34 };
+function slotBar(src, line, m) {
+  if (!raw.bar.up || !raw.bar.down) return null;
+  const s = m.s, set = setAt('bar', s), t0 = set.up;
+  const img = region(src, atX(line, s) + BAR_AT.x * s, line.y + BAR_AT.y * s, BAR_AT.w * s + t0.w, BAR_AT.h * s + t0.h);
+  const score = k => { const t = set[k]; return t ? best(img, set, [k], 0, img.w - t.w, 0, img.h - t.h).score : -1; };
+  const up = Math.max(score('up'), score('upOver')), down = Math.max(score('down'), score('downOver'));
+  if (up >= 0.9 && up - down >= 0.05) return 'hidden';
+  if (down >= 0.9 && down - up >= 0.05) return 'shown';
+  return null;
 }
 // three rows: the top one (under the chat buttons, Rimmah's 2026-11-10 setup keeps a potion in its 4th slot) sits at about -125 base
 // pixels from the EXP line, the middle at -90 and the bottom at -55. Without its own row a top potion took the middle row's key
@@ -888,6 +903,13 @@ function readTab(src, win) {
 const SLOT_MORE = 0.6;
 let slotSc = { s: 0, sc: 0 }, slotCache = { key: '', slots: {} };   // the item in each slot, while its count stays
 function slotRect(win, r, c) { const s = win.s; return { x: win.x + (SLOT.x0 + c * SLOT.px) * s, y: win.y + (SLOT.y0 + r * SLOT.py) * s, w: SLOT.w * s, h: SLOT.h * s }; }
+// how far apart the colour channels are, on average, under a picture's solid pixels where best() put it
+const DIGIT_SPREAD = 35;
+function inkSpread(img, b) {
+  const t = b.t, D = img.data; let sum = 0;
+  for (const i of t.idx) { const k = ((b.y + ((i / t.w) | 0)) * img.w + b.x + (i % t.w)) * 4; sum += Math.max(D[k], D[k + 1], D[k + 2]) - Math.min(D[k], D[k + 1], D[k + 2]); }
+  return sum / t.idx.length;
+}
 // the number at the bottom left of a slot, or null
 // guardLeft (the bag reader): something digit like just left of the first digit means a faint leading 1 was missed
 // ("12" read as "2" on a small share), so none
@@ -913,8 +935,10 @@ function slotNumber(src, rect, sc, guardLeft) {
   for (let k = 0; k < 4; k++) {
     const l = n[n.length - 1], r = best(img, set, SLOT_KEYS, l.x + l.t.w - 2, l.x + l.t.w + 2, l.y - 1, l.y + 1);
     if (r.score >= NEXT) { n.push(r); continue; }
-    // something digit like right after the last digit: the number may be longer than read (12 read as 1), so none
-    if (r.score >= SLOT_MORE) return null;
+    // something digit like right after the last digit: the number may be longer than read (12 read as 1), so none. Unless
+    // it's coloured: the count digits are black and white (5 to 20 apart in colour on a recording), while the red and white
+    // edge of a milk carton right after a 33 looked like a faint 1 (57 apart) and held Rimmah's Use tab back for good
+    if (r.score >= SLOT_MORE && inkSpread(img, r) <= DIGIT_SPREAD) return null;
     break;
   }
   // a slot's count sits at an exact spot (empty slots score about 0.35), so 0.8 is enough here; the quickslot
@@ -1524,6 +1548,6 @@ function readMap(src, frameH, opts) {
 }
 function mapHome(spot) { if (arguments.length) mapSpot = spot || null; return mapSpot; }
 
-window.MapleScreen = { expSeeds: s => (s ? (EXP_SEEDS = s) : EXP_SEEDS), loadMaps, readMap, mapHome, load, sizeOf, findExpLine, greenProbe, readExp, expGlyphs, measure, readLevel, readCounts, readIcon, readParty, levelArea, slotArea, partyArea,
+window.MapleScreen = { expSeeds: s => (s ? (EXP_SEEDS = s) : EXP_SEEDS), loadMaps, readMap, mapHome, load, sizeOf, findExpLine, greenProbe, readExp, expGlyphs, measure, readLevel, readCounts, slotBar, readIcon, readParty, levelArea, slotArea, partyArea,
   findMesoBox, mesoHome, mesoGlyphs, readMesos, invGeometry, readInventory, loadLoot, readBag, readScroll, readShop, shopHome };
 })();

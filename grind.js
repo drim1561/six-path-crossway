@@ -20,7 +20,7 @@ const SHOP_SEARCH_EVERY = 6, SHOP_SEARCH_TOWN = 2, SHOP_QUIET_MS = 20000;   // t
 // came for 20 s (every 8 s found the Perion store 9 s late and booked its sales as pickups, Excavation run, 2026-11-15), every 8 s otherwise: it's the heaviest thing a tick does
 // sessions kept on this device for all time: up to 200, the newest 20 with their minutes (the charts), older ones without
 const LOCAL_MAX = 200, LOCAL_MINUTES = 20;
-const RESUME_MS = 30 * 60000, SAVE_MS = 60000, LEVEL_EVERY = 20, ICON_EVERY = 40, MESO_SEARCH_EVERY = 40, LOST_MS = 15000, BAG_NEAR_MS = 5000;
+const RESUME_MS = 30 * 60000, SAVE_MS = 60000, LEVEL_EVERY = 20, ICON_EVERY = 40, BAR_EVERY = 3, MESO_SEARCH_EVERY = 40, LOST_MS = 15000, BAG_NEAR_MS = 5000;
 // the Windows app's bridge (window.sixPathApp, deps.app) this page needs; an older app is asked to update. RELEASES is
 // where the app downloads from until CONFIG.appDownload is set
 const NEED_BRIDGE = 1, RELEASES = 'https://github.com/drim1561/six-path-crossway/releases/latest';
@@ -83,7 +83,8 @@ function health(f) {
   C.exp = stuckOn(f.exp) ? { state: 'bad', text: "can't see the bar" } : f.exp.ok != null && f.exp.fail == null ? { state: 'ok', text: 'reading' } : { state: 'wait', text: 'looking' };
   // the level is read once a minute, and one read is enough for the session
   C.level = f.level.ok != null ? { state: 'ok', text: f.levelNow ? String(f.levelNow) : 'read' } : stuckOn(f.level) ? { state: 'bad', text: "can't read it" } : { state: 'wait', text: 'looking' };
-  C.potions = stuckOn(f.size) ? { state: 'bad', text: "can't measure the game" } : stuckOn(f.counts) ? { state: 'bad', text: "can't read the numbers" }
+  // f.slotsHidden: the quickslot bar is closed (its arrow points up), so there are no numbers to read and nothing is wrong
+  C.potions = stuckOn(f.size) ? { state: 'bad', text: "can't measure the game" } : f.slotsHidden ? { state: 'wait', text: 'bar closed' } : stuckOn(f.counts) ? { state: 'bad', text: "can't read the numbers" }
     : f.counts.ok == null ? { state: 'wait', text: 'looking' } : f.potNone ? { state: 'wait', text: 'none on quickslots' } : { state: 'ok', text: f.potCount ? String(f.potCount) : 'reading' };
   const mesoStale = f.meso.at != null && t - f.meso.at > STALE_MS;
   // "Mesos waiting": the one line (the nudge) is the only place that asks for the inventory
@@ -101,6 +102,7 @@ function health(f) {
   if (C.potions.state === 'bad') return say('bad', "Can't read quickslots", app ? "Can't read your quickslot numbers. Make the game window bigger, or press Find my game again" : "Can't read your quickslot numbers. Make the game window bigger, or share it again");
   if (C.level.state === 'bad') return say('bad', "Can't read level", "Can't read your level. Try Find my game again");
   if (f.exp.ok == null || f.size.ok == null) return say('wait', 'Looking for game', 'Looking for your game…');
+  if (f.slotsHidden) return say('wait', 'Open your quickslots', "Your quickslot bar is closed, so potions can't count. Press the little arrow at the bottom right of the game to open it");
   if (f.potNone) return say('wait', 'No quickslot potions', 'Put the potions you drink on your quickslots so they count');
   // Count my loot (f.loot: { on, pictures, started, needsFlip }): the start flip through the bag also reads the mesos,
   // so it comes first, once the item pictures are in (a flip before then reads nothing). After it nothing asks for the
@@ -1035,7 +1037,7 @@ function mount(root, deps) {
     if (mesos != null && session) GS().add(session, { t: Date.now(), mesos });
     readLoot(src, S, false);
     if (!st.line) {
-      st.line = S.findExpLine(src, w, h); st.m = null; st.measureAt = 0;
+      st.line = S.findExpLine(src, w, h); st.m = null; st.measureAt = 0; st.slotsHidden = false; st.barAt = 0;
       if (!st.line) {
         if (!st.probeAt || Date.now() - st.probeAt > 15000) { st.probeAt = Date.now(); try { st.probe = S.greenProbe(src, w, h); } catch (e) { st.probe = null; } }   // for a report: why no bar
         mark('exp', false); setCheck('exp', 'fix', 'Make sure the bar at the bottom of the game is showing'); render(); return; }
@@ -1079,11 +1081,30 @@ function mount(root, deps) {
         if (lv.ok) { st.levelMiss = 0; st.level = lv.level; reading.level = lv.level; setCheck('level', 'done', 'Level ' + lv.level); }
         else { st.levelMiss = (st.levelMiss || 0) + 1; if (!st.level) setCheck('level', 'fix', "Can't read your level yet"); }
       }
-      mark('counts', st.m.countScore >= 0.8);
-      if (st.m.countScore < 0.8) setCheck('potions', 'fix', "Can't read the quickslot numbers at this share size (match " + st.m.countScore.toFixed(2) + ')');
+      const countsOk = st.m.countScore >= 0.8, counts = countsOk ? S.readCounts(src, st.line, st.m) : [];
+      // no numbers: is the quickslot bar closed? (Rimmah, 2026-11-16: closed when sharing started, the numbers measured too
+      // faint, the light went red and stayed red after it opened.) Its arrow is looked at every few ticks while nothing reads
+      let reopened = false;
+      if (counts.length) st.slotsHidden = false;
+      else if (S.slotBar && st.ticks >= (st.barAt || 0)) {
+        st.barAt = st.ticks + BAR_EVERY;
+        const bar = S.slotBar(src, st.line, st.m);
+        // opened again after a measure taken while it was closed: measure again, so the numbers' size is found
+        if (bar === 'shown' && st.slotsHidden && !countsOk) { st.m = null; st.measureAt = st.ticks; reopened = true; }
+        if (bar) st.slotsHidden = bar === 'hidden';
+      }
+      mark('counts', countsOk || !!st.slotsHidden || reopened);
+      if (reopened) setCheck('potions', '', 'Your quickslot bar is open again, measuring the game');
+      else if (st.slotsHidden) {
+        // the slots it knew are still there under the closed bar: none of them ran out
+        reading.held = Object.keys(st.slots);
+        st.potNone = false;
+        setCheck('potions', 'fix', 'Your quickslot bar is closed. Press the little arrow at the bottom right of the game to open it');
+      }
+      else if (!countsOk) setCheck('potions', 'fix', "Can't read the quickslot numbers at this share size (match " + st.m.countScore.toFixed(2) + ')');
       else {
         let nth = 0;
-        for (const c of S.readCounts(src, st.line, st.m)) {
+        for (const c of counts) {
           let known = st.slots[c.key];
           nth++;
           // which potion: once per slot, again on any read its count changed (Rimmah, 2026-11-04: Pure Water put on a key
@@ -1537,7 +1558,7 @@ function mount(root, deps) {
   function renderHealth() {
     const s = session;
     const h = lastHealth = health({ t: Date.now(), app: !!app, sharing: st.sharing, stopped: !!st.stopped, hasSession: !!s, exp: st.h.exp, level: st.h.level, levelNow: st.level,
-      size: st.h.size, counts: st.h.counts, potNone: st.potNone, potCount: st.potCount, killed: !!s && (s.gainExp > 0 || s.gainPct > 0),
+      size: st.h.size, counts: st.h.counts, potNone: st.potNone, potCount: st.potCount, slotsHidden: !!st.slotsHidden, killed: !!s && (s.gainExp > 0 || s.gainPct > 0),
       meso: { at: s && s.meso && s.meso.last ? s.meso.last.t : null, unclear: !!(st.mesoOpen && st.mesoUnclear) },
       loot: { on: lootOn, pictures: lootReady, started: !!(s && s.bag && s.bag.startT),
         needsFlip: st.needsFlip = PICKUPS && !!s && lootOn && GS().pickNeedsFlip(s, Date.now(), { sinceT: st.lineT, movedT: st.movedT }) } });
