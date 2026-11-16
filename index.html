@@ -165,9 +165,9 @@ body.testing-off #testing, body.testing-off .testing-only { display: none; }
 .tabs button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 /* the closed Appraiser: dimmed words with no ground and no edge, and a Soon tag beside its name */
 .tabs .soon { display: none; }
-body.appraiser-off #tab-appraiser, body.appraiser-off #tab-appraiser:hover, body.guides-off #tab-guides, body.guides-off #tab-guides:hover { padding: 0 2px; background-color: transparent; color: var(--credit); box-shadow: none; }
-body.guides-off #tab-guides { cursor: default; }
-body.appraiser-off #tab-appraiser .soon, body.guides-off #tab-guides .soon { display: inline-block; margin-left: 5px; padding: 0 5px; border-radius: var(--r-pill); background-color: var(--pill); color: var(--pill-ink); font: 700 var(--fs-xs) var(--font-body); line-height: 18px; }
+body.appraiser-off #tab-appraiser, body.appraiser-off #tab-appraiser:hover, body.guides-off #tab-guides, body.guides-off #tab-guides:hover, body.path-off #tab-builds, body.path-off #tab-builds:hover { padding: 0 2px; background-color: transparent; color: var(--credit); box-shadow: none; }
+body.guides-off #tab-guides, body.path-off #tab-builds { cursor: default; }
+body.appraiser-off #tab-appraiser .soon, body.guides-off #tab-guides .soon, body.path-off #tab-builds .soon { display: inline-block; margin-left: 5px; padding: 0 5px; border-radius: var(--r-pill); background-color: var(--pill); color: var(--pill-ink); font: 700 var(--fs-xs) var(--font-body); line-height: 18px; }
 .auth { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 20px; }
 .auth [hidden] { display: none; }
 .auth #who { padding: 2px 10px; border-radius: var(--r-pill); background-color: var(--surface); box-shadow: 0 0 0 2px var(--wood-o); color: var(--ink); font-size: var(--fs-sm); }
@@ -531,7 +531,7 @@ body.only-grind #tab-timer, body.only-grind #tab-builds, body.only-grind #tab-gu
 body.timer-off #tab-timer, body.timer-off .timer-only { display: none; }
 /* the Appraiser is closed while it gets its new look (window.BT_APPRAISER turns it on): its sign fades, its view is one
    closed card, its part of How it works goes, and none of its code loads */
-body.guides-off .guides-only, body.appraiser-off .appraiser-only, body.appraiser-off #appraiser-root, body:not(.appraiser-off) .appraiser-closed { display: none; }
+body.path-off .path-only, body.guides-off .guides-only, body.appraiser-off .appraiser-only, body.appraiser-off #appraiser-root, body:not(.appraiser-off) .appraiser-closed { display: none; }
 .closed-body { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 16px; }
 .closed-crew { width: 88px; height: 48px; background: var(--night-crew) 0 0 / 88px 48px no-repeat; image-rendering: pixelated; }
 .closed-text h2 { margin: 0; font: 400 var(--tt-m) var(--font-title); }
@@ -1989,13 +1989,13 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
   <i class="ns-fly" style="left:120px;top:90px;--x:40px;--y:-30px;--t:8s"></i><i class="ns-fly" style="right:200px;top:260px;--x:-36px;--y:44px;--t:11s"></i><i class="ns-fly" style="left:48%;top:14px;--x:24px;--y:12px;--t:7s"></i><i class="ns-fly" style="left:90px;bottom:150px;--x:44px;--y:-26px;--t:10s"></i><i class="ns-fly" style="right:130px;bottom:90px;--x:-20px;--y:-50px;--t:9s"></i>
   <i class="ns-slime" style="left:28px"><i></i></i><i class="ns-slime flip" style="right:max(16%,260px);--s:.95;--t:11s;--at:-4s"><i></i></i><i class="ns-slime" style="left:36%;--s:.6;--t:14s;--at:-9s;opacity:.5"><i></i></i></div>
 <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-MDNKTKB5" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
-<div id="testing" class="testing"><p>Trail under construction. Grind and Your Path are in testing, nothing is fully launched. See something odd?</p><button id="testing-report" class="k-btn sm" type="button">Report a problem</button></div>
+<div id="testing" class="testing"><p data-path-off="Trail under construction. Grind is in testing, nothing is fully launched. See something odd?">Trail under construction. Grind and Your Path are in testing, nothing is fully launched. See something odd?</p><button id="testing-report" class="k-btn sm" type="button">Report a problem</button></div>
 <header class="topbar"><div class="in">
   <h1 class="logo">Six Path <b>Crossway</b></h1>
   <nav class="tabs" role="tablist" aria-label="Pages">
     <button id="tab-how" type="button" role="tab" aria-controls="view-how" aria-selected="true">How it works</button>
     <button id="tab-grind" type="button" role="tab" aria-controls="view-grind" aria-selected="false">Grind</button>
-    <button id="tab-builds" type="button" role="tab" aria-controls="view-builds" aria-selected="false">Your Path</button>
+    <button id="tab-builds" type="button" role="tab" aria-controls="view-builds" aria-selected="false" aria-label="Your Path, soon">Your Path<span class="soon" aria-hidden="true">Soon</span></button>
     <button id="tab-guides" type="button" role="tab" aria-controls="view-guides" aria-selected="false" aria-label="Guides, soon">Guides<span class="soon" aria-hidden="true">Soon</span></button>
     <button id="tab-appraiser" type="button" role="tab" aria-controls="view-appraiser" aria-selected="false" aria-label="Appraiser, soon">Appraiser<span class="soon" aria-hidden="true">Soon</span></button>
     <button id="tab-timer" type="button" role="tab" aria-controls="view-timer" aria-selected="false">Timer</button>
@@ -2045,7 +2045,7 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
         <span class="closed-crew" aria-hidden="true"></span>
         <div class="closed-text">
           <h2 id="closed-title">This trail is still being cleared</h2>
-          <p>The Appraiser is closed while it gets its new look. Grind and Your Path are open.</p>
+          <p data-path-off="The Appraiser is closed while it gets its new look. Grind is open.">The Appraiser is closed while it gets its new look. Grind and Your Path are open.</p>
           <a class="k-btn key" href="#grind">Back to Grind</a>
         </div>
       </div>
@@ -2141,7 +2141,7 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
   </section>
   </div>
 
-  <section>
+  <section class="path-only">
   <h3>Your Path</h3>
   <p>Type your level and it lays out your path: where to train, where your points go and what to wear.</p>
   <div class="how-mock how-mock-b" role="img" aria-label="Example of two rows: a monster to train on with EXP an hour, and the next skill point">
@@ -2201,7 +2201,7 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-16j',
+  version: '2026-11-16k',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
@@ -2569,6 +2569,9 @@ const TIMER_ON = window.BT_TIMER === true;
 const APPRAISER_ON = window.BT_APPRAISER === true;
 // Guides is closed for now (window.BT_GUIDES turns it on): its sign stays in the row, faded, and opens nothing; #guides lands on How it works
 const GUIDES_ON = window.BT_GUIDES === true;
+// Your Path is closed for now (Rimmah, 2026-11-16: Grind first; window.BT_PATH turns it on): its sign stays in the row, faded, and opens
+// nothing; #builds lands on How it works and builds.js never loads. Opening it again is making this true
+const PATH_ON = window.BT_PATH === true;
 // the Frequent Eater card pays out during the beta (window.BT_CLAIMS = false turns it off): a full card can be claimed for a stack
 // of potions in game. Ending the beta is making this false; the card then only counts
 const CLAIMS_ON = window.BT_CLAIMS !== false;
@@ -2869,10 +2872,13 @@ document.body.classList.toggle('appraiser-off', !APPRAISER_ON);
 // closed, its sign reads "Appraiser, soon" once (the Soon tag is for the eyes); open, it is just the name
 if (APPRAISER_ON) $('tab-appraiser').removeAttribute('aria-label');
 document.body.classList.toggle('guides-off', !GUIDES_ON);
+document.body.classList.toggle('path-off', !PATH_ON);
+if (PATH_ON) { $('tab-builds').removeAttribute('aria-label'); $('tab-builds').querySelector('.soon').remove(); }
+else { $('tab-builds').setAttribute('aria-disabled', 'true'); document.querySelectorAll('[data-path-off]').forEach(e => { e.textContent = e.dataset.pathOff; }); }
 if (GUIDES_ON) { $('tab-guides').removeAttribute('aria-label'); $('tab-guides').querySelector('.soon').remove(); } else $('tab-guides').setAttribute('aria-disabled', 'true');
 // the front page is How it works while the Timer is off; the tester link opens Grind wherever it lands, How it works aside
 function viewNow() {
-  const view = { '#how': 'how', '#builds': 'builds', '#appraiser': 'appraiser', '#grind': 'grind' }[location.hash]
+  const view = { '#how': 'how', '#builds': PATH_ON ? 'builds' : 'how', '#appraiser': 'appraiser', '#grind': 'grind' }[location.hash]
     || (GUIDES_ON && /^#guides(\/|$)/.test(location.hash) ? 'guides' : TIMER_ON ? 'timer' : 'how');
   return onlyGrind() && location.hash !== '#how' ? 'grind' : view;
 }
@@ -3018,7 +3024,7 @@ $('flag').addEventListener('click', () => {
 $('tab-appraiser').addEventListener('click', () => { if (location.hash !== '#appraiser') location.hash = '#appraiser'; });
 $('tab-grind').addEventListener('click', () => { if (location.hash !== '#grind') location.hash = '#grind'; });
 $('tab-how').addEventListener('click', () => { if (location.hash !== '#how') location.hash = '#how'; });
-$('tab-builds').addEventListener('click', () => { if (location.hash !== '#builds') location.hash = '#builds'; });
+$('tab-builds').addEventListener('click', () => { if (PATH_ON && location.hash !== '#builds') location.hash = '#builds'; });
 // already on a guide, the tab keeps its job
 $('tab-guides').addEventListener('click', () => { if (GUIDES_ON && !/^#guides(\/|$)/.test(location.hash)) location.hash = '#guides'; });
 $('tab-timer').addEventListener('click', () => { if (location.hash) history.pushState(null, '', location.pathname + location.search); showView(); });
