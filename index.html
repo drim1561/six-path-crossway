@@ -126,6 +126,7 @@ window.BT_ERRORS = [];
   --btn-line: var(--btn-lo); --btn-k: var(--btn-lo); --btn-k-ink: var(--btn-ink); --now: var(--bad);
   --halo: #04110f;
   --gap: 12px;
+  --at-line: color-mix(in srgb, var(--card-o) 75%, transparent);   /* the one faint line between neighbours */
   --r-frame: 26px 30px 24px 28px; --r-glass: 17px 20px 15px 18px; --r-card: 12px; --r-btn: 14px 16px 18px 15px; --r-pill: 999px; --r-bub: 12px 12px 12px 3px;
   --fs-xs: 13px; --fs-tag: 14px; --fs-sm: 15px; --fs-md: 17px; --fs-lg: 19px;
   --tt-s: 19px; --tt-m: 24px; --tt-l: 30px; --tt-logo: 36px;
@@ -141,6 +142,11 @@ h1 { font-size: var(--tt-m); margin: 0; }
 
 /* top of the site (Night glow): no band, the header floats over the scene, 122px tall. The logo is a bark sign with a few moss
    tufts, the tabs are pills on a slim glass strip, Sign in is a bark button. Words sit on bark or glass, never on the scene. */
+/* testing mode: one slim glass strip above the tabs on every page, ended by TESTING_ON. It scrolls away with the page */
+.testing { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px var(--gap); padding: 6px 22px 8px; background: var(--surface); border-bottom: 1px solid var(--at-line); color: var(--ink); font-size: var(--fs-sm); }
+.testing p { margin: 0; }
+.testing .k-btn { margin-top: 0; --face: var(--stone); --face-hi: var(--stone-hi); --face-lo: var(--stone-lo); --mossy: var(--stone-moss); color: var(--ink); }
+body.testing-off #testing, body.testing-off .testing-only { display: none; }
 .topbar { color: var(--ink); }
 /* wide screens: the logo lines up with the left edge of the panels (the Grind and Builds columns are 1120 wide less their padding) and the tabs and sign in with the right edge */
 .topbar { --hpad: max(22px, calc((100vw - 1088px) / 2)); }
@@ -1596,7 +1602,7 @@ body:not(.timer-off) #view-how .timer-only, body:not(.appraiser-off) #view-how .
 .examples li { display: grid; grid-template-columns: 150px 1fr; gap: 12px; align-items: baseline; }
 .examples code { justify-self: start; }
 .smallprint { padding-top: var(--gap); background: var(--night-dots) left top / 8px 2px repeat-x; }
-/* How it works: a hero stage, example cards drawn from the site's own pictures, and the Good to know note */
+/* How it works: a hero stage and example cards drawn from the site's own pictures */
 .how-hero { display: grid; gap: var(--gap); min-width: 0; }
 .how-stage { position: relative; height: 70px; overflow: hidden; display: flex; align-items: flex-end; gap: 28px; padding: 0 var(--gap) 12px; isolation: isolate; border: 2px solid var(--card-o); border-radius: var(--r-card); image-rendering: pixelated; }
 .how-stage::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 8px; z-index: -1; border-top: 4px solid var(--ground-line); background-color: var(--ground); }
@@ -1620,11 +1626,26 @@ body:not(.timer-off) #view-how .timer-only, body:not(.appraiser-off) #view-how .
 .how-seg { display: flex; gap: 0; }
 .how-seg span { flex: 1; text-align: center; padding: 4px 0; font: 700 var(--fs-sm) var(--font-body); color: var(--btn-ink); background: var(--btn); border: 2px solid var(--btn-lo); }
 .how-seg span.on { background: var(--lime); color: var(--lime-ink); border-color: var(--lime-lo); }
-.how-list { margin: 0; padding: 0 0 0 20px; display: grid; gap: 8px; }
-.how-note { display: flex; gap: var(--gap); align-items: flex-start; padding: var(--gap); background: var(--lemon); color: var(--lemon-ink); border: 2px solid var(--key-lo); border-radius: var(--r-card); }
-.how-note p, .how-note strong { color: var(--lemon-ink) !important; }
-.how-note > div { display: grid; gap: 8px; min-width: 0; }
-.how-note-ico { flex: none; }
+/* the start steps and the number cards: no boxes, one faint line between neighbours (drawn in the gap, the outer ones clipped) */
+.how-steps, .how-nums { display: grid; gap: var(--gap); overflow: clip; min-width: 0; }
+.how-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: auto 1fr auto; }
+.how-nums { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.how-step, .how-card { position: relative; display: grid; gap: var(--gap); min-width: 0; align-content: start; }
+.how-step { grid-row: span 3; grid-template-rows: subgrid; }
+.how-card { gap: 4px; }
+.how-step::before, .how-card::before { content: ""; position: absolute; top: 0; bottom: 0; left: calc(var(--gap) / -2); border-left: 1px solid var(--at-line); }
+.how-card::after { content: ""; position: absolute; left: 0; right: 0; top: calc(var(--gap) / -2); border-top: 1px solid var(--at-line); }
+#view-how h4 { margin: 0; display: flex; align-items: baseline; gap: 8px; font: 600 var(--fs-md) var(--font-body); color: var(--ink); }
+.how-n { font: 700 var(--tt-m) var(--font-num); color: var(--num-big); }
+.how-step .how-mock { align-content: center; max-width: none; }
+.how-btn { justify-self: center; padding: 6px 14px; font: 700 var(--fs-sm) var(--font-body); color: var(--key-ink); background: var(--accent); border: 2px solid var(--key-lo); border-radius: var(--r-card); }
+.how-lamp { display: inline-flex; align-items: center; gap: 8px; }
+.how-lamp::before { content: ""; flex: none; width: 12px; height: 12px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 8px var(--lime); }
+.how-lbl { font: 600 var(--fs-sm) var(--font-body); color: var(--muted); }
+.how-card .how-num { display: flex; align-items: center; justify-content: flex-start; gap: 6px; }
+.how-card .how-lemon { width: 38px; height: 38px; margin: 4px 0 -12px; }
+.how-acts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap); }
+.how-acts .k-btn { margin-top: 0; }
 @media (prefers-reduced-motion: reduce) { .how-mob { animation: none; } }
 .pill { font: 700 var(--fs-sm) var(--font-body); padding: 3px 9px; border-radius: var(--r-pill); justify-self: start; white-space: nowrap; }
 .pill-due { background: var(--due-bg); color: var(--due-fg); }
@@ -1716,7 +1737,10 @@ b.t { font-family: var(--font-num); }
 /* Something off? (flag.js): the kit's main button, fixed in the corner of every tab, a flag then the words (under 1560 wide just the
    flag, its name kept for screen readers). Its panel is a Window and the thank you note a Card. Every page keeps its foot clear of the button. */
 body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
-.k-btn.flag { position: fixed; right: 15px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 50; margin-top: 0; gap: 12px; padding: 8px 15px 13px; }
+.k-btn.flag { position: fixed; right: 15px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 50; margin-top: 0; gap: 12px; padding: 11px 18px 16px; font-size: var(--fs-lg); }
+/* one small wiggle a visit, a second after the page opens, so the button gets seen once and then sits still */
+@keyframes flag-nudge { 0%, 100% { transform: none; } 20% { transform: rotate(-4deg); } 45% { transform: rotate(3deg); } 70% { transform: rotate(-2deg); } }
+@media (prefers-reduced-motion: no-preference) { .flag.flag-nudge { animation: flag-nudge .6s 1; } }
 .flag[hidden] { display: none; }
 .flag-ico { display: inline-flex; }
 
@@ -1896,6 +1920,7 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
 <div id="night-scene" aria-hidden="true"><i class="ns-far-left"></i><i class="ns-far-right"></i><i class="ns-ray-a"></i><i class="ns-ray-b"></i><i class="ns-trunk-left"></i><i class="ns-trunk-right"></i><i class="ns-trunk-inner-left"></i><i class="ns-trunk-inner-right"></i><i class="ns-treehouse"><i class="ns-glow"></i></i>
   <i class="ns-fly" style="left:120px;top:90px;--x:40px;--y:-30px;--t:8s"></i><i class="ns-fly" style="right:200px;top:260px;--x:-36px;--y:44px;--t:11s"></i><i class="ns-fly" style="left:48%;top:14px;--x:24px;--y:12px;--t:7s"></i><i class="ns-fly" style="left:90px;bottom:150px;--x:44px;--y:-26px;--t:10s"></i><i class="ns-fly" style="right:130px;bottom:90px;--x:-20px;--y:-50px;--t:9s"></i></div>
 <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-MDNKTKB5" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<div id="testing" class="testing"><p>Trail under construction. Grind and Planner are in testing, nothing is fully launched. See something odd?</p><button id="testing-report" class="k-btn sm" type="button">Report a problem</button></div>
 <header class="topbar"><div class="in">
   <h1 class="logo">Six Path <b>Crossway</b></h1>
   <nav class="tabs" role="tablist" aria-label="Pages">
@@ -1967,25 +1992,47 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
   <div class="k-pad">
 
   <div class="how-hero">
-    <p class="lead">Six Path Crossway is a fan made helper for MapleStory Classic players. It watches your game window while you train and turns your level into a plan.</p>
+    <p class="lead">Six Path Crossway is a fan made helper for MapleStory Classic.<span class="testing-only"> It's in testing, so tell us when something looks off.</span></p>
     <div class="how-stage" aria-hidden="true"><span class="how-mob how-mob-pig"></span><span class="how-mob how-mob-ribbon"></span><span class="how-lemon"></span><span class="how-lemon"></span></div>
   </div>
 
   <section>
-  <h3>Grind</h3>
-  <p class="lead">The Grind tab keeps score while you train. Press Share game window, pick MapleStory and go. There's nothing to type: it reads your EXP bar, your level and the potions on your quickslots straight off the screen, so every potion you drink needs a spot on the quickslot bar at the bottom right (HP and MP potions, food, and buffs like Sap of Ancient Tree all count). One in your bag only doesn't get tracked.</p>
-  <div class="how-mock" role="img" aria-label="Example of the pop-out: EXP an hour with a 5m, 10m and run switch, and a Lemon count">
-    <div class="how-row"><span class="how-name">EXP an hour<small>Example numbers</small></span><span class="how-num how-big">118K</span></div>
-    <div class="how-seg"><span>5m</span><span>10m</span><span class="on">run</span></div>
-    <div class="how-row"><span class="how-ring"><span class="how-lemon"></span></span><span class="how-name">Lemons<small>this run</small></span><span class="how-num">240</span></div>
+  <h3>Start in three steps</h3>
+  <div class="how-steps">
+    <div class="how-step">
+      <h4><span class="how-n">1</span>Share your game window</h4>
+      <div class="how-mock" role="img" aria-label="Example of the Share game window button"><span class="how-btn">Share game window</span></div>
+      <p>On the Grind tab, press Share game window and pick MapleStory. Nothing to type.</p>
+    </div>
+    <div class="how-step">
+      <h4><span class="how-n">2</span>Pop out over the game</h4>
+      <div class="how-mock" role="img" aria-label="Example of the pop-out: EXP an hour with a 5m, 10m and run switch">
+        <div class="how-row"><span class="how-name">EXP an hour</span><span class="how-num how-big">118K</span></div>
+        <div class="how-seg"><span>5m</span><span>10m</span><span class="on">run</span></div>
+      </div>
+      <p>The live numbers float in a small window over MapleStory.</p>
+    </div>
+    <div class="how-step">
+      <h4><span class="how-n">3</span>Train</h4>
+      <div class="how-mock" role="img" aria-label="Example of the ready light: a green light that says Grinding">
+        <div class="how-row"><span class="how-ring"><span class="how-mob how-mob-pig"></span></span><span class="how-name"><span class="how-lamp">Grinding</span><small>Lv 35</small></span></div>
+      </div>
+      <p>It reads your EXP bar, level and quickslot potions off the screen.</p>
+    </div>
   </div>
-  <ul class="how-list">
-    <li><strong>Pop out over the game</strong> floats the live numbers in a small window over MapleStory.</li>
-    <li><strong>EXP an hour</strong> counts from your first kill to your latest, so walking out of town doesn't drag it down.</li>
-    <li><strong>All time</strong> counts the Lemons and Meat you've eaten, and Your record keeps your hours, levels and best sessions.</li>
-    <li><strong>Count my loot</strong> is optional. Flip through your Equip, Use and Etc tabs at the start and the end, and it tells you if the session was Profitable or Losing in mesos.</li>
-  </ul>
-  <p>Signed in, your sessions save to your account and nobody else can see them. Signed out, they stay on this device. The reading happens on your computer.</p>
+  </section>
+
+  <section>
+  <h3>What each number means</h3>
+  <div class="how-nums">
+    <div class="how-card"><span class="how-lbl">EXP an hour</span><span class="how-num how-big">118K</span><p>EXP gained from your first kill to your latest, over that time. Press 5m or 10m to see just the last few minutes.</p></div>
+    <div class="how-card"><span class="how-lbl">Kills a minute</span><span class="how-num how-big">14</span><p>Your EXP a minute divided by the map's average EXP a kill. It reads low when a party shares your EXP.</p></div>
+    <div class="how-card"><span class="how-lbl">Profit</span><span class="how-num how-big">+2,410</span><p>Mesos picked up, plus shop sales, minus other buys, plus loot at NPC price with Count my loot on, minus potions drunk.</p></div>
+    <div class="how-card"><span class="how-lbl">Potions</span><span class="how-num how-big"><span class="how-lemon" aria-hidden="true"></span>240</span><p>Counted off your quickslots, so every potion you drink needs a slot there.</p></div>
+    <div class="how-card"><span class="how-lbl">In town</span><span class="how-num how-big">3 min</span><p>From your last kill before a potion refill to your first kill after it.</p></div>
+    <div class="how-card"><span class="how-lbl">All time</span><span class="how-num how-big"><span class="how-lemon" aria-hidden="true"></span>12,300</span><p>Every saved run added up. Signed in that's up to 500 runs, signed out 200 on this device.</p></div>
+  </div>
+  <p class="small">Example numbers. Signed in, runs save to your account, private to you. Signed out, they stay on this device. The reading happens on your computer.</p>
   </section>
   <div class="timer-only">
   <section>
@@ -2026,13 +2073,17 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
 
   <section>
   <h3>Planner</h3>
-  <p class="lead">Pick your class and type just your level to get a leveling guide: where to train, where your skill and ability points go, and what to wear and scroll. Skill paths compares two ways to spend your skill points, with the hours each one takes, and the Quests tab lists what to do next, from quests open now to ones coming up.</p>
+  <p>Pick your class and type just your level to get a leveling plan: where to train, where your points go, and what to wear and scroll.</p>
   <div class="how-mock how-mock-b" role="img" aria-label="Example of a guide row: a monster, where to train, and EXP an hour">
     <div class="how-row"><span class="how-ring"><span class="how-mob how-mob-pig"></span></span><span class="how-name">Train here now<small>Example row</small></span><span class="how-num">112K<small>EXP an hour</small></span></div>
     <div class="how-row"><span class="how-ring"><span class="how-skill"></span></span><span class="how-name">Next skill point<small>Example row</small></span><span class="how-num">Heal<small>level 3</small></span></div>
   </div>
-  <p>Tired of typing your stats? Read from game reads them off your screen: share your game window or paste a screenshot, with your Character Stat window (DETAIL on) and Skill window open. It marks every box it filled, and leaves a box empty when it isn't sure. The reading happens on your computer.</p>
-  <p>Numbers come from the game's own files and meowdb's Classic damage formulas. Claws, one handed swords and polearms have been matched to real stat windows, and other weapons carry an Estimated note until one is. Saving a build needs Discord and shows the character name you type, never your Discord name. It keeps the numbers in the form, plus where you train, a note and an equip screenshot if you add them.</p>
+  <p>Numbers come from the game's files and meowdb's Classic formulas. Weapons not yet checked carry an Estimated note. Saving a build needs Discord and shows the character name you type, never your Discord name.<span class="testing-only"> Still in testing.</span></p>
+  </section>
+  <section>
+  <h3>Guides</h3>
+  <p>A road map from level 1 to 50 for each job: where to train, your points and your gear at every stop.</p>
+  <p>The Mage guide is up first.<span class="testing-only"> Still in testing.</span></p>
   </section>
   <div class="appraiser-only">
   <section>
@@ -2043,20 +2094,10 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
   </section>
   </div>
 
-  <section class="how-good">
-  <h3>Good to know</h3>
-  <div class="how-note">
-    <span class="how-note-ico" aria-hidden="true"><span class="how-lemon"></span></span>
-    <div>
-      <p><strong>EXP an hour covers your whole run by default.</strong> That's the steadiest number, but it moves slowly once you're deep into a run.</p>
-      <p>Whenever something changes your pace, press <strong>5m</strong> or <strong>10m</strong> on the EXP an hour switch to see just the last few minutes. Good times to do it: someone joins or leaves your party, you go solo, or you're an hour in.</p>
-    </div>
-  </div>
-  </section>
   <section>
-  <h3>Discord</h3>
-  <p>Something look off, or have an idea? Press Something off? in the bottom corner of any page and it comes straight to Rimmah, with a picture of what you saw. Fixes and news go up in our Discord. <a id="how-discord" href="https://discord.gg/sHupB2U7tD" target="_blank" rel="noopener">Join our Discord</a></p>
-
+  <h3>Found a bug</h3>
+  <p>Press Report a problem and it comes straight to Rimmah, with a picture of what you saw. Fixes and news go up in our Discord.</p>
+  <div class="how-acts"><button id="how-report" class="k-btn key" type="button">Report a problem</button><a id="how-discord" href="https://discord.gg/sHupB2U7tD" target="_blank" rel="noopener">Join our Discord</a></div>
   </section>
   <div class="timer-only">
   <section>
@@ -2069,7 +2110,7 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
   </div>
 </main>
 <p id="credit" class="credit">Fan project, not affiliated with or endorsed by Nexon. MapleStory belongs to Nexon. · Prices from <a href="https://cozy.markets" target="_blank" rel="noopener">Cozy Market</a> · <a href="https://meowdb.com" target="_blank" rel="noopener">meowdb</a> · <span id="credit-ver"></span></p>
-<button id="flag" class="flag k-btn key" type="button" aria-label="Feeling wonky?"><span class="flag-ico" aria-hidden="true"></span><span class="flag-txt">Feeling wonky?</span></button>
+<button id="flag" class="flag k-btn key" type="button" aria-label="Report a problem"><span class="flag-ico" aria-hidden="true"></span><span class="flag-txt">Report a problem</span></button>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
 <script>
 const CONFIG = {
@@ -2081,7 +2122,7 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-15c',
+  version: '2026-11-15d',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
@@ -2450,6 +2491,9 @@ const APPRAISER_ON = window.BT_APPRAISER === true;
 // the Frequent Eater card pays out during the beta (window.BT_CLAIMS = false turns it off): a full card can be claimed for a stack
 // of potions in game. Ending the beta is making this false; the card then only counts
 const CLAIMS_ON = window.BT_CLAIMS !== false;
+// the site is in testing (Rimmah, 2026-11-15): a strip above the tabs and a line on How it works say so.
+// window.BT_TESTING = false turns it off; ending testing is making this false
+const TESTING_ON = window.BT_TESTING !== false;
 const $ = id => document.getElementById(id);
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
@@ -2732,6 +2776,7 @@ const onlyGrind = () => !!APP || store.get(ONLY) === 'grind';
 document.body.classList.toggle('in-app', !!APP);
 document.body.classList.toggle('only-grind', onlyGrind());
 document.body.classList.toggle('timer-off', !TIMER_ON);
+document.body.classList.toggle('testing-off', !TESTING_ON);
 document.body.classList.toggle('appraiser-off', !APPRAISER_ON);
 // closed, its sign reads "Appraiser, soon" once (the Soon tag is for the eyes); open, it is just the name
 if (APPRAISER_ON) $('tab-appraiser').removeAttribute('aria-label');
@@ -2861,6 +2906,13 @@ function loadFlag() {
   }).catch(err => { flagLoading = null; throw err; });
   return flagLoading;
 }
+setTimeout(() => {
+  let seen = false;
+  try { seen = sessionStorage.getItem('bt.nudged') === '1'; sessionStorage.setItem('bt.nudged', '1'); } catch (e) { /* no storage: it wiggles each page */ }
+  if (!seen) { $('flag').addEventListener('animationend', () => $('flag').classList.remove('flag-nudge'), { once: true }); $('flag').classList.add('flag-nudge'); }   // gone after its one wiggle, so reopening the button can't start it again
+}, 1000);
+$('testing-report').addEventListener('click', () => $('flag').click());
+$('how-report').addEventListener('click', () => $('flag').click());
 $('flag').addEventListener('click', () => {
   if ($('flag').disabled || $('flag-panel')) return;
   $('flag').disabled = true;   // one panel, however fast the clicks come

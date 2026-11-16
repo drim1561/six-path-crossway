@@ -23,7 +23,7 @@
   const TOAST_MS = 8000;
   const COPY = {
     busy: 'Taking a picture…',
-    title: 'Feeling wonky?',
+    title: 'Report a problem',
     wrong: "Something's wrong", idea: 'An idea',
     place: { wrong: 'What looked wrong? A few words is fine', idea: 'What would make it better?' },
     also: 'Also sends which tab, your browser and screen size, and what the page was reading.',
@@ -36,7 +36,7 @@
     gameTooBig: 'Your game window is too big to send a picture of, so that one stays on your computer.',
     open: 'Open full size',
     shots: { page: 'This page', game: 'Your game', popout: 'Pop out' },
-    quickTitle: 'Grind feeling wonky?', quickPlace: 'What just happened? A few words is fine', quickEmpty: 'Type a few words first.',
+    quickTitle: 'Report a Grind problem', quickPlace: 'What just happened? A few words is fine', quickEmpty: 'Type a few words first.',
     quickAlso: 'Sends a picture of this and your game, your browser, screen size and what the tracker read.',
     lastRead: 'From your last Read from game', leaveLastRead: 'Leave out the picture from your last Read from game',
   };

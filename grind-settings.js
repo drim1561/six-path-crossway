@@ -108,7 +108,7 @@ function build(o) {
       section('g-set-you', 'You', who,
         el('div', { class: 'g-set-links' }, btn('Open my profile', () => o.onProfile(), 'k'), btn('Builds ↗', open(o.links.builds))))),
     // the foot: a report goes from here (the pop out used to have a flag of its own), only where the page can send one
-    o.onReport ? el('footer', { class: 'g-set-foot' }, el('button', { type: 'button', id: 'g-set-wonky', class: 'g-set-btn k-btn sm', onclick: () => o.onReport() }, 'Feeling wonky?')) : null);
+    o.onReport ? el('footer', { class: 'g-set-foot' }, el('button', { type: 'button', id: 'g-set-wonky', class: 'g-set-btn k-btn sm', onclick: () => o.onReport() }, 'Report a problem')) : null);
 
   let userKey;   // who You was last drawn for, so a picture isn't fetched again on every update
   function update(s) {
