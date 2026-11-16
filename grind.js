@@ -665,7 +665,7 @@ function mount(root, deps) {
   const bagCheck = el('ul', { class: 'g-check g-bagcheck', id: 'g-bagcheck', hidden: '' }, ['Equip', 'Use', 'Etc'].map(t => el('li', { 'data-k': 'bag-' + t }, el('b', {}, t), el('span', {}, 'Open it in your bag'))));
   // What it earned (V.res), a Window: the session's total as the lead number with Profitable or Losing and the hourly number under it, the
   // plain rows it adds up from, and with Count my loot on What you picked up beside them. The kept lines are small print under both
-  V.res = el('section', { class: 'k-win g-res', id: 'g-res', hidden: '' },
+  V.res = el('section', { class: 'g-win g-res', id: 'g-res', hidden: '' },
     el('div', { class: 'k-bar' }, el('h2', {}, 'What it earned'), V.resBar = el('small', {})),
     el('div', { class: 'k-pad g-res-pad' },
       el('div', { class: 'g-res-grid' },
@@ -832,13 +832,13 @@ function mount(root, deps) {
   // the share started: every check not read yet is looked for now (one already read keeps what it read)
   function startChecks() {
     for (const [k] of CHECKS) if (check.querySelector('[data-k="' + k + '"]').classList.contains('idle')) setCheck(k, '', 'Looking…');
-    if (!session) { detailOpen = true; showDetail(); }   // Session details opens with the share, showing only Notices until a session starts
+    if (!session) { detailOpen = true; showDetail(); }   // This run opens with the share, showing only Notices until a session starts
   }
   // this session on the Now grinding card's band, and its details (the session's card, the potions with their prices, the
   // charts) folded away until asked for (kept on the device); a saved session opened from the list always shows them
   V.now = el('div', { class: 'g-nowv' });
   let detailOpen = store.get(KEY_DETAIL) === '1';
-  const moreWords = el('span', {}, 'Session details');
+  const moreWords = el('span', {}, 'Show this run');
   const moreBtn = el('button', { type: 'button', id: 'g-more', class: 'k-btn push', 'aria-controls': 'g-detail', onclick: () => { detailOpen = !detailOpen; store.set(KEY_DETAIL, detailOpen ? '1' : ''); showDetail(); } }, el('i', { 'aria-hidden': 'true' }, railIcon('find')), moreWords);
   // the session card (grind-card.js): where this run ranks among your own at the map. Its pictures are looked up when it draws
   const sCard = window.GrindCard.build({ el, whole, pics: { get lemon() { return picOf(LEMON_IDS) || null; }, get meat() { return picOf(MEAT_IDS) || null; } } });
@@ -849,28 +849,28 @@ function mount(root, deps) {
   st.notes = []; st.noted = {};
   V.noteRows = el('div', { class: 'k-rows g-notes', id: 'g-noterows' });
   V.noteAll = el('button', { type: 'button', id: 'g-noteall', class: 'linkish', hidden: '', onclick: () => { notesOpen = !notesOpen; renderNotices(); } });
-  const notices = el('section', { class: 'k-win g-win g-notices', id: 'g-notices', hidden: '' }, el('div', { class: 'k-bar' }, el('h2', {}, 'Notices')),
+  const notices = el('section', { class: 'g-win g-notices', id: 'g-notices', hidden: '' }, el('div', { class: 'k-bar' }, el('h2', {}, 'Notices')),
     el('div', { class: 'k-pad g-notepad' }, V.noteRows, el('div', { class: 'g-notefoot' }, V.noteAll, snapBtn)));
   // Potions: the table as it was, with its price boxes
-  const potWin = el('section', { class: 'k-win g-win g-potwin', id: 'g-potwin', hidden: '' }, el('div', { class: 'k-bar' }, el('h2', {}, 'Potions')),
+  const potWin = el('section', { class: 'g-win g-potwin', id: 'g-potwin', hidden: '' }, el('div', { class: 'k-bar' }, el('h2', {}, 'Potions')),
     el('div', { class: 'k-pad g-potpad' }, el('div', { class: 'g-scroll' }, pots), el('p', { class: 'g-note' }, 'A potion only counts if it sits on a quickslot.')));
   // The numbers: the card's rows in a Window of their own, with the lines that explain them in its foot
-  const numbers = el('section', { class: 'k-win g-win', id: 'g-numbers', hidden: '' }, el('div', { class: 'k-bar' }, el('h2', {}, 'The numbers')),
+  const numbers = el('section', { class: 'g-win', id: 'g-numbers', hidden: '' }, el('div', { class: 'k-bar' }, el('h2', {}, 'The numbers')),
     el('div', { class: 'k-pad g-numpad' }, card, V.numFoot = el('div', { class: 'g-numfoot' }, V.mesos, mapNote, partyCompare, V.tradeBox)));
   const duo = el('div', { class: 'g-duo', id: 'g-duo' }, potWin, notices);
-  const detail = el('div', { class: 'g-detail', id: 'g-detail', hidden: '' }, viewBar, sCard.el, V.res, numbers, duo);
-  // Session details opens when the game is shared, even before a session starts (then only Notices, so a player whose game isn't being
+  const detail = el('div', { class: 'g-stop g-detail', id: 'g-detail', hidden: '' }, el('div', { class: 'k-bar' }, el('h2', {}, 'This run')), viewBar, sCard.el, V.res, numbers, duo);
+  // This run opens when the game is shared, even before a session starts (then only Notices, so a player whose game isn't being
   // found can read why), and a saved run always shows it. With nothing to show the block takes no room
   function showDetail() {
     const open = (detailOpen || !!viewing) && (!!session || !!viewing || st.sharing);
     detail.hidden = !open;
-    moreBtn.setAttribute('aria-expanded', String(open)); moreWords.textContent = open ? 'Hide details' : 'Session details';
+    moreBtn.setAttribute('aria-expanded', String(open)); moreWords.textContent = open ? 'Hide this run' : 'Show this run';
     const s = viewing || session;
     numbers.hidden = potWin.hidden = !s;
     notices.hidden = !!viewing || !(st.sharing || st.notes.length);
     duo.hidden = potWin.hidden && notices.hidden;
   }
-  // the button row of the Now grinding window, left to right (Session details is pushed to the right end). Share and Stop come from the
+  // the button row of the Now grinding window, left to right (Show this run is pushed to the right end). Share and Stop come from the
   // reader (shareArea); Find my game again lives on the problem line, and the version line at the page's foot
   const tools = el('div', { class: 'k-tools', id: 'g-tools' }, shareArea, popBtn, markBtn, newBtn, lootBtn, setBtn, quitBtn, moreBtn);
   // Now grinding (grind-now.js): the window with the map's pick and the lantern in its title bar, the numbers line, the buttons, the
@@ -902,11 +902,11 @@ function mount(root, deps) {
     }) };
   const alltime = window.GrindAllTime.build({ el, store, pics: { lemon: picOf(LEMON_IDS), meat: picOf(MEAT_IDS) }, mapName: id => shortMap(id), mobName: id => (data.mobs[id] || ['a monster'])[0],
     sprites: () => mobSprites, mesos: fmtK, claims });
-  // Your runs, then Your record: two Windows. Runs are rows (five, then show more); the record is the five totals in a band, the most
+  // Your runs, then Your record: two stops on the trail. Runs are rows (five, then show more); the record is the five totals in a band, the most
   // trained maps as rows with their hours, Personal bests, then the days
-  const runsWin = el('section', { class: 'k-win g-win', id: 'g-runs', hidden: '' }, el('div', { class: 'k-bar' }, el('h2', {}, 'Your runs')),
+  const runsWin = el('section', { class: 'g-stop g-win', id: 'g-runs', hidden: '' }, el('div', { class: 'k-bar' }, el('h2', {}, 'Your runs')),
     el('div', { class: 'k-pad g-runpad' }, sessions, runsMore));
-  const record = el('section', { class: 'k-win g-win', id: 'g-record', hidden: '' }, el('div', { class: 'k-bar' }, el('h2', {}, 'Your record')),
+  const record = el('section', { class: 'g-stop g-win', id: 'g-record', hidden: '' }, el('div', { class: 'k-bar' }, el('h2', {}, 'Your record')),
     el('div', { class: 'k-pad g-recpad' },
       LF.other = el('p', { class: 'g-note' }),
       LF.tots = el('div', { class: 'g-tots' }),
@@ -915,9 +915,9 @@ function mount(root, deps) {
         el('div', { class: 'g-lcard' }, el('h3', {}, 'Personal bests'), LF.bests = el('div', { class: 'k-rows g-bests', id: 'g-bests' }))),
       el('div', { class: 'g-lcard' }, el('h3', {}, 'Days you grinded'), LF.days = el('div', { class: 'g-days', id: 'g-days' }), LF.daysNote = el('p', { class: 'g-note' }))));
   const life = el('div', { class: 'g-life', id: 'g-life' }, runsWin, record);
-  // one column of windows (spec Part 3): the status line, All time, Now grinding, Session details when open, then Your runs and Your
-  // record, and the small print
-  root.replaceChildren(el('div', { class: 'k-col g-col' }, status, alltime.el, nowCard.el, detail, life,
+  // the trail (2026-11-16): the status line, then the stops (Now grinding, This run when open, All time, Your runs, Your record) on
+  // one dotted trail, and the small print off it
+  root.replaceChildren(el('div', { class: 'k-col g-col' }, status, el('div', { class: 'g-trail', id: 'g-trail' }, nowCard.el, detail, alltime.el, life),
     el('div', { class: 'g-print' }, el('p', { class: 'g-note' }, 'Item and UI pictures are from MapleStory, which belongs to Nexon.'), verLine)), strip);
 
   const setStatus = msg => { status.textContent = msg; };
@@ -1356,14 +1356,6 @@ function mount(root, deps) {
       if (app) { setStatus('Found MapleStory. Grind away, nothing to type.'); if (!overlay.win()) popOut(); return; }
       setStatus(WATCHING);
     } });
-  // a browser that can't share a window (phones, old browsers) hides the button, so say why; Firefox and Safari share and
-  // read right (tests/browsers.test.js) but have no frame reader, so a hidden tab may stop reading, and some have no pop-out
-  // window, so they get a softer line (a friend's Firefox failed until he moved to Edge)
-  if (!app) {
-    const md = navigator.mediaDevices;
-    if (!(md && md.getDisplayMedia)) setStatus('This browser can\'t share a window. Use Chrome or Edge on a computer.');
-    else if (typeof MediaStreamTrackProcessor !== 'function') setStatus('Chrome or Edge on a computer works best. This browser may stop reading while its tab is in the background' + (window.documentPictureInPicture ? '.' : ', and it can\'t pop out.'));
-  }
   // before sharing, Share game window is the main button; once sharing it's Pop out, and Stop sits after where Share was
   for (const b of shareArea.querySelectorAll('button')) b.classList.add('k-btn');
   const shareBtn = shareArea.querySelector('#g-share'), shareWords = t => { shareBtn.lastChild.textContent = t; };
@@ -1410,6 +1402,7 @@ function mount(root, deps) {
   }
   function render() {
     const s = viewing || session;
+    nowCard.el.classList.toggle('lit', !!session && !viewing && st.sharing);   // the trail's dot: lime only while a run is going
     // what the session worked out on its own since the last draw: a trade left out that was really potions
     if (session) {
       if (st.eventsFor !== session.id) { st.eventsFor = session.id; st.eventsSeen = (session.events || []).length; }

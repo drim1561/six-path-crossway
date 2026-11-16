@@ -70,8 +70,8 @@ function build({ el, pics, whole }) {
   const rank = el('span', { class: 'k-ring big g-sc-rank' }), title = el('h3', { class: 'g-sc-title' }), of = el('p', { class: 'g-sc-sub' });
   const tabsBox = el('div', { class: 'g-sc-tabs', role: 'tablist' }), panel = el('div', { class: 'g-sc-panel', role: 'tabpanel' });
   const pots = el('div', { class: 'g-sc-pots' });
-  const card = el('section', { class: 'k-win g-sc', id: 'g-scard', hidden: '', 'aria-label': 'Where this run ranks' },
-    el('div', { class: 'k-bar' }, el('h2', {}, 'This run'), barSub),
+  const card = el('section', { class: 'g-win g-sc', id: 'g-scard', hidden: '', 'aria-label': 'Where this run ranks' },
+    el('div', { class: 'k-bar' }, el('h2', {}, 'Where it ranks'), barSub),
     el('div', { class: 'k-pad g-sc-body' },
       el('div', { class: 'g-sc-head' }, rank, el('div', { class: 'g-sc-hd' }, title, of), tabsBox), panel, whole || null, pots));
 

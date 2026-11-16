@@ -631,6 +631,28 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 #view-grind .g-print .g-note { color: var(--muted); }
 #view-grind .g-at-dots i { width: 7px; height: 7px; border-radius: 50%; }
 #view-grind :is(.g-tv, .k-row > :last-child, .g-run b) { font-variant-numeric: tabular-nums; }
+/* the trail's line and dots (Your Path shares these rules once its own trail ships) */
+.g-trail { list-style: none; display: grid; gap: 36px; min-width: 0; margin: 0 0 0 8px; padding: 0 0 0 30px; border-left: 2px dotted var(--card-o); }
+.g-stop { position: relative; display: grid; min-width: 0; }
+.g-stop::before { content: ""; position: absolute; left: -38px; top: 9px; box-sizing: border-box; width: 14px; height: 14px; border-radius: 50%; background: var(--page); border: 2px solid var(--mint-line); box-shadow: 0 0 10px var(--card-o); }
+.g-stop.lit::before { background: var(--lime); border-color: var(--lime-hi); box-shadow: 0 0 12px var(--lime); }
+/* Grind as a trail (2026-11-16): no bark windows. A 720 column like How it works, each part a stop on Your Path's dotted trail (the line, the
+   dot and the lit dot are the rules above), 36px between stops and --gap inside one. Now grinding's dot is lime while a run is going.
+   This run's five parts are small headings inside one stop. None of this reaches the pop-out, which has no .g-col in it */
+#view-grind .g-col { box-sizing: border-box; max-width: 720px; width: calc(100% - 2 * var(--gap)); padding: 28px 0 40px; gap: 36px; }
+#view-grind .g-stop { gap: var(--gap); align-content: start; }
+#view-grind .g-life { display: contents; }
+#view-grind .g-stop > .k-bar { min-height: 0; padding: 0; background: none; border: 0; color: var(--ink); font: 400 var(--tt-m) var(--font-title); }
+#view-grind .g-stop .k-bar small { color: var(--muted); }
+#view-grind .g-stop .k-pad { padding: 0; }
+#view-grind .g-detail .g-win { display: grid; gap: 4px; align-content: start; }
+#view-grind .g-detail .g-win > .k-bar { min-height: 0; padding: 0; background: none; border: 0; color: var(--ink); font: 400 var(--tt-s) var(--font-title); }
+#view-grind .g-pickt { border-bottom-color: var(--muted); color: var(--ink); }
+#view-grind .g-pickw::after { border-top-color: var(--ink); }
+#view-grind .g-col :is(.g-note, .g-nline, .g-check li span, .g-sc-sub, .g-steps li span) { font-weight: 400; }
+#view-grind .g-col > .g-status, #view-grind .g-viewing { padding: 0; background: none; border: 0; box-shadow: none; }
+#view-grind .g-viewing { margin-top: 0; padding-bottom: 8px; border-bottom: 1px solid var(--at-line); }
+#view-grind .g-ground { margin-inline: 0; border: 2px solid var(--card-o); border-radius: var(--r-card); }
 .g-at-pic { min-width: 0; }
 /* the podium: three steps on one floor, first place in the middle on the gold one */
 .g-at-pod { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 132px); grid-template-rows: 1fr auto auto auto; justify-content: center; column-gap: var(--gap); }
@@ -722,7 +744,19 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 .g-at-card .g-at-claim { margin-top: 0; }
 .g-at-claim:disabled { opacity: .6; cursor: default; }
 /* narrower: the Lemons over the Meat, each on a stage of its own so the trees have ground under them, and the receipt over the card */
+/* the Orchard in the 720 trail column: the two halves are even, the signs narrower, and the trees and ghosts start right of them */
 @container (max-width: 860px) {
+  .g-at-stage { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .g-at-stage .g-at-sign { max-width: 176px; }
+  .g-at-trees { left: 192px; }
+  .g-at-high { left: 192px; }
+  .g-at-low { left: 156px; }
+  .g-at-rec { padding-inline: 12px; }
+  .g-at-bill th, .g-at-bill td { padding-left: 6px; }
+}
+/* a window narrower than the column: the bill drops its pictures so a big total still fits the receipt */
+@container (max-width: 660px) { .g-at-bill img { display: none; } }
+@container (max-width: 600px) {
   .g-at-stage, .g-at-tab { grid-template-columns: minmax(0, 1fr); }
   .g-at-tab { grid-template-rows: auto 1fr; }
   .g-at-tab .g-at-card { padding-block: 6px 7px; border-left: 0; border-top: 1px solid var(--at-line); }
@@ -804,11 +838,11 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
    back with a flip, and stands over its own column: its spot is the column's center plus half the pace, so it never leaves its column. Under it
    one column a monster (a head, then its drops as rows); a lone monster's rows flow in two. Still fireflies in dark, and nothing moves in a number update */
 .g-ground { position: relative; flex: none; box-sizing: content-box; margin-inline: calc(-1 * var(--gap)); height: var(--g-gh, 96px); border-block: 2px solid var(--wood-o); overflow: hidden; image-rendering: pixelated; }
-.g-ground::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 8px; border-top: 4px solid var(--ground-line); background-color: var(--ground); }
-.g-walker { position: absolute; bottom: 12px; z-index: 1; --g-far: max(-150px, -18cqw); animation: g-pace 9s linear infinite; }
+.g-ground::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 24px; background: url(sprites/grass.png) 0 0 repeat-x; }
+.g-walker { position: absolute; bottom: 10px; z-index: 1; --g-far: max(-150px, -18cqw); animation: g-pace 9s linear infinite; }
 .g-walker:nth-child(2) { animation-duration: 11s; animation-delay: -4s; }
 /* no map known yet: Lemons lying still on the ground where the walkers stand, behind them (a walker's z-index puts it in front) */
-.g-lemon { position: absolute; bottom: 12px; translate: -50% 0; line-height: 0; }
+.g-lemon { position: absolute; bottom: 10px; translate: -50% 0; line-height: 0; }
 .g-lemon img { display: block; image-rendering: pixelated; }
 .g-walker:nth-child(3) { animation-duration: 13s; animation-delay: -7s; }
 .g-mob { width: var(--w); height: var(--h); background: var(--src) 0 0 / calc(var(--w) * var(--n)) var(--h) no-repeat; image-rendering: pixelated; animation: g-walk calc(var(--n) * .16s) steps(var(--n)) infinite; }
@@ -816,12 +850,13 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 @keyframes g-pace { 0% { transform: translateX(0) scaleX(1); } 49.9% { transform: translateX(var(--g-far)) scaleX(1); } 50% { transform: translateX(var(--g-far)) scaleX(-1); } 100% { transform: translateX(0) scaleX(-1); } }
 @media (prefers-reduced-motion: reduce) { .g-walker, .g-mob { animation: none; } }
 .g-mn { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
-.g-mobcols { display: grid; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); min-width: 0; }
+.g-mobcols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: var(--gap); min-width: 0; }
+.g-mobcols.one { grid-template-columns: minmax(0, 1fr); }
 .g-mobcols:empty, .g-nnotes:empty { display: none; }
 .g-mobcol { min-width: 0; padding: 0 12px; }
-.g-mobcol:first-of-type { padding-left: 0; }
-.g-mobcol:last-of-type { padding-right: 0; }
 .g-mobcol + .g-mobcol { border-left: 2px solid var(--div); }
+.g-mobcol:nth-child(odd) { padding-left: 0; border-left: 0; }
+.g-mobcol:nth-child(even) { padding-right: 0; }
 .g-mobh { font-size: 1em; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; margin: 0 0 6px; }
 .g-mobh b { font: 400 var(--tt-s)/1.2 var(--font-title); color: var(--ink); }
 .g-mobh .g-mobs { color: var(--muted); font: 600 var(--fs-sm) var(--font-body); }
@@ -843,9 +878,9 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 .g-nfoot { margin: 0; }
 .g-nfoot a, .g-credit a { color: inherit; }
 .g-nowfoot .g-classpick { margin-left: auto; }
-@container (max-width: 759px) {
+@container (max-width: 560px) {
   .g-mobcols { grid-template-columns: minmax(0, 1fr); gap: 12px; }
-  .g-mobcol, .g-mobcol:first-of-type, .g-mobcol:last-of-type { padding: 0; }
+  .g-mobcol, .g-mobcol:nth-child(odd), .g-mobcol:nth-child(even) { padding: 0; }
   .g-mobcol + .g-mobcol { border-left: 0; border-top: 2px solid var(--div); padding-top: 12px; }
   .g-mobcols.one .g-drops { grid-template-columns: minmax(0, 1fr); }
   .g-drops .k-row.last:not(:last-child) { background: var(--night-dots) left bottom / 8px 2px repeat-x; }
@@ -979,9 +1014,9 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 .g-recpad > .g-note { margin: 0; }
 .g-recpad > .g-note:empty { display: none; }
 .g-tots { display: flex; flex-wrap: wrap; gap: 0 12px; border-block: 2px dotted var(--dot); }
-.g-tot { flex: 1 1 150px; padding: 8px 4px; min-width: 0; }
+.g-tot { flex: 1 1 0; padding: 8px 4px; min-width: 0; }
 .g-tot + .g-tot { padding-left: 12px; border-left: 1px solid var(--at-line); }
-.g-tot .g-tv { margin-top: 4px; font: 700 var(--n-m)/1.15 var(--font-num); color: var(--num); white-space: nowrap; }
+.g-tot .g-tv { margin-top: 4px; font: 700 var(--n-s)/1.15 var(--font-num); color: var(--num); white-space: nowrap; }
 .g-tot .g-tv.b { color: var(--exp); } .g-tot .g-tv.y { color: var(--num-big); } .g-tot .g-tv.g { color: var(--good); }
 .g-tsub { margin-top: 2px; font: 600 var(--fs-sm) var(--font-body); color: var(--muted); }
 .g-lgrid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--gap) 24px; }
@@ -989,7 +1024,11 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 .g-lcard h3 { margin: 0 0 4px; font: 400 var(--tt-s) var(--font-title); }
 .g-lcard .g-note:first-child { margin-top: 0; }
 .g-rk { flex: none; width: 1.4em; font: 700 var(--n-s) var(--font-num); color: var(--muted); }
-.g-mrow .g-nv, .g-bi .g-nv { white-space: nowrap; }
+.g-mrow .g-nv, .g-bi .g-nv { flex: none; white-space: nowrap; }
+.g-res-rows .k-row > .g-nv, #g-card .k-row > .g-nv, .g-res-loot .k-row > .g-lc { flex-shrink: 0; }   /* at 328 wide the words wrap, the number is never squeezed */
+.g-bi .g-nl { min-width: 0; }
+.g-bi .g-nl small { display: block; margin-left: 0; }
+.g-bi .g-nv { font-size: var(--n-s); }
 .g-days { display: grid; grid-template-columns: repeat(30, minmax(0, 1fr)); gap: 4px; }
 .g-days i { aspect-ratio: 1; background: var(--div); }
 .g-days .g-d1 { background: color-mix(in srgb, var(--accent) 35%, var(--surface)); } .g-days .g-d2 { background: color-mix(in srgb, var(--accent) 68%, var(--surface)); } .g-days .g-d3 { background: var(--accent); }
@@ -1065,8 +1104,6 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
 .g-strip.g-swap { opacity: 0; }
 /* ornaments (Now grinding's stage on the page keeps its mushroom here): art at one art pixel to --u, taking no clicks */
 .g-strip { --fw: round(.5em, 4px); }
-.g-orn { position: absolute; z-index: 2; pointer-events: none; image-rendering: pixelated; background-repeat: no-repeat; }
-.g-shroom { right: calc(-1 * var(--fw)); bottom: calc(-1 * var(--fw)); width: calc(15 * var(--u)); height: calc(14 * var(--u)); background: var(--night-shroom) 0 0 / 100% 100%; }
 /* the pop-out's moss: tufts along the bark's top edge, over the frame and clear of the words, with the kit's gaps (its span
    also wears the kit's k-moss). Longhands: the pop out copies these rules by their text */
 .g-moss { position: absolute; z-index: 2; pointer-events: none; image-rendering: pixelated; top: calc(-1 * var(--fw) - 4 * var(--u)); height: calc(7 * var(--u)); left: calc(56px - var(--fw)); right: calc(20px - var(--fw)); background-image: var(--night-moss, none); background-position: 0 0; background-size: calc(64 * var(--u)) calc(7 * var(--u)); background-repeat: repeat-x; opacity: var(--g-see, 1); }
@@ -2164,7 +2201,7 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-16i',
+  version: '2026-11-16j',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };

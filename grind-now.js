@@ -139,10 +139,9 @@ function build({ el, band, tools, lamp, mapPick, classPick, steps, lines, pics, 
   const deep = el('div', { class: 'g-nowin' }, stage, cols);
   const notes = el('div', { class: 'g-nnotes' });
   const foot = el('div', { class: 'k-foot g-nowfoot', hidden: '' }, notes, classPick);
-  const card = el('section', { class: 'k-win k-grass g-nowcard', id: 'g-nowcard' },
+  const card = el('section', { class: 'g-stop g-nowcard', id: 'g-nowcard' },
     el('div', { class: 'k-bar' }, label, mapPick, el('span', { class: 'push' }, lamp)),
-    el('div', { class: 'k-pad g-nowpad' }, nums, tools, steps, ...(lines || []), deep, foot),
-    el('span', { class: 'g-orn g-shroom', 'aria-hidden': 'true' }));
+    el('div', { class: 'k-pad g-nowpad' }, nums, tools, steps, ...(lines || []), deep, foot));
 
   // a drop's picture in its ring: one that isn't in yet is filled in when the sheet arrives, so the row isn't drawn again for it
   const ring = r => { const e = el('span', { class: 'k-ring' + (r.gold ? ' gold' : ''), 'data-item': r.id }), src = pics.item(r.id); if (src) e.append(el('img', { src, alt: '' })); return e; };

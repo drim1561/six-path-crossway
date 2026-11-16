@@ -254,7 +254,7 @@ function build({ el, pics, mapName, mobName, sprites, mesos, claims }) {
     statsFace,
     el('div', { class: 'g-at-face', 'data-face': 'orchard' }, stage),
   ];
-  const root = el('section', { class: 'k-win', id: 'g-alltime', hidden: '' }, bar, el('div', { class: 'g-at-faces' }, faces));
+  const root = el('section', { class: 'g-stop', id: 'g-alltime', hidden: '' }, bar, el('div', { class: 'g-at-faces' }, faces));
 
   // the swap: always opens on the Potion Shop, then steps on every SWAP_MS while it's there to be seen. It holds under the mouse or the keyboard,
   // stops for good once you press Next, and never swaps by itself for someone who asked for less motion. All three views share a grid cell,
