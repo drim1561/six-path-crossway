@@ -34,7 +34,7 @@ window.BT_ERRORS = [];
 })();
 </script>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" crossorigin="anonymous" href="https://fonts.googleapis.com/css2?family=Bree+Serif&family=Cabin:wght@600;700&family=Asap:wght@600;700&display=swap">
+<link rel="stylesheet" crossorigin="anonymous" href="https://fonts.googleapis.com/css2?family=Bree+Serif&family=Cabin:wght@400;600;700&family=Asap:wght@600;700&display=swap">
 <link rel="stylesheet" href="night-art.css">
 <script>
 /* Report pictures copy every inherited custom property into every node, so a --night-* picture over 2 KB (the 94 KB bark) goes to a blob:
@@ -159,14 +159,15 @@ body.testing-off #testing, body.testing-off .testing-only { display: none; }
 .topbar .logo::before { left: 20px; right: 20px; top: -8px; }
 .logo b { font-weight: inherit; }
 .tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 0 14px auto; padding: 4px; border-radius: var(--r-pill); background-color: var(--surface); box-shadow: 0 0 0 2px var(--wood-o), inset 0 0 0 1px var(--mint-line); }
-.tabs button { display: flex; align-items: center; height: 34px; margin: 0; padding: 0 13px; background: none; background-color: var(--card); box-shadow: inset 0 0 0 1px var(--card-o); border: 0; border-radius: var(--r-pill); color: var(--ink); font: 700 var(--fs-md)/1 var(--font-body); white-space: nowrap; cursor: pointer; }
+.tabs button { display: flex; align-items: center; height: 34px; margin: 0; padding: 0 12px; background: none; background-color: var(--card); box-shadow: inset 0 0 0 1px var(--card-o); border: 0; border-radius: var(--r-pill); color: var(--ink); font: 700 var(--fs-md)/1 var(--font-body); white-space: nowrap; cursor: pointer; }
 .tabs button:hover { color: var(--num); box-shadow: inset 0 0 0 1px var(--mint-line); }
 .tabs button[aria-selected="true"], .tabs button[aria-selected="true"]:hover { background-color: var(--lime); color: var(--lime-ink); box-shadow: none; }
 .tabs button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 /* the closed Appraiser: dimmed words with no ground and no edge, and a Soon tag beside its name */
 .tabs .soon { display: none; }
-body.appraiser-off #tab-appraiser, body.appraiser-off #tab-appraiser:hover { background-color: transparent; color: var(--credit); box-shadow: none; }
-body.appraiser-off #tab-appraiser .soon { display: inline-block; margin-left: 8px; padding: 0 8px; border-radius: var(--r-pill); background-color: var(--pill); color: var(--pill-ink); font: 700 var(--fs-xs) var(--font-body); line-height: 18px; }
+body.appraiser-off #tab-appraiser, body.appraiser-off #tab-appraiser:hover, body.guides-off #tab-guides, body.guides-off #tab-guides:hover { padding: 0 2px; background-color: transparent; color: var(--credit); box-shadow: none; }
+body.guides-off #tab-guides { cursor: default; }
+body.appraiser-off #tab-appraiser .soon, body.guides-off #tab-guides .soon { display: inline-block; margin-left: 5px; padding: 0 5px; border-radius: var(--r-pill); background-color: var(--pill); color: var(--pill-ink); font: 700 var(--fs-xs) var(--font-body); line-height: 18px; }
 .auth { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 20px; }
 .auth [hidden] { display: none; }
 .auth #who { padding: 2px 10px; border-radius: var(--r-pill); background-color: var(--surface); box-shadow: 0 0 0 2px var(--wood-o); color: var(--ink); font-size: var(--fs-sm); }
@@ -523,7 +524,7 @@ body.only-grind #tab-timer, body.only-grind #tab-builds, body.only-grind #tab-gu
 body.timer-off #tab-timer, body.timer-off .timer-only { display: none; }
 /* the Appraiser is closed while it gets its new look (window.BT_APPRAISER turns it on): its sign fades, its view is one
    closed card, its part of How it works goes, and none of its code loads */
-body.appraiser-off .appraiser-only, body.appraiser-off #appraiser-root, body:not(.appraiser-off) .appraiser-closed { display: none; }
+body.guides-off .guides-only, body.appraiser-off .appraiser-only, body.appraiser-off #appraiser-root, body:not(.appraiser-off) .appraiser-closed { display: none; }
 .closed-body { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 16px; }
 .closed-crew { width: 88px; height: 48px; background: var(--night-crew) 0 0 / 88px 48px no-repeat; image-rendering: pixelated; }
 .closed-text h2 { margin: 0; font: 400 var(--tt-m) var(--font-title); }
@@ -1589,13 +1590,18 @@ a.cozy:hover { border-color: var(--muted); }
 #ap-note input { margin-top: 4px; }
 .ap-card .small { font-size: var(--fs-sm); color: var(--muted); }
 
-/* How it works (Trail Signs): one Window, its title on the plank, the sections stacked on the paper with a dotted rule between them */
-#view-how { max-width: 840px; width: calc(100% - 2 * var(--gap)); margin: var(--gap) auto; padding: 0; }
-#view-how .k-bar h2 { margin: 0; font: inherit; }
-#view-how .k-pad { display: grid; gap: var(--gap); }
-#view-how section { display: grid; gap: var(--gap); min-width: 0; padding-top: var(--gap); background: var(--night-dots) left top / 8px 2px repeat-x; }
-#view-how section.how-first { padding-top: 0; background: none; }
-body:not(.timer-off) #view-how .timer-only, body:not(.appraiser-off) #view-how .appraiser-only { display: contents; }
+/* How it works: the frameless page. One 720 column straight on the forest, each section a stop on a dotted trail, and
+   the reading text is Cabin 400 (names, labels and buttons stay 600 or 700) */
+#view-how { --how-gap: 40px; max-width: 720px; width: calc(100% - 2 * var(--gap)); margin: 28px auto var(--how-gap); padding: 0; font-weight: 400; line-height: 1.55; }
+.how-page, .how-hero { display: grid; min-width: 0; }
+.how-page { gap: var(--how-gap); }
+.how-hero { gap: var(--gap); }
+#view-how h2 { margin: 0; font: 400 var(--tt-logo) / 1.15 var(--font-title); color: var(--ink); text-wrap: balance; }
+.how-hero .lead { color: var(--muted); }
+.how-trail { display: grid; gap: var(--how-gap); min-width: 0; margin-left: 8px; padding-left: 30px; border-left: 2px dotted var(--card-o); }
+#view-how section { position: relative; display: grid; gap: var(--gap); min-width: 0; }
+#view-how section::before { content: ""; position: absolute; left: -38px; top: 9px; box-sizing: border-box; width: 14px; height: 14px; border-radius: 50%; background: var(--page); border: 2px solid var(--mint-line); box-shadow: 0 0 10px var(--card-o); }
+body:not(.timer-off) #view-how .timer-only, body:not(.appraiser-off) #view-how .appraiser-only, body:not(.guides-off) #view-how .guides-only { display: contents; }
 #view-how h3 { margin: 0; font: 400 var(--tt-m) var(--font-title); }
 #view-how p, #view-how li { margin: 0; color: var(--ink); }
 #view-how .lead { font-size: var(--fs-lg); }
@@ -1607,7 +1613,6 @@ body:not(.timer-off) #view-how .timer-only, body:not(.appraiser-off) #view-how .
 .examples code { justify-self: start; }
 .smallprint { padding-top: var(--gap); background: var(--night-dots) left top / 8px 2px repeat-x; }
 /* How it works: a hero stage and example cards drawn from the site's own pictures */
-.how-hero { display: grid; gap: var(--gap); min-width: 0; }
 .how-stage { position: relative; height: 70px; overflow: hidden; display: flex; align-items: flex-end; gap: 28px; padding: 0 var(--gap) 12px; isolation: isolate; border: 2px solid var(--card-o); border-radius: var(--r-card); image-rendering: pixelated; }
 .how-stage::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 8px; z-index: -1; border-top: 4px solid var(--ground-line); background-color: var(--ground); }
 .how-mob { display: block; flex: none; background-repeat: no-repeat; image-rendering: pixelated; animation: how-walk .7s steps(3) infinite; }
@@ -1630,24 +1635,25 @@ body:not(.timer-off) #view-how .timer-only, body:not(.appraiser-off) #view-how .
 .how-seg { display: flex; gap: 0; }
 .how-seg span { flex: 1; text-align: center; padding: 4px 0; font: 700 var(--fs-sm) var(--font-body); color: var(--btn-ink); background: var(--btn); border: 2px solid var(--btn-lo); }
 .how-seg span.on { background: var(--lime); color: var(--lime-ink); border-color: var(--lime-lo); }
-/* the start steps and the number cards: no boxes, one faint line between neighbours (drawn in the gap, the outer ones clipped) */
-.how-steps, .how-nums { display: grid; gap: var(--gap); overflow: clip; min-width: 0; }
-.how-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: auto 1fr auto; }
-.how-nums { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
-.how-step, .how-card { position: relative; display: grid; gap: var(--gap); min-width: 0; align-content: start; }
-.how-step { grid-row: span 3; grid-template-rows: subgrid; }
-.how-card { gap: 4px; }
-.how-step::before, .how-card::before { content: ""; position: absolute; top: 0; bottom: 0; left: calc(var(--gap) / -2); border-left: 1px solid var(--at-line); }
-.how-card::after { content: ""; position: absolute; left: 0; right: 0; top: calc(var(--gap) / -2); border-top: 1px solid var(--at-line); }
-#view-how h4 { margin: 0; display: flex; align-items: baseline; gap: 8px; font: 600 var(--fs-md) var(--font-body); color: var(--ink); }
-.how-n { font: 700 var(--tt-m) var(--font-num); color: var(--num-big); }
+/* the start steps: three columns, each a small gold Step n, a picture, a bold name and one line, no boxes */
+.how-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: auto 1fr auto; gap: var(--gap) 20px; min-width: 0; }
+.how-step { display: grid; grid-row: span 3; grid-template-rows: subgrid; min-width: 0; }
+.how-n { font: 700 var(--fs-xs) var(--font-num); color: var(--num-big); }
+#view-how h4 { margin: 0; font: 600 var(--fs-md) var(--font-body); color: var(--ink); }
 .how-step .how-mock { align-content: center; max-width: none; }
+.how-step p, .how-card p, .how-from span { font-size: var(--fs-sm); color: var(--muted); }
 .how-btn { justify-self: center; padding: 6px 14px; font: 700 var(--fs-sm) var(--font-body); color: var(--key-ink); background: var(--accent); border: 2px solid var(--key-lo); border-radius: var(--r-card); }
 .how-lamp { display: inline-flex; align-items: center; gap: 8px; }
 .how-lamp::before { content: ""; flex: none; width: 12px; height: 12px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 8px var(--lime); }
-.how-lbl { font: 600 var(--fs-sm) var(--font-body); color: var(--muted); }
-.how-card .how-num { display: flex; align-items: center; justify-content: flex-start; gap: 6px; }
-.how-card .how-lemon { width: 38px; height: 38px; margin: 4px 0 -12px; }
+/* the number rows and Where it comes from: the site's row, name and one line on the left, the number on the right, one faint line under */
+.how-nums, .how-from { display: grid; min-width: 0; margin: 0; padding: 0; list-style: none; }
+.how-card, .how-from li { display: flex; align-items: center; gap: 14px; min-width: 0; padding: var(--gap) 0; border-bottom: 1px solid var(--at-line); }
+.how-card:first-child, .how-from li:first-child { padding-top: 0; }
+.how-what { flex: 1; min-width: 0; display: grid; }
+.how-what b, .how-from b { font-weight: 600; }
+.how-from li { align-items: baseline; }
+.how-from b { flex: none; width: 170px; }
+.how-card .how-num { display: flex; align-items: center; gap: 6px; }
 .how-acts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap); }
 .how-acts .k-btn { margin-top: 0; }
 @media (prefers-reduced-motion: reduce) { .how-mob { animation: none; } }
@@ -1924,14 +1930,14 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
 <div id="night-scene" aria-hidden="true"><i class="ns-far-left"></i><i class="ns-far-right"></i><i class="ns-ray-a"></i><i class="ns-ray-b"></i><i class="ns-trunk-left"></i><i class="ns-trunk-right"></i><i class="ns-trunk-inner-left"></i><i class="ns-trunk-inner-right"></i><i class="ns-treehouse"><i class="ns-glow"></i></i>
   <i class="ns-fly" style="left:120px;top:90px;--x:40px;--y:-30px;--t:8s"></i><i class="ns-fly" style="right:200px;top:260px;--x:-36px;--y:44px;--t:11s"></i><i class="ns-fly" style="left:48%;top:14px;--x:24px;--y:12px;--t:7s"></i><i class="ns-fly" style="left:90px;bottom:150px;--x:44px;--y:-26px;--t:10s"></i><i class="ns-fly" style="right:130px;bottom:90px;--x:-20px;--y:-50px;--t:9s"></i></div>
 <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-MDNKTKB5" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
-<div id="testing" class="testing"><p>Trail under construction. Grind and Planner are in testing, nothing is fully launched. See something odd?</p><button id="testing-report" class="k-btn sm" type="button">Report a problem</button></div>
+<div id="testing" class="testing"><p>Trail under construction. Grind and Your Path are in testing, nothing is fully launched. See something odd?</p><button id="testing-report" class="k-btn sm" type="button">Report a problem</button></div>
 <header class="topbar"><div class="in">
   <h1 class="logo">Six Path <b>Crossway</b></h1>
   <nav class="tabs" role="tablist" aria-label="Pages">
     <button id="tab-how" type="button" role="tab" aria-controls="view-how" aria-selected="true">How it works</button>
     <button id="tab-grind" type="button" role="tab" aria-controls="view-grind" aria-selected="false">Grind</button>
-    <button id="tab-builds" type="button" role="tab" aria-controls="view-builds" aria-selected="false">Planner</button>
-    <button id="tab-guides" type="button" role="tab" aria-controls="view-guides" aria-selected="false">Guides</button>
+    <button id="tab-builds" type="button" role="tab" aria-controls="view-builds" aria-selected="false">Your Path</button>
+    <button id="tab-guides" type="button" role="tab" aria-controls="view-guides" aria-selected="false" aria-label="Guides, soon">Guides<span class="soon" aria-hidden="true">Soon</span></button>
     <button id="tab-appraiser" type="button" role="tab" aria-controls="view-appraiser" aria-selected="false" aria-label="Appraiser, soon">Appraiser<span class="soon" aria-hidden="true">Soon</span></button>
     <button id="tab-timer" type="button" role="tab" aria-controls="view-timer" aria-selected="false">Timer</button>
   </nav>
@@ -1980,7 +1986,7 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
         <span class="closed-crew" aria-hidden="true"></span>
         <div class="closed-text">
           <h2 id="closed-title">This trail is still being cleared</h2>
-          <p>The Appraiser is closed while it gets its new look. Grind and Planner are open.</p>
+          <p>The Appraiser is closed while it gets its new look. Grind and Your Path are open.</p>
           <a class="k-btn key" href="#grind">Back to Grind</a>
         </div>
       </div>
@@ -1991,37 +1997,38 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
 <main id="view-grind" hidden>
   <div id="grind-root"><p class="empty">Loading the grind tracker...</p></div>
 </main>
-<main id="view-how" class="k-win" role="tabpanel" aria-labelledby="tab-how">
-  <div class="k-bar"><h2>How it works</h2></div>
-  <div class="k-pad">
+<main id="view-how" role="tabpanel" aria-labelledby="tab-how">
+  <div class="how-page">
 
   <div class="how-hero">
-    <p class="lead">Six Path Crossway is a fan made helper for MapleStory Classic.<span class="testing-only"> It's in testing, so tell us when something looks off.</span></p>
+    <h2>A fan made helper for MapleStory Classic</h2>
+    <p class="lead testing-only">It's in testing, so tell us when something looks off.</p>
     <div class="how-stage" aria-hidden="true"><span class="how-mob how-mob-pig"></span><span class="how-mob how-mob-ribbon"></span><span class="how-lemon"></span><span class="how-lemon"></span></div>
   </div>
 
+  <div class="how-trail">
   <section>
   <h3>Start in three steps</h3>
   <div class="how-steps">
     <div class="how-step">
-      <h4><span class="how-n">1</span>Share your game window</h4>
+      <span class="how-n">Step 1</span>
       <div class="how-mock" role="img" aria-label="Example of the Share game window button"><span class="how-btn">Share game window</span></div>
-      <p>On the Grind tab, press Share game window and pick MapleStory. Nothing to type.</p>
+      <div><h4>Share your game window</h4><p>On Grind, press Share game window and pick MapleStory.</p></div>
     </div>
     <div class="how-step">
-      <h4><span class="how-n">2</span>Pop out over the game</h4>
+      <span class="how-n">Step 2</span>
       <div class="how-mock" role="img" aria-label="Example of the pop-out: EXP an hour with a 5m, 10m and run switch">
         <div class="how-row"><span class="how-name">EXP an hour</span><span class="how-num how-big">118K</span></div>
         <div class="how-seg"><span>5m</span><span>10m</span><span class="on">run</span></div>
       </div>
-      <p>The live numbers float in a small window over MapleStory.</p>
+      <div><h4>Pop out over the game</h4><p>The live numbers float in a small window over MapleStory.</p></div>
     </div>
     <div class="how-step">
-      <h4><span class="how-n">3</span>Train</h4>
+      <span class="how-n">Step 3</span>
       <div class="how-mock" role="img" aria-label="Example of the ready light: a green light that says Grinding">
         <div class="how-row"><span class="how-ring"><span class="how-mob how-mob-pig"></span></span><span class="how-name"><span class="how-lamp">Grinding</span><small>Lv 35</small></span></div>
       </div>
-      <p>It reads your EXP bar, level and quickslot potions off the screen.</p>
+      <div><h4>Train</h4><p>It reads your EXP, level and potions off the screen. Nothing to type.</p></div>
     </div>
   </div>
   </section>
@@ -2029,14 +2036,14 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
   <section>
   <h3>What each number means</h3>
   <div class="how-nums">
-    <div class="how-card"><span class="how-lbl">EXP an hour</span><span class="how-num how-big">118K</span><p>EXP gained from your first kill to your latest, over that time. Press 5m or 10m to see just the last few minutes.</p></div>
-    <div class="how-card"><span class="how-lbl">Kills a minute</span><span class="how-num how-big">14</span><p>Your EXP a minute divided by the map's average EXP a kill. It reads low when a party shares your EXP.</p></div>
-    <div class="how-card"><span class="how-lbl">Profit</span><span class="how-num how-big">+2,410</span><p>Mesos picked up, plus shop sales, minus other buys, plus loot at NPC price with Count my loot on, minus potions drunk.</p></div>
-    <div class="how-card"><span class="how-lbl">Potions</span><span class="how-num how-big"><span class="how-lemon" aria-hidden="true"></span>240</span><p>Counted off your quickslots, so every potion you drink needs a slot there.</p></div>
-    <div class="how-card"><span class="how-lbl">In town</span><span class="how-num how-big">3 min</span><p>From your last kill before a potion refill to your first kill after it.</p></div>
-    <div class="how-card"><span class="how-lbl">All time</span><span class="how-num how-big"><span class="how-lemon" aria-hidden="true"></span>12,300</span><p>Every saved run added up. Signed in that's up to 500 runs, signed out 200 on this device.</p></div>
+    <div class="how-card"><div class="how-what"><b>EXP an hour</b><p>From your first kill to your latest. 5m and 10m show just the last few minutes.</p></div><span class="how-num how-big">118K</span></div>
+    <div class="how-card"><div class="how-what"><b>Kills a minute</b><p>Your EXP a minute over the map's average kill. It reads low in a party.</p></div><span class="how-num how-big">14</span></div>
+    <div class="how-card"><div class="how-what"><b>Profit</b><p>Pickups and shop sales, minus potions and anything else you bought.</p></div><span class="how-num how-big">+2,410</span></div>
+    <div class="how-card"><div class="how-what"><b>Potions</b><p>Counted off your quickslots, so keep every potion you drink on a slot.</p></div><span class="how-num how-big"><span class="how-lemon" aria-hidden="true"></span>240</span></div>
+    <div class="how-card"><div class="how-what"><b>In town</b><p>From your last kill before a refill to your first kill after it.</p></div><span class="how-num how-big">3 min</span></div>
+    <div class="how-card"><div class="how-what"><b>All time</b><p>Every saved run added up, Lemons and all.</p></div><span class="how-num how-big"><span class="how-lemon" aria-hidden="true"></span>12,300</span></div>
   </div>
-  <p class="small">Example numbers. Signed in, runs save to your account, private to you. Signed out, they stay on this device. The reading happens on your computer.</p>
+  <p class="small">Signed in, runs save to your account, private to you. Signed out, they stay on this device. The reading happens on your computer.</p>
   </section>
   <div class="timer-only">
   <section>
@@ -2076,19 +2083,27 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
   </div>
 
   <section>
-  <h3>Planner</h3>
-  <p>Pick your class and type just your level to get a leveling plan: where to train, where your points go, and what to wear and scroll.</p>
-  <div class="how-mock how-mock-b" role="img" aria-label="Example of a guide row: a monster, where to train, and EXP an hour">
+  <h3>Your Path</h3>
+  <p>Type your level and it lays out your path: where to train, where your points go and what to wear.</p>
+  <div class="how-mock how-mock-b" role="img" aria-label="Example of two rows: a monster to train on with EXP an hour, and the next skill point">
     <div class="how-row"><span class="how-ring"><span class="how-mob how-mob-pig"></span></span><span class="how-name">Train here now<small>Example row</small></span><span class="how-num">112K<small>EXP an hour</small></span></div>
     <div class="how-row"><span class="how-ring"><span class="how-skill"></span></span><span class="how-name">Next skill point<small>Example row</small></span><span class="how-num">Heal<small>level 3</small></span></div>
   </div>
-  <p>Numbers come from the game's files and meowdb's Classic formulas. Weapons not yet checked carry an Estimated note. Saving a build needs Discord and shows the character name you type, never your Discord name.<span class="testing-only"> Still in testing.</span></p>
+  <h4>Where it comes from</h4>
+  <ul class="how-from">
+    <li><b>The game's own files</b><span>Monsters, maps, skills and gear, straight from Classic.</span></li>
+    <li><b>Community builds</b><span>The roads real players share in the Classic World Discord.</span></li>
+    <li><b>Your character</b><span>It bends to the points you've already spent.</span></li>
+  </ul>
+  <p class="small">Damage math uses meowdb's Classic formulas. Weapons we haven't checked say Estimated.</p>
   </section>
+  <div class="guides-only">
   <section>
   <h3>Guides</h3>
   <p>A road map from level 1 to 50 for each job: where to train, your points and your gear at every stop.</p>
   <p>The Mage guide is up first.<span class="testing-only"> Still in testing.</span></p>
   </section>
+  </div>
   <div class="appraiser-only">
   <section>
   <h3>Appraiser</h3>
@@ -2100,7 +2115,7 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
 
   <section>
   <h3>Found a bug</h3>
-  <p>Press Report a problem and it comes straight to Rimmah, with a picture of what you saw. Fixes and news go up in our Discord.</p>
+  <p>Press Report a problem and it comes straight to Rimmah, with a picture of what you saw.</p>
   <div class="how-acts"><button id="how-report" class="k-btn key" type="button">Report a problem</button><a id="how-discord" href="https://discord.gg/sHupB2U7tD" target="_blank" rel="noopener">Join our Discord</a></div>
   </section>
   <div class="timer-only">
@@ -2108,6 +2123,7 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
   <h3>Fair play</h3>
   <p>One post every 15 seconds. Your Discord name shows on everything you post. False posts get hidden and the account blocked.</p>
   </section>
+  </div>
   </div>
 
   <p class="small smallprint">Fan made, not affiliated with Nexon. Game art comes from the MapleStory client and belongs to Nexon. Item prices come from Cozy Market, and damage formulas and drop lists from meowdb and community players.</p>
@@ -2126,7 +2142,7 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-15f',
+  version: '2026-11-16a',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
@@ -2492,6 +2508,8 @@ const api = window.BT_API || makeSupabaseApi(CONFIG);
 const TIMER_ON = window.BT_TIMER === true;
 // the Appraiser is closed for now (window.BT_APPRAISER turns it on): no loading, a closed card, its sign faded
 const APPRAISER_ON = window.BT_APPRAISER === true;
+// Guides is closed for now (window.BT_GUIDES turns it on): its sign stays in the row, faded, and opens nothing; #guides lands on How it works
+const GUIDES_ON = window.BT_GUIDES === true;
 // the Frequent Eater card pays out during the beta (window.BT_CLAIMS = false turns it off): a full card can be claimed for a stack
 // of potions in game. Ending the beta is making this false; the card then only counts
 const CLAIMS_ON = window.BT_CLAIMS !== false;
@@ -2765,7 +2783,7 @@ for (const [id, kind] of [['btn-spawned', 'spawn'], ['btn-killed', 'kill'], ['bt
 $('signin').addEventListener('click', () => signIn().catch(err => hint(err.message)));
 $('signout').addEventListener('click', () => api.signOut().catch(() => {}).then(() => setSession(null)));
 
-// The Planner tab is #builds, Guides #guides (a guide's job after it, #guides/mage/cleric), the Appraiser #appraiser,
+// Your Path (the Planner) is #builds, Guides #guides (a guide's job after it, #guides/mage/cleric), the Appraiser #appraiser,
 // Grind #grind and How it works #how, so each can be linked; back and forward switch views too.
 // The tester link: ?only=grind shows just the Grind tab in this browser while the Timer, Builds and Appraiser are worked
 // on; ?only=all brings them back. Kept on the device, since Discord sends a sign in back to the plain address; the
@@ -2784,10 +2802,12 @@ document.body.classList.toggle('testing-off', !TESTING_ON);
 document.body.classList.toggle('appraiser-off', !APPRAISER_ON);
 // closed, its sign reads "Appraiser, soon" once (the Soon tag is for the eyes); open, it is just the name
 if (APPRAISER_ON) $('tab-appraiser').removeAttribute('aria-label');
+document.body.classList.toggle('guides-off', !GUIDES_ON);
+if (GUIDES_ON) { $('tab-guides').removeAttribute('aria-label'); $('tab-guides').querySelector('.soon').remove(); } else $('tab-guides').setAttribute('aria-disabled', 'true');
 // the front page is How it works while the Timer is off; the tester link opens Grind wherever it lands, How it works aside
 function viewNow() {
   const view = { '#how': 'how', '#builds': 'builds', '#appraiser': 'appraiser', '#grind': 'grind' }[location.hash]
-    || (/^#guides(\/|$)/.test(location.hash) ? 'guides' : TIMER_ON ? 'timer' : 'how');
+    || (GUIDES_ON && /^#guides(\/|$)/.test(location.hash) ? 'guides' : TIMER_ON ? 'timer' : 'how');
   return onlyGrind() && location.hash !== '#how' ? 'grind' : view;
 }
 // The guide's job from #guides/mage/<job>; anything else is Fire and Poison
@@ -2934,7 +2954,7 @@ $('tab-grind').addEventListener('click', () => { if (location.hash !== '#grind')
 $('tab-how').addEventListener('click', () => { if (location.hash !== '#how') location.hash = '#how'; });
 $('tab-builds').addEventListener('click', () => { if (location.hash !== '#builds') location.hash = '#builds'; });
 // already on a guide, the tab keeps its job
-$('tab-guides').addEventListener('click', () => { if (!/^#guides(\/|$)/.test(location.hash)) location.hash = '#guides'; });
+$('tab-guides').addEventListener('click', () => { if (GUIDES_ON && !/^#guides(\/|$)/.test(location.hash)) location.hash = '#guides'; });
 $('tab-timer').addEventListener('click', () => { if (location.hash) history.pushState(null, '', location.pathname + location.search); showView(); });
 addEventListener('hashchange', showView);
 addEventListener('popstate', showView);
