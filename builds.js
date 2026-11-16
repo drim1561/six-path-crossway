@@ -1585,7 +1585,7 @@ function fold(label, node) {
 function priceWhen(prices) { return prices && new Date(prices.date + 'T00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
 function priceCredit(prices) {
   if (!prices) return '';
-  return 'Prices from Cozy Market, ' + priceWhen(prices) + ': ' + (prices.sold3d ? 'the middle price of what sold in the past 3 days.' : "Cozy's usual price.");
+  return 'Prices from Cozy Markets, ' + priceWhen(prices) + ': ' + (prices.sold3d ? 'the middle price of what sold in the past 3 days.' : "Cozy's usual price.");
 }
 
 // The card's big numbers: the two stats this class cares about, magic or weapon attack, the attack per hit, and what a point is worth.
@@ -1656,7 +1656,7 @@ function renderOverview(g, cls) {
     E('div', { class: 'b-now' }, ...overviewTiles(g, cls)),
     E('div', { class: 'b-ovgo' }, go('points', 'Points tab'), go('gear', 'Gear tab'), go('scrolls', 'Scrolls tab')),
     levelsBlock, ...(pathsBlock ? [pathsBlock] : []), trainBlock, ...(questBlock ? [questBlock] : []),
-    E('p', { class: 'small b-foot' }, 'EXP an hour: ' + tuneText(g.tune) + (pw ? ' Prices from Cozy Market, ' + pw + '.' : '')));
+    E('p', { class: 'small b-foot' }, 'EXP an hour: ' + tuneText(g.tune) + (pw ? ' Prices from Cozy Markets, ' + pw + '.' : '')));
   loadMobPics(); loadPics();
 }
 
@@ -2156,8 +2156,8 @@ function renderScrolls(g) {
 
   const credit = priceCredit(g.prices), footKids = ['A 60% scroll fails about 4 in 10, so if you want a clean item, plan on rebuying it. '];
   if (credit) {
-    const idx = credit.indexOf('Cozy Market');
-    footKids.push(credit.slice(0, idx), E('a', { href: 'https://cozy.markets', target: '_blank', rel: 'noopener' }, 'Cozy Market'), credit.slice(idx + 'Cozy Market'.length));
+    const idx = credit.indexOf('Cozy Markets');
+    footKids.push(credit.slice(0, idx), E('a', { href: 'https://cozy.markets', target: '_blank', rel: 'noopener' }, 'Cozy Markets'), credit.slice(idx + 'Cozy Markets'.length));
   }
 
   box.replaceChildren(
@@ -2347,8 +2347,8 @@ function renderQuests(g, cls) {
 
   const credit = priceCredit(g.prices), footKids = [];
   if (credit) {
-    const idx = credit.indexOf('Cozy Market');
-    footKids.push(credit.slice(0, idx), E('a', { href: 'https://cozy.markets', target: '_blank', rel: 'noopener' }, 'Cozy Market'), credit.slice(idx + 'Cozy Market'.length));
+    const idx = credit.indexOf('Cozy Markets');
+    footKids.push(credit.slice(0, idx), E('a', { href: 'https://cozy.markets', target: '_blank', rel: 'noopener' }, 'Cozy Markets'), credit.slice(idx + 'Cozy Markets'.length));
   }
   if (gearPriced) { const w = listWhen(g.prices); if (w) footKids.push(" Gear is Cozy's usual price, " + w + '.'); }
   if (tick.prompt) footKids.push((footKids.length ? ' ' : '') + TICK_PROMPT[tick.prompt]);

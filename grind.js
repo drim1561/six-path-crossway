@@ -1910,7 +1910,7 @@ function mount(root, deps) {
         else if (!L.items.length) after.push(el('p', { class: 'g-note' }, 'Nothing new in your bag yet.'));
         else {
           const K = n => (n < 0 ? '−' : '') + fmtK(Math.abs(n));
-          const worth = r => r.fm ? el('a', { href: COZY + r.fmCozy, target: '_blank', rel: 'noopener', 'aria-label': r.name + ' on Cozy Market, ' + K(r.fm) + ' FM' }, K(r.fm) + ' FM') : K(r.value);
+          const worth = r => r.fm ? el('a', { href: COZY + r.fmCozy, target: '_blank', rel: 'noopener', 'aria-label': r.name + ' on Cozy Markets, ' + K(r.fm) + ' FM' }, K(r.fm) + ' FM') : K(r.value);
           for (const r of P.rows) list.push(el('div', { class: 'k-row' }, el('span', { class: 'k-ring' + (L.best && r.key === L.best.key ? ' gold' : '') }, cellPic(r.cell) ? el('img', { src: cellPic(r.cell), alt: '' }) : null),
             el('span', { class: 'g-nnm' }, el('span', { class: 'g-nn' }, r.name), r.got ? el('span', { class: 'k-tag' }, r.got === 'sure' ? 'Got one!' : 'Got one?') : null,
               r.got === 'maybe' ? el('small', {}, 'might be ' + r.might + ', check your bag') : r.n > 1 && r.each ? el('small', {}, fmt(r.each) + ' each') : null),
@@ -1919,7 +1919,7 @@ function mount(root, deps) {
           // an FM price on screen always has its credit, even where Now grinding's foot is folded away
           if (P.rows.some(r => r.fm)) {
             const day = drops && drops.date && new Date(drops.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            after.push(el('p', { class: 'g-note g-credit' }, 'Prices from ', el('a', { href: 'https://cozy.markets/', target: '_blank', rel: 'noopener' }, 'Cozy Market'), day ? ', ' + day + '.' : '.'));
+            after.push(el('p', { class: 'g-note g-credit' }, 'Prices from ', el('a', { href: 'https://cozy.markets/', target: '_blank', rel: 'noopener' }, 'Cozy Markets'), day ? ', ' + day + '.' : '.'));
           }
           after.push(el('p', { class: 'g-note' }, 'Open your bag on Equip, Use or Etc to update it.'));
         }

@@ -147,7 +147,7 @@ function build({ el, band, tools, lamp, mapPick, classPick, steps, lines, pics, 
   const ring = r => { const e = el('span', { class: 'k-ring' + (r.gold ? ' gold' : ''), 'data-item': r.id }), src = pics.item(r.id); if (src) e.append(el('img', { src, alt: '' })); return e; };
   const fillIcons = () => { for (const e of cols.querySelectorAll('.k-ring[data-item]:empty')) { const src = pics.item(+e.dataset.item); if (src) e.append(el('img', { src, alt: '' })); } };
   const line = text => el('p', { class: 'g-nline' }, text);
-  const cozyLink = (n, text, name) => el('a', { href: COZY + n, target: '_blank', rel: 'noopener', 'aria-label': name + ' on Cozy Market, ' + text }, text);
+  const cozyLink = (n, text, name) => el('a', { href: COZY + n, target: '_blank', rel: 'noopener', 'aria-label': name + ' on Cozy Markets, ' + text }, text);
   const num = v => el('span', { class: 'g-mn' }, String(v));
 
   // a monster's head: its name, how strong and how many, and the undead tag
@@ -197,7 +197,7 @@ function build({ el, band, tools, lamp, mapPick, classPick, steps, lines, pics, 
     const also = (x.mobIds || []).slice(3).map(mobName), date = x.D && new Date(x.D.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     notes.replaceChildren(...[
       also.length ? el('p', { class: 'g-nfoot' }, 'Also here: ' + also.join(', ') + '.') : null,
-      C && C.any ? el('p', { class: 'g-nfoot' }, 'Seen dropping here, no drop rates yet.' + (C.anyCozy ? ' ' : ''), C.anyCozy ? ['Prices from ', el('a', { href: 'https://cozy.markets/', target: '_blank', rel: 'noopener' }, 'Cozy Market'), ', ' + date + '.' + (C.anyGearCozy ? ' Gear varies by stats.' : '')] : null) : null,
+      C && C.any ? el('p', { class: 'g-nfoot' }, 'Seen dropping here, no drop rates yet.' + (C.anyCozy ? ' ' : ''), C.anyCozy ? ['Prices from ', el('a', { href: 'https://cozy.markets/', target: '_blank', rel: 'noopener' }, 'Cozy Markets'), ', ' + date + '.' + (C.anyGearCozy ? ' Gear varies by stats.' : '')] : null) : null,
     ].filter(Boolean));
   }
 

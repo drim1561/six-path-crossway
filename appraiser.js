@@ -548,7 +548,7 @@ function renderSales() {
 // Straight to the item's page on Cozy and on meowdb when its number is known, otherwise copy the name and open Cozy.
 function lookups(name) {
   const n = ui.cozy.get(name);
-  if (n) return [E('a', { class: 'cozy', href: 'https://cozy.markets/items/' + n, target: '_blank', rel: 'noopener', title: 'Sales and listings on Cozy Market' }, 'Cozy'),
+  if (n) return [E('a', { class: 'cozy', href: 'https://cozy.markets/items/' + n, target: '_blank', rel: 'noopener', title: 'Sales and listings on Cozy Markets' }, 'Cozy'),
     E('a', { class: 'cozy', href: 'https://meowdb.com/msclassic/item-db/' + n, target: '_blank', rel: 'noopener', title: 'The item on meowdb' }, 'meowdb')];
   return [copyButton(name, 'https://cozy.markets/items', 'Cozy')];
 }
