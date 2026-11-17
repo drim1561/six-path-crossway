@@ -575,6 +575,7 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
    would drop the next thing it says before a screen reader hears it) but takes no gap */
 #view-grind { max-width: none; padding: 0; }
 .g-col > .g-status { margin: 0; padding: 8px 12px; background: var(--card); border: 2px solid var(--card-o); box-shadow: inset 0 2px 0 var(--card-hi), inset 0 -2px 0 var(--card-lo); color: var(--ink); font: 600 var(--fs-md) var(--font-body); }
+.g-status a { color: var(--focus); text-decoration: underline; text-underline-offset: 3px; }
 .g-col > .g-status:empty { position: absolute; width: 1px; height: 0; min-height: 0; padding: 0; border: 0; overflow: hidden; }
 .g-life > .g-note:empty { display: none; }
 .g-print { display: grid; gap: 4px; padding: 8px 12px; background: var(--card); border: 2px solid var(--card-o); box-shadow: inset 0 2px 0 var(--card-hi), inset 0 -2px 0 var(--card-lo); color: var(--ink); }
@@ -1713,6 +1714,20 @@ body:not(.timer-off) #view-how .timer-only, body:not(.appraiser-off) #view-how .
 .how-from li { align-items: baseline; }
 .how-from b { flex: none; width: 170px; }
 .how-card .how-num { display: flex; align-items: center; gap: 6px; }
+/* Not counting?: a question a row, the site's faint line under each; open, one line of why and the steps */
+.how-qs { display: grid; min-width: 0; }
+.how-q { border-bottom: 1px solid var(--at-line); }
+.how-q summary { display: flex; align-items: center; gap: 10px; padding: 10px 0; font: 600 var(--fs-md) var(--font-body); color: var(--ink); cursor: pointer; list-style: none; }
+.how-q summary::-webkit-details-marker { display: none; }
+.how-q summary::before { content: ""; flex: none; width: 7px; height: 7px; margin: 0 3px; border: solid var(--muted); border-width: 0 2px 2px 0; transform: rotate(-45deg); transition: transform .15s; }
+.how-q[open] summary::before { transform: rotate(45deg); }
+.how-q summary:hover::before { border-color: var(--ink); }
+#view-how .how-q > p { color: var(--muted); }
+#view-how .how-q > p, .how-q ol { margin: 0 0 0 23px; }
+.how-q ol { display: grid; gap: 4px; padding: 6px 0 var(--gap) 20px; }
+.how-q:first-child summary { padding-top: 0; }
+.how-link { background: none; border: 0; padding: 0; font: inherit; color: var(--focus); text-decoration: underline; cursor: pointer; }
+@media (prefers-reduced-motion: reduce) { .how-q summary::before { transition: none; } }
 .how-acts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap); }
 .how-acts .k-btn { margin-top: 0; }
 @media (prefers-reduced-motion: reduce) { .how-mob, .how-stage > *, .how-stage > .how-mob, .how-roll .how-lemon { animation: none; } .how-stage > .how-roll { left: 250px; } .how-stage > .how-mob-pig { left: 320px; } .how-stage > .how-mob-ribbon { left: 420px; } .how-stage > .how-mob-snail { left: 600px; } }
@@ -2105,6 +2120,33 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
   </div>
   <p class="small">Signed in, runs save to your account, private to you. Signed out, they stay on this device. The reading happens on your computer.</p>
   </section>
+
+  <section id="how-help">
+  <h3>Not counting?</h3>
+  <div class="how-qs">
+    <details class="how-q" id="how-q-red"><summary>The light turned red</summary>
+      <p>Grind finds your game by its EXP bar and quickslots, so they have to be in what you share.</p>
+      <ol><li>Share the MapleStory window. Your whole screen works too, as long as the game is on it.</li><li>Keep the game open and on screen, not minimized, with nothing covering the bottom of it.</li><li>Still red? Press Find my game again.</li></ol>
+    </details>
+    <details class="how-q" id="how-q-stops"><summary>It counts for a while, then stops</summary>
+      <p>Browsers and Windows slow down a page you aren't looking at, and a slowed page can lose the game.</p>
+      <ol><li>Grind in Chrome or Edge. They keep reading while the tab is in the background.</li><li>Turn off Energy Saver in Chrome, or Efficiency mode in Edge, while you grind. Both are in the browser's settings.</li><li>If the light says Share stopped, press Share game window and your run carries on.</li></ol>
+    </details>
+    <details class="how-q" id="how-q-mesos"><summary>EXP counts, but mesos or loot don't</summary>
+      <p>Mesos only show inside your bag, and loot is what changed in your bag between two looks.</p>
+      <ol><li>Open your inventory for a moment now and then, with the mouse off the meso total.</li><li>With Count my loot on, flip through Equip, Use and Etc at the start, then open your bag again later.</li></ol>
+    </details>
+    <details class="how-q" id="how-q-potions"><summary>Potions don't count</summary>
+      <p>Potions are counted off the numbers on your quickslots.</p>
+      <ol><li>Put every potion you drink on a quickslot, and drink from there.</li><li>Keep the quickslot bar open. The little arrow at the bottom right of the game opens it.</li></ol>
+    </details>
+    <details class="how-q" id="how-q-browser"><summary>On Safari or Firefox</summary>
+      <p>Both read the game fine, but they may stop reading while the Grind tab is hidden, and Safari can't pop out.</p>
+      <ol><li>Use Chrome or Edge for Grind. Both run on a Mac too.</li><li>Or keep the Grind tab showing, in its own window beside the game.</li></ol>
+    </details>
+  </div>
+  <p class="small">Still stuck? <button id="how-help-report" class="how-link" type="button">Report a problem</button> and it comes with a picture of what you saw.</p>
+  </section>
   <div class="timer-only">
   <section>
   <h3>Why post</h3>
@@ -2202,7 +2244,7 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-16n',
+  version: '2026-11-16o',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
@@ -2879,9 +2921,17 @@ else { $('tab-builds').setAttribute('aria-disabled', 'true'); document.querySele
 if (GUIDES_ON) { $('tab-guides').removeAttribute('aria-label'); $('tab-guides').querySelector('.soon').remove(); } else $('tab-guides').setAttribute('aria-disabled', 'true');
 // the front page is How it works while the Timer is off; the tester link opens Grind wherever it lands, How it works aside
 function viewNow() {
-  const view = { '#how': 'how', '#builds': PATH_ON ? 'builds' : 'how', '#appraiser': 'appraiser', '#grind': 'grind' }[location.hash]
+  const how = /^#how(\/|$)/.test(location.hash);
+  const view = how ? 'how' : { '#builds': PATH_ON ? 'builds' : 'how', '#appraiser': 'appraiser', '#grind': 'grind' }[location.hash]
     || (GUIDES_ON && /^#guides(\/|$)/.test(location.hash) ? 'guides' : TIMER_ON ? 'timer' : 'how');
-  return onlyGrind() && location.hash !== '#how' ? 'grind' : view;
+  return onlyGrind() && !how ? 'grind' : view;
+}
+// #how/<question> (Grind's browser line links #how/browser) opens that Not counting? question and brings it into view
+function openHowQuestion() {
+  const q = document.getElementById('how-q-' + location.hash.split('/')[1]);
+  if (!q || !/^#how\//.test(location.hash)) return;
+  q.open = true;
+  requestAnimationFrame(() => q.scrollIntoView({ block: 'center' }));
 }
 // The guide's job from #guides/mage/<job>; anything else is Fire and Poison
 const guidesJob = () => { const j = location.hash.split('/')[2]; return ['fp', 'il', 'cleric'].includes(j) ? j : 'fp'; };
@@ -2912,6 +2962,7 @@ function showView() {
   if (view === 'guides') loadGuides().then(() => guidesView && guidesView.setJob(guidesJob()));
   if (view === 'appraiser' && APPRAISER_ON) loadAppraiser();
   if (view === 'grind') loadGrind();
+  if (view === 'how') openHowQuestion();
   // The stage has no size while hidden, so the sprite is sized again when it shows.
   if (view === 'timer' && sprite.lay) { placeSprite(); walk(); }
 }
@@ -3010,6 +3061,7 @@ setTimeout(() => {
 }, 1000);
 $('testing-report').addEventListener('click', () => $('flag').click());
 $('how-report').addEventListener('click', () => $('flag').click());
+$('how-help-report').addEventListener('click', () => $('flag').click());
 $('flag').addEventListener('click', () => {
   if ($('flag').disabled || $('flag-panel')) return;
   $('flag').disabled = true;   // one panel, however fast the clicks come

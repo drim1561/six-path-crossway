@@ -1379,11 +1379,14 @@ function mount(root, deps) {
     } });
   // a browser that can't share a window (phones, old browsers) hides the button, so say why; Firefox and Safari share and
   // read right (tests/browsers.test.js) but have no frame reader, so a hidden tab may stop reading, and some have no pop-out
-  // window, so they get a softer line (a friend's Firefox failed until he moved to Edge)
+  // window, so they get a softer line that names the browser and links How it works' Not counting? question for it (a
+  // friend's Firefox failed until he moved to Edge)
   if (!app) {
-    const md = navigator.mediaDevices;
+    const md = navigator.mediaDevices, ua = navigator.userAgent;
+    const name = /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) && !/Chrom|CriOS|FxiOS|Edg|OPR\//.test(ua) ? 'Safari' : '';
+    const lacks = [!window.documentPictureInPicture && 'can\'t pop out here', typeof MediaStreamTrackProcessor !== 'function' && 'may stop reading while this tab is hidden'].filter(Boolean);
     if (!(md && md.getDisplayMedia)) setStatus('This browser can\'t share a window. Use Chrome or Edge on a computer.');
-    else if (typeof MediaStreamTrackProcessor !== 'function') setStatus('Chrome or Edge on a computer works best. This browser may stop reading while its tab is in the background' + (window.documentPictureInPicture ? '.' : ', and it can\'t pop out.'));
+    else if (typeof MediaStreamTrackProcessor !== 'function') status.replaceChildren((name ? 'You\'re on ' + name + ': ' : '') + 'Grind ' + lacks.join(', and it ') + '. ', el('a', { href: '#how/browser' }, 'What to do'));
   }
   // before sharing, Share game window is the main button; once sharing it's Pop out, and Stop sits after where Share was
   for (const b of shareArea.querySelectorAll('button')) b.classList.add('k-btn');
