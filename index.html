@@ -2244,7 +2244,7 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-16o',
+  version: '2026-11-18a',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
@@ -2614,7 +2614,21 @@ const APPRAISER_ON = window.BT_APPRAISER === true;
 const GUIDES_ON = window.BT_GUIDES === true;
 // Your Path is closed for now (Rimmah, 2026-11-16: Grind first; window.BT_PATH turns it on): its sign stays in the row, faded, and opens
 // nothing; #builds lands on How it works and builds.js never loads. Opening it again is making this true
-const PATH_ON = window.BT_PATH === true;
+// A private key opens it on one browser (Rimmah, 2026-11-18): #unlock-<key> once, kept on the device (bt.pathKey), and #unlock-off
+// closes it again. Only the key's hash is here, so reading the page doesn't give the link
+const PATH_KEY = (() => {
+  const good = t => { let h = 2166136261; for (const c of String(t)) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0; return h === 188311431; };
+  const m = /^#unlock-(.+)$/.exec(location.hash);
+  try {
+    if (m) {
+      if (good(m[1])) localStorage.setItem('bt.pathKey', m[1]); else if (m[1] === 'off') localStorage.removeItem('bt.pathKey');
+      history.replaceState(null, '', location.pathname + location.search + (good(m[1]) ? '#builds' : ''));
+    }
+    return good(localStorage.getItem('bt.pathKey') || '');
+  } catch { return false; }
+})();
+window.addEventListener('hashchange', () => { if (/^#unlock-/.test(location.hash)) location.reload(); });
+const PATH_ON = window.BT_PATH === true || PATH_KEY;
 // the Frequent Eater card pays out during the beta (window.BT_CLAIMS = false turns it off): a full card can be claimed for a stack
 // of potions in game. Ending the beta is making this false; the card then only counts
 const CLAIMS_ON = window.BT_CLAIMS !== false;
