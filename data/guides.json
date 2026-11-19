@@ -1,5 +1,5 @@
 {
-  "made": "2026-11-13",
+  "made": "2026-11-19",
   "guides": {
     "mage": {
       "id": "mage",
@@ -14,7 +14,7 @@
           "name": "Magician",
           "from": 10,
           "to": 30,
-          "hours": 9.1
+          "hours": 8.6
         },
         "jobs": [
           {
@@ -38,16 +38,22 @@
             "line": "Ice holds monsters still and Lightning hits a crowd, so a crowded map goes fast.",
             "roads": [
               {
+                "id": "beam",
+                "name": "Beam first",
+                "hours": 57.5,
+                "lemons": 30251
+              },
+              {
+                "id": "xbucc",
+                "name": "Beam, then Meditation",
+                "hours": 57.5,
+                "lemons": 28423
+              },
+              {
                 "id": "qchaos",
                 "name": "Beam, then Teleport",
                 "hours": 59.5,
                 "lemons": 29633
-              },
-              {
-                "id": "beam",
-                "name": "Beam first",
-                "hours": 59.6,
-                "lemons": 29435
               }
             ]
           },
@@ -72,8 +78,8 @@
               {
                 "id": "teleport",
                 "name": "Teleport first",
-                "hours": 61.4,
-                "lemons": 30855
+                "hours": 63.2,
+                "lemons": 25847
               },
               {
                 "id": "meso",
@@ -99,41 +105,17 @@
                 "stages": [
                   {
                     "from": 10,
-                    "to": 11,
-                    "mob": "Bubbling",
-                    "map": "Kerning City Subway : Line 1 <Area 1>",
-                    "mapId": 10003061,
-                    "expHour": 20700
-                  },
-                  {
-                    "from": 12,
-                    "to": 16,
-                    "mob": "Jr. Necki",
-                    "map": "Warning Street : Dangerous Croko I",
-                    "mapId": 10003093,
-                    "expHour": 25400
-                  },
-                  {
-                    "from": 17,
-                    "to": 19,
-                    "mob": "Horny Mushroom",
-                    "map": "Dungeon : Ant Tunnel IV",
-                    "mapId": 10005063,
-                    "expHour": 48400
-                  },
-                  {
-                    "from": 20,
                     "to": 20,
                     "mob": "Jr. Necki",
                     "map": "Warning Street : Dangerous Croko I",
                     "mapId": 10003093,
-                    "expHour": 57800
+                    "expHour": 21200
                   }
                 ],
                 "tryNext": {
-                  "name": "Octopus",
-                  "level": 12,
-                  "map": "Dungeon : Damp Tree-Forest"
+                  "name": "Bubbling",
+                  "level": 15,
+                  "map": "Kerning City Subway : Line 1 <Area 1>"
                 }
               },
               "ap": [
@@ -211,7 +193,7 @@
                   "cozy": 1435
                 }
               ],
-              "hours": 1.9,
+              "hours": 1.6,
               "lemons": null
             }
           ]
@@ -229,27 +211,11 @@
                 "stages": [
                   {
                     "from": 20,
-                    "to": 24,
+                    "to": 30,
                     "mob": "Jr. Necki",
                     "map": "Warning Street : Dangerous Croko I",
                     "mapId": 10003093,
                     "expHour": 57800
-                  },
-                  {
-                    "from": 25,
-                    "to": 28,
-                    "mob": "Zombie Mushroom",
-                    "map": "Dungeon : Ant Tunnel III",
-                    "mapId": 10005062,
-                    "expHour": 66700
-                  },
-                  {
-                    "from": 29,
-                    "to": 30,
-                    "mob": "Fire Boar",
-                    "map": "Warning Street : The Burnt Land V",
-                    "mapId": 10004115,
-                    "expHour": 70800
                   }
                 ],
                 "tryNext": {
@@ -326,7 +292,7 @@
                   "cozy": 1444
                 }
               ],
-              "hours": 7.2,
+              "hours": 7,
               "lemons": null
             }
           ]
@@ -350,11 +316,19 @@
                 "stages": [
                   {
                     "from": 30,
+                    "to": 37,
+                    "mob": "Jr. Necki",
+                    "map": "Warning Street : Dangerous Croko I",
+                    "mapId": 10003093,
+                    "expHour": 76700
+                  },
+                  {
+                    "from": 38,
                     "to": 39,
-                    "mob": "Fire Boar",
-                    "map": "Warning Street : The Burnt Land V",
-                    "mapId": 10004115,
-                    "expHour": 70800
+                    "mob": "Raffle",
+                    "map": "Shallow Passage : Forgotten Entrance II",
+                    "mapId": 10006050,
+                    "expHour": 99100
                   },
                   {
                     "from": 40,
@@ -473,19 +447,27 @@
                 "stages": [
                   {
                     "from": 40,
-                    "to": 45,
+                    "to": 43,
                     "mob": "Tortie",
                     "map": "Florina Road : Hot Sand",
                     "mapId": 10007040,
                     "expHour": 107400
                   },
                   {
-                    "from": 46,
+                    "from": 44,
+                    "to": 46,
+                    "mob": "Rafflesia",
+                    "map": "Hidden Street : Hanging Gardens of Rot",
+                    "mapId": 10006022,
+                    "expHour": 134600
+                  },
+                  {
+                    "from": 47,
                     "to": 48,
                     "mob": "Wraith",
                     "map": "Kerning City Subway : Line 2 <Area 3>",
                     "mapId": 10003068,
-                    "expHour": 134000
+                    "expHour": 142200
                   },
                   {
                     "from": 49,
@@ -616,13 +598,13 @@
                     "mob": "Zombie Mushroom",
                     "map": "Dungeon : Ant Tunnel III",
                     "mapId": 10005062,
-                    "expHour": 130400
+                    "expHour": 129200
                   }
                 ],
                 "tryNext": {
-                  "name": "Curse Eye",
-                  "level": 33,
-                  "map": "Dungeon : Sleepy Dungeon V"
+                  "name": "Jr. Wraith",
+                  "level": 34,
+                  "map": "Kerning City Subway : Line 2 <Area 1>"
                 }
               },
               "ap": [
@@ -696,8 +678,8 @@
                   "cozy": 1467
                 }
               ],
-              "hours": 20.9,
-              "lemons": 8535
+              "hours": 21,
+              "lemons": 8213
             },
             {
               "road": "qchaos",
@@ -713,25 +695,25 @@
                 "stages": [
                   {
                     "from": 30,
-                    "to": 37,
-                    "mob": "Fire Boar",
-                    "map": "Warning Street : The Burnt Land V",
-                    "mapId": 10004115,
-                    "expHour": 70800
+                    "to": 38,
+                    "mob": "Jr. Necki",
+                    "map": "Warning Street : Dangerous Croko I",
+                    "mapId": 10003093,
+                    "expHour": 76700
                   },
                   {
-                    "from": 38,
+                    "from": 39,
                     "to": 40,
                     "mob": "Jr. Wraith",
                     "map": "Kerning City Subway : Line 2 <Area 1>",
                     "mapId": 10003066,
-                    "expHour": 92100
+                    "expHour": 97400
                   }
                 ],
                 "tryNext": {
-                  "name": "Curse Eye",
-                  "level": 33,
-                  "map": "Dungeon : Sleepy Dungeon V"
+                  "name": "Jr. Wraith",
+                  "level": 34,
+                  "map": "Kerning City Subway : Line 2 <Area 1>"
                 }
               },
               "ap": [
@@ -814,6 +796,129 @@
               ],
               "hours": 22.1,
               "lemons": 9541
+            },
+            {
+              "road": "xbucc",
+              "name": "Beam, then Meditation",
+              "credit": {
+                "parts": [
+                  {
+                    "text": "xBucc's I/L build",
+                    "link": "https://meowdb.com/msclassic/guides/il-wizard-class-guide"
+                  }
+                ]
+              },
+              "train": {
+                "stages": [
+                  {
+                    "from": 30,
+                    "to": 40,
+                    "mob": "Jr. Necki",
+                    "map": "Warning Street : Dangerous Croko I",
+                    "mapId": 10003093,
+                    "expHour": 76700
+                  }
+                ],
+                "tryNext": {
+                  "name": "Jr. Wraith",
+                  "level": 34,
+                  "map": "Kerning City Subway : Line 2 <Area 1>"
+                }
+              },
+              "ap": [
+                {
+                  "from": 31,
+                  "to": 38,
+                  "text": "5 INT"
+                },
+                {
+                  "from": 39,
+                  "to": 39,
+                  "text": "5 LUK, for a Wand at 40"
+                },
+                {
+                  "from": 40,
+                  "to": 40,
+                  "text": "5 INT"
+                }
+              ],
+              "points": [
+                {
+                  "from": 30,
+                  "to": 30,
+                  "id": 2201001,
+                  "target": 1,
+                  "text": "Teleport to 1 (1 point)"
+                },
+                {
+                  "from": 31,
+                  "to": 31,
+                  "id": 2200000,
+                  "target": 1,
+                  "text": "MP Eater to 1 (1 point)"
+                },
+                {
+                  "from": 31,
+                  "to": 31,
+                  "id": 2201003,
+                  "target": 1,
+                  "text": "Cold Beam to 1 (1 point)"
+                },
+                {
+                  "from": 31,
+                  "to": 31,
+                  "id": 2201004,
+                  "target": 1,
+                  "text": "Thunder Bolt to 1 (1 point)"
+                },
+                {
+                  "from": 32,
+                  "to": 40,
+                  "id": 2201003,
+                  "target": 28,
+                  "text": "Cold Beam to 28 (27 points)"
+                }
+              ],
+              "gear": [
+                {
+                  "slot": "Wand",
+                  "id": 1372004,
+                  "name": "Mithril Wand",
+                  "level": 30,
+                  "cozy": 653
+                },
+                {
+                  "slot": "Wand",
+                  "id": 1372006,
+                  "name": "Fairy Wand",
+                  "level": 40,
+                  "cozy": 655,
+                  "up": true
+                },
+                {
+                  "slot": "Hat",
+                  "id": 1002102,
+                  "name": "Steel Pride",
+                  "level": 30,
+                  "cozy": 810
+                },
+                {
+                  "slot": "Overall",
+                  "id": 1050012,
+                  "name": "Blue Wizard Robe",
+                  "level": 30,
+                  "cozy": null
+                },
+                {
+                  "slot": "Gloves",
+                  "id": 1082032,
+                  "name": "Blue Lutia",
+                  "level": 30,
+                  "cozy": 1467
+                }
+              ],
+              "hours": 22,
+              "lemons": 9462
             }
           ]
         },
@@ -929,8 +1034,8 @@
                   "cozy": 1491
                 }
               ],
-              "hours": 38.7,
-              "lemons": 20900
+              "hours": 36.5,
+              "lemons": 22038
             },
             {
               "road": "qchaos",
@@ -970,11 +1075,19 @@
                   },
                   {
                     "from": 47,
-                    "to": 50,
+                    "to": 49,
                     "mob": "Wraith",
                     "map": "Kerning City Subway : Line 2 <Area 3>",
                     "mapId": 10003068,
                     "expHour": 139300
+                  },
+                  {
+                    "from": 50,
+                    "to": 50,
+                    "mob": "Duskmander",
+                    "map": "Shallow Passage : Forbidden Entrance",
+                    "mapId": 10006080,
+                    "expHour": 155200
                   }
                 ],
                 "tryNext": {
@@ -1070,6 +1183,130 @@
               ],
               "hours": 37.4,
               "lemons": 20092
+            },
+            {
+              "road": "xbucc",
+              "name": "Beam, then Meditation",
+              "credit": {
+                "parts": [
+                  {
+                    "text": "xBucc's I/L build",
+                    "link": "https://meowdb.com/msclassic/guides/il-wizard-class-guide"
+                  }
+                ]
+              },
+              "train": {
+                "stages": [
+                  {
+                    "from": 40,
+                    "to": 45,
+                    "mob": "Jr. Wraith",
+                    "map": "Kerning City Subway : Line 2 <Area 1>",
+                    "mapId": 10003066,
+                    "expHour": 170600
+                  },
+                  {
+                    "from": 46,
+                    "to": 50,
+                    "mob": "Wraith",
+                    "map": "Kerning City Subway : Line 2 <Area 3>",
+                    "mapId": 10003068,
+                    "expHour": 191800
+                  }
+                ],
+                "tryNext": {
+                  "name": "Tortie",
+                  "level": 46,
+                  "map": "Florina Road : Hot Sand"
+                }
+              },
+              "ap": [
+                {
+                  "from": 41,
+                  "to": 46,
+                  "text": "5 INT"
+                },
+                {
+                  "from": 47,
+                  "to": 49,
+                  "text": "5 LUK, for a Cromi at 50"
+                },
+                {
+                  "from": 50,
+                  "to": 50,
+                  "text": "5 INT"
+                }
+              ],
+              "points": [
+                {
+                  "from": 41,
+                  "to": 41,
+                  "id": 2201003,
+                  "target": 30,
+                  "text": "Cold Beam to 30 (2 points)"
+                },
+                {
+                  "from": 41,
+                  "to": 42,
+                  "id": 2200000,
+                  "target": 3,
+                  "text": "MP Eater to 3 (2 points)"
+                },
+                {
+                  "from": 42,
+                  "to": 48,
+                  "id": 2201000,
+                  "target": 20,
+                  "text": "Meditation to 20 (20 points)"
+                },
+                {
+                  "from": 49,
+                  "to": 50,
+                  "id": 2201001,
+                  "target": 7,
+                  "text": "Teleport to 7 (6 points)"
+                }
+              ],
+              "gear": [
+                {
+                  "slot": "Wand",
+                  "id": 1372006,
+                  "name": "Fairy Wand",
+                  "level": 40,
+                  "cozy": 655
+                },
+                {
+                  "slot": "Wand",
+                  "id": 1372007,
+                  "name": "Cromi",
+                  "level": 50,
+                  "cozy": 656,
+                  "up": true
+                },
+                {
+                  "slot": "Hat",
+                  "id": 1002146,
+                  "name": "Brown Guiltian",
+                  "level": 40,
+                  "cozy": 854
+                },
+                {
+                  "slot": "Overall",
+                  "id": 1050025,
+                  "name": "Blue Starlight",
+                  "level": 40,
+                  "cozy": 1133
+                },
+                {
+                  "slot": "Gloves",
+                  "id": 1082056,
+                  "name": "Blue Arten",
+                  "level": 40,
+                  "cozy": 1491
+                }
+              ],
+              "hours": 35.5,
+              "lemons": 18961
             }
           ]
         },
@@ -1093,18 +1330,26 @@
                   {
                     "from": 30,
                     "to": 36,
-                    "mob": "Fire Boar",
-                    "map": "Warning Street : The Burnt Land V",
-                    "mapId": 10004115,
-                    "expHour": 70800
+                    "mob": "Jr. Necki",
+                    "map": "Warning Street : Dangerous Croko I",
+                    "mapId": 10003093,
+                    "expHour": 76700
                   },
                   {
                     "from": 37,
+                    "to": 39,
+                    "mob": "Jr. Wraith",
+                    "map": "Kerning City Subway : Line 2 <Area 1>",
+                    "mapId": 10003066,
+                    "expHour": 88500
+                  },
+                  {
+                    "from": 40,
                     "to": 40,
                     "mob": "Zombie Mushroom",
                     "map": "Dungeon : Ant Tunnel III",
                     "mapId": 10005062,
-                    "expHour": 89100
+                    "expHour": 95000
                   }
                 ],
                 "tryNext": {
@@ -1198,8 +1443,8 @@
                   "cozy": 1467
                 }
               ],
-              "hours": 21.3,
-              "lemons": 9114
+              "hours": 22.3,
+              "lemons": 5860
             },
             {
               "road": "heal",
@@ -1215,19 +1460,19 @@
                 "stages": [
                   {
                     "from": 30,
-                    "to": 34,
-                    "mob": "Fire Boar",
-                    "map": "Warning Street : The Burnt Land V",
-                    "mapId": 10004115,
-                    "expHour": 70800
+                    "to": 32,
+                    "mob": "Jr. Necki",
+                    "map": "Warning Street : Dangerous Croko I",
+                    "mapId": 10003093,
+                    "expHour": 76700
                   },
                   {
-                    "from": 35,
+                    "from": 33,
                     "to": 40,
                     "mob": "Jr. Wraith",
                     "map": "Kerning City Subway : Line 2 <Area 1>",
                     "mapId": 10003066,
-                    "expHour": 121600
+                    "expHour": 102700
                   }
                 ],
                 "tryNext": {
@@ -1324,19 +1569,11 @@
                 "stages": [
                   {
                     "from": 30,
-                    "to": 31,
-                    "mob": "Fire Boar",
-                    "map": "Warning Street : The Burnt Land V",
-                    "mapId": 10004115,
-                    "expHour": 70800
-                  },
-                  {
-                    "from": 32,
                     "to": 39,
-                    "mob": "Jr. Wraith",
-                    "map": "Kerning City Subway : Line 2 <Area 1>",
-                    "mapId": 10003066,
-                    "expHour": 69600
+                    "mob": "Jr. Necki",
+                    "map": "Warning Street : Dangerous Croko I",
+                    "mapId": 10003093,
+                    "expHour": 76700
                   },
                   {
                     "from": 40,
@@ -1344,7 +1581,7 @@
                     "mob": "Zombie Lupin",
                     "map": "Hidden Street : Monkey Swamp III",
                     "mapId": 10003097,
-                    "expHour": 98600
+                    "expHour": 105000
                   }
                 ],
                 "tryNext": {
@@ -1442,14 +1679,22 @@
                 "stages": [
                   {
                     "from": 30,
-                    "to": 37,
-                    "mob": "Fire Boar",
-                    "map": "Warning Street : The Burnt Land V",
-                    "mapId": 10004115,
-                    "expHour": 70800
+                    "to": 32,
+                    "mob": "Jr. Necki",
+                    "map": "Warning Street : Dangerous Croko I",
+                    "mapId": 10003093,
+                    "expHour": 76700
                   },
                   {
-                    "from": 38,
+                    "from": 33,
+                    "to": 34,
+                    "mob": "Zombie Mushroom",
+                    "map": "Dungeon : Ant Tunnel III",
+                    "mapId": 10005062,
+                    "expHour": 93800
+                  },
+                  {
+                    "from": 35,
                     "to": 40,
                     "mob": "Jr. Wraith",
                     "map": "Kerning City Subway : Line 2 <Area 1>",
@@ -1727,8 +1972,8 @@
                   "cozy": 1491
                 }
               ],
-              "hours": 40.1,
-              "lemons": 21741
+              "hours": 40.9,
+              "lemons": 19987
             },
             {
               "road": "heal",
@@ -1857,7 +2102,7 @@
                     "mob": "Zombie Lupin",
                     "map": "Hidden Street : Monkey Swamp III",
                     "mapId": 10003097,
-                    "expHour": 104500
+                    "expHour": 105000
                   },
                   {
                     "from": 42,
@@ -1978,19 +2223,11 @@
                 "stages": [
                   {
                     "from": 40,
-                    "to": 41,
+                    "to": 45,
                     "mob": "Jr. Wraith",
                     "map": "Kerning City Subway : Line 2 <Area 1>",
                     "mapId": 10003066,
                     "expHour": 105600
-                  },
-                  {
-                    "from": 42,
-                    "to": 45,
-                    "mob": "Zombie Mushroom",
-                    "map": "Dungeon : Ant Tunnel III",
-                    "mapId": 10005062,
-                    "expHour": 110400
                   },
                   {
                     "from": 46,
@@ -2111,6 +2348,10 @@
         "cleric": "They part at 30, when Teleport first takes Teleport to 20 and Heal first takes Heal to 30."
       },
       "pick": {
+        "il": [
+          "beam",
+          "xbucc"
+        ],
         "cleric": [
           "heal",
           "arrow"
