@@ -26,8 +26,8 @@
               {
                 "id": "qchaos",
                 "name": "Fire Arrow, then Teleport",
-                "hours": 57.9,
-                "lemons": 33909
+                "hours": 56.9,
+                "lemons": 33284
               }
             ]
           },
@@ -38,22 +38,22 @@
             "line": "Ice holds monsters still and Lightning hits a crowd, so a crowded map goes fast.",
             "roads": [
               {
-                "id": "beam",
-                "name": "Beam first",
-                "hours": 57.5,
-                "lemons": 30251
-              },
-              {
                 "id": "xbucc",
                 "name": "Beam, then Meditation",
-                "hours": 57.5,
-                "lemons": 28423
+                "hours": 57.4,
+                "lemons": 28318
+              },
+              {
+                "id": "beam",
+                "name": "Beam first",
+                "hours": 58.5,
+                "lemons": 31466
               },
               {
                 "id": "qchaos",
                 "name": "Beam, then Teleport",
-                "hours": 59.5,
-                "lemons": 29633
+                "hours": 59.4,
+                "lemons": 29545
               }
             ]
           },
@@ -66,26 +66,26 @@
               {
                 "id": "heal",
                 "name": "Heal first",
-                "hours": 57,
-                "lemons": 31893
+                "hours": 56.9,
+                "lemons": 31888
               },
               {
                 "id": "arrow",
                 "name": "Holy Arrow first",
-                "hours": 59.5,
-                "lemons": 36756
-              },
-              {
-                "id": "teleport",
-                "name": "Teleport first",
-                "hours": 63.2,
-                "lemons": 25847
+                "hours": 59.4,
+                "lemons": 36580
               },
               {
                 "id": "meso",
                 "name": "Meso saver",
-                "hours": 63.4,
-                "lemons": 29188
+                "hours": 63,
+                "lemons": 31926
+              },
+              {
+                "id": "teleport",
+                "name": "Teleport first",
+                "hours": 63.6,
+                "lemons": 31645
               }
             ]
           }
@@ -109,7 +109,7 @@
                     "mob": "Jr. Necki",
                     "map": "Warning Street : Dangerous Croko I",
                     "mapId": 10003093,
-                    "expHour": 21200
+                    "expHour": 21800
                   }
                 ],
                 "tryNext": {
@@ -336,7 +336,7 @@
                     "mob": "Tortie",
                     "map": "Florina Road : Hot Sand",
                     "mapId": 10007040,
-                    "expHour": 102700
+                    "expHour": 104500
                   }
                 ],
                 "tryNext": {
@@ -413,7 +413,7 @@
                   "id": 1050012,
                   "name": "Blue Wizard Robe",
                   "level": 30,
-                  "cozy": null
+                  "cozy": 1107
                 },
                 {
                   "slot": "Gloves",
@@ -424,7 +424,7 @@
                 }
               ],
               "hours": 21.2,
-              "lemons": 9087
+              "lemons": 9063
             }
           ]
         },
@@ -447,19 +447,19 @@
                 "stages": [
                   {
                     "from": 40,
-                    "to": 43,
+                    "to": 42,
                     "mob": "Tortie",
                     "map": "Florina Road : Hot Sand",
                     "mapId": 10007040,
                     "expHour": 107400
                   },
                   {
-                    "from": 44,
+                    "from": 43,
                     "to": 46,
                     "mob": "Rafflesia",
                     "map": "Hidden Street : Hanging Gardens of Rot",
                     "mapId": 10006022,
-                    "expHour": 134600
+                    "expHour": 126300
                   },
                   {
                     "from": 47,
@@ -467,7 +467,7 @@
                     "mob": "Wraith",
                     "map": "Kerning City Subway : Line 2 <Area 3>",
                     "mapId": 10003068,
-                    "expHour": 142200
+                    "expHour": 142800
                   },
                   {
                     "from": 49,
@@ -475,7 +475,7 @@
                     "mob": "Croco",
                     "map": "Warning Street : Dangerous Croko II",
                     "mapId": 10003094,
-                    "expHour": 145200
+                    "expHour": 146400
                   }
                 ],
                 "tryNext": {
@@ -569,8 +569,8 @@
                   "cozy": 1491
                 }
               ],
-              "hours": 36.7,
-              "lemons": 24822
+              "hours": 35.7,
+              "lemons": 24221
             }
           ]
         },
@@ -598,7 +598,7 @@
                     "mob": "Zombie Mushroom",
                     "map": "Dungeon : Ant Tunnel III",
                     "mapId": 10005062,
-                    "expHour": 129200
+                    "expHour": 129800
                   }
                 ],
                 "tryNext": {
@@ -668,7 +668,7 @@
                   "id": 1050012,
                   "name": "Blue Wizard Robe",
                   "level": 30,
-                  "cozy": null
+                  "cozy": 1107
                 },
                 {
                   "slot": "Gloves",
@@ -678,8 +678,8 @@
                   "cozy": 1467
                 }
               ],
-              "hours": 21,
-              "lemons": 8213
+              "hours": 22,
+              "lemons": 9454
             },
             {
               "road": "qchaos",
@@ -784,7 +784,7 @@
                   "id": 1050012,
                   "name": "Blue Wizard Robe",
                   "level": 30,
-                  "cozy": null
+                  "cozy": 1107
                 },
                 {
                   "slot": "Gloves",
@@ -794,8 +794,8 @@
                   "cozy": 1467
                 }
               ],
-              "hours": 22.1,
-              "lemons": 9541
+              "hours": 22,
+              "lemons": 9447
             },
             {
               "road": "xbucc",
@@ -907,7 +907,7 @@
                   "id": 1050012,
                   "name": "Blue Wizard Robe",
                   "level": 30,
-                  "cozy": null
+                  "cozy": 1107
                 },
                 {
                   "slot": "Gloves",
@@ -918,7 +918,7 @@
                 }
               ],
               "hours": 22,
-              "lemons": 9462
+              "lemons": 9429
             }
           ]
         },
@@ -946,7 +946,7 @@
                     "mob": "Jr. Wraith",
                     "map": "Kerning City Subway : Line 2 <Area 1>",
                     "mapId": 10003066,
-                    "expHour": 170600
+                    "expHour": 171700
                   },
                   {
                     "from": 45,
@@ -954,7 +954,7 @@
                     "mob": "Wraith",
                     "map": "Kerning City Subway : Line 2 <Area 3>",
                     "mapId": 10003068,
-                    "expHour": 220700
+                    "expHour": 221300
                   }
                 ],
                 "tryNext": {
@@ -1035,7 +1035,7 @@
                 }
               ],
               "hours": 36.5,
-              "lemons": 22038
+              "lemons": 22012
             },
             {
               "road": "qchaos",
@@ -1051,27 +1051,11 @@
                 "stages": [
                   {
                     "from": 40,
-                    "to": 41,
-                    "mob": "Tortie",
-                    "map": "Florina Road : Hot Sand",
-                    "mapId": 10007040,
-                    "expHour": 98000
-                  },
-                  {
-                    "from": 42,
-                    "to": 43,
-                    "mob": "Fire Boar",
-                    "map": "Warning Street : The Burnt Land V",
-                    "mapId": 10004115,
-                    "expHour": 118000
-                  },
-                  {
-                    "from": 44,
                     "to": 46,
                     "mob": "Tortie",
                     "map": "Florina Road : Hot Sand",
                     "mapId": 10007040,
-                    "expHour": 125700
+                    "expHour": 100300
                   },
                   {
                     "from": 47,
@@ -1079,7 +1063,7 @@
                     "mob": "Wraith",
                     "map": "Kerning City Subway : Line 2 <Area 3>",
                     "mapId": 10003068,
-                    "expHour": 139300
+                    "expHour": 140500
                   },
                   {
                     "from": 50,
@@ -1087,7 +1071,7 @@
                     "mob": "Duskmander",
                     "map": "Shallow Passage : Forbidden Entrance",
                     "mapId": 10006080,
-                    "expHour": 155200
+                    "expHour": 155800
                   }
                 ],
                 "tryNext": {
@@ -1182,7 +1166,7 @@
                 }
               ],
               "hours": 37.4,
-              "lemons": 20092
+              "lemons": 20098
             },
             {
               "road": "xbucc",
@@ -1211,7 +1195,7 @@
                     "mob": "Wraith",
                     "map": "Kerning City Subway : Line 2 <Area 3>",
                     "mapId": 10003068,
-                    "expHour": 191800
+                    "expHour": 195900
                   }
                 ],
                 "tryNext": {
@@ -1305,8 +1289,8 @@
                   "cozy": 1491
                 }
               ],
-              "hours": 35.5,
-              "lemons": 18961
+              "hours": 35.4,
+              "lemons": 18889
             }
           ]
         },
@@ -1433,7 +1417,7 @@
                   "id": 1050012,
                   "name": "Blue Wizard Robe",
                   "level": 30,
-                  "cozy": null
+                  "cozy": 1107
                 },
                 {
                   "slot": "Gloves",
@@ -1542,7 +1526,7 @@
                   "id": 1050012,
                   "name": "Blue Wizard Robe",
                   "level": 30,
-                  "cozy": null
+                  "cozy": 1107
                 },
                 {
                   "slot": "Gloves",
@@ -1552,8 +1536,8 @@
                   "cozy": 1467
                 }
               ],
-              "hours": 20.3,
-              "lemons": 9634
+              "hours": 20.2,
+              "lemons": 9558
             },
             {
               "road": "arrow",
@@ -1651,7 +1635,7 @@
                   "id": 1050012,
                   "name": "Blue Wizard Robe",
                   "level": 30,
-                  "cozy": null
+                  "cozy": 1107
                 },
                 {
                   "slot": "Gloves",
@@ -1662,7 +1646,7 @@
                 }
               ],
               "hours": 20.7,
-              "lemons": 9359
+              "lemons": 9330
             },
             {
               "road": "meso",
@@ -1691,7 +1675,7 @@
                     "mob": "Zombie Mushroom",
                     "map": "Dungeon : Ant Tunnel III",
                     "mapId": 10005062,
-                    "expHour": 93800
+                    "expHour": 93200
                   },
                   {
                     "from": 35,
@@ -1846,7 +1830,7 @@
                   "id": 1050012,
                   "name": "Blue Wizard Robe",
                   "level": 30,
-                  "cozy": null
+                  "cozy": 1107
                 },
                 {
                   "slot": "Gloves",
@@ -1857,7 +1841,7 @@
                 }
               ],
               "hours": 21.2,
-              "lemons": 9089
+              "lemons": 9029
             }
           ]
         },
@@ -1892,7 +1876,7 @@
                     "mob": "Wraith",
                     "map": "Kerning City Subway : Line 2 <Area 3>",
                     "mapId": 10003068,
-                    "expHour": 134600
+                    "expHour": 131000
                   }
                 ],
                 "tryNext": {
@@ -1972,8 +1956,8 @@
                   "cozy": 1491
                 }
               ],
-              "hours": 40.9,
-              "lemons": 19987
+              "hours": 41.3,
+              "lemons": 25785
             },
             {
               "road": "heal",
@@ -2001,7 +1985,7 @@
                     "mob": "Wraith",
                     "map": "Kerning City Subway : Line 2 <Area 3>",
                     "mapId": 10003068,
-                    "expHour": 174700
+                    "expHour": 174100
                   }
                 ],
                 "tryNext": {
@@ -2082,7 +2066,7 @@
                 }
               ],
               "hours": 36.7,
-              "lemons": 22259
+              "lemons": 22330
             },
             {
               "road": "arrow",
@@ -2110,7 +2094,7 @@
                     "mob": "Skeledog",
                     "map": "Victoria Road : Remains <Tomb> I",
                     "mapId": 10004134,
-                    "expHour": 115700
+                    "expHour": 116900
                   },
                   {
                     "from": 45,
@@ -2118,7 +2102,7 @@
                     "mob": "Wraith",
                     "map": "Kerning City Subway : Line 2 <Area 3>",
                     "mapId": 10003068,
-                    "expHour": 124500
+                    "expHour": 123300
                   }
                 ],
                 "tryNext": {
@@ -2205,8 +2189,8 @@
                   "cozy": 1491
                 }
               ],
-              "hours": 38.8,
-              "lemons": 27397
+              "hours": 38.7,
+              "lemons": 27250
             },
             {
               "road": "meso",
@@ -2227,7 +2211,7 @@
                     "mob": "Jr. Wraith",
                     "map": "Kerning City Subway : Line 2 <Area 1>",
                     "mapId": 10003066,
-                    "expHour": 105600
+                    "expHour": 106200
                   },
                   {
                     "from": 46,
@@ -2235,7 +2219,7 @@
                     "mob": "Wraith",
                     "map": "Kerning City Subway : Line 2 <Area 3>",
                     "mapId": 10003068,
-                    "expHour": 115100
+                    "expHour": 115700
                   }
                 ],
                 "tryNext": {
@@ -2336,8 +2320,8 @@
                   "cozy": 1491
                 }
               ],
-              "hours": 42.2,
-              "lemons": 20099
+              "hours": 41.8,
+              "lemons": 22897
             }
           ]
         }
@@ -2349,8 +2333,8 @@
       },
       "pick": {
         "il": [
-          "beam",
-          "xbucc"
+          "xbucc",
+          "beam"
         ],
         "cleric": [
           "heal",
