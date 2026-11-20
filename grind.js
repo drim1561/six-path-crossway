@@ -75,7 +75,7 @@ const plural = name => /s$|^meat$/i.test(name) ? name : name + 's';
 // current run of misses began (null while it works). meso: { at, unclear }: the last inventory look.
 // Returns four checks (ok green, wait amber, bad red), the one thing to do (most important first) and stuck, which lights
 // up Find my game again. Red is kept for what breaks the core numbers; mesos only ever ask.
-const STUCK_MS = 30000, STALE_MS = 15 * 60000;
+const STUCK_MS = 30000, STALE_MS = 15 * 60000, NO_GAME_TICKS = 20;
 function health(f) {
   const t = f.t, ago = at => { const m = Math.floor((t - at) / 60000); return m < 1 ? 'just now' : m + ' min ago'; };
   const stuckOn = r => !!(r && r.fail != null && t - r.fail >= STUCK_MS);
@@ -97,6 +97,9 @@ function health(f) {
   // f.stopped: the player pressed Stop, so in the app the game wasn't lost
   if (!f.sharing) return app ? (!f.hasSession ? say('idle', 'Press Start', 'Press Start to begin') : f.stopped ? say('idle', 'Stopped', 'Stopped. Press Start to carry on') : say('idle', 'Lost the game', 'Lost the game window. Press Start to carry on'))
     : f.hasSession ? say('idle', 'Share stopped', 'Share stopped. Share the game window again to carry on') : say('idle', 'Not sharing yet', 'Share the game window to start');
+  // f.noGame: a share in a browser has gone many frames without ever finding the game's bar, so it is most likely the wrong window
+  // (this page, the browser) or a full screen game the window list can't offer; reshare opens the picker again
+  if (f.noGame && !app) return say('bad', "Can't find MapleStory", "Grind can't find MapleStory in what you shared. Pick the game window itself, or Entire Screen if the game is full screen. Firefox often can't do this: try Edge or Chrome, or the EXP Tracker app", { reshare: true });
   if (C.exp.state === 'bad') return say('bad', "Can't see EXP bar", app ? "Can't see your EXP bar, paused. Is the game open, with the bar showing?" : "Can't see your EXP bar, paused. Is the game still shared, with the bar showing?");
   if (stuckOn(f.size)) return say('bad', "Can't measure game", app ? "Can't measure the game. Is it minimized, or very small?" : "Can't measure the game. Share the game window itself, at full size");
   if (C.potions.state === 'bad') return say('bad', "Can't read quickslots", app ? "Can't read your quickslot numbers. Make the game window bigger, or press Find my game again" : "Can't read your quickslot numbers. Make the game window bigger, or share it again");
@@ -409,7 +412,10 @@ function mount(root, deps) {
   V.nudge = el('div', { class: 'g-nudge idle', id: 'g-nudge', hidden: '' }, toStart);
   // a check that matters is failing: its words and Find my game again at the end, in place of the old chips (the lantern goes red with it)
   V.problemText = el('span', {});
-  V.problem = el('div', { class: 'g-problem', id: 'g-problem', hidden: '' }, V.problemText, refindBtn);
+  // the wrong window or a full screen game: stop this share and open the picker again (inside the click, so the browser allows it)
+  const reshareBtn = btn('g-reshare', 'pop', 'Share again', () => { capture.stop(); const b = shareArea.querySelector('#g-share'); if (b) b.click(); });
+  reshareBtn.classList.add('sm'); reshareBtn.hidden = true;
+  V.problem = el('div', { class: 'g-problem', id: 'g-problem', hidden: '' }, V.problemText, reshareBtn, refindBtn);
   // a big jump between peeks: a trade or a big buy isn't grinding, so it asks (a rise is likely loot sold to someone,
   // so Keep it comes first; a drop, something bought, so Leave it out does)
   V.tradeQ = el('span', {});
@@ -1040,8 +1046,10 @@ function mount(root, deps) {
       st.line = S.findExpLine(src, w, h); st.m = null; st.measureAt = 0; st.slotsHidden = false; st.barAt = 0;
       if (!st.line) {
         if (!st.probeAt || Date.now() - st.probeAt > 15000) { st.probeAt = Date.now(); try { st.probe = S.greenProbe(src, w, h); } catch (e) { st.probe = null; } }   // for a report: why no bar
+        st.noLine = (st.noLine || 0) + 1;
         mark('exp', false); setCheck('exp', 'fix', 'Make sure the bar at the bottom of the game is showing'); render(); return; }
     }
+    st.noLine = 0;
     const exp = S.readExp(src, st.line);
     mark('exp', exp.ok);
     if (exp.ok) {
@@ -1560,7 +1568,7 @@ function mount(root, deps) {
      the pop out's tiles) ----- */
   function renderHealth() {
     const s = session;
-    const h = lastHealth = health({ t: Date.now(), app: !!app, sharing: st.sharing, stopped: !!st.stopped, hasSession: !!s, exp: st.h.exp, level: st.h.level, levelNow: st.level,
+    const h = lastHealth = health({ t: Date.now(), app: !!app, sharing: st.sharing, stopped: !!st.stopped, hasSession: !!s, noGame: !st.reads && (st.noLine || 0) >= NO_GAME_TICKS, exp: st.h.exp, level: st.h.level, levelNow: st.level,
       size: st.h.size, counts: st.h.counts, potNone: st.potNone, potCount: st.potCount, slotsHidden: !!st.slotsHidden, killed: !!s && (s.gainExp > 0 || s.gainPct > 0),
       meso: { at: s && s.meso && s.meso.last ? s.meso.last.t : null, unclear: !!(st.mesoOpen && st.mesoUnclear) },
       loot: { on: lootOn, pictures: lootReady, started: !!(s && s.bag && s.bag.startT),
@@ -1579,6 +1587,7 @@ function mount(root, deps) {
     V.nudge.hidden = !!viewing || problem || h.nudge.state === 'ok' || (h.nudge.state === 'idle' && !s);
     V.problem.hidden = !!viewing || !problem;
     if (V.problemText.textContent !== h.nudge.text) V.problemText.textContent = h.nudge.text;
+    reshareBtn.hidden = !h.nudge.reshare; refindBtn.hidden = !!h.nudge.reshare;
     if (problem && window.track && window.__prob !== h.nudge.text) { window.__prob = h.nudge.text; window.track('reading_problem', { text: String(h.nudge.text).slice(0, 60), app: app ? 1 : 0 }); }
     V.nudge.className = 'g-nudge ' + h.nudge.state; V.nudge.textContent = h.nudge.text;   // the lantern and the band carry the state, so no sign here
     // an app older than this page: that comes first, with where to get the new one
