@@ -158,7 +158,9 @@ body.testing-off #testing, body.testing-off .testing-only { display: none; }
 .topbar .logo { --f1: color-mix(in srgb, color-mix(in srgb, var(--face-lo) 22%, var(--face)) 92%, transparent); }
 .topbar .logo::before { left: 20px; right: 20px; top: -8px; }
 .logo b { font-weight: inherit; }
-.tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 0 14px auto; padding: 4px; border-radius: var(--r-pill); background-color: var(--surface); box-shadow: 0 0 0 2px var(--wood-o), inset 0 0 0 1px var(--mint-line); }
+/* the tabs take a line of their own under the logo (seven no longer fit beside it and Sign in), the logo and Sign in share the first */
+.topbar .in::after { content: ""; order: 2; flex-basis: 100%; height: 0; }
+.tabs { order: 3; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 0 14px; padding: 4px; border-radius: var(--r-pill); background-color: var(--surface); box-shadow: 0 0 0 2px var(--wood-o), inset 0 0 0 1px var(--mint-line); }
 .tabs button { display: flex; align-items: center; height: 34px; margin: 0; padding: 0 12px; background: none; background-color: var(--card); box-shadow: inset 0 0 0 1px var(--card-o); border: 0; border-radius: var(--r-pill); color: var(--ink); font: 700 var(--fs-md)/1 var(--font-body); white-space: nowrap; cursor: pointer; }
 .tabs button:hover { color: var(--num); box-shadow: inset 0 0 0 1px var(--mint-line); }
 .tabs button[aria-selected="true"], .tabs button[aria-selected="true"]:hover { background-color: var(--lime); color: var(--lime-ink); box-shadow: none; }
@@ -168,7 +170,7 @@ body.testing-off #testing, body.testing-off .testing-only { display: none; }
 body.appraiser-off #tab-appraiser, body.appraiser-off #tab-appraiser:hover, body.guides-off #tab-guides, body.guides-off #tab-guides:hover, body.path-off #tab-builds, body.path-off #tab-builds:hover { padding: 0 2px; background-color: transparent; color: var(--credit); box-shadow: none; }
 body.guides-off #tab-guides, body.path-off #tab-builds { cursor: default; }
 body.appraiser-off #tab-appraiser .soon, body.guides-off #tab-guides .soon, body.path-off #tab-builds .soon { display: inline-block; margin-left: 5px; padding: 0 5px; border-radius: var(--r-pill); background-color: var(--pill); color: var(--pill-ink); font: 700 var(--fs-xs) var(--font-body); line-height: 18px; }
-.auth { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 20px; }
+.auth { order: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 20px auto; }
 .auth [hidden] { display: none; }
 .auth #who { padding: 2px 10px; border-radius: var(--r-pill); background-color: var(--surface); box-shadow: 0 0 0 2px var(--wood-o); color: var(--ink); font-size: var(--fs-sm); }
 /* the credit: quiet, small, centered, under every tab, on a faint glass strip because the night scene behind it is too bright for 4.5 to 1 on its own; the pop-out and the app's windows show none */
@@ -526,7 +528,7 @@ body.g-pip .credit, body.g-ov .credit, body.g-setwin .credit { display: none; }
 
 /* Grind tab (grind.js) */
 /* the tester link (?only=grind): just the Grind tab */
-body.only-grind #tab-timer, body.only-grind #tab-builds, body.only-grind #tab-guides, body.only-grind #tab-appraiser { display: none; }
+body.only-grind #tab-timer, body.only-grind #tab-builds, body.only-grind #tab-guides, body.only-grind #tab-appraiser, body.only-grind #tab-boxes, body.only-grind #tab-recipes { display: none; }
 /* the Timer is off for now (window.BT_TIMER turns it on): its tab and its parts of How it works go */
 body.timer-off #tab-timer, body.timer-off .timer-only { display: none; }
 /* the Appraiser is closed while it gets its new look (window.BT_APPRAISER turns it on): its sign fades, its view is one
@@ -538,8 +540,8 @@ body.path-off .path-only, body.guides-off .guides-only, body.appraiser-off .appr
 .closed-text p { margin: 4px 0 12px; color: var(--muted); }
 .closed-text .k-btn { margin-top: 4px; }
 @media (max-width: 759px) { .closed-body { grid-template-columns: minmax(0, 1fr); } }
-/* the Windows app is only the Grind page, and is the app already: no tabs, no Get the app */
-body.in-app .tabs, body.in-app #g-getapp { display: none; }
+/* the Windows app has Grind, Box Odds and Recipes, and is the app already: no other tabs, no Get the app */
+body.in-app .tabs > :not(#tab-grind, #tab-boxes, #tab-recipes), body.in-app #g-getapp { display: none; }
 #view-grind [hidden] { display: none !important; }
 .g-lbl { font: 700 var(--fs-xs) var(--font-body); color: var(--muted); }
 .g-check { list-style: none; margin: 0; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); display: grid; gap: 6px; font-size: var(--fs-md); }
@@ -607,10 +609,10 @@ body.in-app .tabs, body.in-app #g-getapp { display: none; }
 #view-grind { --at-line: color-mix(in srgb, var(--card-o) 75%, transparent); }
 /* the pop-out's look on the whole Grind page (Rimmah, 2026-11-15): mossy stone buttons (the one amber main button stays), a soft
    round light with no pill, one faint line between rows where the dashes and dots were, no boxes, numbers in even columns */
-#view-grind :is(.k-btn:not(.key), .k-sq) { --face: var(--stone); --face-hi: var(--stone-hi); --face-lo: var(--stone-lo); --mossy: var(--stone-moss); color: var(--ink); }
-#view-grind :is(.k-btn:not(.key), .k-sq)[aria-pressed="true"] { --face: var(--lime); --face-hi: var(--lime-hi); --face-lo: var(--lime-lo); --mossy: var(--lime-hi); color: var(--lime-ink); }
-#view-grind :is(.k-btn:not(.key), .k-sq)::after { background-image: none; box-shadow: 0 var(--ledge) 0 var(--face-lo), 0 0 0 2px var(--wood-o), inset 0 3px 0 var(--mossy), inset 0 5px 0 color-mix(in srgb, var(--wood-o) 30%, transparent); }
-#view-grind :is(.k-btn:not(.key), .k-sq):hover::after { box-shadow: 0 var(--ledge) 0 var(--face-lo), 0 0 0 2px var(--wood-o), inset 0 3px 0 var(--mossy), inset 0 0 0 99px color-mix(in srgb, var(--face-hi) 28%, transparent); }
+:is(#view-grind, #view-boxes, #view-recipes) :is(.k-btn:not(.key), .k-sq) { --face: var(--stone); --face-hi: var(--stone-hi); --face-lo: var(--stone-lo); --mossy: var(--stone-moss); color: var(--ink); }
+:is(#view-grind, #view-boxes, #view-recipes) :is(.k-btn:not(.key), .k-sq)[aria-pressed="true"] { --face: var(--lime); --face-hi: var(--lime-hi); --face-lo: var(--lime-lo); --mossy: var(--lime-hi); color: var(--lime-ink); }
+:is(#view-grind, #view-boxes, #view-recipes) :is(.k-btn:not(.key), .k-sq)::after { background-image: none; box-shadow: 0 var(--ledge) 0 var(--face-lo), 0 0 0 2px var(--wood-o), inset 0 3px 0 var(--mossy), inset 0 5px 0 color-mix(in srgb, var(--wood-o) 30%, transparent); }
+:is(#view-grind, #view-boxes, #view-recipes) :is(.k-btn:not(.key), .k-sq):hover::after { box-shadow: 0 var(--ledge) 0 var(--face-lo), 0 0 0 2px var(--wood-o), inset 0 3px 0 var(--mossy), inset 0 0 0 99px color-mix(in srgb, var(--face-hi) 28%, transparent); }
 #view-grind .g-pill { --lamp: var(--lime); gap: 9px; padding: 3px 4px; background: none; box-shadow: none; color: var(--ink); }
 #view-grind .g-pill.wait { --lamp: var(--lamp-wait); } #view-grind .g-pill.bad { --lamp: var(--lamp-bad); } #view-grind .g-pill.off { --lamp: var(--lamp-idle); }
 #view-grind .g-pill::before { width: 10px; height: 10px; opacity: 1; animation: none; background-color: var(--lamp); box-shadow: inset 2px 2px 4px var(--lamp-hi), 0 0 4px var(--lamp), 0 0 14px 4px color-mix(in srgb, var(--lamp) 40%, transparent); }
@@ -1643,6 +1645,174 @@ a.cozy:hover { border-color: var(--muted); }
 
 /* How it works: the frameless page. One 720 column straight on the forest, each section a stop on a dotted trail, and
    the reading text is Cabin 400 (names, labels and buttons stay 600 or 700) */
+/* Box Odds (#boxes, box.js): frameless on the forest like How it works, a 720 column; rows are ring, name, number and one
+   faint --at-line under each, no list box; the sum card keeps a surface so its numbers read over the scene */
+#view-boxes { max-width: 720px; width: calc(100% - 2 * var(--gap)); margin: 28px auto 40px; padding: 0; }
+#view-boxes .bx { display: grid; gap: var(--gap); min-width: 0; }
+#view-boxes .bx-top { display: grid; gap: 4px; }
+#view-boxes h2 { margin: 0; font: 400 var(--tt-logo) / 1.15 var(--font-title); color: var(--ink); }
+#view-boxes .bx-top p { margin: 0; color: var(--muted); font-size: var(--fs-md); }
+#view-boxes .bx-crates { display: flex; gap: 8px; overflow-x: auto; padding: 4px 2px 8px; scrollbar-width: thin; }
+#view-boxes .bx-crate { flex: 0 0 auto; display: grid; grid-template-columns: 32px auto; grid-template-rows: auto auto; column-gap: 8px; row-gap: 2px; align-items: center; justify-items: start; padding: 6px 12px calc(6px + 3px); text-align: left; }
+#view-boxes .bx-crate img { grid-row: 1 / 3; image-rendering: pixelated; }
+#view-boxes .bx-crate .c-name { font: 700 var(--fs-sm) var(--font-body); }
+#view-boxes .bx-chip { font: 600 var(--fs-xs) var(--font-body); color: var(--muted); }
+#view-boxes .bx-crate[aria-pressed="true"] .bx-chip { color: inherit; }
+#view-boxes .bx-chip.on::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 5px; border-radius: 50%; background: var(--lime); vertical-align: 1px; }
+#view-boxes .bx-info { display: grid; gap: 2px; }
+#view-boxes .bx-info h3 { margin: 0; font: 400 var(--tt-m) var(--font-title); color: var(--ink); }
+#view-boxes .bx-info .meta, #view-boxes .bx-info .worth { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
+#view-boxes .bx-info .worth b { font: 600 var(--n-s) var(--font-num); color: var(--num); }
+#view-boxes a { color: var(--focus); text-decoration: underline; }
+#view-boxes .bx-logbar { display: flex; align-items: center; justify-content: space-between; gap: var(--gap); padding-bottom: 8px; border-bottom: 1px solid var(--at-line); color: var(--ink); }
+#view-boxes .bx-logbar[hidden] { display: none; }
+#view-boxes .bx-note { margin: 0; color: var(--ink); font-size: var(--fs-sm); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+#view-boxes .bx-note:empty { display: none; }
+#view-boxes .bx-linkish { border: 0; padding: 0; background: none; color: var(--focus); text-decoration: underline; cursor: pointer; font: 600 var(--fs-sm) var(--font-body); }
+#view-boxes .bx-linkish:disabled { color: var(--credit); text-decoration: none; cursor: default; }
+#view-boxes .bx-sum { position: sticky; top: 8px; z-index: 2; display: grid; gap: var(--gap); padding: 14px 16px; border-radius: var(--r-glass); background: var(--surface); border: 2px solid var(--card-o); }
+#view-boxes .bx-sum .hint, #view-boxes .bx-sum .note { margin: 0; color: var(--muted); }
+#view-boxes .bx-sum h4 { margin: 0; font: 400 var(--tt-s) var(--font-title); color: var(--ink); }
+#view-boxes .bx-sum .block { display: grid; gap: 8px; }
+#view-boxes .bx-sum .head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+#view-boxes .bx-sum .odds { color: var(--muted); font-size: var(--fs-sm); }
+#view-boxes .bx-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+#view-boxes .bx-tile { display: grid; gap: 2px; padding: 8px 10px; border-radius: var(--r-card); background: var(--card); }
+#view-boxes .bx-tile b { font: 600 var(--n-m) var(--font-num); color: var(--num); }
+#view-boxes .bx-tile span { color: var(--muted); font-size: var(--fs-xs); }
+#view-boxes .bx-tools { display: grid; gap: 8px; }
+#view-boxes .bx-bar-row { display: flex; align-items: center; justify-content: space-between; gap: var(--gap); flex-wrap: wrap; }
+#view-boxes .bx-pills { display: flex; gap: 8px; }
+#view-boxes .bx-filters { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 8px; }
+#view-boxes .bx-filters select, #view-boxes .bx-filters input { min-width: 0; padding: 7px 10px; border-radius: var(--r-card); border: 2px solid var(--card-o); background: var(--card); color: var(--ink); font: 600 var(--fs-sm) var(--font-body); }
+#view-boxes .bx-filters select option { background: var(--page); color: var(--ink); }
+#view-boxes .bx-list { display: grid; }
+#view-boxes .bx-row { display: grid; grid-template-columns: 22px 32px 1fr auto 40px; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--at-line); cursor: pointer; }
+#view-boxes .bx-row input { width: 18px; height: 18px; margin: 0; accent-color: var(--lime); }
+#view-boxes .bx-row img { image-rendering: pixelated; }
+#view-boxes .bx-row .mid { display: grid; gap: 2px; min-width: 0; }
+#view-boxes .bx-row .line { display: flex; align-items: center; gap: 8px; min-width: 0; }
+#view-boxes .bx-row .name { font: 700 var(--fs-md) var(--font-body); color: var(--ink); cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#view-boxes .bx-row .slot { color: var(--muted); font-size: var(--fs-sm); }
+#view-boxes .bx-row .slot .fm { font: 600 var(--fs-sm) var(--font-num); color: var(--num); }
+#view-boxes .bx-row .got { flex: none; padding: 0 7px; border-radius: var(--r-pill); background: var(--lime); color: var(--lime-ink); font: 700 var(--fs-xs) var(--font-body); line-height: 20px; }
+#view-boxes .bx-row .num { display: grid; justify-items: end; font: 600 var(--n-s) var(--font-num); color: var(--num); }
+#view-boxes .bx-row .num small { font: 600 var(--fs-xs) var(--font-body); color: var(--muted); }
+#view-boxes .bx-row.on .name { color: var(--lime); }
+#view-boxes .bx-got.k-sq { width: 40px; height: 40px; font: 700 var(--fs-lg) var(--font-num); }
+#view-boxes .bx-got:disabled { opacity: .45; cursor: default; }
+#view-boxes .bx-empty { margin: 0; color: var(--muted); }
+#view-boxes .bx-empty[hidden] { display: none; }
+#view-boxes .bx-foot { margin: 0; color: var(--credit); font-size: var(--fs-xs); }
+#view-boxes .bx-foot a { color: inherit; }
+/* Recipes (#recipes, recipes.js): frameless on the forest, a 1120 column. List (one line a recipe, the open one's panel
+   right under it) or Shelf (a picture grid with the open recipe in a sticky column beside it); word tabs for the view,
+   the craft and the level; rows are one faint --at-line under each, no boxes; profit lime when up, --bad when down. */
+#view-recipes { max-width: 1120px; width: calc(100% - 2 * var(--gap)); margin: 28px auto 40px; padding: 0; }
+#view-recipes .rc { display: grid; gap: var(--gap); min-width: 0; }
+#view-recipes .rc-top { display: grid; gap: 4px; }
+#view-recipes h2 { margin: 0; font: 400 var(--tt-logo) / 1.15 var(--font-title); color: var(--ink); }
+#view-recipes .rc-top p { margin: 0; color: var(--muted); font-size: var(--fs-md); max-width: 720px; }
+#view-recipes .rc-top b, #view-recipes .rc-count b { font: 600 var(--n-s) var(--font-num); color: var(--num); }
+#view-recipes a { color: var(--focus); text-decoration: underline; }
+#view-recipes [hidden] { display: none !important; }
+#view-recipes .rc-find { position: relative; display: flex; gap: 8px; align-items: center; max-width: 520px; }
+#view-recipes #rc-q { flex: 1; min-width: 0; padding: 9px 12px; border-radius: var(--r-card); border: 2px solid var(--card-o); background: var(--card); color: var(--ink); font: 600 var(--fs-md) var(--font-body); }
+#view-recipes #rc-q::placeholder { color: var(--muted); }
+#view-recipes #rc-sug { position: absolute; z-index: 5; top: calc(100% + 4px); left: 0; right: 0; margin: 0; padding: 4px; list-style: none; border-radius: var(--r-card); background: var(--surface); border: 2px solid var(--card-o); }
+#view-recipes #rc-sug li { display: grid; grid-template-columns: 32px 1fr auto; align-items: center; gap: 10px; padding: 6px 8px; border-radius: var(--r-card); cursor: pointer; }
+#view-recipes #rc-sug li[aria-selected="true"], #view-recipes #rc-sug li:hover { background: var(--card); }
+#view-recipes #rc-sug .sn { font: 700 var(--fs-sm) var(--font-body); color: var(--ink); }
+#view-recipes #rc-sug small { color: var(--muted); font-size: var(--fs-xs); }
+#view-recipes .rc-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--gap); flex-wrap: wrap; }
+#view-recipes .rc-pills { display: flex; gap: 8px; }
+#view-recipes .words { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+#view-recipes .words button { border: 0; padding: 2px 0 4px; background: none; color: var(--muted); cursor: pointer; font: 600 var(--fs-sm) var(--font-body); border-bottom: 2px solid transparent; }
+#view-recipes .words button:hover { color: var(--ink); }
+#view-recipes .words button[aria-pressed="true"] { color: var(--lime); border-bottom-color: var(--lime); }
+#view-recipes #rc-views button { font: 400 var(--tt-s) var(--font-title); }
+#view-recipes .rc-count { margin: 0; color: var(--ink); font-size: var(--fs-sm); }
+#view-recipes .rc-foot { margin: 0; color: var(--credit); font-size: var(--fs-xs); }
+#view-recipes .rc-foot a { color: inherit; }
+#view-recipes .rc-empty, #view-recipes .rc-hint, #view-recipes .rc-note { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
+#view-recipes img { image-rendering: pixelated; }
+#view-recipes .ic { display: grid; place-items: center; min-width: 32px; }
+#view-recipes .up { color: var(--lime); }
+#view-recipes .down { color: var(--bad); }
+#view-recipes .none { color: var(--muted); }
+/* List */
+#view-recipes .rc-led { display: grid; }
+#view-recipes .rc-hd, #view-recipes .rc-row { display: grid; grid-template-columns: 36px minmax(160px, 1.1fr) 2fr 84px 120px 84px; align-items: center; gap: 12px; padding: 8px 0; border: 0; border-bottom: 1px solid var(--at-line); background: transparent; }
+#view-recipes .rc-hd { padding-top: 0; color: var(--muted); font: 600 var(--fs-xs) var(--font-body); }
+#view-recipes .rc-hd span:nth-child(n+4) { text-align: right; }
+#view-recipes .rc-row { cursor: pointer; }
+#view-recipes .rc-row:hover .rc-open b { color: var(--lime); }
+#view-recipes .rc-row .nm { display: grid; gap: 1px; min-width: 0; }
+#view-recipes .rc-open { border: 0; padding: 0; background: none; text-align: left; cursor: pointer; min-width: 0; }
+#view-recipes .rc-open b { display: block; font: 700 var(--fs-md) var(--font-body); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#view-recipes .rc-open[aria-expanded="true"] b { color: var(--lime); }
+#view-recipes .rc-row small { color: var(--muted); font: 600 var(--fs-xs) var(--font-body); }
+#view-recipes .rc-row .ms { display: flex; flex-wrap: wrap; gap: 2px 14px; min-width: 0; color: var(--ink); font-size: var(--fs-sm); }
+#view-recipes .rc-row .m { display: inline-flex; align-items: center; gap: 4px; }
+#view-recipes .rc-row .m img { max-height: 20px; width: auto; }
+#view-recipes .rc-row .m i { font: 600 var(--fs-xs) var(--font-num); font-style: normal; color: var(--muted); }
+#view-recipes .rc-row .n { display: grid; justify-items: end; text-align: right; font: 600 var(--n-s) var(--font-num); color: var(--num); }
+#view-recipes .rc-row .n a { color: var(--num); text-decoration: none; }
+#view-recipes .rc-row .n a:hover { text-decoration: underline; }
+#view-recipes .rc-row .pf.up { color: var(--lime); }
+#view-recipes .rc-row .pf.down { color: var(--bad); }
+#view-recipes .rc-lvbar { display: flex; align-items: baseline; gap: 12px; padding: 18px 0 6px; border-bottom: 1px solid var(--at-line); }
+#view-recipes .rc-lvbar h3 { margin: 0; font: 400 var(--tt-m) var(--font-title); color: var(--ink); }
+#view-recipes .rc-lvbar .tag { padding: 0 8px; border-radius: var(--r-pill); background: var(--card); color: var(--muted); font: 600 var(--fs-xs) var(--font-body); line-height: 20px; }
+#view-recipes .rc-lvbar .n { margin-left: auto; color: var(--muted); font-size: var(--fs-xs); }
+/* the open recipe */
+#view-recipes .rc-panel { display: grid; gap: 10px; padding: 14px 16px; border-radius: var(--r-glass); background: var(--surface); border: 2px solid var(--card-o); color: var(--ink); cursor: default; }
+#view-recipes .rc-led .rc-panel { margin: 8px 0 12px 48px; max-width: 520px; }
+#view-recipes .rc-panel .ph { display: flex; align-items: center; gap: 12px; }
+#view-recipes .rc-panel .well { display: grid; place-items: center; width: 72px; height: 72px; flex: none; border-radius: var(--r-card); background: var(--card); }
+#view-recipes .rc-panel h4 { margin: 0; font: 400 var(--tt-m) var(--font-title); color: var(--ink); }
+#view-recipes .rc-panel .meta, #view-recipes .rc-panel .stats, #view-recipes .rc-panel .pf-foot { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
+#view-recipes .rc-panel .stats b { font: 600 var(--fs-sm) var(--font-num); color: var(--num); }
+#view-recipes .rc-panel .big { margin: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; color: var(--muted); font-size: var(--fs-sm); }
+#view-recipes .rc-panel .big b { font: 600 var(--n-m) var(--font-num); }
+#view-recipes .rc-panel .rows { display: grid; }
+#view-recipes .rc-mat, #view-recipes .rc-panel .line { display: grid; grid-template-columns: 32px 1fr auto; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--at-line); }
+#view-recipes .rc-mat button { border: 0; padding: 0; background: none; color: var(--focus); text-decoration: underline; text-align: left; cursor: pointer; font: 600 var(--fs-sm) var(--font-body); }
+#view-recipes .rc-panel .v { display: grid; justify-items: end; font: 600 var(--n-s) var(--font-num); color: var(--num); }
+#view-recipes .rc-panel .v a { color: var(--num); }
+#view-recipes .rc-panel small { color: var(--muted); font: 600 var(--fs-xs) var(--font-body); }
+#view-recipes .rc-panel .line > span:nth-child(2) { display: grid; font-size: var(--fs-sm); }
+#view-recipes .rc-panel .line.sum > span:nth-child(2) { font-weight: 700; }
+/* Shelf */
+#view-recipes .rc-shelf { display: grid; grid-template-columns: 1fr 340px; gap: 20px; align-items: start; }
+#view-recipes .rc-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; align-content: start; }
+#view-recipes .rc-gh { grid-column: 1 / -1; }
+#view-recipes .rc-gh:first-child .rc-lvbar { padding-top: 0; }
+#view-recipes .rc-tile { display: grid; justify-items: center; align-content: start; gap: 4px; padding: 10px 6px; border-radius: var(--r-card); border: 2px solid transparent; background: var(--card); color: var(--ink); cursor: pointer; font: 600 var(--fs-xs) var(--font-body); text-align: center; }
+#view-recipes .rc-tile .ic { height: 48px; }
+#view-recipes .rc-tile .tn { min-height: 2.4em; line-height: 1.2; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+#view-recipes .rc-tile b { font: 600 var(--n-s) var(--font-num); }
+#view-recipes .rc-tile:hover { border-color: var(--card-o); }
+#view-recipes .rc-tile[aria-pressed="true"] { border-color: var(--lime); }
+#view-recipes .rc-shelf > .rc-panel, #view-recipes .rc-shelf > .rc-hint { position: sticky; top: 8px; }
+/* Level up */
+#view-recipes .rc-lu { display: grid; }
+#view-recipes .rc-luh { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 18px 0 6px; border-bottom: 1px solid var(--at-line); }
+#view-recipes .rc-lu:first-child .rc-luh { padding-top: 0; }
+#view-recipes .rc-luh h3 { margin: 0; font: 400 var(--tt-m) var(--font-title); color: var(--ink); }
+#view-recipes .rc-luh .n { color: var(--muted); font-size: var(--fs-sm); }
+#view-recipes .rc-luh .n b { font: 600 var(--n-s) var(--font-num); color: var(--num); }
+#view-recipes .rc-luh .n b.up { color: var(--lime); }
+#view-recipes .rc-lr { display: grid; grid-template-columns: 64px 36px 1fr 110px; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--at-line); }
+#view-recipes .rc-lr .lr-l { color: var(--muted); font: 600 var(--fs-sm) var(--font-num); }
+#view-recipes .lr-m { display: grid; gap: 1px; min-width: 0; color: var(--ink); font-size: var(--fs-sm); }
+#view-recipes .lr-m button { border: 0; padding: 0; background: none; color: var(--ink); cursor: pointer; text-decoration: underline; font: 700 var(--fs-md) var(--font-body); }
+#view-recipes .lr-m b { font: 600 var(--n-s) var(--font-num); color: var(--num); }
+#view-recipes .lr-m small { color: var(--muted); font-size: var(--fs-xs); }
+#view-recipes .lr-n { display: grid; justify-items: end; font: 600 var(--n-s) var(--font-num); color: var(--num); }
+#view-recipes .lr-n.up { color: var(--lime); }
+#view-recipes .lr-n small { color: var(--muted); font: 600 var(--fs-xs) var(--font-body); }
+#view-recipes .rc-note { padding-top: 6px; max-width: 760px; }
 #view-how { --how-gap: 40px; max-width: 720px; width: calc(100% - 2 * var(--gap)); margin: 28px auto var(--how-gap); padding: 0; font-weight: 400; line-height: 1.55; }
 .how-page, .how-hero { display: grid; min-width: 0; }
 .how-page { gap: var(--how-gap); }
@@ -2011,6 +2181,8 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
   <nav class="tabs" role="tablist" aria-label="Pages">
     <button id="tab-how" type="button" role="tab" aria-controls="view-how" aria-selected="true">How it works</button>
     <button id="tab-grind" type="button" role="tab" aria-controls="view-grind" aria-selected="false">Grind</button>
+    <button id="tab-boxes" type="button" role="tab" aria-controls="view-boxes" aria-selected="false">Box Odds</button>
+    <button id="tab-recipes" type="button" role="tab" aria-controls="view-recipes" aria-selected="false">Recipes</button>
     <button id="tab-builds" type="button" role="tab" aria-controls="view-builds" aria-selected="false" aria-label="Your Path, soon">Your Path<span class="soon" aria-hidden="true">Soon</span></button>
     <button id="tab-guides" type="button" role="tab" aria-controls="view-guides" aria-selected="false" aria-label="Guides, soon">Guides<span class="soon" aria-hidden="true">Soon</span></button>
     <button id="tab-appraiser" type="button" role="tab" aria-controls="view-appraiser" aria-selected="false" aria-label="Appraiser, soon">Appraiser<span class="soon" aria-hidden="true">Soon</span></button>
@@ -2050,6 +2222,8 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
 <main id="view-builds" role="tabpanel" aria-labelledby="tab-builds" hidden>
   <div id="builds-root"><p class="empty">Loading the calculator...</p></div>
 </main>
+<main id="view-boxes" role="tabpanel" aria-labelledby="tab-boxes" hidden><div id="boxes-root"><p class="empty">Loading the crates...</p></div></main>
+<main id="view-recipes" role="tabpanel" aria-labelledby="tab-recipes" hidden><div id="recipes-root"><p class="empty">Loading the recipes...</p></div></main>
 <main id="view-guides" role="tabpanel" aria-labelledby="tab-guides" hidden>
   <div id="guides-root"><p class="empty">Loading the guide...</p></div>
 </main>
@@ -2199,6 +2373,11 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
   </ul>
   <p class="small">Damage math uses meowdb's Classic formulas. Weapons we haven't checked say Estimated.</p>
   </section>
+  <section id="how-also">
+  <h3>Also here</h3>
+  <p><a class="how-link" href="#boxes">Box Odds</a> shows every crate's odds and what each item sells for, and keeps a log of what you pull.</p>
+  <p><a class="how-link" href="#recipes">Recipes</a> has every crafting recipe with its materials, cost and what it sells for.</p>
+  </section>
   <div class="guides-only">
   <section>
   <h3>Guides</h3>
@@ -2244,7 +2423,7 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-19b',
+  version: '2026-11-19c',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
@@ -2539,6 +2718,16 @@ function makeSupabaseApi(cfg) {
       if (error && error.code !== '23505') throw new Error(error.message);
     },
     async removeQuestDone(buildId, questId) { check(await sb.from('quest_done').delete().eq('build_id', buildId).eq('quest_id', questId)); },
+    // Box Odds pull log: the player's own rows only (box-opens.sql), newest first, rows from to to (box.js pages through)
+    async listBoxOpens(from = 0, to = 999) {
+      const { data, error } = await sb.from('box_opens').select('id, crate, item_id, created_at').order('created_at', { ascending: false }).order('id', { ascending: false }).range(from, to);
+      if (error) throw new Error(error.message); return data;
+    },
+    async addBoxOpen(crate, itemId) {
+      const { data, error } = await sb.from('box_opens').insert({ crate, item_id: itemId }).select('id, crate, item_id, created_at').single();
+      if (error) throw new Error(error.message); return data;
+    },
+    async removeBoxOpen(id) { check(await sb.from('box_opens').delete().eq('id', id)); },
     // Appraiser: prices players report (the last 14 days, like Cozy) and the tab's daily estimates. The database stamps
     // who wrote each row itself, so nothing here sends or reads user_id.
     async listPriceReports(itemId) {
@@ -2879,6 +3068,7 @@ async function setSession(s) {
   if (window.Appraiser && window.Appraiser.refresh) window.Appraiser.refresh();
   // Grind's runs, record and All time are the player's: signing in or out anywhere on the page lists them again
   if (reporters.grind && reporters.grind.refresh) reporters.grind.refresh();
+  if (boxesView) boxesView.refresh(s);
 }
 
 async function send(channel, kind, at) {
@@ -2919,8 +3109,10 @@ const ONLY = 'bt.only';
   const q = new URLSearchParams(location.search).get('only');
   if (q === 'grind' || q === 'all') { store.set(ONLY, q === 'grind' ? 'grind' : ''); history.replaceState(null, '', location.pathname + location.hash); }
 }
-// the app is only the Grind page: the site's other tabs and their nav are hidden there (Builds and Appraiser open the browser)
-const onlyGrind = () => !!APP || store.get(ONLY) === 'grind';
+// the app has Grind, Box Odds and Recipes; the tester link has Grind alone; elsewhere every tab (null)
+const APP_TABS = ['grind', 'boxes', 'recipes'];
+const appTabs = () => APP ? APP_TABS : store.get(ONLY) === 'grind' ? ['grind'] : null;
+const onlyGrind = () => !APP && store.get(ONLY) === 'grind';
 document.body.classList.toggle('in-app', !!APP);
 document.body.classList.toggle('only-grind', onlyGrind());
 document.body.classList.toggle('timer-off', !TIMER_ON);
@@ -2937,8 +3129,9 @@ if (GUIDES_ON) { $('tab-guides').removeAttribute('aria-label'); $('tab-guides').
 function viewNow() {
   const how = /^#how(\/|$)/.test(location.hash);
   const view = how ? 'how' : { '#builds': PATH_ON ? 'builds' : 'how', '#appraiser': 'appraiser', '#grind': 'grind' }[location.hash]
-    || (GUIDES_ON && /^#guides(\/|$)/.test(location.hash) ? 'guides' : TIMER_ON ? 'timer' : 'how');
-  return onlyGrind() && !how ? 'grind' : view;
+    || (/^#boxes(\/|$)/.test(location.hash) ? 'boxes' : /^#recipes(\/|$)/.test(location.hash) ? 'recipes' : GUIDES_ON && /^#guides(\/|$)/.test(location.hash) ? 'guides' : TIMER_ON ? 'timer' : 'how');
+  const tabs = appTabs();
+  return tabs && !how && !tabs.includes(view) ? 'grind' : view;
 }
 // #how/<question> (Grind's browser line links #how/browser) opens that Not counting? question and brings it into view
 function openHowQuestion() {
@@ -2948,6 +3141,10 @@ function openHowQuestion() {
   requestAnimationFrame(() => q.scrollIntoView({ block: 'center' }));
 }
 // The guide's job from #guides/mage/<job>; anything else is Fire and Poison
+// The crate from #boxes/<key>; '' leaves the pick to box.js (the one remembered on this device)
+const boxesCrate = () => (location.hash.match(/^#boxes\/([\w-]+)/) || [])[1] || '';
+// The item from #recipes/<id>; null shows the whole book
+const recipesItem = () => { const m = location.hash.match(/^#recipes\/(\d+)$/); return m ? +m[1] : null; };
 const guidesJob = () => { const j = location.hash.split('/')[2]; return ['fp', 'il', 'cleric'].includes(j) ? j : 'fp'; };
 let lastViewSent = null;
 // Anonymous button counts (names only, never anything typed or read): one delegated listener so the tabs' own code stays untouched.
@@ -2964,7 +3161,7 @@ document.addEventListener('click', e => {
 }, true);
 function showView() {
   const view = viewNow();
-  for (const v of ['timer', 'builds', 'guides', 'appraiser', 'grind', 'how']) {
+  for (const v of ['timer', 'builds', 'guides', 'appraiser', 'grind', 'boxes', 'recipes', 'how']) {
     $('view-' + v).hidden = v !== view;
     if ($('tab-' + v)) $('tab-' + v).setAttribute('aria-selected', String(v === view));
   }
@@ -2976,6 +3173,8 @@ function showView() {
   if (view === 'guides') loadGuides().then(() => guidesView && guidesView.setJob(guidesJob()));
   if (view === 'appraiser' && APPRAISER_ON) loadAppraiser();
   if (view === 'grind') loadGrind();
+  if (view === 'boxes') loadBoxes().then(() => boxesView && boxesView.show(boxesCrate()));
+  if (view === 'recipes') loadRecipes().then(() => recipesView && recipesView.show(recipesItem()));
   if (view === 'how') openHowQuestion();
   // The stage has no size while hidden, so the sprite is sized again when it shows.
   if (view === 'timer' && sprite.lay) { placeSprite(); walk(); }
@@ -3012,6 +3211,42 @@ function loadGuides() {
     $('guides-root').replaceChildren(el('p', { class: 'empty' }, "The guide didn't load. Try reloading the page."));
   });
   return guidesLoading;
+}
+// box.js and data/box.json (npm run box:items) load the first time someone opens Box Odds. Picking a crate moves the
+// hash, so a crate can be linked; the pull log is the signed in player's box_opens rows (box-opens.sql).
+let boxesLoading = null, boxesView = null;
+function loadBoxes() {
+  if (boxesLoading) return boxesLoading;
+  const script = new Promise((resolve, reject) => {
+    document.head.append(el('script', { src: 'box.js', onload: resolve, onerror: () => reject(new Error('box.js')) }));
+  });
+  const data = fetch('data/box.json').then(r => { if (!r.ok) throw new Error('box.json'); return r.json(); });
+  boxesLoading = Promise.all([script, data]).then(([, d]) => {
+    boxesView = reporters.boxes = window.BoxOdds.mount($('boxes-root'), { el, store, api, data: d, session: state.session, signIn: () => signIn(), crate: boxesCrate(),
+      onCrate: key => { if (location.hash !== '#boxes/' + key) location.hash = '#boxes/' + key; } });
+  }).catch(() => {
+    boxesLoading = null; window.track('load_failed', { what: 'boxes' });
+    $('boxes-root').replaceChildren(el('p', { class: 'empty' }, "Box Odds didn't load. Try reloading the page."));
+  });
+  return boxesLoading;
+}
+// recipes.js and data/recipes.json (npm run craft:book) load the first time someone opens Recipes. Picking an item moves
+// the hash to #recipes/<id>, so an item can be linked; leaving it goes back to #recipes.
+let recipesLoading = null, recipesView = null;
+function loadRecipes() {
+  if (recipesLoading) return recipesLoading;
+  const script = new Promise((resolve, reject) => {
+    document.head.append(el('script', { src: 'recipes.js', onload: resolve, onerror: () => reject(new Error('recipes.js')) }));
+  });
+  const data = fetch('data/recipes.json').then(r => { if (!r.ok) throw new Error('recipes.json'); return r.json(); });
+  recipesLoading = Promise.all([script, data]).then(([, d]) => {
+    recipesView = reporters.recipes = window.Recipes.mount($('recipes-root'), { el, store, data: d, item: recipesItem(),
+      onItem: id => { const h = id == null ? '#recipes' : '#recipes/' + id; if (location.hash !== h) location.hash = h; } });
+  }).catch(() => {
+    recipesLoading = null; window.track('load_failed', { what: 'recipes' });
+    $('recipes-root').replaceChildren(el('p', { class: 'empty' }, "Recipes didn't load. Try reloading the page."));
+  });
+  return recipesLoading;
 }
 // Same for appraiser.js, its selling price engine (appraiser-price.js) and its data.
 let appraiserLoading = null;
@@ -3090,6 +3325,9 @@ $('flag').addEventListener('click', () => {
 });
 $('tab-appraiser').addEventListener('click', () => { if (location.hash !== '#appraiser') location.hash = '#appraiser'; });
 $('tab-grind').addEventListener('click', () => { if (location.hash !== '#grind') location.hash = '#grind'; });
+// already on a crate, the tab keeps it
+$('tab-boxes').addEventListener('click', () => { if (!/^#boxes(\/|$)/.test(location.hash)) location.hash = '#boxes'; });
+$('tab-recipes').addEventListener('click', () => { if (!/^#recipes(\/|$)/.test(location.hash)) location.hash = '#recipes'; });
 $('tab-how').addEventListener('click', () => { if (location.hash !== '#how') location.hash = '#how'; });
 $('tab-builds').addEventListener('click', () => { if (PATH_ON && location.hash !== '#builds') location.hash = '#builds'; });
 // already on a guide, the tab keeps its job
