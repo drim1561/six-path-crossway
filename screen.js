@@ -138,7 +138,13 @@ function findExpLine(src, fw, fh) {
   // brackets the exact green (Rimmah's shots, 2026-11-13), so HP's numbers were taken for the EXP line. EXP is the
   // rightmost of the row, so the looser green gets a look to the right of what the exact one found
   if (p) { p = pick(true, p.o.y0, p.c.x1) || p; p = pick(2, p.o.y0, p.c.x1) || p; }
-  else p = pick(true);
+  // with no exact pair, the looser greens each get the whole bottom and the lowest pair wins (the EXP line is the HUD's
+  // bottom row). kev's 1920x1080 window, 2026-11-20: the HUD drawn 1:1 leaves EXP's 1 px brackets a pale 160,185,130 that
+  // only the loosest green takes, while the loose one paired blades of grass far above the bar
+  else {
+    const a = pick(true), z = pick(2);
+    p = a && z ? (z.o.y0 > a.o.y0 + 2 ? z : a) : a || z;
+  }
   if (!p) return null;
   // one bracket alone to the right of the pair, on its row: the pair's "closing" bracket was really EXP's opening one.
   // With no exact pair, the looser green paired MP's ] with EXP's [ because EXP's ] had blended into the bar (Rimmah's
@@ -411,9 +417,12 @@ function levelIn(img, set, t0) {
 
 /* ---------- quickslot counts ---------- */
 
+// spots are seeded by the 8 and the 1, which a stretched (soft) digit of any shape fits. Drawn 1:1 the digits are crisp and
+// a 3, 5 or 7 fits neither at 0.6, so there every digit seeds (kev's 9, 356 and 357 at UI Size Ideal, 2026-11-20, swept 0.81
+// at 1:1 against 0.86 at 1.057, and 1.057 put every count one key to the left); the area is smallest there
 function roughSpots(img, set, min) {
   const spots = [];
-  for (const t of [set['8'], set['1']]) {
+  for (const t of (set['8'].w === raw.count['8'].width && set['8'].h === raw.count['8'].height ? DIGITS : ['8', '1']).map(d => set[d])) {
     for (let y = 0; y + t.h <= img.h; y++) for (let x = 0; x + t.w <= img.w; x++) {
       const sc = ncc(img, x, y, t); if (sc <= min) continue;
       const near = spots.find(p => Math.abs(p.x - x) < 4 && Math.abs(p.y - y) < 4);
