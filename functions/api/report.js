@@ -15,7 +15,7 @@ export const CAPS = { text: 1000, details: 200000, page: 2000000, popout: 100000
 // ip -> send times in the last hour. Per Cloudflare isolate, so it's best effort: enough to stop one person hammering Send.
 export const LIMITS = new Map();
 const HOUR = 3600000;
-const TABS = { timer: 'Timer tab', builds: 'Builds tab', appraiser: 'Appraiser tab', grind: 'Grind tab', how: 'How it works page' };
+const TABS = { timer: 'Timer tab', builds: 'Builds tab', appraiser: 'Appraiser tab', grind: 'Grind tab', how: 'How it works page', chat: 'Maple Chat' };
 const COLOR = { wrong: 0xE0525A, idea: 0x6CBF3F };
 const NAME = 'Six Path Crossway';
 const NO_PINGS = { parse: [] };   // nothing a reporter types can ping @everyone or anyone else
@@ -29,9 +29,12 @@ const SAY = {
   discord: "Couldn't reach Discord. Try again in a minute.",
 };
 
-// sixpathcrossway.pages.dev, its preview deploys, and the GitHub Pages copy
+// sixpathcrossway.pages.dev, its preview deploys, the GitHub Pages copy, and Maple Chat (chat-translator), a page its
+// own helper serves on the player's PC at exactly these two addresses
+const MAPLE_CHAT = ['http://localhost:47321', 'http://127.0.0.1:47321'];
 export function allowed(origin) {
   if (!origin) return false;
+  if (MAPLE_CHAT.includes(origin)) return true;
   let u;
   try { u = new URL(origin); } catch (e) { return false; }
   if (u.protocol !== 'https:' || u.origin !== origin) return false;
