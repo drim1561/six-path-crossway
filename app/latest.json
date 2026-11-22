@@ -1,0 +1,15 @@
+{
+  "version": "1.0.1",
+  "notes": "The app can see the game on Windows 10 and older Windows 11.",
+  "pub_date": "2026-11-22T07:55:59.975Z",
+  "platforms": {
+    "windows-x86_64-nsis": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSMHJGMVNjdnNQWUxZbjBOeTJSUnpvVGZmR3RVYkhFSks5ZGtvNmM1VXZBekgxUERnRy9iMU9pbjg3dVUyMUJYRUpFM0J3Vk0vdlRyeFlWVXNwUE9PR0lpKytvd3NYWmdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1MzM0MTU5CWZpbGU6U2l4UGF0aEVYUFRyYWNrZXJfMS4wLjFfeDY0LXNldHVwLmV4ZQl2ZXJzaW9uOjEuMC4xCllOOGlENG9mNTV5ak1HVWVibC9LRlZwY0xFWnRYNlpyVHRWY3dra2QrR1dmakFTYmpDK1A4aDJ5UWM1bzRGMFNxVUx4RjFUM1JsYkd4RFZwczFpNUNnPT0K",
+      "url": "https://sixpathcrossway.pages.dev/app/SixPathEXPTracker_1.0.1_x64-setup.exe"
+    },
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSMHJGMVNjdnNQWUxZbjBOeTJSUnpvVGZmR3RVYkhFSks5ZGtvNmM1VXZBekgxUERnRy9iMU9pbjg3dVUyMUJYRUpFM0J3Vk0vdlRyeFlWVXNwUE9PR0lpKytvd3NYWmdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1MzM0MTU5CWZpbGU6U2l4UGF0aEVYUFRyYWNrZXJfMS4wLjFfeDY0LXNldHVwLmV4ZQl2ZXJzaW9uOjEuMC4xCllOOGlENG9mNTV5ak1HVWVibC9LRlZwY0xFWnRYNlpyVHRWY3dra2QrR1dmakFTYmpDK1A4aDJ5UWM1bzRGMFNxVUx4RjFUM1JsYkd4RFZwczFpNUNnPT0K",
+      "url": "https://sixpathcrossway.pages.dev/app/SixPathEXPTracker_1.0.1_x64-setup.exe"
+    }
+  }
+}
