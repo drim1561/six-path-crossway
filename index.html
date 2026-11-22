@@ -656,6 +656,67 @@ body.in-app .tabs > :not(#tab-grind, #tab-boxes, #tab-recipes), body.in-app #g-g
 #view-grind .g-col > .g-status, #view-grind .g-viewing { padding: 0; background: none; border: 0; box-shadow: none; }
 #view-grind .g-viewing { margin-top: 0; padding-bottom: 8px; border-bottom: 1px solid var(--at-line); }
 #view-grind .g-ground { margin-inline: 0; border: 2px solid var(--card-o); border-radius: var(--r-card); }
+/* page G (2026-11-18): Now grinding in two columns with one faint line between (the run on the left, What it earned on the right),
+   the grass strip under both, then four folds on the trail, every one closed on load. Tokens only, no new colors */
+#view-grind .g-gcols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--gap) 0; align-items: start; }
+#view-grind .g-gleft, #view-grind .g-gright { display: grid; gap: var(--gap); min-width: 0; align-content: start; }
+#view-grind .g-gleft { padding-right: 20px; }
+#view-grind .g-gright { padding-left: 20px; border-left: 1px solid var(--at-line); }
+#view-grind .g-gleft > .k-bar { min-height: 0; padding: 0; background: none; border: 0; }
+#view-grind .g-gleadrow { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; padding-bottom: 6px; border-bottom: 1px solid var(--at-line); }
+#view-grind .g-glead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; min-width: 0; }
+#view-grind .g-gbig { font: 700 var(--n-xl)/1.05 var(--font-num); font-variant-numeric: tabular-nums; color: var(--num-big); }
+#view-grind .g-glbl { color: var(--muted); font: 600 var(--fs-md) var(--font-body); }
+#view-grind .g-glead em { font-style: normal; font-size: var(--fs-sm); } #view-grind .g-glead em.up { color: var(--good); } #view-grind .g-glead em.down { color: var(--bad); }
+#view-grind .g-nowv { display: grid; gap: 4px; }
+#view-grind .g-grows .k-row { padding: 6px 4px; }
+#view-grind .g-grows .g-nl { display: inline-flex; align-items: center; gap: 6px; }
+#view-grind .g-grows .g-nl img { width: 24px; height: 24px; object-fit: contain; image-rendering: pixelated; }
+#view-grind .g-grows .g-nv { font: 700 var(--n-s) var(--font-num); font-variant-numeric: tabular-nums; color: var(--ink); }
+#view-grind .g-gruns { display: flex; align-items: center; gap: 12px; }
+#view-grind .g-runb { margin: 0; padding: 2px 0; border: 0; background: none; color: var(--ink); font: 700 var(--fs-md) var(--font-body); text-decoration: underline; text-underline-offset: .15em; cursor: pointer; }
+#view-grind .g-runb:disabled { color: var(--muted); text-decoration: none; cursor: default; }
+#view-grind .g-rundiv { width: 1px; height: 1.1em; background: var(--at-line); }
+#view-grind .g-gres { display: grid; gap: var(--gap); min-width: 0; }
+#view-grind .g-gres .g-res-grid { grid-template-columns: minmax(0, 1fr); }
+#view-grind .g-switch { display: inline-flex; align-items: center; gap: 10px; justify-self: start; margin: 0; padding: 2px 0; border: 0; background: none; color: var(--ink); font: 700 var(--fs-md) var(--font-body); cursor: pointer; }
+#view-grind .g-knob { position: relative; flex: none; width: 34px; height: 18px; border-radius: var(--r-pill); background: var(--stone-lo); box-shadow: inset 0 0 0 2px var(--wood-o); }
+#view-grind .g-knob::after { content: ""; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; border-radius: 50%; background: var(--stone-hi); transition: left .15s; }
+#view-grind .g-switch[aria-checked="true"] .g-knob { background: var(--lime); }
+#view-grind .g-switch[aria-checked="true"] .g-knob::after { left: 19px; background: var(--lime-ink); }
+#view-grind .g-switch:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+#view-grind .g-howc summary { cursor: pointer; color: var(--muted); font: 600 var(--fs-sm) var(--font-body); }
+#view-grind .g-fold { gap: 0; }
+#view-grind .g-foldhead { display: flex; align-items: center; gap: 10px; width: 100%; margin: 0; padding: 0 0 6px; border: 0; border-bottom: 1px solid var(--at-line); background: none; color: var(--ink); text-align: left; cursor: pointer; }
+#view-grind .g-foldhead h2 { margin: 0; font: 400 var(--tt-m) var(--font-title); }
+#view-grind #g-nowcard.g-stop::before { top: 4px; }
+#view-grind .g-foldhead svg.li { width: 18px; height: 18px; }
+#view-grind .g-foldhead:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+#view-grind .g-foldbody { display: grid; gap: var(--gap); min-width: 0; padding-top: var(--gap); }
+#view-grind .g-foldbody[hidden] { display: none; }
+#view-grind #g-alltime > .k-bar h2 { display: none; }
+@media (max-width: 760px) { #view-grind .g-gcols { grid-template-columns: minmax(0, 1fr); } #view-grind .g-gleft { padding-right: 0; } #view-grind .g-gright { padding-left: 0; border-left: 0; } }
+/* the Run summary after End run (mockup G after End run): its head with the one amber button, How it went beside If you sold everything */
+#view-grind .g-endoff { display: none !important; }
+#view-grind .g-endsum { display: grid; gap: var(--gap); }
+#view-grind .g-endsum[hidden] { display: none; }
+#view-grind .g-endtop { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 8px 16px; padding-bottom: 8px; border-bottom: 1px solid var(--at-line); }
+#view-grind .g-endtitle { display: grid; gap: 2px; min-width: 0; }
+#view-grind .g-endtitle h2 { margin: 0; font: 400 var(--tt-m) var(--font-title); }
+#view-grind .g-endhead, #view-grind .g-endmins { margin: 0; color: var(--muted); font: 600 var(--fs-sm) var(--font-body); }
+#view-grind .g-endh { margin: 0 0 4px; font: 700 var(--fs-md) var(--font-body); color: var(--ink); }
+#view-grind .g-endlem { display: flex; gap: 6px; }
+#view-grind .g-endlem img { width: 28px; height: 28px; object-fit: contain; image-rendering: pixelated; }
+#view-grind .g-endlem img.off { opacity: .3; }
+#view-grind .g-endrate { margin: 6px 0 0; font: 400 var(--tt-m) var(--font-title); color: var(--ink); }
+#view-grind .g-endwords { margin: 2px 0 0; color: var(--muted); font: 400 var(--fs-md) var(--font-body); }
+#view-grind .g-endsold { margin: 0; font: 700 var(--n-xl)/1.05 var(--font-num); font-variant-numeric: tabular-nums; color: var(--good); }
+#view-grind .g-endsold.neg { color: var(--bad); }
+#view-grind .g-endeat { display: grid; gap: 6px; }
+#view-grind .g-endeatl { display: flex; align-items: center; gap: 8px; margin: 0; font: 400 var(--fs-md) var(--font-body); color: var(--ink); }
+#view-grind .g-endeatl img { flex: none; width: 24px; height: 24px; object-fit: contain; image-rendering: pixelated; }
+#view-grind .g-endloot .k-row { padding: 6px 4px; }
+#view-grind .g-endn { margin-left: 6px; color: var(--muted); font: 700 var(--fs-sm) var(--font-num); }
 .g-at-pic { min-width: 0; }
 /* the podium: three steps on one floor, first place in the middle on the gold one */
 .g-at-pod { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 132px); grid-template-rows: 1fr auto auto auto; justify-content: center; column-gap: var(--gap); }
@@ -801,7 +862,9 @@ body.in-app .tabs > :not(#tab-grind, #tab-boxes, #tab-recipes), body.in-app #g-g
 .g-nowpad { display: grid; gap: var(--gap); min-width: 0; }
 .g-nowpad > * { min-width: 0; }
 /* the button row's grass hangs 6px above its buttons: with the row first under the title bar, the gap to the grass is the one 12px */
-.g-nowcard.fold .g-nowpad > :not(.k-tools):not(.k-sr) { display: none; }
+.g-nowcard.fold .g-nowpad > :not(.k-tools):not(.k-sr):not(.g-gcols) { display: none; }
+/* page G: the title bar and the button rows sit in the left column, so a fold keeps that column and drops the numbers and the right one */
+.g-nowcard.fold .g-gright, .g-nowcard.fold .g-gleft > .g-nums { display: none; }
 .g-nums { padding: 4px 12px; }
 .g-nowv { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 28px; min-width: 0; color: var(--muted); font: 600 var(--fs-md) var(--font-body); }
 .g-nm { color: var(--ink); font: 600 var(--fs-md) var(--font-body); }
@@ -818,6 +881,8 @@ body.in-app .tabs > :not(#tab-grind, #tab-boxes, #tab-recipes), body.in-app #g-g
 .g-nowpad .k-tools { row-gap: 14px; }
 .k-btn > i { display: inline-grid; place-items: center; font-style: normal; }
 .k-btn > i svg { display: block; }
+/* line icons (pixel-icons.js lineIcon): our own buttons' thin rounded strokes, sized with the words; game pictures stay pixel */
+.li { width: 1.2em; height: 1.2em; shape-rendering: geometricPrecision; }
 .g-nowpad .k-btn[aria-pressed="true"] { --face: var(--lime); --face-hi: var(--lime-hi); --face-lo: var(--lime-lo); color: var(--lime-ink); }
 .k-tools .g-choose { flex: 1 1 100%; }
 .g-steps { display: block; margin: 0; padding: 0 0 0 28px; list-style: decimal; color: var(--ink); font: 600 var(--fs-md) var(--font-body); }
@@ -912,6 +977,7 @@ body.in-app .tabs > :not(#tab-grind, #tab-boxes, #tab-recipes), body.in-app #g-g
 .g-sc-big { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; padding: 10px 12px; }
 .g-sc-big .n { display: block; font: 700 var(--n-xl)/1.05 var(--font-num); font-variant-numeric: tabular-nums; color: var(--ink); }
 .g-sc-big .n.gold { color: var(--num-big); }
+.g-sc-big .g-sc-about { display: block; font: 600 var(--fs-sm) var(--font-body); color: var(--muted); font-style: italic; }
 .g-sc-big small { display: block; font: 600 var(--fs-sm) var(--font-body); color: var(--muted); }
 .g-sc-big .vs { font: 400 var(--tt-s) var(--font-title); color: var(--muted); }
 .g-sc-vs { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; font: 700 var(--n-m) var(--font-num); }
@@ -961,6 +1027,7 @@ body.in-app .tabs > :not(#tab-grind, #tab-boxes, #tab-recipes), body.in-app #g-g
 .g-lc b { display: block; font: 700 var(--n-s) var(--font-num); }
 .g-lc small { display: block; color: var(--muted); font: 600 var(--fs-sm) var(--font-body); }
 .g-lc a { color: inherit; }
+.g-lc .g-src { font-size: .85em; }   /* the log's FM or NPC tag: where the value came from */
 .g-res-loot > .linkish, .g-res-loot > .g-note { margin-top: 8px; }
 .g-res-small { display: grid; gap: 4px; }
 .g-res-small > * { margin: 0; }
@@ -1137,10 +1204,10 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
    frame round it). The map gives way before the panel does: fit() measures its longest line, so a long map name would
    shrink everything else (its box is one width whatever it says, and it ends in dots) */
 .g-top { display: flex; align-items: center; gap: .6em; min-width: 0; height: calc(16 * var(--u)); color: var(--ink); white-space: nowrap; }
-.g-who { display: contents; }
+.g-who, .g-right { display: contents; }
 .g-el { display: flex; flex: none; width: 11em; font-size: .88em; font-weight: 600; color: var(--muted); }
 .g-elm { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.g-elt { flex: none; white-space: pre; }
+.g-eld, .g-elt { flex: none; white-space: pre; }
 .g-btns { position: relative; flex: none; display: flex; gap: .3em; margin-left: auto; }
 .g-layw { display: inline-flex; }
 /* ⇆ ↺ ⚙ and the app's ✕: the kit's square wood buttons with pixel icons, sized in em, the ledge two art pixels. The pictures
@@ -1162,10 +1229,13 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
 .gq-row { display: flex; justify-content: flex-end; gap: 8px; }
 /* the pop-out's buttons are mossy stones: the kit's square in flat stone, no bark, a strip of moss along the top with its shadow
    under it. Lit (Settings open) the stone turns lime and the moss its pale tip */
-.g-strip .g-btns .k-sq { --face: var(--stone); --face-hi: var(--stone-hi); --face-lo: var(--stone-lo); --mossy: var(--stone-moss); color: var(--ink); }
-.g-strip .g-btns .k-sq::after { background-image: none; box-shadow: 0 var(--ledge) 0 var(--face-lo), 0 0 0 var(--u) var(--wood-o), inset 0 calc(2 * var(--u)) 0 var(--mossy), inset 0 calc(3 * var(--u)) 0 color-mix(in srgb, var(--wood-o) 30%, transparent); }
-.g-strip .g-btns .k-sq:hover::after { box-shadow: 0 var(--ledge) 0 var(--face-lo), 0 0 0 var(--u) var(--wood-o), inset 0 calc(2 * var(--u)) 0 var(--mossy), inset 0 0 0 99px color-mix(in srgb, var(--face-hi) 28%, transparent); }
-.g-strip .g-btns .g-gear[aria-pressed="true"] { --face: var(--lime); --face-hi: var(--lime-hi); --face-lo: var(--lime-lo); --mossy: var(--lime-hi); color: var(--lime-ink); }
+/* round 7: flat icons, no stone faces (like Your Path's plain word buttons): muted, brighter under the mouse, lime for the one
+   that's on (the arrow while the panel is open, the gear while Settings is, the layout pick while its row is) */
+.g-strip .g-btns .k-sq { color: var(--muted); }
+.g-strip .g-btns .k-sq::after { display: none; }
+.g-strip .g-btns .k-sq:hover { color: var(--ink); }
+.g-strip .g-btns .k-sq:active { transform: none; }
+.g-strip .g-btns .k-sq:is([aria-pressed="true"], [aria-expanded="true"]) { color: var(--lime); }
 /* ⇆ Layout's row: the three layouts as pictures with their names over the panel, under the buttons (beside them in Bar,
    which has no room under), the one showing lit. Solid whatever See-through says: it's only there while it's being used.
    While clicks pass through to the game (g-pass) it waits for the mouse on ⇆ to hold them (g-hold) */
@@ -1186,26 +1256,42 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
    their text, and Chromium writes a font shorthand holding var() followed by a font longhand as empty values, so the copy
    would lose the font */
 .g-k-exp { grid-area: exp; min-width: 0; }
-.g-kh { display: flex; align-items: center; gap: .5em; white-space: nowrap; }
+.g-kh { display: flex; align-items: baseline; gap: .5em; white-space: nowrap; }
 .g-kh .g-kl { font-family: var(--font-title); font-size: 1.12em; font-weight: 400; line-height: 1.3; color: var(--ink); }
-.g-seg { display: inline-flex; font-size: .88em; line-height: 1.25; }
-.g-seg button { margin: 0 0 0 calc(-1 * var(--u)); padding: 0 .4em; border: var(--u) solid var(--seg-e); border-radius: 0; background: none; color: var(--ink); font-family: inherit; font-size: 1em; font-weight: 700; line-height: inherit; white-space: nowrap; cursor: pointer; }
-.g-seg button:first-child { margin-left: 0; }
-.g-seg button:hover:not(:disabled):not([aria-pressed="true"]) { background-color: var(--div); }
-.g-seg button[aria-pressed="true"] { background-color: var(--lime); color: var(--lime-ink); }
-.g-seg button:disabled { color: var(--muted); cursor: default; }
-/* the window row: the window in words at rest; the switch and ↻ (Start fresh from now) take the same cell under the mouse or
-   keyboard focus and go back about 2 s after it leaves. The cell is as wide and tall as the larger of the two, so the row never
-   changes size. While the app passes clicks through to the game (g-pass) the row stays words */
-.g-strip .g-win { display: inline-grid; grid-template-columns: auto auto; align-items: center; column-gap: .3em; margin-left: auto; }
-.g-ww { grid-area: 1 / 1; justify-self: end; font-size: .88em; font-weight: 700; line-height: 1.25; color: var(--muted); white-space: nowrap; transition: opacity .15s ease 2s; }
-.g-strip .g-win .g-seg { grid-area: 1 / 1; margin-left: 0; opacity: 0; pointer-events: none; transition: opacity .15s ease 2s; }
-.g-again { grid-area: 1 / 2; display: grid; place-items: center; width: 1.6em; height: 1.6em; padding: 0; border: var(--u) solid var(--seg-e); border-radius: 50%; background: none; color: var(--ink); font-family: inherit; font-size: .88em; font-weight: 700; line-height: 1; cursor: pointer; opacity: 0; pointer-events: none; transition: opacity .15s ease 2s; }
-.g-again svg { width: calc(9 * max(1px, round(.09em, 1px))); height: calc(9 * max(1px, round(.09em, 1px))); }
-.g-again:hover { background-color: var(--div); }
-.g-strip:not(.g-pass) .g-win:hover .g-seg, .g-strip:not(.g-pass) .g-win:hover .g-again, .g-strip:not(.g-pass) .g-win:focus-within .g-seg, .g-strip:not(.g-pass) .g-win:focus-within .g-again { opacity: 1; pointer-events: auto; transition-delay: 0s; }
-.g-strip:not(.g-pass) .g-win:hover .g-ww, .g-strip:not(.g-pass) .g-win:focus-within .g-ww { opacity: 0; transition-delay: 0s; }
-@media (prefers-reduced-motion: reduce) { .g-ww, .g-strip .g-win .g-seg, .g-again { transition: none; } }
+/* Start fresh (2026-11-21): a little refresh icon beside EXP an hour's label, on the page and in the pop-out, quiet until the
+   mouse is on it like the pop-out's other icons */
+.g-fresh { flex: none; align-self: center; display: inline-grid; place-items: center; margin: -.2em 0; padding: .2em; border: 0; border-radius: 50%; background: none; color: var(--muted); line-height: 1; cursor: pointer; }
+.g-fresh svg { display: block; width: 1.1em; height: 1.1em; }   /* the label's own line height, and the padding is pulled back in, so the row is no taller than the words were */
+.g-fresh:hover { color: var(--ink); }
+.g-fresh:active svg { transform: rotate(-90deg); }
+.g-nl > .g-fresh { margin-left: .6em; }
+/* round 7: New run and End run, two plain words at the foot of every view with a line between them; End run greys out when
+   there's nothing to end */
+.g-runs { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-width: 0; }
+.g-runs > button { margin: 0; padding: .45em .3em; border: 0; border-radius: 0; background: none; color: var(--ink); font-family: var(--font-body); font-size: .88em; font-weight: 700; line-height: 1.25; white-space: nowrap; cursor: pointer; }
+.g-runs > button:not(:disabled):hover { text-decoration: underline; text-underline-offset: .15em; }
+.g-runs > .g-endrun { border-left: var(--u) solid var(--g-line); }
+.g-runs > button:disabled { color: var(--muted); cursor: default; }
+/* after End run: the Lemon rating (the client's own Lemon, the dim ones are the Lemons it didn't earn) and the way to the
+   Run summary */
+.g-sumlink { margin: 0; padding: 0; border: 0; background: none; color: var(--ink); font-family: var(--font-body); font-size: .88em; font-weight: 700; line-height: 1.25; text-decoration: underline; text-underline-offset: .15em; white-space: nowrap; cursor: pointer; }
+.g-rate { display: grid; justify-items: center; align-content: center; gap: .3em; min-width: 0; text-align: center; }
+.g-strip :is(.g-rate, .g-sumlink)[hidden] { display: none; }
+.g-rl { font-size: .88em; font-weight: 700; line-height: 1.25; color: var(--ink); white-space: nowrap; }
+.g-rlem { display: flex; gap: .5em; }
+.g-rlem img { width: auto; height: 2.1em; image-rendering: pixelated; }
+.g-rlem img.off { opacity: .3; mix-blend-mode: luminosity; }
+.g-rtitle { font-family: var(--font-title); font-size: 1em; line-height: 1.25; color: var(--ink); white-space: nowrap; }
+/* a potion is one cell: its picture beside how many and the name, the clock under them (95 Lemons last over 23:44) */
+.g-plbl { font-size: .88em; font-weight: 600; line-height: 1.25; white-space: nowrap; }
+.g-strip :is(.g-pleft, .g-pcap) { display: none; }
+/* the switch, always showing under the number (round 8): plain words, the one in use in lime ink, no boxes */
+.g-strip .g-win { display: flex; min-width: 0; }
+.g-seg { display: inline-flex; flex-wrap: wrap; gap: 0 .7em; font-size: .88em; line-height: 1.25; }
+.g-seg button { margin: 0; padding: 0; border: 0; border-radius: 0; background: none; color: var(--ink); font-family: inherit; font-size: 1em; font-weight: 700; line-height: inherit; white-space: nowrap; cursor: pointer; }
+.g-seg button:hover:not(:disabled):not([aria-pressed="true"]) { text-decoration: underline; text-underline-offset: .15em; }
+.g-seg button[aria-pressed="true"] { color: var(--lime); }
+.g-seg button:disabled { opacity: 1; color: var(--muted); cursor: default; }
 .g-kv { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 .4em; }
 .g-kn { font-family: var(--font-num); font-weight: 700; font-size: 1.47em; line-height: 1.2; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .g-k-exp .g-kn { font-size: 2.94em; line-height: 1.05; color: var(--num-big); }
@@ -1232,6 +1318,8 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
 .g-pn { font-family: var(--font-num); font-size: 1.3em; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; color: var(--ink); }
 /* closed: the rest (Profit's parts, EXP gained, Kills so far, Per 1%, In town) waits behind the ▾ button */
 .g-strip[data-open="0"] .g-body :is(.g-grid, .g-quip) { display: none; }
+/* EXP gained, Kills so far and Per 1% left the pop-out (Grind refresh): still filled, never shown */
+.g-strip .g-k[hidden] { display: none; }
 .g-k-kills { grid-area: kills; } .g-k-lv { grid-area: lv; } .g-k-profit { grid-area: profit; }
 .g-strip .up { color: var(--good); } .g-strip .down { color: var(--bad); }
 /* the four little columns: label over number with a small line under */
@@ -1239,9 +1327,9 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
 .g-k { display: grid; align-content: start; min-width: 0; line-height: 1.25; color: var(--muted); white-space: nowrap; }
 .g-k .g-kl, .g-ks { font-size: .88em; }
 .g-k .g-kn { color: var(--ink); }
-.g-mesosw { margin-left: .5em; padding: 0 .4em; border: var(--u) solid var(--seg-e); border-radius: var(--r-card); background: none; color: var(--ink); font-family: inherit; font-size: 1em; font-weight: 700; line-height: 1.2; white-space: nowrap; cursor: pointer; }
-.g-mesosw:hover { background-color: var(--div); }
-.g-k-profit .g-kn { color: var(--good); } .g-k-gain .g-kn, .g-k-lv .g-kn { color: var(--exp); }
+.g-mesosw { margin-left: .5em; padding: 0; border: 0; background: none; color: var(--muted); text-decoration: underline; text-decoration-color: var(--g-line); text-underline-offset: .2em; font-family: inherit; font-size: 1em; font-weight: 600; line-height: 1.2; white-space: nowrap; cursor: pointer; }
+.g-mesosw:hover { color: var(--ink); text-decoration-color: currentColor; }
+.g-k-profit .g-kn, .g-k-mhr .g-kn, .g-k-sold .g-kn { color: var(--good); } .g-k-mhr .g-kn.neg, .g-k-sold .g-kn.neg { color: var(--bad); } .g-k-gain .g-kn, .g-k-lv .g-kn { color: var(--exp); }
 .g-ppr { display: flex; align-items: center; gap: .3em; color: var(--ink); }
 .g-perp { display: inline-flex; align-items: center; gap: .3em; }
 .g-perp + .g-perp { margin-left: .3em; }
@@ -1301,28 +1389,29 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
 .g-lt { overflow: hidden; text-overflow: ellipsis; text-wrap: balance; }
 /* flipping the bag: a little light for each tab, on a row of its own (the map and how long step aside for it): grey to go,
    amber scroll on, lime seen. The names always show whole */
-.g-flip { display: flex; flex: none; align-items: center; gap: .9em; font-size: .88em; font-weight: 600; line-height: 1.25; white-space: nowrap; color: var(--muted); }
-.g-flip b { display: inline-flex; align-items: center; gap: .4em; font-weight: 600; }
+.g-flip { display: flex; flex: none; align-items: center; gap: 1.2em; margin-top: .25em; padding-left: calc(2.5 * var(--u)); font-size: .88em; font-weight: 600; line-height: 1.25; white-space: nowrap; color: var(--muted); }
+.g-flip b { display: inline-flex; align-items: center; gap: calc(2.5 * var(--u) + .45em); font-weight: 600; }
 .g-flip i { flex: none; width: calc(4 * var(--u)); height: calc(4 * var(--u)); border-radius: 50%; background-color: var(--lamp-idle); }
 .g-flip b.fix { color: var(--ink); } .g-flip b.fix i { background-color: var(--lamp-wait); box-shadow: 0 0 calc(3 * var(--u)) var(--lamp-wait); }
 .g-flip b.done { color: var(--ink); } .g-flip b.done i { background-color: var(--lime); box-shadow: 0 0 calc(3 * var(--u)) var(--lime); }
-.g-who:has(> .g-flip:not([hidden])) > .g-el { display: none; }
 /* Column and Tile: two rows with no spare room. The light beside the buttons, the map and how long beside the window row.
    The light and the map take no width of their own (fit() measures the panel's longest line): the light's words wrap to a
    second line when they're long, and so does the map's name (nothing ends in dots) */
 .g-strip:is([data-layout="column"], [data-layout="tile"]) .g-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .15em .6em; height: auto; }
-.g-strip:is([data-layout="column"], [data-layout="tile"]) .g-lamp { grid-area: 1 / 1; flex: none; width: auto; min-height: calc(14 * var(--u)); contain: inline-size; font-size: .9em; }
+/* the light keeps room for its dot and a word as long as Grinding at every Size: the buttons are whole pixel units, so at
+   some app Sizes (80, 90, 140) they don't shrink with the window and squeeze the word (Rimmah, 2026-11-17) */
+.g-strip:is([data-layout="column"], [data-layout="tile"]) .g-lamp { grid-area: 1 / 1; flex: none; width: auto; min-width: calc(9 * var(--u) + 5em); min-height: calc(14 * var(--u)); contain: inline-size; font-size: .9em; }
 .g-strip:is([data-layout="column"], [data-layout="tile"]) .g-lw { flex: 1 1 0; width: 0; flex-wrap: wrap; row-gap: 0; }
 .g-strip:is([data-layout="column"], [data-layout="tile"]) .g-lt { white-space: normal; }
 .g-strip:is([data-layout="column"], [data-layout="tile"]) .g-btns { grid-area: 1 / 2; margin-left: 0; justify-self: end; }
-.g-strip:is([data-layout="column"], [data-layout="tile"]) .g-el { grid-area: 2 / 1; width: auto; min-width: 0; contain: inline-size; flex-wrap: wrap; column-gap: 0; line-height: 1.25; white-space: normal; }
+.g-strip[data-layout="column"] .g-el { grid-area: 2 / 1; }
+.g-strip:is([data-layout="column"], [data-layout="tile"]) .g-el { width: auto; min-width: 0; contain: inline-size; flex-wrap: wrap; column-gap: 0; line-height: 1.25; white-space: normal; }
 .g-strip:is([data-layout="column"], [data-layout="tile"]) .g-elm { overflow: visible; }
 /* the tab lights take no width of their own (fit() measures the panel's longest line, and they must never bring the text down):
    Column has the room beside the window row, Tile gives them the whole row and the window row steps aside */
 .g-strip:is([data-layout="column"], [data-layout="tile"]) .g-flip { grid-area: 2 / 1; min-width: 0; contain: inline-size; }
 .g-strip[data-layout="tile"] .g-flip { grid-column: 1 / -1; }
-.g-strip[data-layout="tile"] .g-top:has(.g-flip:not([hidden])) .g-win { display: none; }
-.g-strip:is([data-layout="column"], [data-layout="tile"]) .g-win { grid-area: 2 / 2; margin-left: 0; justify-self: end; }
+.g-strip[data-layout="column"] .g-win { grid-area: 2 / 2; margin-left: 0; justify-self: end; }
 /* while it shows, the size of the text stays as it is (fit() measures the panel without it), and so does the window while the
    room it frees is enough: the small lines under the numbers step aside in Tile and Column, EXP an hour's arrow and usual with
    them, and in Tile the window row too (its own row there, beside the map in Column); Bar's is further down. One that needs
@@ -1332,7 +1421,20 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
 /* the layouts. Tile: one narrow column. The light, the map and how long, the window row, then EXP an hour with Kills a
    minute beside it, Level in, Profit, the timers side by side, and when opened the rest in a little grid; the alert last.
    The panel itself is the grid here (.g-body steps out of the way) */
-.g-strip[data-layout="tile"] { grid-template: "top top" auto "exp kills" auto "lv profit" auto "grid grid" auto "tiles tiles" auto "alert alert" 1fr / minmax(0, 1fr) minmax(0, 1fr); gap: 0; }
+.g-strip[data-layout="tile"] { grid-template: "top top" auto "exp exp" auto "kills lv" auto "profit tiles" auto "grid grid" auto "alert alert" 1fr "runs runs" auto / minmax(0, 1fr) minmax(0, 1fr); gap: 0; }
+/* two potions: Profit takes the row, its parts under it when opened, the two timers across under that */
+.g-strip[data-layout="tile"][data-pots="2"] { grid-template-areas: "top top" "exp exp" "kills lv" "profit profit" "grid grid" "tiles tiles" "alert alert" "runs runs"; }
+/* after End run (round 7): map and how long, the Lemons, EXP an hour beside Mesos an hour, if you sold everything, the
+   way to the Run summary, the run buttons */
+.g-strip[data-layout="tile"][data-ended="1"] { grid-template: "top top" auto "el el" auto "rate rate" auto "exp mhr" auto "sold sold" auto "link link" auto "alert alert" 1fr "runs runs" auto / minmax(0, 1fr) minmax(0, 1fr); }
+/* round 8: EXP an hour is one centred block across the panel, its label with Start fresh, the number, the switch, then the map
+   and how long (they moved here from under the light) */
+.g-strip[data-layout="tile"] .g-k-exp { display: grid; justify-items: center; text-align: center; padding-bottom: .45em; }
+.g-strip[data-layout="tile"] .g-kh { justify-content: center; }
+.g-strip[data-layout="tile"] .g-k-exp .g-kv { justify-items: center; }
+.g-strip[data-layout="tile"] .g-win { justify-content: center; margin-top: .2em; }
+.g-strip[data-layout="tile"] .g-seg { justify-content: center; }
+.g-strip[data-layout="tile"] .g-k-exp .g-el { justify-content: center; justify-self: stretch; margin-top: .25em; text-align: center; }
 .g-strip[data-layout="tile"] .g-body { display: contents; }
 .g-strip[data-layout="tile"] .g-top { grid-area: top; margin-bottom: .3em; }
 .g-strip[data-layout="tile"] .g-l3 { grid-area: alert; align-self: end; margin-top: .4em; }
@@ -1341,10 +1443,10 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
 /* Tile: every number in its own spot, two across (Level in beside Profit), the opened three across with Profit's parts
    under. No boxes: one faint line between neighbours, left edges on the panel's own */
 .g-strip[data-layout="tile"] .g-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; border-top: var(--u) solid var(--g-line); }
-.g-strip[data-layout="tile"] :is(.g-k-exp, .g-k-lv, .g-k-gain) { padding-left: 0; }
-.g-strip[data-layout="tile"] :is(.g-k-kills, .g-k-profit, .g-k-per) { padding-right: 0; }
-.g-strip[data-layout="tile"] :is(.g-k-kills, .g-k-profit, .g-k-ksf, .g-k-per) { border-left: var(--u) solid var(--g-line); }
-.g-strip[data-layout="tile"] :is(.g-k-lv, .g-k-profit, .g-parts, .g-town, .g-tiles) { border-top: var(--u) solid var(--g-line); }
+.g-strip[data-layout="tile"] :is(.g-k-exp, .g-k-kills, .g-k-profit, .g-k-gain) { padding-left: 0; }
+.g-strip[data-layout="tile"] :is(.g-k-exp, .g-k-lv, .g-k-profit, .g-k-per) { padding-right: 0; }
+.g-strip[data-layout="tile"] :is(.g-k-lv, .g-k-ksf, .g-k-per) { border-left: var(--u) solid var(--g-line); }
+.g-strip[data-layout="tile"] :is(.g-k-kills, .g-k-lv, .g-k-profit, .g-parts, .g-town, .g-tiles) { border-top: var(--u) solid var(--g-line); }
 .g-strip[data-layout="tile"] .g-grid .g-k { padding-inline: .5em; }
 .g-strip[data-layout="tile"] .g-grid .g-k-gain { padding-left: 0; } .g-strip[data-layout="tile"] .g-grid .g-k-per { padding-right: 0; }
 /* the small lines take no width of their own (three tiles of "107 EXP a kill here" end to end would shrink all the text):
@@ -1352,10 +1454,32 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
 .g-strip[data-layout="tile"] .g-ks { justify-self: stretch; contain: inline-size; white-space: normal; }
 /* the opened three are narrow: label and number only, like Bar's */
 .g-strip[data-layout="tile"] .g-grid .g-ks { display: none; }
+.g-strip:is([data-layout="tile"], [data-layout="bar"]) :is(.g-k-kills, .g-k-lv) .g-ks { display: none; }
 /* Per 1% with two potions: the two counts wrap inside the tile, one under the other, and take no width of their own */
 .g-strip[data-layout="tile"] .g-ppr { justify-self: stretch; flex-wrap: wrap; row-gap: 0; contain: inline-size; }
 /* the one potion Tile's line from the session card takes no width of its own: it wraps in the half it has */
 .g-strip[data-layout="tile"] .g-quip { contain: inline-size; white-space: normal; }
+/* round 9: every number centred in its spot. One potion sits beside Profit with a line between; its picture beside how
+   many and the name, the clock under them */
+.g-strip[data-layout="tile"] :is(.g-k-kills, .g-k-lv, .g-k-profit, .g-k-mhr) { justify-items: center; text-align: center; }
+.g-strip[data-layout="tile"] .g-k-profit .g-ks { justify-self: stretch; }
+.g-strip[data-layout="tile"]:not([data-pots="2"]) .g-tiles { border-left: var(--u) solid var(--g-line); }
+.g-strip[data-layout="tile"] .g-tiles { padding-top: 0; }
+/* the run buttons at the foot: two plain words side by side, a line over them and between */
+.g-strip[data-layout="tile"] .g-runs { grid-area: runs; border-top: var(--u) solid var(--g-line); margin-top: .2em; }
+/* after End run: the map and how long up top, the Lemons with their words, EXP an hour beside Mesos an hour, if you sold
+   everything as one row, the way to the Run summary */
+.g-strip[data-layout="tile"] .g-body > .g-el { grid-area: el; justify-content: center; margin-bottom: .2em; text-align: center; }
+.g-strip[data-layout="tile"] .g-rate { grid-area: rate; padding-bottom: .5em; }
+.g-strip[data-layout="tile"] .g-rl { display: none; }
+.g-strip[data-layout="tile"][data-ended="1"] .g-k-exp { border-top: var(--u) solid var(--g-line); padding: .35em .5em; }
+.g-strip[data-layout="tile"] .g-k-mhr { grid-area: mhr; border-top: var(--u) solid var(--g-line); border-left: var(--u) solid var(--g-line); }
+.g-strip[data-layout="tile"] .g-k-sold { grid-area: sold; display: flex; align-items: baseline; justify-content: space-between; gap: .5em; padding-inline: 0; border-top: var(--u) solid var(--g-line); }
+.g-strip[data-layout="tile"] .g-k-sold .g-kl { min-width: 0; white-space: normal; contain: inline-size; flex: 1 1 0; }
+.g-strip[data-layout="tile"] .g-k-sold .g-kn { font-size: 1.25em; }
+.g-strip[data-layout="tile"] .g-sumlink { grid-area: link; justify-self: center; margin: .15em 0 .45em; }
+.g-strip[data-layout="tile"][data-ended="1"] :is(.g-k-exp, .g-k-mhr) .g-kn { font-size: 1.7em; }
+.g-strip[data-layout="tile"] :is(.g-k-mhr, .g-k-sold) .g-kl { font-family: var(--font-body); font-size: .88em; font-weight: 700; line-height: 1.25; color: var(--ink); }
 /* Column: the light, the map and how long on the window row's left, then EXP an hour with Kills a minute beside it, Level in,
    Profit, the timers side by side, the numbers */
 .g-strip:is([data-layout="column"]) .g-body { grid-template: "exp kills" auto "lv lv" auto "profit profit" auto "tiles tiles" auto "grid grid" auto / minmax(0, 1fr) minmax(0, 1fr); }
@@ -1394,7 +1518,7 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
    the clock's half) */
 .g-strip:is([data-layout="tile"], [data-layout="column"]) .g-tiles { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 0; padding-top: .3em; }
 .g-strip:is([data-layout="tile"], [data-layout="column"]) .g-pot { padding: .3em .7em; column-gap: .4em; justify-content: start; grid-template-columns: auto auto; }
-.g-strip:is([data-layout="tile"], [data-layout="column"]) .g-tiles > :first-child { padding-left: 0; }
+.g-strip[data-layout="column"] .g-tiles > :first-child { padding-left: 0; }
 .g-strip:is([data-layout="tile"], [data-layout="column"]) .g-tiles > :not([hidden]) ~ * { border-left: var(--u) solid var(--g-line); }
 .g-strip:is([data-layout="tile"], [data-layout="column"]) .g-vial { width: auto; min-width: 1.5em; height: 2.1em; }
 .g-strip:is([data-layout="tile"], [data-layout="column"]) .g-vial img { height: 1.5em; }
@@ -1406,53 +1530,82 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
 /* it takes no width of its own and wraps in what the tile has, never cut (Rimmah, 2026-11-16: it read sta...) */
 .g-strip:is([data-layout="tile"], [data-layout="column"]) .g-pot.none { grid-template-columns: auto minmax(0, 1fr); }
 .g-strip:is([data-layout="tile"], [data-layout="column"]) .g-pcap { contain: inline-size; white-space: normal; }
-/* Bar (round 2): one grid. A narrow first column (the light, the map and time under it, the window row under that), four even
-   columns (EXP an hour, Kills a minute, Level in, Profit), the potions, then the buttons as a 2 x 2 of 32 px. Opened, the rest
-   is a second row under the same columns: In town under the light, EXP gained, Kills so far, Per 1%, and Profit's parts under
-   Profit and the potions. The title bar, the body and the opened grid are no boxes (display: contents), so all of it is
-   placed on the panel's own grid. No title bar, just the glass; the alert goes under. EXP an hour's column grows past 13em
-   when its line under the number is longer (a huge "over usual"), so the window's font comes down to fit it instead of the
-   line spilling out of its column */
-.g-strip[data-layout="bar"] { display: grid; grid-template-columns: auto minmax(13.1em, max-content) repeat(3, 13.1em) auto auto; align-items: stretch; align-content: center; gap: 0; padding: .4em .7em; }
-.g-strip[data-layout="bar"] :is(.g-top, .g-body, .g-kh) { display: contents; }
+/* Tile's potion cell (after the shared Tile and Column rules, which it overrides) is the row's widest half,
+   so its sides stay tight (the panel's text is sized by its widest row). */
+.g-strip[data-layout="tile"] .g-pot { grid-template: "vial lbl" auto "clock clock" auto / auto auto; justify-content: center; align-content: center; column-gap: .25em; padding: .35em .2em; text-align: center; }
+.g-strip[data-layout="tile"] .g-pwords { display: contents; }
+.g-strip[data-layout="tile"] .g-vial { grid-area: vial; min-width: 0; height: 1.25em; }
+.g-strip[data-layout="tile"] .g-vial img { height: .85em; }
+/* with one potion its name line sets the panel's width, so its digits are all one width: 95 Lemons turning 12 keeps the font and the window */
+.g-strip[data-layout="tile"] .g-plbl { grid-area: lbl; align-self: center; min-width: 0; font-variant-numeric: tabular-nums; }
+.g-strip[data-layout="tile"] .g-pclock { grid-area: clock; justify-self: center; font-size: 1.7em; }
+/* Bar (round 9): one grid of even columns, EXP an hour, Kills a minute, Level in, Profit, the potions, the map and how long,
+   then the right cell (the light, the buttons, New run and End run). Opened, the rest is a second row under the same columns:
+   In town under EXP an hour and Profit's parts across the rest. The title bar, the body and the opened grid are no boxes
+   (display: contents), so all of it is placed on the panel's own grid; the alert takes the place of Kills, Level and Profit
+   (below), so the window never needs to grow for it. EXP an hour's column grows when its line under the number is longer (a
+   huge "over usual"), so the window's font comes down to fit it instead of the line spilling out of its column */
+.g-strip[data-layout="bar"] { display: grid; grid-template-columns: minmax(9.5em, max-content) repeat(3, 9.5em) auto minmax(7em, max-content) auto; align-items: stretch; align-content: center; gap: 0; padding: .4em .7em; }
+.g-strip[data-layout="bar"][data-ended="1"] { grid-template-columns: repeat(4, minmax(9.5em, max-content)) minmax(7em, max-content) minmax(7em, max-content) auto; }
+.g-strip[data-layout="bar"] :is(.g-top, .g-body) { display: contents; }
 .g-strip[data-layout="bar"][data-open="1"] .g-grid { display: contents; }
-.g-strip[data-layout="bar"] .g-who { grid-area: 1 / 1; display: flex; flex-direction: column; justify-content: center; font-size: .9em; color: var(--ink); }
+/* round 9: the left cell is gone. One cell at the right end holds the light and the buttons, with New run and End run under
+   them; opened, its two rows line up with the panel's two rows (subgrid), so the run buttons sit beside the parts */
+.g-strip[data-layout="bar"] .g-right { grid-area: 1 / 7; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto; align-content: center; column-gap: .7em; min-width: 0; padding-left: .8em; border-left: var(--u) solid var(--g-line); }
+.g-strip[data-layout="bar"][data-open="1"]:not([data-ended="1"]) .g-right { grid-row: 1 / span 2; grid-template-rows: subgrid; }
+.g-strip[data-layout="bar"] .g-who { grid-area: 1 / 1; display: flex; flex-direction: column; justify-content: center; width: 9.7em; max-width: 100%; min-width: 0; padding: .3em 0; font-size: .9em; color: var(--ink); }
 .g-strip[data-layout="bar"] .g-lamp { flex: none; width: auto; min-width: 0; font-size: 1em; }
-.g-strip[data-layout="bar"] .g-el { width: auto; min-width: 0; font-size: 1em; color: var(--muted); contain: inline-size; }
 .g-strip[data-layout="bar"] .g-lw { flex-direction: column; align-items: flex-start; gap: 0; }
 .g-strip[data-layout="bar"] .g-lt { max-width: 100%; white-space: normal; }
-/* the window row is small print like the rest of the Bar's (.88 of the panel), not .9 of the light's size: at the Bar's 14 px
-   the smaller one fell under 11 px */
-.g-strip[data-layout="bar"] .g-who .g-win { align-self: flex-start; margin-left: 0; font-size: calc(1em / .9); }
 .g-strip[data-layout="bar"] .g-flip { font-size: 1em; gap: .7em; }
-/* Bar: the closed row, each in its column; the opened row under the same ones (the left edges match) */
-.g-strip[data-layout="bar"] .g-k-exp { grid-area: 1 / 2; display: grid; grid-template-columns: auto; align-content: center; }
-.g-strip[data-layout="bar"] .g-k-kills { grid-area: 1 / 3; } .g-strip[data-layout="bar"] .g-k-lv { grid-area: 1 / 4; } .g-strip[data-layout="bar"] .g-k-profit { grid-area: 1 / 5; }
-.g-strip[data-layout="bar"] .g-tiles { grid-area: 1 / 6; }
-.g-strip[data-layout="bar"] .g-btns { grid-area: 1 / 7; display: grid; grid-template-columns: repeat(2, 32px); grid-auto-rows: 32px; gap: .3em; align-self: center; margin-left: .7em; }
+.g-strip[data-layout="bar"] .g-btns { grid-area: 1 / 2; display: flex; gap: .3em; align-self: center; margin-left: 0; }
 .g-strip[data-layout="bar"] .g-btns .k-sq { width: 32px; height: 32px; }
+.g-strip[data-layout="bar"] .g-runs { grid-area: 2 / 1 / 3 / 3; align-self: end; border-top: var(--u) solid var(--g-line); }
+/* the map and how long have their own cell after the potions: the map small over the time big, both whole (a long map name
+   wraps, never ends in dots); no dot between them */
+.g-strip[data-layout="bar"] .g-el { grid-area: 1 / 6; display: grid; align-content: center; justify-items: center; width: auto; min-width: 0; padding: .3em .8em; border-left: var(--u) solid var(--g-line); font-size: 1em; line-height: 1.25; white-space: normal; text-align: center; color: var(--ink); contain: inline-size; }
+.g-strip[data-layout="bar"] .g-elm { overflow: visible; font-size: .88em; font-weight: 700; }
+.g-strip[data-layout="bar"] .g-eld { display: none; }
+.g-strip[data-layout="bar"] .g-elt { font-family: var(--font-num); font-size: 1.7em; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Bar: the closed row, each in its column; the opened row under them */
+.g-strip[data-layout="bar"] .g-k-exp { grid-area: 1 / 1; display: grid; grid-template-columns: auto; align-content: center; justify-items: center; text-align: center; }
+.g-strip[data-layout="bar"] .g-kh { justify-content: center; font-size: .88em; font-weight: 700; line-height: 1.25; }
+.g-strip[data-layout="bar"] .g-kh .g-fresh { font-size: 1em; }
+.g-strip[data-layout="bar"] .g-k-kills { grid-area: 1 / 2; } .g-strip[data-layout="bar"] .g-k-lv { grid-area: 1 / 3; } .g-strip[data-layout="bar"] .g-k-profit { grid-area: 1 / 4; }
+.g-strip[data-layout="bar"] .g-tiles { grid-area: 1 / 5; }
+.g-strip[data-layout="bar"] :is(.g-k-kills, .g-k-lv, .g-k-profit, .g-k-mhr, .g-k-sold) { justify-items: center; text-align: center; }
 .g-strip[data-layout="bar"] .g-k-gain { grid-area: 2 / 2; } .g-strip[data-layout="bar"] .g-k-ksf { grid-area: 2 / 3; } .g-strip[data-layout="bar"] .g-k-per { grid-area: 2 / 4; }
-.g-strip[data-layout="bar"] .g-parts { grid-area: 2 / 5 / auto / -1; white-space: normal; }
+.g-strip[data-layout="bar"] .g-parts { grid-area: 2 / 1 / 3 / -2; white-space: normal; }
+.g-strip[data-layout="bar"]:has(.g-town:not([hidden])) .g-parts { grid-column: 2 / -2; }
 .g-strip[data-layout="bar"] .g-town { grid-area: 2 / 1; }
+/* after End run: How it went, EXP an hour, Mesos an hour, If you sold everything, the map and how long, the way to the Run
+   summary, and the right cell */
+.g-strip[data-layout="bar"] .g-rate { grid-area: 1 / 1; padding: .3em .8em .3em 0; }
+.g-strip[data-layout="bar"] .g-rlem { gap: .3em; }
+.g-strip[data-layout="bar"] .g-rlem img { height: 1.3em; }
+.g-strip[data-layout="bar"] .g-rtitle { display: none; }
+.g-strip[data-layout="bar"][data-ended="1"] .g-k-exp { grid-area: 1 / 2; }
+.g-strip[data-layout="bar"] .g-k-mhr { grid-area: 1 / 3; } .g-strip[data-layout="bar"] .g-k-sold { grid-area: 1 / 4; }
+.g-strip[data-layout="bar"][data-ended="1"] .g-el { grid-column: 5; }
+.g-strip[data-layout="bar"] .g-sumlink { grid-area: 1 / 6; align-self: stretch; justify-self: stretch; padding: .3em .8em; border: 0; border-left: var(--u) solid var(--g-line); border-radius: 0; box-shadow: none; white-space: nowrap; text-align: center; }
+.g-strip[data-layout="bar"] :is(.g-k-mhr, .g-k-sold) .g-kl { font-family: var(--font-body); font-weight: 700; color: var(--ink); }
+.g-strip[data-layout="bar"] .g-k-sold .g-kl { white-space: nowrap; }
 /* no boxes anywhere (Rimmah, 2026-11-15: outlined tiles read blocky): every number keeps its own spot and one padding,
    with one faint line between neighbours. In Tile and Column .g-who is no box, so it takes nothing there */
 .g-strip { --g-line: color-mix(in srgb, var(--card-o) 75%, transparent); }
 .g-strip :is(.g-who, .g-k, .g-k-exp, .g-parts, .g-town) { padding: .35em .7em; }
 .g-strip[data-layout="bar"] :is(.g-k, .g-k-exp, .g-parts, .g-town) { align-content: center; padding: .3em .8em; }
-.g-strip[data-layout="bar"] .g-who { padding: .3em .8em .3em 0; }
-.g-strip[data-layout="bar"] :is(.g-k, .g-k-exp, .g-parts, .g-tiles) { border-left: var(--u) solid var(--g-line); }
+.g-strip[data-layout="bar"] .g-who { padding: .3em 0; }
+.g-strip[data-layout="bar"] :is(.g-k, .g-k-exp, .g-tiles) { border-left: var(--u) solid var(--g-line); }
+.g-strip[data-layout="bar"]:not([data-ended="1"]) .g-k-exp { border-left: 0; padding-left: 0; }
+.g-strip[data-layout="bar"]:has(.g-town:not([hidden])) .g-parts { border-left: var(--u) solid var(--g-line); }
 .g-strip[data-layout="bar"] :is(.g-k-gain, .g-k-ksf, .g-k-per, .g-parts, .g-town) { border-top: var(--u) solid var(--g-line); }
 .g-strip[data-layout="bar"] .g-pot + .g-pot { border-left: var(--u) solid var(--g-line); }
 .g-strip[data-layout="bar"] :is(.g-parts, .g-town) { display: grid; }
-/* no hole in the opened row: the left tile takes both rows until In town shows under it, and Profit's parts run to the
-   right edge, under the potions and the buttons */
-.g-strip[data-layout="bar"][data-open="1"]:has(.g-town[hidden]) .g-who { grid-row: 1 / span 2; }
-.g-strip[data-layout="bar"] .g-ww { justify-self: start; }
 /* the small lines: Kills a minute and Profit keep theirs (pick the map, loot not counted); the rest stay hidden */
-.g-strip[data-layout="bar"] :is(.g-pcap, .g-plf, .g-pdot, .g-k-lv .g-ks, .g-k-gain .g-ks, .g-k-ksf .g-ks, .g-k-per .g-ks) { display: none; }
-.g-strip[data-layout="bar"] .g-kh .g-kl { display: none; }
-.g-strip[data-layout="bar"] .g-kv { grid-column: 1; grid-row: 1; display: grid; grid-template-columns: auto auto 1fr; gap: 0 .3em; font-size: .88em; font-weight: 700; line-height: 1.25; color: var(--muted); }
-.g-strip[data-layout="bar"] .g-kv::before { content: 'an hour'; grid-row: 2; }
+.g-strip[data-layout="bar"] :is(.g-plf, .g-pdot, .g-k-lv .g-ks, .g-k-gain .g-ks, .g-k-ksf .g-ks, .g-k-per .g-ks) { display: none; }
+.g-strip[data-layout="bar"] .g-kh .g-kl { font-family: var(--font-body); font-size: 1em; font-weight: 700; line-height: inherit; color: var(--ink); }
+.g-strip[data-layout="bar"] .g-kv { display: grid; grid-template-columns: auto auto; justify-content: center; gap: 0 .3em; font-size: .88em; font-weight: 700; line-height: 1.25; color: var(--muted); }
 .g-strip[data-layout="bar"] .g-k-exp .g-kn { grid-column: 1 / -1; grid-row: 1; font-size: 2em; line-height: 1.05; }
 .g-strip[data-layout="bar"] .g-us { grid-row: 2; font-family: var(--font-body); font-size: 1em; font-weight: 700; }
 /* the chip and its percent keep their line's size (.88 of the panel): at the Bar's 14 px a smaller one fell under 11 px */
@@ -1461,22 +1614,24 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
 .g-strip[data-layout="bar"] .g-tiles { display: flex; gap: 0; align-self: stretch; }
 .g-strip[data-layout="bar"] .g-k .g-kn { font-size: 1.7em; line-height: 1.1; }
 .g-strip[data-layout="bar"] :is(.g-k .g-kl, .g-ks, .g-kv) { font-size: 1em; }
+.g-strip[data-layout="bar"] .g-k .g-kl { font-weight: 700; color: var(--ink); }
 .g-strip[data-layout="bar"] .g-ppr .g-us { font-size: .8em; }
-/* a timer is its picture and its clock: no pill, no box, no glass ring round the picture */
-.g-strip[data-layout="bar"] .g-pot { flex: none; padding: .3em .8em; column-gap: .5em; }
-.g-strip[data-layout="bar"] .g-vial { width: auto; min-width: 1.5em; height: 2.1em; }
-.g-strip[data-layout="bar"] .g-vial img { height: 1.6em; }
-.g-strip[data-layout="bar"] .g-pclock { font-size: 1.45em; }
-/* the fourth choice after Reset average has to fit too: Bar and Column drop the word since, Bar the words an hour, and
-   Column's switch closes up */
-.g-strip:is([data-layout="bar"], [data-layout="column"], [data-layout="tile"]) .g-sw { display: none; }
-.g-strip[data-layout="bar"]:has(.g-seg [data-w="since"]:not([hidden])) .g-kv::before { display: none; }
-.g-strip:is([data-layout="column"], [data-layout="tile"]) .g-seg:has([data-w="since"]:not([hidden])) button { padding-inline: .4em; }
-/* Tile is the narrow one: its switch closes up further, so the time beside it is never cut */
-.g-strip[data-layout="tile"] .g-seg:has([data-w="since"]:not([hidden])) button { padding-inline: .2em; }
-/* Bar's alert: one line in what's left of its 80 pixels, the tiles' second line making room */
-.g-strip[data-layout="bar"]:has(> .g-l3:not([hidden])) .g-pleft { display: none; }
-.g-strip[data-layout="bar"] .g-alert { grid-area: 3 / 1 / auto / -1; padding: 0 .5em; border: 0; background: none; box-shadow: none; color: var(--ink); overflow: hidden; white-space: nowrap; }
+/* a timer is one cell: its picture beside how many and the name, the clock under them; no pill, no box */
+.g-strip[data-layout="bar"] .g-pot { flex: 1 1 0; min-width: max-content; grid-template: "vial lbl" auto "clock clock" auto / auto auto; justify-content: center; align-content: center; column-gap: .35em; padding: .3em .8em; text-align: center; }
+.g-strip[data-layout="bar"] .g-pwords { display: contents; }
+.g-strip[data-layout="bar"] .g-vial { grid-area: vial; width: auto; min-width: max-content; height: 1.25em; }
+.g-strip[data-layout="bar"] .g-vial img { height: 1em; }
+.g-strip[data-layout="bar"] .g-plbl { grid-area: lbl; font-size: 1em; font-weight: 700; }
+.g-strip[data-layout="bar"] .g-pclock { grid-area: clock; justify-self: center; font-size: 1.7em; }
+/* Bar's alert: in the closed row's place of Kills, Level and Profit, beside EXP an hour, wrapping in their three columns with its
+   buttons at the end. Under the panel it took a third row, which the site's pop-out can't grow into without a press in it, so
+   the whole Bar shrank to fit (Rimmah's video, 2026-11-16: down to 8 px) */
+.g-strip[data-layout="bar"]:has(> .g-l3:not([hidden])) :is(.g-k-kills, .g-k-lv, .g-k-profit) { display: none; }
+.g-strip[data-layout="bar"] .g-alert { grid-area: 1 / 2 / 2 / 5; display: flex; flex-wrap: wrap; align-items: center; align-content: center; gap: .2em .7em; padding: .3em .8em; border: 0; border-left: var(--u) solid var(--g-line); background: none; box-shadow: none; color: var(--ink); white-space: normal; }
+.g-strip[data-layout="bar"] .g-alert > :is(button, .g-l3b) { float: none; margin-left: auto; }
+/* after End run every layout drops the live numbers: Kills a minute, Level in, Profit, the potions, the window switch, Start
+   fresh, the usual and the opened row */
+.g-strip[data-ended="1"][data-layout] .g-body :is(.g-k-kills, .g-k-lv, .g-k-profit, .g-tiles, .g-grid, .g-win, .g-fresh, .g-chip, .g-us) { display: none; }
 /* Settings (grind-settings.js), opened by ⚙ Settings on the top strip: under the panel inside the pop-out, which grows to
    fit it. On the glass in the site's theme (the tokens, no colors of its own): a bark title bar, wood sign buttons, flat
    switches. Its sections stack as in the mockup, and sit side by side when the window is wide. Fonts as longhands, as on
@@ -2423,7 +2578,7 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-21b',
+  version: '2026-11-21c',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
@@ -2438,6 +2593,7 @@ const BOSSES = [
  {"id":700000,"name":"Mushmom","level":40,"map":"Hidden Street : Someone Else's House","timer":60,"frames":[{"x":0,"w":119,"h":110,"ox":59,"oy":110,"delay":500},{"x":119,"w":120,"h":105,"ox":60,"oy":105,"delay":100},{"x":239,"w":118,"h":102,"ox":59,"oy":102,"delay":100},{"x":357,"w":118,"h":125,"ox":59,"oy":180,"delay":300},{"x":475,"w":118,"h":125,"ox":59,"oy":160,"delay":100},{"x":593,"w":120,"h":105,"ox":60,"oy":105,"delay":100}]},
  {"id":700006,"name":"Shade","level":48,"map":"Hidden Street : Cabin of the Forsaken","timer":60,"frames":[{"x":0,"w":101,"h":98,"ox":38,"oy":105,"delay":180},{"x":101,"w":102,"h":96,"ox":39,"oy":101,"delay":180},{"x":203,"w":99,"h":92,"ox":39,"oy":96,"delay":180},{"x":302,"w":101,"h":91,"ox":37,"oy":99,"delay":180},{"x":403,"w":104,"h":92,"ox":37,"oy":100,"delay":180},{"x":507,"w":100,"h":97,"ox":38,"oy":106,"delay":180}]},
  {"id":700002,"name":"Zombie Mushmom","level":55,"map":"Dungeon : The Grave of Mushmom","timer":60,"frames":[{"x":0,"w":118,"h":102,"ox":59,"oy":102,"delay":500},{"x":118,"w":118,"h":106,"ox":60,"oy":105,"delay":100},{"x":236,"w":118,"h":102,"ox":59,"oy":102,"delay":100},{"x":354,"w":118,"h":125,"ox":59,"oy":180,"delay":300},{"x":472,"w":118,"h":125,"ox":59,"oy":180,"delay":100},{"x":590,"w":118,"h":106,"ox":60,"oy":105,"delay":100}]},
+ {"id":700003,"name":"Rotten Mushmom","level":60,"map":"Hidden Street : Someone Else's Grave","timer":60,"frames":[{"x":0,"w":120,"h":105,"ox":59,"oy":104,"delay":350},{"x":120,"w":118,"h":102,"ox":59,"oy":101,"delay":225},{"x":238,"w":118,"h":131,"ox":59,"oy":170,"delay":250},{"x":356,"w":118,"h":151,"ox":59,"oy":170,"delay":150},{"x":474,"w":120,"h":114,"ox":59,"oy":113,"delay":150},{"x":594,"w":118,"h":102,"ox":59,"oy":101,"delay":225}]},
  {"id":700001,"name":"Jr. Balrog","level":80,"map":"Dungeon : The Cursed Sanctuary","timer":180,"frames":[{"x":0,"w":171,"h":162,"ox":85,"oy":162,"delay":180},{"x":171,"w":158,"h":156,"ox":90,"oy":156,"delay":180},{"x":329,"w":177,"h":166,"ox":95,"oy":166,"delay":180},{"x":506,"w":169,"h":158,"ox":99,"oy":158,"delay":180},{"x":675,"w":177,"h":170,"ox":95,"oy":170,"delay":180}]}
 ];
 /* BOSSES:END */
@@ -3097,7 +3253,7 @@ function dropMine() {
   if (window.Builds && window.Builds.signedOut) return window.Builds.signedOut();
   try { const f = JSON.parse(store.get('bt.calc')); if (f && f.from === 'mine') { store.set('bt.calc', JSON.stringify({ cls: f.cls, v: {}, s: {} })); store.set('bt.ign', ''); } } catch { /* nothing kept */ }
 }
-$('signout').addEventListener('click', () => api.signOut().catch(() => {}).then(() => { dropMine(); setSession(null); }));
+$('signout').addEventListener('click', () => api.signOut().catch(() => {}).then(() => { dropMine(); if (reporters.grind && reporters.grind.signedOut) reporters.grind.signedOut(); setSession(null); }));
 
 // Your Path (the Planner) is #builds, Guides #guides (a guide's job after it, #guides/mage/cleric), the Appraiser #appraiser,
 // Grind #grind and How it works #how, so each can be linked; back and forward switch views too.
@@ -3275,8 +3431,8 @@ function loadGrind() {
   });
   const json = f => fetch('data/' + f).then(r => { if (!r.ok) throw new Error(f); return r.json(); });
   const scripts = (window.Reader ? Promise.resolve() : script('reader.js')).then(() => Promise.all([script('screen.js'), script('grind-session.js'), script('grind-overlay.js'), script('grind-settings.js'), script('grind-now.js'), script('grind-card.js'), script('grind-alltime.js')])).then(() => script('grind.js'));
-  // pickup lines (loot from the game's pickup strip): behind a switch like the Timer's, off until Rimmah says so
-  const PICKUPS_ON = window.BT_PICKUPS === true;
+  // pickup lines (the live loot log from the game's pickup strip): on unless window.BT_PICKUPS is false
+  const PICKUPS_ON = window.BT_PICKUPS !== false;
   const pickups = PICKUPS_ON ? Promise.all([script('pickup-lines.js'), json('pickup-templates.json')]).then(([, tpl]) => window.PickupLines.setTemplates(tpl)) : Promise.resolve();
   grindLoading = Promise.all([scripts, pickups, json('grind.json'), json('grind-pictures.json')]).then(([, , data, pictures]) => {
     reporters.grind = window.Grind.mount($('grind-root'), { api, store, el, data, pictures, session: () => state.session, signIn: () => signIn(),

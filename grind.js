@@ -12,7 +12,7 @@ const MS = () => window.MapleScreen, GS = () => window.GrindSession;
 const MAP_SEARCH_MS = 5000;
 const KEY_OPEN = 'grind.open', KEY_LOCAL = 'grind.local', KEY_PRICES = 'grind.prices', KEY_HOME = 'grind.mesoHome';
 // (no window sizes are kept since round 2: the pop-out fits what it shows, so grind.layoutSizes3 is left behind, never read)
-const KEY_LAYOUT = 'grind.layout', KEY_DETAIL = 'grind.detail', KEY_LOOT = 'grind.loot', KEY_POPOPEN = 'grind.popOpen', KEY_POPMESO = 'grind.popMesoHr', KEY_WINDOW = 'grind.expWindow', KEY_CLASS = 'grind.class';
+const KEY_LAYOUT = 'grind.layout', KEY_LOOT = 'grind.loot', KEY_POPMESO = 'grind.popMesoHr', KEY_WINDOW = 'grind.expWindow', KEY_CLASS = 'grind.class';
 // the app's overlay: See-through (25 to 100%, in fives) and Size (60 to 160%, in tens), kept on this device
 const KEY_SEE = 'grind.seeThrough', KEY_SCALE = 'grind.overlayScale';
 // the shop window is looked for over the whole frame this often (ticks) until it's been seen, then where it was each tick
@@ -95,6 +95,8 @@ function health(f) {
   const say = (state, short, text, extra) => ({ checks: C, nudge: Object.assign({ state, short, text }, extra), stuck });
   const app = !!f.app;   // the Windows app has no share step: Start picks the game
   // f.stopped: the player pressed Stop, so in the app the game wasn't lost
+  // f.ended: End run was pressed, so nothing counts until New run, whatever the share is doing
+  if (f.ended) return say('idle', 'Run ended', "Run ended. Press New run when you're ready for the next one");
   if (!f.sharing) return app ? (!f.hasSession ? say('idle', 'Press Start', 'Press Start to begin') : f.stopped ? say('idle', 'Stopped', 'Stopped. Press Start to carry on') : say('idle', 'Lost the game', 'Lost the game window. Press Start to carry on'))
     : f.hasSession ? say('idle', 'Share stopped', 'Share stopped. Share the game window again to carry on') : say('idle', 'Not sharing yet', 'Share the game window to start');
   // f.noGame: a share in a browser has gone many frames without ever finding the game's bar, so it is most likely the wrong window
@@ -107,14 +109,13 @@ function health(f) {
   if (f.exp.ok == null || f.size.ok == null) return say('wait', 'Looking for game', 'Looking for your game…');
   if (f.slotsHidden) return say('wait', 'Open your quickslots', "Your quickslot bar is closed, so potions can't count. Press the little arrow at the bottom right of the game to open it");
   if (f.potNone) return say('wait', 'No quickslot potions', 'Put the potions you drink on your quickslots so they count');
-  // Count my loot (f.loot: { on, pictures, started, needsFlip }): the start flip through the bag also reads the mesos,
+  // Count my loot (f.loot: { on, pictures, started, rough }): the start flip through the bag also reads the mesos,
   // so it comes first, once the item pictures are in (a flip before then reads nothing). After it nothing asks for the
   // bag again: every row seen from then on counts (the forgiving bag, 2026-11-15), so a refill is just a refill
   if (f.loot && f.loot.on && f.loot.pictures === false) return say('wait', 'Loading pictures', 'Loading the item pictures for Count my loot');
-  // flip: the pop out's light shows the three tabs' own checkmarks beside its words (bagTabStates in renderHealth)
-  if (f.loot && f.loot.on && !f.loot.started) return say('wait', 'Flip your bag', 'Open your bag and flip through Equip, Use and Etc, scrolling to the bottom of each', { flip: true });
-  // with the pickup lines on, the bag is only asked for again when they can't be trusted (loot.needsFlip)
-  if (f.loot && f.loot.on && f.loot.needsFlip) return say('wait', 'Flip your bag', "Flip through your bag again, the pickup lines can't be trusted for now", { flip: true });
+  // flip: the pop out's light shows the three tabs' own checkmarks beside its words (bagTabStates in renderHealth);
+  // with the rough Profit on (loot.rough) the pickup lines lead and nothing ever asks for a flip
+  if (f.loot && f.loot.on && !f.loot.started && !f.loot.rough) return say('wait', 'Flip your bag', 'Open your bag and flip through Equip, Use and Etc, scrolling to the bottom of each', { flip: true });
   if (f.meso.unclear) return say('wait', 'Mouse off mesos', "Can't read your meso total clearly yet. Move the mouse off it");
   if (f.meso.at == null) return say('wait', 'Open your bag', 'Open your inventory for a moment so mesos count');
   if (mesoStale) return say('wait', 'Open your bag', 'Mesos last seen ' + ago(f.meso.at) + '. Open your inventory for a moment');
@@ -214,7 +215,7 @@ function lootItem(L, cell, tab, potions) {
   const grade = scroll ? String(first[1]).split(': ')[1] || '' : '';
   const pot = ids.filter(id => potions && potions[id]);
   return { key: tab[0] + cell, name: scroll && GRADES[grade] ? grade + ' scroll' : first[1], price: Math.min(...ids.map(id => L.items[id][2] || 0)),
-    kind: scroll ? 'scroll' : tab === 'Equip' ? 'equip' : tab === 'Etc' ? 'etc' : 'use', rank: scroll ? GRADES[grade] || 1 : 0, pot: pot.length ? pot : undefined };
+    kind: scroll ? 'scroll' : tab === 'Equip' ? 'equip' : tab === 'Etc' ? 'etc' : 'use', rank: scroll ? GRADES[grade] || 1 : 0, pot: pot.length ? pot : undefined, ids };
 }
 // the session's Lemon and Meat tiles: how often, what it cost (or the HP it gave back), how many for every 1%, and a
 // line by how many went down (Lemons fill a glass, Meat comes off a pig)
@@ -336,7 +337,7 @@ function runRow(r, rows, o) {
 }
 
 // pixel icons are shared with the page (pixel-icons.js, loaded by index.html)
-const { pixelSvg, RAIL_ICONS, railIcon, arrowed } = window.PixelIcons;
+const { pixelSvg, RAIL_ICONS, railIcon, arrowed, lineIcon } = window.PixelIcons;
 
 /* ---------- the tab ---------- */
 
@@ -351,7 +352,8 @@ function mount(root, deps) {
   // This map: none until the game shows it or one is picked (Rimmah, 2026-11-09: it used to start on the last map, or Remains <Tomb> I).
   // A run carried on after a reload keeps its own
   let mapId = null;
-  let session = null, viewing = null, editing = false, picturesReady = false;
+  // ended: the run End run finished, shown until New run (memory only: a reload has nothing ended); while it's set no read starts a run
+  let session = null, viewing = null, ended = null, editing = false, picturesReady = false;
   let lastHealth = null, lastRows = [], lifeAt = 0;   // the checks as last drawn, the saved sessions as last listed, when all time was drawn
   const open = jget(KEY_OPEN, null);
   if (open && open.tLast && Date.now() - open.tLast < RESUME_MS) { session = open; mapId = open.mapId || null; }   // carry on after a reload or a dropped share
@@ -376,15 +378,17 @@ function mount(root, deps) {
   const status = el('p', { class: 'g-status', id: 'g-status', role: 'status' });
   const shareArea = el('div', { id: 'g-sharearea' });
   // the button row's wood signs: a pixel icon and the words
-  const btn = (id, icon, label, onclick) => el('button', { type: 'button', id, class: 'k-btn', onclick }, el('i', { 'aria-hidden': 'true' }, railIcon(icon)), el('span', {}, label));
+  const btn = (id, icon, label, onclick) => el('button', { type: 'button', id, class: 'k-btn', onclick }, el('i', { 'aria-hidden': 'true' }, lineIcon(icon)), el('span', {}, label));
   // in the app the overlay opens with the share, so this only shows while it's closed during a session (showPop)
   const popBtn = btn('g-pop', 'pop', app ? 'Show the overlay' : 'Pop out over the game', () => popOut());
   // a fresh average from now on, to try another way of grinding; the session average keeps going
-  const markBtn = btn('g-mark', 'reset', 'Reset average', () => resetAverage());
   // the quick reset: look for the bars, measure and name the potions again, keeping the session
   const refindBtn = btn('g-refind', 'find', 'Find my game again', () => refind());
   refindBtn.classList.add('sm');
-  const newBtn = btn('g-new', 'plus', 'New session', () => newSession());
+  // New run and End run (page G): plain words under the buttons, shown while a run is going or has just ended
+  const newRunBtn = el('button', { type: 'button', id: 'g-newrun', class: 'g-runb', onclick: () => newRun() }, 'New run');
+  const endRunBtn = el('button', { type: 'button', id: 'g-endrun', class: 'g-runb', onclick: () => endRun() }, 'End run');
+  const runsRow = el('div', { class: 'g-gruns', id: 'g-gruns', hidden: '' }, newRunBtn, el('span', { class: 'g-rundiv', 'aria-hidden': 'true' }), endRunBtn);
   // the next frame from the share comes down as a picture, to send when something reads wrong
   const snapBtn = btn('g-snap', 'frame', 'Save a frame', () => { st.wantSnap = true; setStatus('Saving the next frame from your game…'); });
   // the app's power button (an app built before its bridge had quit shows none); the shell saves first, as the tray's Quit does
@@ -429,8 +433,12 @@ function mount(root, deps) {
   V.perPotRow = row('perPot', 'Potions per 1%'); V.perPotL = V.perPotRow.firstChild;
   V.perPot2Row = row('perPot2', ''); V.perPot2Row.hidden = true; V.perPot2L = V.perPot2Row.firstChild;
   V.mesoRow = row('mesoBig', 'Mesos earned', 'mesoSub', { id: 'g-mesokpi' }); V.mesoBig.className = 'g-nv g-big';
+  // Start fresh (Rimmah, 2026-11-19: one name on the page and the pop-out; 2026-11-21: a little refresh icon, no words) beside EXP an hour
+  V.expRow = row('expHr', 'EXP an hour', 'sub');
+  // on page G it sits in Now grinding's lead, beside the big EXP an hour (V.freshBtn, drawn once so a frame never takes a press off it)
+  V.freshBtn = el('button', { type: 'button', class: 'g-fresh', id: 'g-fresh', title: 'Start the average fresh from now', 'aria-label': 'Start fresh', onclick: () => resetAverage() }, lineIcon('reset'));
   const card = el('div', { class: 'g-card', id: 'g-card' },
-    row('expHr', 'EXP an hour', 'sub'), V.mesoRow,
+    V.expRow, V.mesoRow,
     row('time', 'Time', 'timeSub'), row('gain', 'EXP gained'), row('kpm', 'Kills a minute'), row('pots', 'Potions used'),
     row('costHr', 'Potions an hour'), row('per1', 'Cost per 1%'), V.perPotRow, V.perPot2Row,
     row('paceV', 'Pace', 'pace'), row('level', 'Level', 'next'));
@@ -450,8 +458,9 @@ function mount(root, deps) {
   // dark empty band over the panel (Rimmah, 2026-11-15), so the site's pop-out has no room and no mushroom (g-noroom)
   // window.BT_POPROOM === true gives the site the room too, so the tests can check the mushroom in a browser
   const ROOMY = !!app || window.BT_POPROOM === true, ROOM = ROOMY ? 30 : 0;
-  const ORDER = Object.keys(WIDTHS);
-  // anything not a layout now (a saved hero or corner) opens as Tile
+  // Tile and Bar only (Grind refresh, 2026-11-18: Column left; WIDTHS.column stays for its picture and old tests)
+  const ORDER = ['tile', 'bar'];
+  // anything not a layout now (a saved hero, corner or column) opens as Tile
   let layout = ORDER.includes(store.get(KEY_LAYOUT)) ? store.get(KEY_LAYOUT) : 'tile';
   // the app's own (the site's pop-out can't be see-through, so there both stay at 100%): See-through is how far the panel's
   // bark, glass and moss fade while it's left alone (60% with nothing saved, a saved level kept), never its text, pictures
@@ -467,6 +476,8 @@ function mount(root, deps) {
   const perPart = () => { const P = {}; P.box = el('span', { class: 'g-perp' }, P.img = el('img', { alt: '', hidden: '' }), P.n = el('span', {}, '·')); return P; };
   SP.perN = [perPart(), perPart()];
   SP.perN[1].box.hidden = true;
+  // EXP gained, Kills so far and Per 1% left the pop-out (Grind refresh, 2026-11-18; the page keeps them): hidden, still filled
+  const hid = t => { t.hidden = true; return t; };
   const perTile = () => { const t = kTile('per', 'Per 1%'); t.replaceChild(el('div', { class: 'g-kn g-ppr' }, SP.perN[0].box, SP.perN[1].box, SP.perUs = el('span', { class: 'g-us', hidden: '' })), SP.per); return t; };
   // a potion tile: a little glass that drains with the potion's picture in it, beside its clock, how many went down and
   // what's left, and a caption under them
@@ -474,7 +485,9 @@ function mount(root, deps) {
     const P = {};
     P.box = el('div', { class: 'g-pot none' },
       el('div', { class: 'g-vial' }, P.juice = el('div', { class: 'g-juice', hidden: '' }), P.img = el('img', { alt: '', hidden: '' })),
-      el('div', { class: 'g-pwords' }, P.clock = el('span', { class: 'g-pclock' }, '··:··'),
+      // round 9: one cell, how many and the name then "last" and the clock (95 Lemons last 23:44); the old lines stay for
+      // the page's hover words and are hidden in the pop-out
+      el('div', { class: 'g-pwords' }, P.lbl = el('span', { class: 'g-plbl' }), P.clock = el('span', { class: 'g-pclock' }, '··:··'),
         P.left = el('div', { class: 'g-pleft', hidden: '' }, P.n = el('b', {}), P.verb = el('span', { class: 'g-pv' }), P.dot = el('span', { class: 'g-pdot' }), P.lf = el('span', { class: 'g-plf' })),
         P.cap = el('div', { class: 'g-pcap' })));
     return P;
@@ -486,7 +499,7 @@ function mount(root, deps) {
   // pictures keeps it. While clicks pass through to the game it stays out of sight until the mouse on ⇆ holds them (the
   // CSS, g-pass and g-hold)
   const layName = l => l.charAt(0).toUpperCase() + l.slice(1);
-  SP.lay = el('button', { type: 'button', class: 'g-lay k-sq', title: 'Layout', 'aria-label': 'Layout', 'aria-haspopup': 'true', 'aria-expanded': 'false', onclick: () => layRow(true) }, railIcon('swap'));
+  SP.lay = el('button', { type: 'button', class: 'g-lay k-sq', title: 'Layout', 'aria-label': 'Layout', 'aria-haspopup': 'true', 'aria-expanded': 'false', onclick: () => layRow(true) }, lineIcon('swap'));
   SP.layRow = el('span', { class: 'g-laypick', hidden: '' }, ORDER.map(l => el('button', { type: 'button', class: 'g-laypic', 'data-l': l, 'aria-pressed': 'false', title: layName(l),
     onclick: () => { layRow(false); setLayout(l); } }, window.GrindSettings.picture(l), el('span', {}, layName(l)))));
   let layT = null;
@@ -501,46 +514,59 @@ function mount(root, deps) {
   const layWrap = el('span', { class: 'g-layw', onpointerenter: () => layRow(true, 120), onpointerleave: () => layRow(false, 300),
     onkeydown: e => { if (e.key === 'Escape' && !SP.layRow.hidden) { layRow(false); SP.lay.focus(); } },
     onfocusout: e => { if (!layWrap.contains(e.relatedTarget)) layRow(false, 300); } }, SP.lay, SP.layRow);
-  // EXP an hour's switch: 5m, 10m, the run, and since Reset average once there is one
+  // EXP an hour's switch, always showing (round 8): 5m, 10m, the run, and since 11:46 once Start fresh made a mark
   const segBtn = (w, ...kids) => el('button', { type: 'button', 'data-w': w, 'aria-pressed': 'false', onclick: () => pickWindow(w) }, ...kids);
-  SP.segs = [segBtn('5', '5m'), segBtn('10', '10m'), segBtn('run', 'run'), segBtn('since', el('span', { class: 'g-sw' }, 'since '), SP.sinceAt = el('span', {}))];
+  SP.segs = [segBtn('5', '5m'), segBtn('10', '10m'), segBtn('run', 'run'), segBtn('since', 'since ', SP.sinceAt = el('span', {}))];
   SP.segs[3].hidden = true;
-  // the window row (Rimmah, 2026-11-14): the window in words at rest ("last 5 min", "this run", "since 11:46"); the switch and ↻ come
-  // up under the mouse or keyboard focus and go back about 2 s after it leaves (the CSS), so the row never changes height
-  SP.winWords = el('span', { class: 'g-ww' });
-  SP.again = el('button', { type: 'button', class: 'g-again', title: 'Start fresh from now', 'aria-label': 'Start fresh from now', onclick: () => resetAverage() }, railIcon('reset'));
+  // Start fresh: a little refresh icon beside the EXP/hr label (2026-11-21, in place of round 8's underlined words)
+  SP.fresh = el('button', { type: 'button', class: 'g-fresh', title: 'Start the average fresh from now', 'aria-label': 'Start fresh', onclick: () => resetAverage() }, lineIcon('reset'));
+  // the foot of every view (round 7): New run and End run as plain words. End run waits for the run's first EXP and greys
+  // once it's ended. Tile puts them at the panel's foot, Bar in its one right cell under the light and the icons
+  SP.runs = el('div', { class: 'g-runs' },
+    SP.newRun = el('button', { type: 'button', class: 'g-newrun', title: 'Save this run and start the next one', onclick: () => newRun() }, 'New run'),
+    SP.endRun = el('button', { type: 'button', class: 'g-endrun', title: 'Save this run and stop counting', disabled: '', onclick: () => endRun() }, 'End run'));
+  // after End run (round 7): how it went in Lemons, Mesos an hour, what it came to if you sold everything, and a way to the
+  // page's Run summary. The Lemon pictures are filled in when they show (the client's Lemon icon)
+  SP.rate = el('div', { class: 'g-rate', role: 'img', hidden: '' }, el('div', { class: 'g-rl' }, 'How it went'),
+    SP.rateLem = el('div', { class: 'g-rlem' }, Array.from({ length: 5 }, () => el('img', { alt: '' }))), SP.rateT = el('div', { class: 'g-rtitle' }));
+  SP.sumLink = el('button', { type: 'button', class: 'g-sumlink', hidden: '', onclick: () => seeSummary() }, 'See the run summary');
   const strip = el('div', { class: 'g-strip', id: 'g-strip', 'data-layout': layout, 'data-pots': '1', hidden: '' },
-    el('div', { class: 'g-top' },
+    // .g-right: Bar's one right cell (the light, the four icons and the run buttons); Tile lays its children out on its own
+    el('div', { class: 'g-top' }, SP.right = el('div', { class: 'g-right' },
       // the light: is it ready, in a colour and two or three words (green reading, amber it wants something, red paused,
       // grey not running), with the bag's three tabs ticking off beside it during a flip
-      // the map and how long sit under it, in the same box (Bar stacks the two, the others lay them out as their own rows)
+      // the map and how long sit under it in Tile; Bar gives them a cell of their own after the potions
       SP.who = el('span', { class: 'g-who' },
         SP.lamp = el('span', { class: 'g-lamp idle', role: 'status' }, el('i', { class: 'g-dot', 'aria-hidden': 'true' }),
           el('span', { class: 'g-lw' }, SP.lampT = el('span', { class: 'g-lt' }))),
         // flipping the bag: a little light for each tab on a row of its own (grey to go, amber scroll on, lime seen), where the
         // map and how long sit otherwise (Rimmah, 2026-11-16: the ticks beside the words were bunched up and cut off)
         SP.lampF = el('span', { class: 'g-flip', role: 'status', hidden: '' }),
-        SP.el = el('span', { class: 'g-el' }, SP.elMap = el('span', { class: 'g-elm' }), SP.elTime = el('span', { class: 'g-elt' }))),
+        SP.el = el('span', { class: 'g-el' }, SP.elMap = el('span', { class: 'g-elm' }), SP.elDot = el('span', { class: 'g-eld' }), SP.elTime = el('span', { class: 'g-elt' }))),
       el('span', { class: 'g-btns' },
-        SP.moreBtn = el('button', { type: 'button', class: 'g-more k-sq', title: 'Show more', 'aria-label': 'Show more', 'aria-expanded': 'false', onclick: () => toggleOpen() }, railIcon('down')),
+        SP.moreBtn = el('button', { type: 'button', class: 'g-more k-sq', title: 'Show more', 'aria-label': 'Show more', 'aria-expanded': 'false', onclick: () => toggleOpen() }, lineIcon('down')),
         layWrap,
-        SP.gear = el('button', { type: 'button', class: 'g-gear k-sq', title: 'Settings', 'aria-label': 'Settings', 'aria-pressed': 'false', onclick: () => toggleSettings() }, railIcon('gear')),
+        SP.gear = el('button', { type: 'button', class: 'g-gear k-sq', title: 'Settings', 'aria-label': 'Settings', 'aria-pressed': 'false', onclick: () => toggleSettings() }, lineIcon('gear')),
         // the app's overlay has no frame: ✕ closes just it and brings the main window up, the session goes on (Show the
         // overlay brings it back). The site's pop-out has the browser's own ✕
-        app ? el('button', { type: 'button', class: 'g-close g-x k-sq', title: 'Back to the main window', 'aria-label': 'Back to the main window', onclick: () => backToMain() }, railIcon('close')) : null)),
-    el('div', { class: 'g-body' },
+        app ? el('button', { type: 'button', class: 'g-close g-x k-sq', title: 'Back to the main window', 'aria-label': 'Back to the main window', onclick: () => backToMain() }, lineIcon('close')) : null))),
+    SP.body = el('div', { class: 'g-body' }, SP.rate,
       el('div', { class: 'g-k-exp' },
-        SP.kh = el('div', { class: 'g-kh' }, el('span', { class: 'g-kl' }, 'EXP an hour'), SP.winRow = el('span', { class: 'g-win' }, SP.winWords, SP.seg = el('span', { class: 'g-seg', role: 'group', 'aria-label': 'EXP an hour over' }, SP.segs), SP.again)),
+        SP.kh = el('div', { class: 'g-kh' }, el('span', { class: 'g-kl' }, 'EXP/hr'), SP.fresh),
         el('div', { class: 'g-kv' }, SP.exp = el('span', { class: 'g-kn' }, '·'),
           // the line under it: ▲ 4% (words, never a pill), "over usual" in Tile only, then "· usual 121K" everywhere else
           SP.chip = el('span', { class: 'g-chip' }, SP.expD = el('span', { class: 'g-d' }), SP.expOv = el('span', { class: 'g-over' })),
-          SP.expUs = el('span', { class: 'g-us', hidden: '' }, SP.expUn = el('span', {})))),
+          SP.expUs = el('span', { class: 'g-us', hidden: '' }, SP.expUn = el('span', {}))),
+        // the switch under the number, always showing
+        SP.winRow = el('span', { class: 'g-win' }, SP.seg = el('span', { class: 'g-seg', role: 'group', 'aria-label': 'EXP an hour over' }, SP.segs))),
       // closed: EXP an hour with its line, Kills a minute, Lv in, Profit, the timers. The ▾ button opens the rest (the little columns)
-      kTile('kills', 'Kills a minute'), kTile('lv', 'Level in'), kTile('profit', 'Profit'),
-      SP.grid = el('div', { class: 'g-grid' }, kTile('gain', 'EXP gained'), kTile('ksf', 'Kills so far'), perTile(),
+      kTile('kills', 'Kills/min'), kTile('lv', 'Level in'), kTile('profit', 'Profit'),
+      hid(kTile('mhr', 'Mesos/hr')), hid(kTile('sold', 'If you sold everything')),
+      SP.grid = el('div', { class: 'g-grid' }, hid(kTile('gain', 'EXP gained')), hid(kTile('ksf', 'Kills so far')), hid(perTile()),
         SP.partsBox = el('div', { class: 'g-parts' }, ...[['pMesos', 'Mesos'], ['pLoot', 'Loot'], ['pPots', 'Potions']].map(([k, w]) => el('div', { class: 'g-part' }, el('span', { class: 'g-pl' }, w), SP[k] = el('b', { class: 'g-pn' }, '·')))),
         SP.town = el('div', { class: 'g-town', hidden: '' })),
-      SP.tilesBox = el('div', { class: 'g-tiles' }, SP.pots[0].box, SP.quip = el('div', { class: 'g-quip', hidden: '' }, SP.quipB = el('b', {}), SP.quipS = el('span', {})))),
+      SP.tilesBox = el('div', { class: 'g-tiles' }, SP.pots[0].box, SP.quip = el('div', { class: 'g-quip', hidden: '' }, SP.quipB = el('b', {}), SP.quipS = el('span', {}))),
+      SP.sumLink),
     SP.l3 = el('div', { class: 'g-l3 g-alert', hidden: '' }),
     // moss tufts along the frame's top, and the Orange Mushroom in the room above the panel's top left (clipped at the bark's
     // inner edge) with its bubble: they come out with the one line worth saying (shroomLine) and never size the window
@@ -565,7 +591,9 @@ function mount(root, deps) {
     put(SP.profit, pv);
     // a million or more is a long number: Tile draws it smaller in its half, so the whole panel's text doesn't shrink for it
     SP.profit.classList.toggle('g-long', pv.length >= 10);
-    put(SP.profitSub, GS().profitWords(P, Date.now()));
+    // the small line only once loot is in it (Rimmah, 2026-11-17: no hints in the tiles, the light says what it wants)
+    // (a rough Profit from pickup lines says about and how old its check is from the first pickup)
+    put(SP.profitSub, P && (P.lootCounted || P.sure) ? GS().profitWords(P, Date.now()) : '');
     // opened: the three parts it is made of, each a word over its number (loot is a dot until a bag is counted)
     const part = (e, v) => put(e, !P || v == null ? '·' : sgnK(v));
     part(SP.pMesos, P && P.mesos); part(SP.pLoot, P && P.loot); part(SP.pPots, !P || P.potions == null ? null : -P.potions);
@@ -573,25 +601,37 @@ function mount(root, deps) {
   const potCount = () => +strip.dataset.pots || 1;
   // ▾ opens the rest of the numbers (Profit's parts, EXP gained, Kills so far, Per 1%, In town), ▴ tucks them away; kept per layout on the device.
   // The window grows and shrinks with it (fit()); the text keeps its size, set by the window's width
-  const popOpen = () => { const o = jget(KEY_POPOPEN, {}); return o && typeof o === 'object' ? o : {}; };
+  // the pop-out opens closed every time (Rimmah, 2026-11-19): the open state lives in memory only, never saved, so an old
+  // saved grind.popOpen is ignored. window.BT_POPOPEN === true starts it open, for the tests
+  let popOpenNow = window.BT_POPOPEN === true;
   function syncOpen() {
-    const on = !!popOpen()[layout];
+    const on = popOpenNow;
     strip.dataset.open = on ? '1' : '0';
     SP.moreBtn.setAttribute('aria-expanded', String(on));
     const t = on ? 'Show less' : 'Show more';
     SP.moreBtn.title = t; SP.moreBtn.setAttribute('aria-label', t);
-    SP.moreBtn.replaceChildren(railIcon(on ? 'up' : 'down'));
+    SP.moreBtn.replaceChildren(lineIcon(on ? 'up' : 'down'));
   }
   function toggleOpen() {
-    const o = popOpen(); o[layout] = !o[layout]; jset(KEY_POPOPEN, o);
+    popOpenNow = !popOpenNow;
     syncOpen();
     overlay.fit();
   }
   syncOpen();
-  // the map and run time, then the window row, sit with the light in every layout (round 2, as the mockups draw them):
-  // Tile stacks them under the light, Column puts them on one row under it, and Bar stacks them in its first column
+  // the map and run time: Tile puts them under EXP an hour's switch (round 8), Bar gives them a cell after the potions
+  // (round 9). The run buttons: Tile's foot, Bar's right cell under the light and the icons
   function placeEl() {
-    if (SP.el.parentNode !== SP.who || SP.winRow.parentNode !== SP.who) SP.who.append(SP.el, SP.winRow);
+    if (layout === 'tile' && ended) {
+      // ended: map · how long goes up top, over the Lemon rating (round 7)
+      if (SP.el.nextSibling !== SP.rate) SP.rate.before(SP.el);
+      if (SP.runs.parentNode !== SP.body || SP.body.lastChild !== SP.runs) SP.body.append(SP.runs);
+    } else if (layout === 'tile') {
+      if (SP.el.previousSibling !== SP.winRow) SP.winRow.after(SP.el);
+      if (SP.runs.parentNode !== SP.body || SP.body.lastChild !== SP.runs) SP.body.append(SP.runs);
+    } else {
+      if (SP.el.previousSibling !== SP.tilesBox) SP.tilesBox.after(SP.el);
+      if (SP.runs.parentNode !== SP.right) SP.right.append(SP.runs);
+    }
   }
   placeEl();
   // the window the panel lives in, as wide as its layout and tile count (times the app's Size) and as tall as the panel
@@ -668,12 +708,14 @@ function mount(root, deps) {
   // lootIdx and lootImg: the item pictures' sheet (the card's lists show them whatever the switch says); lootReady: the reader
   // has them too, so a flip through the bag counts
   let lootOn = store.get(KEY_LOOT) === '1', lootIdx = null, lootImg = null, sheetLoad = null, lootLoad = null, lootReady = false;
-  const lootWords = el('span', {}, 'Count my loot: ' + (lootOn ? 'on' : 'off'));
-  const lootBtn = el('button', { type: 'button', id: 'g-loot', class: 'k-btn', 'aria-pressed': String(lootOn), onclick: () => setLoot(!lootOn) }, el('i', { 'aria-hidden': 'true' }, railIcon('book')), lootWords);
+  const lootBtn = el('button', { type: 'button', id: 'g-loot', class: 'g-switch', role: 'switch', 'aria-checked': String(lootOn), onclick: () => setLoot(!lootOn) },
+    el('span', { class: 'g-knob', 'aria-hidden': 'true' }), el('span', {}, 'Count my loot'));
   const bagCheck = el('ul', { class: 'g-check g-bagcheck', id: 'g-bagcheck', hidden: '' }, ['Equip', 'Use', 'Etc'].map(t => el('li', { 'data-k': 'bag-' + t }, el('b', {}, t), el('span', {}, 'Open it in your bag'))));
   // What it earned (V.res), a Window: the session's total as the lead number with Profitable or Losing and the hourly number under it, the
-  // plain rows it adds up from, and with Count my loot on What you picked up beside them. The kept lines are small print under both
-  V.res = el('section', { class: 'g-win g-res', id: 'g-res', hidden: '' },
+  // plain rows it adds up from. The kept lines are small print under them. With Count my loot on, What you picked up (V.resLoot) sits
+  // under Now grinding's two columns at the full width (2026-11-21), so it is its own block, shown and hidden with V.res
+  V.resLoot = el('div', { class: 'g-res-loot', id: 'g-res-loot', hidden: '' });
+  V.res = el('section', { class: 'g-res', id: 'g-res', hidden: '' },
     el('div', { class: 'k-bar' }, el('h2', {}, 'What it earned'), V.resBar = el('small', {})),
     el('div', { class: 'k-pad g-res-pad' },
       el('div', { class: 'g-res-grid' },
@@ -683,14 +725,14 @@ function mount(root, deps) {
           V.resSub = el('p', { class: 'g-note g-res-sub', id: 'g-res-sub' }),
           V.resRows = el('div', { class: 'k-rows g-res-rows', id: 'g-res-rows' }),
           V.resNudge = el('div', { class: 'g-res-nudge', id: 'g-res-nudge' }, el('span', {}, "Your loot isn't counted, so this only shows mesos."),
-            el('button', { type: 'button', class: 'k-btn sm', onclick: () => setLoot(true) }, 'Count my loot next time'))),
-        V.resLoot = el('div', { class: 'g-res-loot', id: 'g-res-loot' })),
+            el('button', { type: 'button', class: 'k-btn sm', onclick: () => setLoot(true) }, 'Count my loot next time')))),
       el('div', { class: 'g-res-small' }, V.resLines = el('div', { class: 'g-res-lines', id: 'g-res-lines' }), V.resOther = el('p', { class: 'g-note' }),
-        el('p', { class: 'g-note' }, 'Count my loot reads your bag when you flip through Equip, Use and Etc: the first full look and the latest one, at what an NPC pays (the market may pay more later). ' +
-          'Without it, selling loot from an earlier session counts as earned. Items you use, wear, drop or hand over count as loot going down.'))));
+        el('details', { class: 'g-howc' }, el('summary', {}, 'How this is counted'),
+          el('p', { class: 'g-note' }, 'Count my loot reads your bag when you flip through Equip, Use and Etc: the first full look and the latest one, at what an NPC pays (the market may pay more later). ' +
+            'Without it, selling loot from an earlier session counts as earned. Items you use, wear, drop or hand over count as loot going down.')))));
   function setLoot(on) {
     lootOn = on; store.set(KEY_LOOT, on ? '1' : '');
-    lootBtn.setAttribute('aria-pressed', String(on)); lootWords.textContent = 'Count my loot: ' + (on ? 'on' : 'off'); bagCheck.hidden = !on;
+    lootBtn.setAttribute('aria-checked', String(on)); bagCheck.hidden = !on;
     if (session) session.mode = on ? 'loot' : 'track';
     if (on) loadLoot();
     render();
@@ -821,7 +863,8 @@ function mount(root, deps) {
   function openProfile() {
     toMain();
     try { window.focus(); } catch (e) { /* the browser keeps the focus where it is */ }
-    (alltime.el.hidden ? nowCard.el : alltime.el).scrollIntoView({ block: 'start', behavior: 'smooth' });
+    if (!life.hidden) setFold('g-life', true);
+    (life.hidden ? nowCard.el : life).scrollIntoView({ block: 'start', behavior: 'smooth' });
   }
   const mapNote = el('p', { class: 'g-note' });
   let mapMobs = [], drops = null, mobSprites = null;   // the map's monsters, most numerous first; the card's data files, once they arrive   // the card's data files, once they arrive
@@ -840,14 +883,30 @@ function mount(root, deps) {
   // the share started: every check not read yet is looked for now (one already read keeps what it read)
   function startChecks() {
     for (const [k] of CHECKS) if (check.querySelector('[data-k="' + k + '"]').classList.contains('idle')) setCheck(k, '', 'Looking…');
-    if (!session) { detailOpen = true; showDetail(); }   // This run opens with the share, showing only Notices until a session starts
+    showDetail();   // the Run summary's row shows with the share; it stays closed until pressed
   }
   // this session on the Now grinding card's band, and its details (the session's card, the potions with their prices, the
   // charts) folded away until asked for (kept on the device); a saved session opened from the list always shows them
-  V.now = el('div', { class: 'g-nowv' });
-  let detailOpen = store.get(KEY_DETAIL) === '1';
-  const moreWords = el('span', {}, 'Show this run');
-  const moreBtn = el('button', { type: 'button', id: 'g-more', class: 'k-btn push', 'aria-controls': 'g-detail', onclick: () => { detailOpen = !detailOpen; store.set(KEY_DETAIL, detailOpen ? '1' : ''); showDetail(); } }, el('i', { 'aria-hidden': 'true' }, railIcon('find')), moreWords);
+  // page G's left column: the lead (the big EXP an hour, against your usual, and Start fresh), then plain rows; before the first EXP one line
+  V.nowLead = el('div', { class: 'g-glead' }); V.nowRows = el('div', { class: 'k-rows g-grows' }); V.nowSay = el('p', { class: 'g-nm', hidden: '' });
+  V.now = el('div', { class: 'g-nowv' }, el('div', { class: 'g-gleadrow' }, V.nowLead, V.freshBtn), V.nowRows, V.nowSay);
+  // the folds (page G): Run summary, All time, Your runs and Your record are rows on the trail, every one closed on load (never kept),
+  // and a press opens only that one
+  const foldOpen = {}, folds = {};
+  function foldOf(id, title, body, cls) {
+    const arrow = el('i', { class: 'g-foldarrow', 'aria-hidden': 'true' }, lineIcon('down'));
+    const head = el('button', { type: 'button', class: 'g-foldhead', 'aria-expanded': 'false', 'aria-controls': id + '-body', onclick: () => setFold(id, !foldOpen[id]) },
+      el('h2', {}, title), el('span', { class: 'push' }), arrow);
+    const bodyEl = el('div', { class: 'g-foldbody', id: id + '-body', hidden: '' }, ...body);
+    const f = el('section', { class: 'g-stop g-fold' + (cls ? ' ' + cls : ''), id, hidden: '' }, head, bodyEl);
+    folds[id] = { f, head, body: bodyEl, arrow };
+    return f;
+  }
+  function setFold(id, on) {
+    const F = folds[id]; foldOpen[id] = !!on;
+    F.head.setAttribute('aria-expanded', String(!!on)); F.body.hidden = !on; F.f.classList.toggle('open', !!on);
+    F.arrow.replaceChildren(lineIcon(on ? 'up' : 'down'));
+  }
   // the session card (grind-card.js): where this run ranks among your own at the map. Its pictures are looked up when it draws
   const sCard = window.GrindCard.build({ el, whole, pics: { get lemon() { return picOf(LEMON_IDS) || null; }, get meat() { return picOf(MEAT_IDS) || null; } } });
   // Notices (live only): a time stamped log, newest first, three rows and Show all N; Save a frame sits in its foot. A row is added when a
@@ -866,13 +925,37 @@ function mount(root, deps) {
   const numbers = el('section', { class: 'g-win', id: 'g-numbers', hidden: '' }, el('div', { class: 'k-bar' }, el('h2', {}, 'The numbers')),
     el('div', { class: 'k-pad g-numpad' }, card, V.numFoot = el('div', { class: 'g-numfoot' }, V.mesos, mapNote, partyCompare, V.tradeBox)));
   const duo = el('div', { class: 'g-duo', id: 'g-duo' }, potWin, notices);
-  const detail = el('div', { class: 'g-stop g-detail', id: 'g-detail', hidden: '' }, el('div', { class: 'k-bar' }, el('h2', {}, 'This run')), viewBar, sCard.el, V.res, numbers, duo);
+  const detail = foldOf('g-detail', 'Run summary', [viewBar, sCard.el, numbers, duo], 'g-detail');
+  // the Run summary after End run (mockup G after End run): when it ended and how long it went with Start a new run, the window's one
+  // amber button; How it went (the Lemon rating, the rows, the minute strip, Lemons and Meat) beside If you sold everything (the total,
+  // its rows, what you looted, the Cozy credit). It takes Run summary's place in the fold while the run that just ended is open
+  const E = {};
+  V.endSum = el('div', { class: 'g-endsum', id: 'g-endsum', hidden: '' },
+    el('div', { class: 'g-endtop' },
+      el('div', { class: 'g-endtitle' }, E.head = el('p', { class: 'g-endhead', id: 'g-endhead' }), el('h2', {}, 'Run summary'), E.mins = el('p', { class: 'g-endmins' })),
+      el('button', { type: 'button', class: 'k-btn key', id: 'g-startrun', onclick: () => newRun().then(() => Object.keys(folds).forEach(id => setFold(id, false))) }, 'Start a new run')),
+    el('div', { class: 'g-gcols g-endcols' },
+      el('div', { class: 'g-gleft' },
+        el('div', {}, el('h3', { class: 'g-endh' }, 'How it went'), E.lem = el('div', { class: 'g-endlem', role: 'img' }),
+          E.rate = el('p', { class: 'g-endrate', id: 'g-endrate' }), E.words = el('p', { class: 'g-endwords', id: 'g-endwords' })),
+        E.rows = el('div', { class: 'k-rows g-grows' }),
+        E.minBox = el('div', {}, el('h3', { class: 'g-endh' }, 'Minute by minute'), E.whole = el('div', { class: 'g-endwhole' }),
+          el('p', { class: 'g-note' }, 'Brighter is faster. An empty one is a minute with no EXP, like a trip to town.')),
+        el('div', {}, el('h3', { class: 'g-endh' }, 'Lemons and Meat'), E.eat = el('div', { class: 'g-endeat' }))),
+      el('div', { class: 'g-gright' },
+        el('div', {}, el('h3', { class: 'g-endh' }, 'If you sold everything'), E.sold = el('p', { class: 'g-endsold', id: 'g-endsold' })),
+        E.sRows = el('div', { class: 'k-rows g-grows' }),
+        E.loot = el('div', { class: 'g-endloot' }),
+        E.credit = el('div'))));
+  folds['g-detail'].body.prepend(V.endSum);
+  const wholeHome = { parent: whole.parentNode, next: whole.nextSibling };
   // This run opens when the game is shared, even before a session starts (then only Notices, so a player whose game isn't being
   // found can read why), and a saved run always shows it. With nothing to show the block takes no room
+  // the other three fold rows show while a run is going, and otherwise once they have something (eaten, a saved run, a session counted)
+  const foldHas = { life: false, runs: false, record: false };
   function showDetail() {
-    const open = (detailOpen || !!viewing) && (!!session || !!viewing || st.sharing);
-    detail.hidden = !open;
-    moreBtn.setAttribute('aria-expanded', String(open)); moreWords.textContent = open ? 'Hide this run' : 'Show this run';
+    detail.hidden = !(session || viewing || st.sharing);
+    life.hidden = !(foldHas.life || session); runsWin.hidden = !(foldHas.runs || session); record.hidden = !(foldHas.record || session);
     const s = viewing || session;
     numbers.hidden = potWin.hidden = !s;
     notices.hidden = !!viewing || !(st.sharing || st.notes.length);
@@ -880,10 +963,10 @@ function mount(root, deps) {
   }
   // the button row of the Now grinding window, left to right (Show this run is pushed to the right end). Share and Stop come from the
   // reader (shareArea); Find my game again lives on the problem line, and the version line at the page's foot
-  const tools = el('div', { class: 'k-tools', id: 'g-tools' }, shareArea, popBtn, markBtn, newBtn, lootBtn, setBtn, quitBtn, moreBtn);
+  const tools = el('div', { class: 'k-tools', id: 'g-tools' }, shareArea, popBtn, setBtn, quitBtn);
   // Now grinding (grind-now.js): the window with the map's pick and the lantern in its title bar, the numbers line, the buttons, the
   // lines that need you, then the map's monsters, the best drops there and what you picked up
-  const nowCard = window.GrindNow.build({ el, band: V.now, tools, lamp: V.pill, mapPick, classPick, steps, lines: [V.problem, V.nudge, V.trade, bagCheck, check], mobName: id => (data.mobs[id] || [''])[0],
+  const nowCard = window.GrindNow.build({ el, band: V.now, tools, runs: runsRow, right: el('div', { class: 'g-gres' }, lootBtn, V.res), under: V.resLoot, lamp: V.pill, mapPick, classPick, steps, lines: [V.problem, V.nudge, V.trade, bagCheck, check], mobName: id => (data.mobs[id] || [''])[0],
     pics: { item: id => lootIdx && lootIdx.items[id] ? cellPic(lootIdx.items[id][3]) : null } });
   // all time: Lemons and Meat first (by the client's own pictures), then the totals, the maps, personal bests and the days
   const LEMON_IDS = Object.keys(data.potions).filter(id => data.potions[id][0] === 'Lemon').map(Number);
@@ -912,20 +995,21 @@ function mount(root, deps) {
     sprites: () => mobSprites, mesos: fmtK, claims });
   // Your runs, then Your record: two stops on the trail. Runs are rows (five, then show more); the record is the five totals in a band, the most
   // trained maps as rows with their hours, Personal bests, then the days
-  const runsWin = el('section', { class: 'g-stop g-win', id: 'g-runs', hidden: '' }, el('div', { class: 'k-bar' }, el('h2', {}, 'Your runs')),
-    el('div', { class: 'k-pad g-runpad' }, sessions, runsMore));
-  const record = el('section', { class: 'g-stop g-win', id: 'g-record', hidden: '' }, el('div', { class: 'k-bar' }, el('h2', {}, 'Your record')),
+  const runsWin = foldOf('g-runs', 'Your runs', [el('div', { class: 'k-pad g-runpad' }, sessions, runsMore)]);
+  const record = foldOf('g-record', 'Your record', [
     el('div', { class: 'k-pad g-recpad' },
       LF.other = el('p', { class: 'g-note' }),
       LF.tots = el('div', { class: 'g-tots' }),
       el('div', { class: 'g-lgrid' },
         el('div', { class: 'g-lcard' }, el('h3', {}, 'Most trained maps'), LF.maps = el('div', { class: 'k-rows', id: 'g-maps' })),
         el('div', { class: 'g-lcard' }, el('h3', {}, 'Personal bests'), LF.bests = el('div', { class: 'k-rows g-bests', id: 'g-bests' }))),
-      el('div', { class: 'g-lcard' }, el('h3', {}, 'Days you grinded'), LF.days = el('div', { class: 'g-days', id: 'g-days' }), LF.daysNote = el('p', { class: 'g-note' }))));
-  const life = el('div', { class: 'g-life', id: 'g-life' }, runsWin, record);
+      el('div', { class: 'g-lcard' }, el('h3', {}, 'Days you grinded'), LF.days = el('div', { class: 'g-days', id: 'g-days' }), LF.daysNote = el('p', { class: 'g-note' })))]);
+  // All time's fold keeps grind-alltime.js's window (id g-alltime) inside it, its own title left out by the CSS
+  alltime.el.classList.remove('g-stop'); alltime.el.hidden = false;
+  const life = foldOf('g-life', 'All time', [alltime.el]);
   // the trail (2026-11-16): the status line, then the stops (Now grinding, This run when open, All time, Your runs, Your record) on
   // one dotted trail, and the small print off it
-  root.replaceChildren(el('div', { class: 'k-col g-col' }, status, el('div', { class: 'g-trail', id: 'g-trail' }, nowCard.el, detail, alltime.el, life),
+  root.replaceChildren(el('div', { class: 'k-col g-col' }, status, el('div', { class: 'g-trail', id: 'g-trail' }, nowCard.el, detail, life, runsWin, record),
     el('div', { class: 'g-print' }, el('p', { class: 'g-note' }, 'Item and UI pictures are from MapleStory, which belongs to Nexon.'), verLine)), strip);
 
   const setStatus = msg => { status.textContent = msg; };
@@ -966,7 +1050,9 @@ function mount(root, deps) {
   // The strip above the quickslots is cropped from the frame already in hand every tick (lines last a few seconds, so a read
   // every 1.4 s would miss some), fed to the tracker, and each new line is read: an item line for its tab and count (its name
   // stays unread for now), a mesos line for its amount. Display only: GrindSession keeps them beside the bag, never in the money
-  const PICKUPS = window.BT_PICKUPS === true && !!window.PickupLines;
+  const PICKUPS = window.BT_PICKUPS !== false && !!window.PickupLines;
+  // the rough Profit from pickup lines (off: the bag alone); it runs on the lines, so no lines means no rough Profit
+  window.GrindSession.CFG.ROUGH = window.BT_ROUGH !== false && PICKUPS;
   let pickTracker = null, pickCv = null, pickKey = '';
   // the gap between the frames the tab reads: a median over 1.5 s (half a line's life) means lines can slip by unseen
   const frameGaps = []; let lastFrameT = 0;
@@ -974,6 +1060,29 @@ function mount(root, deps) {
     if (lastFrameT) { frameGaps.push(now - lastFrameT); if (frameGaps.length > 20) frameGaps.shift(); }
     lastFrameT = now;
     st.pickupSlow = frameGaps.length >= 10 && frameGaps.slice().sort((a, b) => a - b)[frameGaps.length >> 1] > 1500;
+  }
+  // the names a pickup line could be (PickupLines.nameOf matches against these, never guesses): what the map the game is on
+  // drops (grind-drops.json through the map's spawns in grind.json) and every name the bag has shown this run; no map, the bag's
+  let dropNames = null, dropNamesAt = null, dropIds = new Set();
+  function pickupNames(s) {
+    const id = mapOfNow(s), out = new Set();
+    if (id && drops && data.maps[id]) {
+      if (dropNamesAt !== id) { dropNamesAt = id; dropNames = []; dropIds = new Set(); for (const [mob] of data.maps[id].s || []) for (const it of drops.mobs[mob] || []) if (drops.items[it]) { dropNames.push(drops.items[it].n); dropIds.add(+it); } }
+      for (const n of dropNames) out.add(n);
+    }
+    const tabs = s && s.bag && s.bag.tabs;
+    if (tabs) for (const T of Object.values(tabs)) for (const it of Object.values((T && T.items) || {})) if (it && it.name) out.add(it.name);
+    return [...out];
+  }
+  // a named line's item id and NPC price from loot-icons.json: the one item of that name in that tab, or the one the map's
+  // monsters drop when two share it; else no id and the lowest NPC price among them (worth is never more than the bag says)
+  let byName = null;
+  function pickupItem(name, tab) {
+    if (name == null || !lootIdx) return { id: null, npc: null };
+    if (!byName) { byName = new Map(); for (const [id, [t, n, npc]] of Object.entries(lootIdx.items)) { const k = t + '|' + String(n).toLowerCase(); (byName.get(k) || byName.set(k, []).get(k)).push([+id, npc || 0]); } }
+    const all = byName.get(tab + '|' + String(name).toLowerCase()) || [];
+    const hit = all.length === 1 ? all[0] : all.find(([id]) => dropIds.has(id));
+    return hit ? { id: hit[0], npc: hit[1] } : { id: null, npc: all.length ? Math.min(...all.map(x => x[1])) : null };
   }
   function readPickups(src, info) {
     if (PICKUPS) noteFrame(Date.now());
@@ -987,12 +1096,13 @@ function mount(root, deps) {
     pickCv.width = a.w; pickCv.height = a.h;
     const g = pickCv.getContext('2d', { willReadFrequently: true });
     g.drawImage(src, a.x, a.y, a.w, a.h, 0, 0, a.w, a.h);
-    const id = g.getImageData(0, 0, a.w, a.h), img = { w: id.width, h: id.height, data: id.data }, rows = PL.rowsOf(img), born = pickTracker.feed(rows, now).births;
+    // the tracker tells the shift between reads by each row's ink (sig), as the gate does
+    const id = g.getImageData(0, 0, a.w, a.h), img = { w: id.width, h: id.height, data: id.data }, read = PL.readRows(img), rows = read.rows, born = pickTracker.feed(rows, now, read.sig).births;
     if (!born.length) return;
     st.lineT = now;
-    const items = [], mesos = [];
+    const items = [], mesos = [], names = born.some(i => rows[i] === 'I') ? pickupNames(session) : [];
     for (const i of born) {
-      if (rows[i] === 'I') { const r = PL.readItem(img, i); items.push({ tab: r.tab, qty: r.qty, name: null }); }
+      if (rows[i] === 'I') { const r = PL.readItem(img, i), name = PL.nameOf(img, i, names); items.push(Object.assign({ tab: r.tab, qty: r.qty, name }, pickupItem(name, r.tab))); }
       else if (rows[i] === 'M') mesos.push(PL.readMesos(img, i).amount);
     }
     GS().add(session, { t: now, pickup: { items, mesos, lines: items.length + mesos.length } });
@@ -1144,7 +1254,11 @@ function mount(root, deps) {
         else setCheck('potions', '', 'No potions on your quickslot bar yet (potions only count from the bar at the bottom right)');
       }
     }
-    if (reading.exp != null || reading.counts.length) {
+    takeReading(reading, mesos);
+  }
+  // one reading into the run: the first one starts it, except after End run, when nothing starts until New run
+  function takeReading(reading, mesos) {
+    if ((reading.exp != null || reading.counts.length) && !(ended && !session)) {
       if (!session) { session = GS().create({ mapId, t: reading.t, prices, eat: eatCfg() }); session.mode = lootOn ? 'loot' : 'track'; }
       GS().add(session, reading); st.reads++;
       if (reading.exp != null) { if (st.prevExp != null && reading.exp !== st.prevExp) st.movedT = reading.t; st.prevExp = reading.exp; }
@@ -1152,7 +1266,7 @@ function mount(root, deps) {
       if (session.levelByExp) { st.level = session.level; mark('level', true); setCheck('level', 'done', 'Level ' + st.level); }
     }
     // the last 10 readings, for a Something off? report (an 84 read as 684 shows up here)
-    st.recent.push({ t: reading.t, exp: reading.exp, pct: reading.pct, level: reading.level, mesos,
+    st.recent.push({ t: reading.t, exp: reading.exp, pct: reading.pct, level: reading.level, mesos: mesos == null ? reading.mesos : mesos,
       counts: reading.counts.map(c => ({ key: c.key, id: c.id, value: c.value })) });
     if (st.recent.length > 10) st.recent.shift();
     // saved before it's drawn, so a drawing bug can't take the save with it
@@ -1355,8 +1469,38 @@ function mount(root, deps) {
       st.notes = []; st.noted = {}; notesOpen = false; renderNotices();   // Notices last the session
       if (opens) viewing = GS().fromRow(row, eatCfg());
       render();
-      if (opens) detail.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      if (opens) { setFold('g-detail', true); detail.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
       setStatus('New session. It starts with your next EXP.');
+    });
+  }
+  // End run: the run is saved and stays on show, and nothing counts until New run. A run with no EXP saves nothing (a row an
+  // earlier minute save kept on the device, or one waiting its turn for the account, goes too) and still ends
+  function endRun() {
+    if (!session) return Promise.resolve();
+    const row = GS().toRow(session), keep = row.exp > 0;
+    const done = () => {
+      ended = GS().fromRow(row, eatCfg()); if (keep) viewing = ended;   // nothing kept: the run you were looking at stays open
+      session = null; store.set(KEY_OPEN, '');
+      st.notes = []; st.noted = {}; notesOpen = false; renderNotices();
+      render();
+      setStatus("Run ended. Press New run when you're ready for the next one.");
+      if (keep) setFold('g-detail', true);   // the run just ended opens in Run summary
+    };
+    if (keep) return save(true).then(done);
+    waiting.delete(row.id);
+    if (sending && sending.id === row.id) landsDeleted.add(row.id);
+    jset(KEY_LOCAL, jget(KEY_LOCAL, []).filter(r => r.id !== row.id));
+    done(); listSessions();
+    return Promise.resolve();
+  }
+  // New run: a run still going is saved first; the ended one leaves the panel, Start fresh's mark goes with it, and the next EXP starts one
+  function newRun() {
+    return (session ? save(true) : Promise.resolve()).then(() => {
+      session = null; store.set(KEY_OPEN, '');
+      ended = null; viewing = null; sinceFor = null;
+      st.notes = []; st.noted = {}; notesOpen = false; renderNotices();
+      render();
+      setStatus('New run. It starts with your next EXP.');
     });
   }
 
@@ -1399,7 +1543,7 @@ function mount(root, deps) {
   // before sharing, Share game window is the main button; once sharing it's Pop out, and Stop sits after where Share was
   for (const b of shareArea.querySelectorAll('button')) b.classList.add('k-btn');
   const shareBtn = shareArea.querySelector('#g-share'), shareWords = t => { shareBtn.lastChild.textContent = t; };
-  if (shareBtn) { shareBtn.classList.add('key'); shareBtn.replaceChildren(el('i', { 'aria-hidden': 'true' }, railIcon('pop')), el('span', {}, shareBtn.textContent)); }
+  if (shareBtn) { shareBtn.classList.add('key'); shareBtn.replaceChildren(el('i', { 'aria-hidden': 'true' }, lineIcon('pop')), el('span', {}, shareBtn.textContent)); }
   // an app older than this page can't start: the one line says to update it (renderHealth)
   if (appOld && shareBtn) shareBtn.disabled = true;
   if (app && typeof app.onClosing === 'function') app.onClosing(letGo);
@@ -1471,8 +1615,9 @@ function mount(root, deps) {
     const share = shareArea.querySelector('#g-share');   // the reader's button; the main one until the game is shared
     if (share) share.classList.toggle('key', !st.sharing);
     renderBag();
+    guard('the run summary', () => renderEndSum());
     if (!s) {
-      V.res.hidden = true; sCard.update(null);
+      V.res.hidden = true; V.resLoot.hidden = true; sCard.update(null);
       guard('the band', () => renderNow(null)); guard('the Now grinding card', () => renderCard()); guard('the pop-out panel', () => renderStrip());
       overlay.fit(); return;
     }
@@ -1530,7 +1675,7 @@ function mount(root, deps) {
       live: !viewing, map: mapOf ? panelMap(mapOf) : '', mins: o.mins, gained: o.exp, levelFrom: s.levelStart, levelTo: s.level,
       exp: gs.standing(lastRows, Object.assign({ metric: 'expHr', value: o.expMins >= 10 && o.expHr > 0 ? o.expHr : null }, base)),
       mesos: gs.standing(lastRows, Object.assign({ metric: 'mesosHr', mode: R.mode, value: R.window && R.window.mins >= 10 && R.perHr != null ? R.perHr : null }, base)),
-      verdict: R.verdict || null,
+      verdict: R.verdict || null, about: R.sure === 'rough',
       pot: main ? gs.standing(lastRows, Object.assign({ metric: 'potPer1', potIds, value: o.pct >= 1 && o.mins >= 10 && potUsed > 0 ? potUsed / o.pct : null }, base)) : null,
       potName: main ? plural(main.name) : null,
       lemon: { n: used(LEMON_IDS), quip: lastLine('lemon', used(LEMON_IDS)) }, meat: { n: used(MEAT_IDS), quip: lastLine('meat', used(MEAT_IDS)) },
@@ -1568,14 +1713,13 @@ function mount(root, deps) {
      the pop out's tiles) ----- */
   function renderHealth() {
     const s = session;
-    const h = lastHealth = health({ t: Date.now(), app: !!app, sharing: st.sharing, stopped: !!st.stopped, hasSession: !!s, noGame: !st.reads && (st.noLine || 0) >= NO_GAME_TICKS, exp: st.h.exp, level: st.h.level, levelNow: st.level,
+    const h = lastHealth = health({ t: Date.now(), app: !!app, sharing: st.sharing, stopped: !!st.stopped, hasSession: !!s, ended: !!ended, noGame: !st.reads && (st.noLine || 0) >= NO_GAME_TICKS, exp: st.h.exp, level: st.h.level, levelNow: st.level,
       size: st.h.size, counts: st.h.counts, potNone: st.potNone, potCount: st.potCount, slotsHidden: !!st.slotsHidden, killed: !!s && (s.gainExp > 0 || s.gainPct > 0),
       meso: { at: s && s.meso && s.meso.last ? s.meso.last.t : null, unclear: !!(st.mesoOpen && st.mesoUnclear) },
-      loot: { on: lootOn, pictures: lootReady, started: !!(s && s.bag && s.bag.startT),
-        needsFlip: st.needsFlip = PICKUPS && !!s && lootOn && GS().pickNeedsFlip(s, Date.now(), { sinceT: st.lineT, movedT: st.movedT }) } });
+      loot: { on: lootOn, pictures: lootReady, started: !!(s && s.bag && s.bag.startT), rough: !!GS().CFG.ROUGH } });
     // the pill over the buttons goes by what the core numbers need (mesos only ever ask)
     const core = ['exp', 'level', 'potions'].map(k => h.checks[k].state);
-    const ps = !st.sharing ? 'idle' : core.includes('bad') ? 'bad' : core.every(x => x === 'ok') ? 'ok' : 'wait';
+    const ps = ended || !st.sharing ? 'idle' : core.includes('bad') ? 'bad' : core.every(x => x === 'ok') ? 'ok' : 'wait';
     V.pill.className = 'k-lamp g-pill ' + ps + (ps === 'idle' ? ' off' : '');
     // its words are the light's (the pop out says the same), with the level once it's read
     const pillText = h.nudge.short + (ps !== 'idle' && ps !== 'bad' && st.level ? ' · Lv ' + st.level : '');
@@ -1599,7 +1743,7 @@ function mount(root, deps) {
     const jump = s && s.meso && s.meso.jump;
     const savedRun = !!stripView();
     const ask = !!jump && !savedRun && h.nudge.state !== 'bad';   // a mesos jump to answer comes before anything amber
-    const lamp = savedRun ? ['idle', 'Saved run'] : ask ? ['wait', 'Check your mesos'] : [h.nudge.state, h.nudge.short];
+    const lamp = ended ? ['idle', 'Run ended'] : savedRun ? ['idle', 'Saved run'] : ask ? ['wait', 'Check your mesos'] : [h.nudge.state, h.nudge.short];
     const tabs = !savedRun && !ask && h.nudge.flip ? bagTabStates(s && s.bag) : null;
     // drawn again only when what it says changes: this runs on every frame, and the light is a live region
     const lampKey = lamp.join() + (tabs ? tabs.map(x => x.tab + x.state).join() : '');
@@ -1629,7 +1773,8 @@ function mount(root, deps) {
   /* ----- the pop out panel ----- */
   // the run the panel shows, decided here alone: a saved run only while nothing is being shared (a pop-out of a stopped
   // share can show one), else the running one, or none yet (dots)
-  const stripView = () => st.sharing ? null : viewing;
+  // after End run the panel keeps the ended run on show, shared or not
+  const stripView = () => ended || (st.sharing ? null : viewing);
   const stripSession = () => stripView() || session;
   // the panel writes only what changed, so a frame costs nothing and nothing restarts an animation
   const put = (e, text) => { if (e.textContent !== text) e.textContent = text; };
@@ -1649,6 +1794,11 @@ function mount(root, deps) {
   const NO_RUN = { exp: 0, pct: 0, mins: 0, expHr: null, pace: {}, markT: null, since: null, mesosEarned: null, profit: null, mesoLooks: 0, per1: null, hrsToLevel: null, expToLevel: null, deaths: 0 };
   function renderStrip(stats, mains = []) {
     const s = stripSession(), saved = !!stripView(), now = Date.now(), o = stats || NO_RUN;
+    // End run's view: Kills, Level in, Profit and the potions step aside for the rating, Mesos an hour and If you sold everything
+    const isEnd = !!ended, endChanged = (strip.dataset.ended === '1') !== isEnd;
+    if (endChanged) { strip.dataset.ended = isEnd ? '1' : ''; placeEl(); }
+    const endOff = !session || isEnd || !(session.gainExp > 0);
+    if (SP.endRun.disabled !== endOff) SP.endRun.disabled = endOff;
     // a saved session has no live clock, and its counts are where it stopped: no countdowns and no counts for it; retired
     // slots are marked so a stale count never shows
     const slots = !s ? [] : Object.values(s.slots).map(sl => saved ? Object.assign({}, sl, { count: null }) : sl)
@@ -1659,7 +1809,7 @@ function mount(root, deps) {
     const n = SP.tiles.length;
     if (potCount() !== n) {
       strip.dataset.pots = String(n);
-      if (n === 2) SP.tilesBox.insertBefore(SP.pots[1].box, SP.quip); else SP.pots[1].box.remove();
+      if (n === 2) SP.pots[0].box.after(SP.pots[1].box); else SP.pots[1].box.remove();
       overlay.fit();
     }
     SP.hrs = saved || !st.sharing ? null : o.hrsToLevel;   // the mushroom's level up line, kept for the clocks' ticks between reads (none once the share stops)
@@ -1669,9 +1819,10 @@ function mount(root, deps) {
     renderMeso(s ? GS().profitOf(s, saved ? s.tLast : now) : null);
     // Kills a minute: the number the switch shows, over the map's average EXP a kill. No map known, no average: a dot. A saved run has no window
     const avg = s ? avgExp(mapOfNow(s)) : null, kp = !saved && avg ? killsPerMin(ep.value, avg) : null;
-    show(SP.killsBox, !saved);
+    show(SP.killsBox, !saved && !isEnd);
     put(SP.kills, kp ? fmtKills(kp.perMin) : '·');
-    put(SP.killsSub, saved ? '' : !avg ? 'pick the map' : kp ? '1 every ' + (kp.every < 100 ? Math.max(1, Math.round(kp.every)) + ' s' : Math.round(kp.every / 60) + ' min') : '');
+    put(SP.killsSub, saved || !avg ? '' : kp ? '1 every ' + (kp.every < 100 ? Math.max(1, Math.round(kp.every)) + ' s' : Math.round(kp.every / 60) + ' min') : '');
+    hoverText(SP.killsBox, SP.killsSub.textContent ? 'A kill ' + SP.killsSub.textContent.replace(/^1 /, '') : '');   // Tile and Bar hide the small line (round 7)
     // opened: kills so far (EXP gained over the same average), and the town trips once there has been one
     put(SP.ksf, s && avg && o.exp > 0 ? fmt(Math.round(o.exp / avg)) : '·');
     put(SP.ksfSub, s && avg ? fmt(Math.round(avg)) + ' EXP a kill here' : '');
@@ -1683,28 +1834,97 @@ function mount(root, deps) {
     hoverText(SP.gainBox, o.deaths ? deathText(o) : '');
     renderPer(s, o, saved);
     // the next level, live only
-    show(SP.lvBox, !saved);
+    show(SP.lvBox, !saved && !isEnd);
     put(SP.lvL, s && s.level ? 'Lv ' + (s.level + 1) + ' in' : 'Next level in');
     put(SP.lv, !saved && o.hrsToLevel != null ? fmtDur(o.hrsToLevel * 60) : '·');
     put(SP.lvSub, !saved && o.hrsToLevel != null && o.expToLevel != null ? fmtK(o.expToLevel) + ' to go' : '');
-    // one potion in Tile (the CSS keeps it to Tile): the spare slot's line, once something has gone down
-    const lone = n === 1 && SP.tiles[0] && SP.tiles[0].used > 0 ? SP.tiles[0] : null;
-    show(SP.quip, !!lone);
-    if (lone) {
-      const every = o.mins >= 1, lines = eatLines(lone.kind, { n: lone.used, name: lone.name, everySec: every ? o.mins * 60 / lone.used : null });
-      put(SP.quipB, lines[lines.length - 1]);
-      put(SP.quipS, every ? lines[0] : '');
-    }
+    hoverText(SP.lvBox, SP.lvSub.textContent ? SP.lvSub.textContent.replace(/ to go$/, ' EXP to go') : '');
+    // the spare slot's joke line is gone since round 9: Tile puts Profit beside a lone potion instead
+    show(SP.quip, false);
+    show(SP.profitBox, !isEnd);
+    renderEnded(isEnd ? stats : null);
+    if (endChanged) overlay.fit();
+  }
+  // the ended view's numbers: how it went in Lemons (one for showing up, up to three against your usual at this map, one when it
+  // paid for itself), Mesos an hour after potions, and If you sold everything (loot at FM where its picture is one item)
+  function renderEnded(stats) {
+    const on = !!ended;
+    show(SP.rate, on); show(SP.mhrBox, on); show(SP.sumLink, on);
+    if (!on) { show(SP.soldBox, false); return; }
+    const mapId = mapOfNow(ended), eo = stats || GS().stats(ended, ended.tLast, avgExp(mapId));
+    const usual = GS().standing(lastRows, { mapId, exceptId: ended.id, metric: 'expHr', value: null }).usual;
+    const P = GS().profitOf(ended, ended.tLast), r = GS().rateRun({ expHr: eo.expHr, usual, mesosHr: P.perHr });
+    const pic = picOf(LEMON_IDS);
+    SP.rateLem.querySelectorAll('img').forEach((img, i) => { picTo(img, pic, ''); img.classList.toggle('off', i >= r.lemons); });
+    attr(SP.rate, 'aria-label', r.title); hoverText(SP.rate, r.title + '. ' + r.words); put(SP.rateT, r.title);
+    put(SP.mhr, P.perHr != null ? sgnK(P.perHr) : '·'); SP.mhr.classList.toggle('neg', P.perHr < 0);
+    const sold = GS().soldAll(GS().result(ended, ended.tLast), soldPrice);
+    show(SP.soldBox, sold != null);
+    put(SP.sold, sold != null ? sgnK(sold) : ''); SP.sold.classList.toggle('neg', sold < 0);
+  }
+  // a bag cell's price for If you sold everything: the FM usual when its picture is one item Cozy prices, its NPC price otherwise
+  // the Run summary after End run, drawn while the run that just ended is the one open (an ended run with no EXP isn't kept, so it has none)
+  function renderEndSum() {
+    const on = !!ended && viewing === ended;
+    show(V.endSum, on); show(folds['g-detail'].head, !on);
+    for (const x of [sCard.el, numbers, duo]) x.classList.toggle('g-endoff', on);   // the viewing bar stays: it holds Delete for the run just kept
+    nowCard.el.hidden = on;
+    if (on) { popBtn.classList.remove('key'); const sh = shareArea.querySelector('#g-share'); if (sh) sh.classList.remove('key'); }
+    if (!on) { if (whole.parentNode !== wholeHome.parent) wholeHome.parent.insertBefore(whole, wholeHome.next); return; }
+    if (!foldOpen['g-detail']) setFold('g-detail', true);
+    const e = ended, mapId = mapOfNow(e), o = GS().stats(e, e.tLast, avgExp(mapId)), R = GS().result(e, e.tLast), P = GS().profitOf(e, e.tLast);
+    const usual = GS().standing(lastRows, { mapId, exceptId: e.id, metric: 'expHr', value: null }).usual;
+    const r = GS().rateRun({ expHr: o.expHr, usual, mesosHr: P.perHr });
+    const n = Math.round(o.mins), K = v => v == null ? '·' : (v < 0 ? '−' : '') + fmtK(Math.abs(v));
+    put(E.head, 'Run ended at ' + timeOfDay(e.tLast));
+    put(E.mins, n + (n === 1 ? ' minute' : ' minutes') + ' of grinding, ' + timeOfDay(e.t0) + ' to ' + timeOfDay(e.tLast) + '.');
+    const pic = picOf(LEMON_IDS);
+    if (E.lem.children.length !== 5) E.lem.replaceChildren(...[0, 1, 2, 3, 4].map(() => el('img', { alt: '' })));
+    [...E.lem.children].forEach((img, i) => { picTo(img, pic, ''); img.classList.toggle('off', i >= r.lemons); });
+    attr(E.lem, 'aria-label', r.title); put(E.rate, r.title); put(E.words, r.words);
+    const row = (label, v, cls) => el('div', { class: 'k-row' }, el('span', { class: 'g-nl' }, label), el('span', { class: 'g-nv' + (cls ? ' ' + cls : '') }, v));
+    const vsUsual = o.expHr != null && usual ? Math.round((o.expHr / usual - 1) * 100) : null;
+    E.rows.replaceChildren(row('EXP', fmt(o.exp)),
+      row('EXP an hour', o.expHr != null ? fmtK(o.expHr) + (vsUsual ? ', ' + Math.abs(vsUsual) + '% ' + (vsUsual > 0 ? 'over' : 'under') + ' your usual' : '') : '·', vsUsual > 0 ? 'pos' : ''),
+      row('Mesos an hour', P.perHr != null ? sgnK(P.perHr) : '·', tone(P.perHr)),
+      row('Mesos spent per 1%', o.per1 != null ? fmtK(o.per1) : '·'));
+    if (whole.parentNode !== E.whole) E.whole.append(whole);
+    E.minBox.hidden = whole.hidden;
+    const eatRow = (kind, ids, g) => { const L = eatLines(kind, g), p = picOf(ids);
+      return el('p', { class: 'g-endeatl' }, p ? el('img', { src: p, alt: '' }) : null, el('span', {}, [L[0], L.length > 1 ? L[L.length - 1] : ''].filter(Boolean).map(x => /[.!?]$/.test(x) ? x : x + '.').join(' '))); };
+    E.eat.replaceChildren(eatRow('lemon', LEMON_IDS, R.eat && R.eat.lemon), eatRow('meat', MEAT_IDS, R.eat && R.eat.meat));
+    const sold = GS().soldAll(R, soldPrice);
+    put(E.sold, sold != null ? (sold >= 0 ? '+' : '−') + fmtK(Math.abs(sold)) + ' mesos' : 'Not counted');
+    E.sold.classList.toggle('neg', sold < 0);
+    const base = R.pickedUp == null ? null : R.pickedUp + (R.sold || 0) - (R.otherBuys || 0) - (R.potions || 0);
+    E.sRows.replaceChildren(row('Mesos picked up', K(R.pickedUp)), row('Sold at the NPC', K(R.sold)),
+      ...(R.mode === 'loot' && sold != null && base != null ? [row('Loot at FM prices', K(sold - base))] : []),
+      ...(R.otherBuys ? [row('Other shop buys', K(-R.otherBuys))] : []),
+      row('Potions', K(R.potions == null ? null : -R.potions)));
+    const L = R.loot, items = L && L.items && L.items.length ? window.GrindNow.pickedRows(L, [], lootIdx || { cells: {} }, PICKED_SHOWN, drops).rows : [];
+    E.loot.replaceChildren(...(items.length ? [el('h3', { class: 'g-endh' }, 'What you looted'), el('div', { class: 'k-rows' }, ...items.map(it => el('div', { class: 'k-row' },
+      el('span', { class: 'k-ring' }, cellPic(it.cell) ? el('img', { src: cellPic(it.cell), alt: '' }) : null),
+      el('span', { class: 'g-nnm' }, el('span', { class: 'g-nn' }, it.name), it.n > 1 ? el('b', { class: 'g-endn' }, fmt(it.n)) : null),
+      el('span', { class: 'g-nv' + (L.best && it.key === L.best.key ? ' gold' : '') }, K(it.fm ? it.fm : it.value)))))] : []));
+    E.credit.replaceChildren(creditOf(drops && drops.date));
+  }
+  function soldPrice(key, it) {
+    const c = lootIdx && lootIdx.cells[String(key).slice(1)], ids = c && c.ids;
+    const fm = ids && ids.length === 1 && drops && drops.items[ids[0]] ? drops.items[ids[0]].p : null;
+    return fm > 0 ? fm : it.price;
+  }
+  // See the run summary: on the site This run opens on the page; the app has no page in the pop-out, so the main window comes up
+  function seeSummary() {
+    if (app) return backToMain();
+    setFold('g-detail', true); showDetail();
+    if (!detail.hidden) detail.scrollIntoView({ block: 'start', behavior: 'smooth' });
   }
   // the biggest number: the window picked, your usual beside it (a saved run says how long it ran over), the arrow, and under
   // them nothing (the trend line is gone). Before 2 minutes it's dots
-  const WIN_WORDS = { 5: 'last 5 min', 10: 'last 10 min', run: 'this run' };
   function renderExp(s, o, saved, now) {
     const usual = s && !saved ? GS().standing(lastRows, { mapId: mapOfNow(s), exceptId: s.id, metric: 'expHr', value: null }).usual : null;
     const p = expPick(o, saved ? 'run' : s && sinceFor === s.id ? 'since' : expWin, usual);
     show(SP.winRow, !saved);
-    const on = p.windows.find(x => x.on);
-    put(SP.winWords, on ? WIN_WORDS[on.key] || on.label : '');
     for (const b of SP.segs) {
       const w = p.windows.find(x => x.key === b.dataset.w);
       show(b, !!w);
@@ -1716,7 +1936,7 @@ function mount(root, deps) {
     // a live run with no EXP gained yet has nothing to measure: say so instead of leaving a bare dot (a 16d report read the bare
     // dots as "no numbers are populating"); .wait lets Tile, which hides the usual, show these words
     const waiting = !saved && !!s && p.value == null && !(o.exp > 0);
-    const us = waiting ? 'waiting for your first kill' : saved ? (o.expHr != null ? 'over ' + fmtDur(o.expMins) : '') : usual != null ? (p.vs ? '· ' : '') + 'usual ' + fmtK(usual) : '';
+    const us = waiting ? '' : saved ? (o.expHr != null ? 'over ' + fmtDur(o.expMins) : '') : usual != null ? (p.vs ? '· ' : '') + 'usual ' + fmtK(usual) : '';
     put(SP.exp, p.value != null ? fmtK(p.value) : '·');
     show(SP.expUs, !!us);
     attr(SP.expUs, 'class', 'g-us' + (waiting ? ' wait' : ''));
@@ -1757,6 +1977,11 @@ function mount(root, deps) {
       put(P.clock, x.clock);
       show(P.left, !!(x.n || x.left));
       put(P.n, x.n); put(P.verb, x.verb ? ' ' + x.verb : ''); put(P.dot, x.n && x.left ? ' · ' : ''); put(P.lf, x.left); put(P.cap, x.cap);
+      // the one line each tile reads as: 95 Lemons last (the clock beside it), 95 Lemons left with no clock yet, 40 Lemons drunk
+      // for a saved run, or the caption when there's no count
+      const nm = k => k === 1 ? tile.name : plural(tile.name), c = tile && tile.cd;
+      put(P.lbl, !tile ? x.cap : saved ? (tile.used ? fmt(tile.used) + ' ' + nm(tile.used) + ' ' + x.verb : x.cap)
+        : c ? fmt(c.left) + ' ' + nm(c.left) + ' last' : tile.count != null ? fmt(tile.count) + ' ' + nm(tile.count) + ' left' : x.cap);
       // each layout shows only some of these (Tile and Column the clock and what's left, Bar the clock and how many drunk),
       // so the whole line stays in the hover title
       hoverText(P.box, [x.n && x.n + (x.verb ? ' ' + x.verb : ''), x.left, x.cap].filter(Boolean).join(' · '));
@@ -1769,14 +1994,15 @@ function mount(root, deps) {
     // no map known: the spot stays empty, and how long runs on its own
     const pm = mapOfNow(s);
     put(SP.elMap, pm ? panelMap(pm) : '');
-    put(SP.elTime, (pm ? ' · ' : '') + fmtDur(s ? elapsedSecs(s, now, !saved && st.sharing) / 60 : 0));
+    put(SP.elDot, pm ? ' · ' : '');
+    put(SP.elTime, fmtDur(s ? elapsedSecs(s, now, !saved && st.sharing) / 60 : 0));
   }
   // a layout picked (from ⇆ Layout's row, or its picture in Settings): the panel fades out, takes the new layout, and the
   // window fits it (the overlay resizes its window when the browser lets it), fades back in, and is kept for next time.
   // The pick counts at once, so a second pick straight after wins
   let swapT = null;
   function setLayout(l) {
-    if (!WIDTHS[l]) return;
+    if (!ORDER.includes(l)) return;
     layout = l; syncSettings(); litRow();
     strip.classList.add('g-swap');
     clearTimeout(swapT);
@@ -1848,7 +2074,9 @@ function mount(root, deps) {
   // Reset average and New session need a session. Before that the row is Share and Count my loot (and the app's Settings and Quit)
   function showPop() {
     popBtn.hidden = !(st.sharing || session) || (!!app && (appOld || !!overlay.win()));
-    markBtn.hidden = newBtn.hidden = !session;
+    runsRow.hidden = !(session || ended);
+    const endOff = !session || !!ended || !(session.gainExp > 0);
+    if (endRunBtn.disabled !== endOff) endRunBtn.disabled = endOff;
   }
   // mesos from inventory looks, and the verdict: mesos earned an hour less potions drunk an hour
   function renderMesos(s, o) {
@@ -1875,42 +2103,46 @@ function mount(root, deps) {
   const money = n => n == null ? '·' : (n > 0 ? '+' : n < 0 ? '−' : '') + fmt(Math.abs(Math.round(n)));
   const moneyK = n => n == null ? '·' : (n > 0 ? '+' : n < 0 ? '−' : '') + fmtK(Math.abs(n));
   const tone = n => n == null || n === 0 ? '' : n > 0 ? 'pos' : 'neg';
-  const COZY = 'https://cozy.markets/items/', PICKED_SHOWN = 5;
+  const COZY = 'https://cozy.markets/items/', PICKED_SHOWN = 5, LOG_SHOWN = 8, SLOW_NOTE = 'The pickup lines are read too slowly to count every one.',
+    ROUGH_OFFER = 'Open your bag at the start and the end for exact numbers.';
   let lootOpen = false, lootKey = null, potsKey = null, tradeKey = null;
-  // What the pickup lines said, under What you picked up: a list marked "not checked", how it compares with the bag, and (only
-  // while the mesos reading passes its accuracy gate) the mesos it saw. Never part of the total or the verdict
-  function pickBlock(s) {
-    if (!PICKUPS) return { key: '', nodes: [] };
-    const K = GS().pickups(s), cmp = GS().pickupCompare(s), mesosOn = window.PickupLines.mesosOn();
-    if (!K.lines && !cmp) return { key: '', nodes: [] };
-    const key = JSON.stringify([K, cmp, mesosOn, !!st.pickupSlow]);
-    const row = (label, v) => el('div', { class: 'k-row' }, el('span', { class: 'g-nl' }, label), el('span', { class: 'g-nv' }, v));
-    const rows = [];
-    for (const x of K.items) rows.push(row(x.name, '×' + fmt(x.count)));
-    for (const tab of ['Use', 'Etc']) if (K.unnamed[tab]) rows.push(row(tab + ' items', '×' + fmt(K.unnamed[tab])));
-    if (K.equips) rows.push(row('Equipment', '×' + fmt(K.equips)));
-    if (mesosOn && (K.mesos.sum || K.mesos.unsure)) {
-      rows.push(row('Mesos from drops (from lines)', fmt(K.mesos.sum)));
-    }
-    const nodes = [el('div', { class: 'g-res-h' }, 'From pickup lines, not checked')];
-    if (rows.length) nodes.push(el('div', { class: 'k-rows' }, ...rows));
-    if (mesosOn && K.mesos.unsure) nodes.push(el('p', { class: 'g-note' }, K.mesos.unsure + (K.mesos.unsure === 1 ? ' line' : ' lines') + ' unreadable'));
-    if (cmp) nodes.push(el('p', { class: 'g-note' }, cmp.differs ? 'Counted ' + fmt(cmp.fromLines) + ' from the lines, the bag says ' + fmt(cmp.inBag) + '.' : 'The lines and the bag agree on ' + fmt(cmp.inBag) + '.'));
-    if (st.pickupSlow) nodes.push(el('p', { class: 'g-note' }, 'The pickup lines are read too slowly to count every one.'));
-    return { key, nodes };
+  const creditOf = date => {
+    const day = date && new Date(date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return el('p', { class: 'g-note g-credit' }, 'Prices from ', el('a', { href: 'https://cozy.markets/', target: '_blank', rel: 'noopener' }, 'Cozy Markets'), day ? ', ' + day + '.' : '.');
+  };
+  // the live loot log, from the pickup lines (GrindSession.logOf): on a live run once the lines have anything to list, in place
+  // of the bag's list. Mesos lines never show here, and none of it is part of the total or the verdict
+  // A saved rough run shows the log it kept (R.log), a run saved before it has none
+  function logBlock(s, R) {
+    if (viewing ? !(R && R.log && R.log.length) : !PICKUPS) return null;
+    const log = viewing ? { rows: R.log, unnamed: 0, equips: 0, date: null } : GS().logOf(s);
+    if (!log.rows.length && !log.unnamed && !log.equips) return null;
+    const slow = !!st.pickupSlow;
+    return { key: 'log' + JSON.stringify([log, lootOpen, !!lootImg, slow]), build() {
+      const L = window.GrindNow.logRows(log, lootOpen ? Infinity : LOG_SHOWN, { el, fmtK, pic: id => lootIdx && lootIdx.items[id] ? cellPic(lootIdx.items[id][3]) : null });
+      const nodes = [el('div', { class: 'g-res-h' }, 'What you picked up'), el('div', { class: 'k-rows' }, ...L.nodes)];
+      if (L.more || lootOpen) nodes.push(el('button', { type: 'button', class: 'linkish', id: 'g-lootmore', 'aria-expanded': String(lootOpen), onclick: () => { lootOpen = !lootOpen; render(); } }, lootOpen ? 'Show fewer' : 'Show ' + L.more + ' more'));
+      if (log.rows.some(r => r.src === 'fm')) nodes.push(creditOf(log.date));
+      if (slow) nodes.push(el('p', { class: 'g-note' }, SLOW_NOTE));
+      return nodes;
+    } };
   }
   function renderResult(s, R) {
     V.res.hidden = false;
     const has = !!R.window, loot = R.mode === 'loot';
     // the same small line as the pop-out's Profit tile; a saved run has no age to tell
-    V.resBar.textContent = !has ? '' : GS().profitWords({ lootCounted: !!R.loot, lootTabs: R.loot ? (R.loot.tabs == null ? 3 : R.loot.tabs) : null, lootOn: viewing ? undefined : s.mode === 'loot', lootStarted: !!(s.bag && s.bag.startT), lookT: viewing || !s.meso || !s.meso.last ? null : s.meso.last.t }, Date.now());
+    V.resBar.textContent = !has ? '' : GS().profitWords({ lootCounted: !!R.loot, lootTabs: R.loot ? (R.loot.tabs == null ? 3 : R.loot.tabs) : null, lootOn: viewing ? undefined : s.mode === 'loot', lootStarted: !!(s.bag && s.bag.startT), sure: R.sure,
+      lookT: R.sure ? (R.lookT == null ? null : R.lookT) : viewing || !s.meso || !s.meso.last ? null : s.meso.last.t }, viewing ? R.lookT : Date.now());
     V.resTotal.textContent = has ? money(R.total) : '·'; V.resTotal.className = 'g-res-total ' + (has ? tone(R.total) : '');
     V.resPill.textContent = R.verdict || 'Counting'; V.resPill.className = 'g-res-pill ' + (R.verdict === 'Profitable' ? 'up' : R.verdict === 'Losing' ? 'down' : '');
     V.resHr.textContent = has && R.perHr != null ? moneyK(R.perHr) + ' an hour · ' + fmtDur(R.window.mins) : 'no hourly number yet';
     V.resHr.className = 'g-res-hr ' + (has ? tone(R.perHr) : '');
     const usual = has && R.perHr != null ? GS().usualOf(lastRows, { mapId: s.mapId, mode: R.mode, exceptId: s.id }) : null;
     const short = has && R.window.mins < R.window.sessionMins - 1;
-    const bits = [usual != null && Math.abs(R.perHr - usual) >= 1 ? fmtK(Math.abs(R.perHr - usual)) + ' an hour ' + (R.perHr >= usual ? 'better' : 'worse') + ' than your usual ' + shortMap(s.mapId) + '.' : '',
+    // the rough Profit (pickup lines lead) asks for nothing; it offers the bag once, in place of the two looks it would ask for
+    const rough = loot && !viewing && !!GS().CFG.ROUGH;
+    const vsUsual = usual != null && Math.abs(R.perHr - usual) >= 1 ? fmtK(Math.abs(R.perHr - usual)) + ' an hour ' + (R.perHr >= usual ? 'better' : 'worse') + ' than your usual ' + shortMap(s.mapId) + '.' : '';
+    const bits = rough ? [vsUsual, R.sure === 'checked' ? '' : ROUGH_OFFER].filter(Boolean) : [vsUsual,
       short ? 'Counted over ' + Math.round(R.window.mins) + ' of your ' + Math.round(R.window.sessionMins) + ' minutes. ' + (loot ? 'Open your bag before you stop to count it all.' : 'Open your inventory before you stop to count it all.') : '',
       // a saved session can't take another look: it says why it has no total instead of asking for one
       has ? '' : viewing ? (loot ? 'Its bag was never looked through twice, so it has no total' : 'Its inventory was never opened twice, so it has no total')
@@ -1918,25 +2150,31 @@ function mount(root, deps) {
     V.resSub.textContent = bits.join(' '); V.resSub.hidden = !bits.length;
     const rowOf = (label, v, sub, off) => el('div', { class: 'k-row' }, el('span', { class: 'g-nl' }, label, sub ? el('small', {}, sub) : null),
       el('span', { class: 'g-nv ' + (off ? 'quiet' : tone(v)) }, off ? 'Not counted' : money(v)));
-    V.resRows.replaceChildren(rowOf('Mesos picked up', R.pickedUp), rowOf('Sold at the NPC', R.sold, R.otherBuys ? 'bought ' + fmt(R.otherBuys) + ' besides potions' : ''),
+    V.resRows.replaceChildren(rowOf('Picked up', R.pickedUp), rowOf('Sold at the NPC', R.sold, R.otherBuys ? 'bought ' + fmt(R.otherBuys) + ' besides potions' : ''),
       // until a bag row has been seen twice the mesos seen are counted and the loot waits
-      rowOf("Your bag's change, at NPC prices", R.loot ? R.loot.value : null, loot && !R.loot && has ? (viewing ? 'its bag was looked through once' : 'counts once a bag row is seen twice') : '', !loot),
-      rowOf('Potions', R.potions == null ? null : -R.potions));
+      rowOf('Loot in your bag', R.loot ? R.loot.value : null, loot && !R.loot && has ? (viewing ? 'its bag was looked through once' : 'counts once a bag row is seen twice') : 'at NPC prices', !loot),
+      rowOf('Potions', R.potions == null ? null : -R.potions),
+      rowOf('An hour', has ? R.perHr : null));
     V.resOther.textContent = R.other && R.other.n ? 'Plus ' + fmt(R.other.n) + ' other potions, ' + fmt(R.other.cost) + ' mesos of them.' : '';
     V.resOther.hidden = !V.resOther.textContent;
     // what you picked up: the catches first, then by value, each with its ring (a gold ring is the best one), five rows then show more
     V.resLoot.hidden = !loot;
-    if (loot) {
+    const lg = loot ? logBlock(s, R) : null;
+    if (lg) {
+      // redrawn only when what it shows changes, like the bag's list below
+      if (lg.key !== lootKey) { lootKey = lg.key; V.resLoot.replaceChildren(...lg.build()); }
+    } else if (loot) {
       const L = R.loot, list = [], after = [];
       let P = null, key = L ? 'empty' : 'wait';
-      const pk = pickBlock(s);
       if (L && L.items.length) {
         const C = drops ? window.GrindNow.dropColumns(mobsOf(mapOfNow(s)).sort((x, y) => y.count - x.count).map(m => m.id), drops, id => (data.mobs[id] || [''])[0], classId, levelNow()) : null;
         P = window.GrindNow.pickedRows(L, C ? window.GrindNow.wantedOf(C) : [], lootIdx || { cells: {} }, lootOpen ? Infinity : PICKED_SHOWN, drops);
         key = JSON.stringify([P.rows, P.more, lootOpen, L.best && L.best.key, !!lootImg, drops && drops.date]);
       }
       // redrawn only when what it shows changes: a frame every second or so would take the focus and the press off its button
-      key += '|' + pk.key;
+      // frames too slow to catch every pickup line say so here too, while the lines have nothing to list yet
+      const slow = PICKUPS && !viewing && !!st.pickupSlow;
+      key += '|' + slow;
       if (key !== lootKey) {
         lootKey = key;
         if (!L) after.push(el('p', { class: 'g-note' }, 'Your loot shows once your bag has been looked through twice, a minute or more apart.'));
@@ -1950,13 +2188,11 @@ function mount(root, deps) {
             el('span', { class: 'g-lc' }, el('b', {}, '×' + fmt(r.n)), el('small', {}, worth(r)))));
           if (P.more || lootOpen) after.push(el('button', { type: 'button', class: 'linkish', id: 'g-lootmore', 'aria-expanded': String(lootOpen), onclick: () => { lootOpen = !lootOpen; render(); } }, lootOpen ? 'Show fewer' : 'Show ' + P.more + ' more'));
           // an FM price on screen always has its credit, even where Now grinding's foot is folded away
-          if (P.rows.some(r => r.fm)) {
-            const day = drops && drops.date && new Date(drops.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            after.push(el('p', { class: 'g-note g-credit' }, 'Prices from ', el('a', { href: 'https://cozy.markets/', target: '_blank', rel: 'noopener' }, 'Cozy Markets'), day ? ', ' + day + '.' : '.'));
-          }
+          if (P.rows.some(r => r.fm)) after.push(creditOf(drops && drops.date));
           after.push(el('p', { class: 'g-note' }, 'Open your bag on Equip, Use or Etc to update it.'));
         }
-        V.resLoot.replaceChildren(el('div', { class: 'g-res-h' }, 'What you picked up'), ...(list.length ? [el('div', { class: 'k-rows' }, ...list)] : []), ...after, ...pk.nodes);
+        if (slow) after.push(el('p', { class: 'g-note' }, SLOW_NOTE));
+        V.resLoot.replaceChildren(el('div', { class: 'g-res-h' }, 'What you picked up'), ...(list.length ? [el('div', { class: 'k-rows' }, ...list)] : []), ...after);
       }
     }
     const lines = [];
@@ -2058,14 +2294,30 @@ function mount(root, deps) {
       : p.name ? el('span', { class: 'g-nk pic' }, iconOf(p.pic, p.name), el('b', {}, fmt(p.n)))
         : el('span', { class: 'g-nk ' + p.cls }, p.pre || null, el('b', {}, p.v), p.label || null, p.vs ? arrowed(el('em', { class: p.vs.up ? 'up' : 'down' }), p.vs.text) : null);
   let bandKey = null;
+  // page G's left column: the lead, then Time, EXP, Lemons, Meat, the main other potion and Level N in, each a plain row. Mesos and the
+  // verdict moved to What it earned on the right. bandParts and bandPart stay for the band's words (nothing draws them now)
+  function nowParts(s, o, mains) {
+    const usual = GS().standing(lastRows, { mapId: mapOfNow(s), exceptId: s.id, metric: 'expHr', value: null }).usual;
+    const pick = expPick(o, sinceFor === s.id ? 'since' : 'run', usual), main = mains[0];
+    const count = (ids, name) => ({ pic: ids.find(id => pictures.Icons[id]), label: name, v: fmt(ids.reduce((a, id) => a + usedOf(s, id), 0)) });
+    return { lead: { v: pick.value != null ? fmtK(pick.value) : '·', vs: pick.vs && { up: pick.vs.up, text: pick.vs.text + ' vs usual' } },
+      rows: [{ label: 'Time', v: fmtDur(o.mins) }, { label: 'EXP', v: fmt(o.exp) }, count(LEMON_IDS, 'Lemons'), count(MEAT_IDS, 'Meat'),
+        main && !LEMON_IDS.includes(+main.id) && !MEAT_IDS.includes(+main.id) ? count([+main.id], plural(main.name)) : null,
+        o.hrsToLevel != null && s.level ? { label: 'Level ' + (s.level + 1) + ' in', v: fmtDur(o.hrsToLevel * 60) } : null].filter(Boolean) };
+  }
   function renderNow(s, o, mains, R) {
-    moreBtn.hidden = (!s && !st.sharing) || !!viewing;
     if (viewing) return;   // a saved run folds the card to its title bar and button row
-    const parts = s ? bandParts(s, o, mains, R) : st.sharing ? [{ say: 'Your session starts with your next EXP' }] : [];   // before sharing the steps say how to start
+    const parts = s ? nowParts(s, o, mains) : st.sharing ? { say: 'Your session starts with your next EXP' } : {};   // before sharing the steps say how to start
     const key = JSON.stringify(parts);
     if (key === bandKey) return;
     bandKey = key;
-    V.now.replaceChildren(...parts.map(bandPart));
+    V.nowSay.hidden = !parts.say; V.nowSay.textContent = parts.say || '';
+    V.nowLead.parentNode.hidden = !parts.lead; V.nowRows.hidden = !parts.rows;
+    if (parts.lead) V.nowLead.replaceChildren(el('b', { class: 'g-gbig' }, parts.lead.v), el('span', { class: 'g-glbl' }, 'EXP an hour'),
+      ...(parts.lead.vs ? [arrowed(el('em', { class: parts.lead.vs.up ? 'up' : 'down' }), parts.lead.vs.text)] : []));
+    V.nowRows.replaceChildren(...(parts.rows || []).map(r => el('div', { class: 'k-row' },
+      el('span', { class: 'g-nl' }, ...(r.pic ? [iconOf(r.pic, r.label)] : []), r.label), el('span', { class: 'g-nv' }, r.v))));
+    void bandParts; void bandPart; void R;
   }
   // the level: as read, else this session's, else the newest saved run's
   function levelNow() {
@@ -2077,7 +2329,8 @@ function mount(root, deps) {
   }
   // a saved run being viewed folds the card to its title bar and button row
   function renderCard() {
-    nowCard.update({ fold: !!viewing, nums: !!(session || st.sharing), sharing: st.sharing, session: !!session, label: session && st.sharing && st.h.exp.ok != null ? 'Now grinding' : 'This map',
+    nowCard.update({ fold: !!viewing, nums: !!(session || st.sharing), sharing: st.sharing, session: !!session, label: session ? 'Now grinding' : 'This map',   // page G: a run that's going is Now grinding, even while its share is down
+     
       mobs: mapMobs, mobIds: mapMobs.map(m => m.id), D: drops, sprites: mobSprites, L: lootIdx, cls: classId, level: levelNow(),
       noMap: !mapId, lemon: pictures.Icons[LEMON_IDS[0]] || null });
   }
@@ -2102,8 +2355,7 @@ function mount(root, deps) {
   const emptyRun = r => !(r.exp > 0) && !(r.active_min >= 1);
   function listRuns() {
     const rows = lastRows, listed = rows.filter(r => !emptyRun(r));
-    runsWin.hidden = !listed.length;   // a player with no runs yet sees no empty window
-    life.hidden = runsWin.hidden && record.hidden;
+    foldHas.runs = !!listed.length; showDetail();   // a player with no runs yet sees no empty row until a run starts
     if (!listed.length) { runsMore.hidden = true; sessions.replaceChildren(el('p', { class: 'g-note' }, signedIn() ? 'No saved sessions yet.' : 'No sessions yet. Signed out, they stay on this device.')); return; }
     const newest = listed.sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at)), shown = runsOpen ? newest : newest.slice(0, RUNS_SHOWN);
     const lemonPic = picOf(LEMON_IDS), meatPic = picOf(MEAT_IDS);
@@ -2122,7 +2374,7 @@ function mount(root, deps) {
   function openSession(r) {
     // older sessions kept on this device have no minutes any more: they open without charts
     const full = r.minutes || jget(KEY_LOCAL, []).some(x => x.id === r.id) ? Promise.resolve(r) : api.getGrind(r.id);
-    return full.then(row => { viewing = GS().fromRow(row, eatCfg()); render(); detail.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, e => setStatus("Couldn't open that session (" + e.message + ').'));
+    return full.then(row => { viewing = GS().fromRow(row, eatCfg()); render(); setFold('g-detail', true); detail.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, e => setStatus("Couldn't open that session (" + e.message + ').'));
   }
   // all time: the listed sessions with the running one as it is now (its last save swapped for the live numbers)
   function renderLife() {
@@ -2133,8 +2385,7 @@ function mount(root, deps) {
     }
     const L = lifetime(rows, { now: Date.now(), lemon: LEMON_IDS, meat: MEAT_IDS, mobs: data.mobs, maps: data.maps });
     alltime.update(L, { since: 'since you started tracking' + (signedIn() ? '' : ', on this device') + ' · ' + L.sessions + ' run' + (L.sessions === 1 ? '' : 's'), claims: claimRows });
-    record.hidden = !L.sessions; life.hidden = runsWin.hidden && record.hidden;
-    alltime.el.hidden = !(L.lemon.used || L.meat.used);   // a new player with nothing eaten doesn't see it
+    foldHas.record = !!L.sessions; foldHas.life = !!(L.lemon.used || L.meat.used); showDetail();   // a new player with nothing eaten doesn't see it
     LF.other.textContent = L.other.used ? 'Plus ' + fmt(L.other.used) + ' other potions, ' + fmtK(L.other.cost) + ' mesos of them.' : '';
     const tot = (label, v, sub, cls) => el('div', { class: 'g-tot' }, el('div', { class: 'g-lbl' }, label), el('div', { class: 'g-tv ' + (cls || '') }, v), el('div', { class: 'g-tsub' }, sub));
     const hrs = L.mins / 60, levels = L.levelFrom != null && L.levelTo != null;
@@ -2165,18 +2416,23 @@ function mount(root, deps) {
   const dataFile = f => fetch('data/' + f).then(r => { if (!r.ok) throw new Error(f); return r.json(); });
   dataFile('grind-drops.json').then(D => { drops = D; fillClass(D); render(); }, () => {});
   dataFile('mob-sprites.json').then(S => { mobSprites = S; render(); renderLife(); }, () => {});
+  if (PICKUPS) dataFile('loot-worth.json').then(w => { GS().setWorth(w); render(); }, () => {});
   loadSheet().catch(() => {});
   if (session) setStatus('Carrying on your session from ' + timeOfDay(session.t0) + (app ? '. Press Start to carry on.' : '. Share the game window to keep going.'));
   window.Grind.debug = { noteFrame, session: () => session, state: () => ({ reads: st.reads, ticks: st.ticks, line: st.line, m: st.m, level: st.level }),
     // the overlay, opened as Start opens it (the app's own test); resolves to whether it's open
     overlay: () => (overlay.win() ? Promise.resolve() : popOut()).then(() => !!overlay.win()),
-    setCheck, save: () => save(true), load: row => { viewing = GS().fromRow(row, eatCfg()); render(); }, capture: () => capture, mesoLine, lootReady: () => lootReady,
+    // End run and New run as their buttons press them; read: one reading through the reading path (a share's frame stood in for)
+    endRun, newRun, ended: () => ended, read: r => takeReading(Object.assign({ counts: [] }, r), null),
+    setCheck, save: () => save(true), load: row => { viewing = GS().fromRow(row, eatCfg()); render(); setFold('g-detail', true); }, capture: () => capture, mesoLine, lootReady: () => lootReady,
     // a session carried in whole (the page tests' mockup session), as if it had been read here
     use: x => { session = x; viewing = null; if (!session.eat) session.eat = eatCfg(); session.mode = lootOn ? 'loot' : 'track'; render(); },
     // a share stood in for (no frames, no checks; read: with every reading check passed, so the light gets past Looking for game), for a test whose run carried in with use() is being read, as a level up line needs
     // the minimap read as another map (what followMap does with a new read)
     mapRead: id => { putMap(id); render(); },
-    sharing: (on, read) => { st.sharing = !!on; if (read) for (const k of ['exp', 'level', 'size', 'counts']) st.h[k].ok = Date.now(); render(); } };
+    sharing: (on, read) => { st.sharing = !!on; if (read) for (const k of ['exp', 'level', 'size', 'counts']) st.h[k].ok = Date.now(); render(); },
+    // a reader stood in as missing for longer than the light waits (k: exp, level, size or counts), so the red light and its line come up
+    missing: k => { st.h[k].fail = Date.now() - STUCK_MS - 1000; render(); } };
   // what a Something off? report carries from this tab (index.html keeps it), and the pop out to draw beside the page
   const reporter = {
     report: () => ({ sharing: st.sharing, ticks: st.ticks, reads: st.reads, frame: [st.fw, st.fh],
@@ -2189,9 +2445,11 @@ function mount(root, deps) {
       loot: { on: lootOn, mode: session ? session.mode : null, pictures: lootReady, started: !!(session && session.bag && session.bag.startT), banked: session && session.bag ? session.bag.banked : null,
         tabs: session && session.bag && session.bag.tabs ? Object.fromEntries(Object.entries(session.bag.tabs).map(([k, T]) => [k, { len: T.len, seen: T.rows.filter(r => r && r.tb > r.ta).length, strips: T.strips.length }])) : null,
         shop: session && session.shop ? { open: session.shop.open, visits: session.shop.visits.length } : null, learned: session ? session.learned || [] : [],
-        needsFlip: !!st.needsFlip, pickups: PICKUPS && session ? GS().pickups(session) : null } }),
+        rough: !!GS().CFG.ROUGH, pickups: PICKUPS && session ? GS().pickups(session) : null } }),
     popout: () => overlay.win() ? overlay.win().document.body : null,
   };
+  // the header's Sign out: the run you were looking at and this device's runs go with the player; a run still going stays
+  reporter.signedOut = () => { viewing = null; ended = null; try { localStorage.removeItem(KEY_LOCAL); } catch { /* nothing kept */ } render(); };
   // the player signed in or out somewhere else on the page (the header's button): the runs listed are theirs, so list again
   reporter.refresh = () => listSessions();
   window.Grind.debug.refresh = reporter.refresh;

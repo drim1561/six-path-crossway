@@ -106,6 +106,25 @@ function pickedRows(loot, wanted, L, limit = 5, D = null) {
   return { rows: rows.slice(0, limit), more: Math.max(0, rows.length - limit), value: loot.value };
 }
 
+// The live loot log (What you picked up while the pickup lines name things): log is GrindSession.logOf's { rows (newest first),
+// unnamed, equips }, limit how many rows show, h = { el, pic(id), fmtK }. A named row: its ring and picture, the name, ×count and
+// the value with a small FM or NPC tag. Then one row for the Use and Etc lines it couldn't name and one for the equips, a count
+// and no value. Returns { nodes, more } (more = rows past the limit)
+function logRows(log, limit, h) {
+  const fmt = n => Math.round(n).toLocaleString('en-US');
+  const all = log.rows.map(r => {
+    const src = h.pic(r.id);
+    return h.el('div', { class: 'k-row' }, h.el('span', { class: 'k-ring' }, src ? h.el('img', { src, alt: '' }) : null),
+      h.el('span', { class: 'g-nnm' }, h.el('span', { class: 'g-nn' }, r.name)),
+      h.el('span', { class: 'g-lc' }, h.el('b', {}, '×' + fmt(r.count)), h.el('small', {}, h.fmtK(r.value) + ' ', h.el('span', { class: 'g-src' }, r.src === 'fm' ? 'FM' : 'NPC'))));
+  });
+  const plain = (name, n) => h.el('div', { class: 'k-row' }, h.el('span', { class: 'k-ring' }),
+    h.el('span', { class: 'g-nnm' }, h.el('span', { class: 'g-nn' }, name)), h.el('span', { class: 'g-lc' }, h.el('b', {}, '×' + fmt(n))));
+  if (log.unnamed) all.push(plain("Something it couldn't name", log.unnamed));
+  if (log.equips) all.push(plain('Equips picked up', log.equips));
+  return { nodes: all.slice(0, limit), more: Math.max(0, all.length - limit) };
+}
+
 /* ---------- the card ---------- */
 
 const COZY = 'https://cozy.markets/items/';
@@ -130,18 +149,27 @@ const NO_MAP_MOBS = [8, 10], LEMON_SPOTS = [9, 37, 58, 90];
 // lemon's picture, and no columns or foot), fold is a saved run being open (the title bar and the button row
 // only), nums whether the numbers line has anything to say, session whether one exists; each part keeps what it last drew and
 // draws again only when that changes, so a frame restarts no walker.
-function build({ el, band, tools, lamp, mapPick, classPick, steps, lines, pics, mobName }) {
+// Page G (2026-11-20): two columns side by side. The left is the lamp, the label with the map's pick, the numbers (band), the
+// buttons (tools) and the run buttons (runs); the right is what grind.js hands in (right: the Count my loot switch and What it
+// earned). The grass strip leads the card (2026-11-21), the steps and the lines that need you sit under both columns, then what
+// grind.js hands in as under (What you picked up, the full width). The drop columns left the page: drawCols stays, but cols is
+// never put on the page and nothing calls it.
+function build({ el, band, tools, runs, right, under, lamp, mapPick, classPick, steps, lines, pics, mobName }) {
   const K = n => window.Grind.fmtK(n);
   const label = el('h2', { class: 'g-nowl' });
   const stage = el('div', { class: 'g-ground', 'aria-hidden': 'true', hidden: '' });
   const cols = el('div', { class: 'g-mobcols' });
   const nums = el('div', { class: 'k-card g-nums', id: 'g-now', hidden: '' }, band);
-  const deep = el('div', { class: 'g-nowin' }, stage, cols);
+  const deep = el('div', { class: 'g-nowin' }, stage);
   const notes = el('div', { class: 'g-nnotes' });
   const foot = el('div', { class: 'k-foot g-nowfoot', hidden: '' }, notes, classPick);
   const card = el('section', { class: 'g-stop g-nowcard', id: 'g-nowcard' },
-    el('div', { class: 'k-bar' }, label, mapPick, el('span', { class: 'push' }, lamp)),
-    el('div', { class: 'k-pad g-nowpad' }, nums, tools, steps, ...(lines || []), deep, foot));
+    el('div', { class: 'k-pad g-nowpad' },
+      deep,
+      el('div', { class: 'g-gcols' },
+        el('div', { class: 'g-gleft' }, el('div', { class: 'k-bar g-ghead' }, label, mapPick, el('span', { class: 'push' }, lamp)), nums, tools, runs || null),
+        el('div', { class: 'g-gright' }, right || null)),
+      steps, ...(lines || []), under || null, foot));
 
   // a drop's picture in its ring: one that isn't in yet is filled in when the sheet arrives, so the row isn't drawn again for it
   const ring = r => { const e = el('span', { class: 'k-ring' + (r.gold ? ' gold' : ''), 'data-item': r.id }), src = pics.item(r.id); if (src) e.append(el('img', { src, alt: '' })); return e; };
@@ -210,12 +238,11 @@ function build({ el, band, tools, lamp, mapPick, classPick, steps, lines, pics, 
     steps.hidden = !!x.sharing || !!x.session;   // the first time steps: before sharing, and never under a stopped session's nudge
     const ids = x.noMap ? NO_MAP_MOBS : (x.mobIds || []).slice(0, 3);
     if (changed('stage', ids, !!x.sprites, x.noMap ? x.lemon : null)) { drawStage(ids, x.sprites); if (x.noMap) dropLemons(x.lemon); }
-    if (changed('cols', !!x.noMap, x.mobs, x.mobIds, !!x.D, x.cls, x.level)) drawCols(x.noMap ? {} : x);
-    if (x.L) fillIcons();
-    foot.hidden = !!x.noMap || (!notes.children.length && classPick.hidden);
+    void drawCols; void fillIcons;   // the drop columns are off the page (page G); their code stays
+    foot.hidden = !!x.noMap || classPick.hidden;
   }
   return { el: card, update };
 }
 
-window.GrindNow = { shortName, dropColumns, wantedOf, forYou, pickedRows, build };
+window.GrindNow = { shortName, dropColumns, wantedOf, forYou, pickedRows, logRows, build };
 })();

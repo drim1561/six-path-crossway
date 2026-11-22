@@ -50,6 +50,8 @@ function model(q) {
   const tabs = [tab('exp', 'EXP an hour', q.exp, q.fmtK, false, 'Needs ' + BEST_MIN + ' minutes from the first kill to rank.'),
     tab('mesos', 'Mesos', q.mesos, sign, false, 'Needs ' + BEST_MIN + ' minutes of counted mesos to rank.')];
   tabs[1].verdict = q.verdict || null;
+  // a rough Profit (pickup lines with no bag look to check them) says "about" beside its number
+  tabs[1].about = !!q.about;
   if (q.pot && q.potName) tabs.push(tab('pot', q.potName + ' per 1%', q.pot, fmtPer, true, 'Needs ' + BEST_MIN + ' minutes and a whole 1% of EXP to rank.'));
   // sub is the whole line; bar is what the title bar says (the same without how many runs) and of what sits under the rank ring
   const bar = [q.live ? 'So far' : 'Session done', q.mins != null ? q.fmtDur(q.mins) : '', lv].filter(Boolean).join(' · ');
@@ -88,10 +90,10 @@ function build({ el, pics, whole }) {
   const span = (cls, text) => el('span', { class: cls }, text);
   function drawPanel(t, m) {
     // the shape: what is drawn, apart from the numbers in it. The same shape is patched in place
-    const sig = JSON.stringify([t.key, t.rows.map(r => r.label + (r.lit ? '*' : '')), t.usual == null, !!t.verdict, !!t.vs, t.line, m.line]);
+    const sig = JSON.stringify([t.key, t.rows.map(r => r.label + (r.lit ? '*' : '')), t.usual == null, !!t.verdict, !!t.vs, !!t.about, t.line, m.line]);
     if (shape !== sig) {
       shape = sig;
-      const big = el('div', { class: 'k-card g-sc-big' }, el('div', {}, span('n gold', ''), el('small', {}, 'this run')),
+      const big = el('div', { class: 'k-card g-sc-big' }, el('div', {}, span('n gold', ''), t.about ? span('g-sc-about', 'about') : null, el('small', {}, 'this run')),
         t.usual != null ? el('div', { class: 'vs' }, 'vs') : null, t.usual != null ? el('div', {}, span('n', ''), el('small', {}, 'your usual')) : null,
         t.vs ? el('span', { class: 'g-sc-vs' }) : null,
         t.verdict ? el('div', { class: 'g-sc-verdict ' + (t.verdict === 'Profitable' ? 'up' : 'down') }, t.verdict) : null);
