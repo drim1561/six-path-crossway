@@ -72,8 +72,17 @@ function consistent(s, exp, pct) {
   const sz = s.sizes[s.level];
   return !sz || Math.abs(exp / sz * 100 - pct) <= CFG.sizeTol + (pct < 5 ? 0.02 : 0);
 }
-// returns { ok, dExp, dPct }
+// a number no level fits: part of it is covered. A friend's report (2026-11-21): Chrome's "sharing a window" bar sat over
+// the left of the EXP line, so 259,570 read as 570 at 72.73%, a size no level has, and the garbage counted. Checked from
+// 1% (under it the percent's rounding is too coarse to tell) and only inside the table (past level 70 nothing can be checked)
+function cutNumber(exp, pct) {
+  if (!(exp > 0) || !(pct >= 1)) return false;
+  if (exp / (pct / 100) >= EXP_TABLE[EXP_TABLE.length - 1] * 1.03) return false;
+  return levelOfExp(exp, pct) == null;
+}
+// returns { ok, dExp, dPct }, or { ok: false, cut: true } for a covered number, refused before anything learns from it
 function takeExp(s, t, exp, pct) {
+  if (cutNumber(exp, pct)) return { ok: false, cut: true };
   const prev = s.last;
   if (!prev) {
     if (!consistent(s, exp, pct)) return { ok: false };
@@ -817,6 +826,8 @@ function add(s, r) {
       for (const sl of Object.values(s.slots)) sl.paused = true;
     }
     const e = takeExp(s, t, r.exp, r.pct);
+    // covered numbers running (the light says so from 3); any read that counts clears it. Never saved (toRow)
+    if (e.cut) s.cut = { n: (s.cut ? s.cut.n : 0) + 1, exp: r.exp, pct: r.pct }; else if (e.ok) s.cut = null;
     // !s.last is the first read after a pause: a level up in the gap makes the old size refuse the new EXP, so EXP answers anyway
     if (e.ok || !s.last) syncLevel(s, r.exp, r.pct);
     if (e.ok) {

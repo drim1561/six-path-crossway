@@ -103,6 +103,10 @@ function health(f) {
   // (this page, the browser) or a full screen game the window list can't offer; reshare opens the picker again
   if (f.noGame && !app) return say('bad', "Can't find MapleStory", "Grind can't find MapleStory in what you shared. Pick the game window itself, or Entire Screen if the game is full screen. Firefox often can't do this: try Edge or Chrome, or the EXP Tracker app", { reshare: true });
   if (C.exp.state === 'bad') return say('bad', "Can't see EXP bar", app ? "Can't see your EXP bar, paused. Is the game open, with the bar showing?" : "Can't see your EXP bar, paused. Is the game still shared, with the bar showing?");
+  // f.cut: the EXP number reads, but no level fits it, three reads running: something sits over part of it. In a browser
+  // that is Chrome's or Edge's "sharing a window" bar when the game's bottom edge is the screen's (a friend's report, 2026-11-21)
+  if (f.cut) return say('bad', app ? 'EXP bar covered' : 'Hide the sharing bar', app ? "Part of the EXP number is covered, so nothing counts. Move whatever sits over the EXP bar"
+    : "Part of the EXP number is covered, so nothing counts. Press Hide on the browser's sharing bar, or move whatever sits over the EXP bar");
   if (stuckOn(f.size)) return say('bad', "Can't measure game", app ? "Can't measure the game. Is it minimized, or very small?" : "Can't measure the game. Share the game window itself, at full size");
   if (C.potions.state === 'bad') return say('bad', "Can't read quickslots", app ? "Can't read your quickslot numbers. Make the game window bigger, or press Find my game again" : "Can't read your quickslot numbers. Make the game window bigger, or share it again");
   if (C.level.state === 'bad') return say('bad', "Can't read level", "Can't read your level. Try Find my game again");
@@ -1714,7 +1718,7 @@ function mount(root, deps) {
   function renderHealth() {
     const s = session;
     const h = lastHealth = health({ t: Date.now(), app: !!app, sharing: st.sharing, stopped: !!st.stopped, hasSession: !!s, ended: !!ended, noGame: !st.reads && (st.noLine || 0) >= NO_GAME_TICKS, exp: st.h.exp, level: st.h.level, levelNow: st.level,
-      size: st.h.size, counts: st.h.counts, potNone: st.potNone, potCount: st.potCount, slotsHidden: !!st.slotsHidden, killed: !!s && (s.gainExp > 0 || s.gainPct > 0),
+      size: st.h.size, counts: st.h.counts, potNone: st.potNone, potCount: st.potCount, slotsHidden: !!st.slotsHidden, killed: !!s && (s.gainExp > 0 || s.gainPct > 0), cut: !!(s && s.cut && s.cut.n >= 3),
       meso: { at: s && s.meso && s.meso.last ? s.meso.last.t : null, unclear: !!(st.mesoOpen && st.mesoUnclear) },
       loot: { on: lootOn, pictures: lootReady, started: !!(s && s.bag && s.bag.startT), rough: !!GS().CFG.ROUGH } });
     // the pill over the buttons goes by what the core numbers need (mesos only ever ask)
