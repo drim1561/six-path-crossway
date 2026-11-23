@@ -6,7 +6,8 @@
 (function () {
 'use strict';
 
-const CFG = { jumpFrac: 0.04, sizeTol: 0.06, maxGapMs: 30000, rateWindow: 600000, minUse: 120000, low: 300, ROUGH: false };
+// idleMs: the longest stretch between two kills that still counts as grinding (EXP an hour leaves a longer one out whole)
+const CFG = { jumpFrac: 0.04, sizeTol: 0.06, maxGapMs: 30000, idleMs: 45000, rateWindow: 600000, minUse: 120000, low: 300, ROUGH: false };
 // EXP to the next level, by level: a copy of builds.js's, kept here so the Grind tab doesn't load Builds (a test checks they match)
 const EXP_TABLE = [0, 15, 34, 57, 92, 135, 372, 560, 840, 1242, 1716, 2360, 3216, 4200, 5460, 7050, 8840, 11040, 13716, 16680, 20216,
   24402, 28980, 34320, 40512, 47216, 54900, 63666, 73080, 83720, 95700, 108480, 122760, 138666, 155540, 174216, 194832, 216600, 240550,
@@ -26,15 +27,22 @@ function uuid() {
 function create({ mapId, t, prices, eat } = {}) {
   return { id: uuid(), mapId: mapId || null, t0: t, tLast: t, prices: prices || {}, eat: eat || null, mode: 'track', dated: true,
     level: null, levelStart: null, levels: 0, sizes: {}, last: null, pend: null,
-    gainExp: 0, gainPct: 0, deaths: 0, lostExp: 0, lostPct: 0, activeMs: 0, lastValidT: null, expFrom: null, expTo: null,
+    gainExp: 0, gainPct: 0, deaths: 0, lostExp: 0, lostPct: 0, activeMs: 0, lastValidT: null, expFrom: null, expTo: null, grindMs: 0, expFree: 0,
     slots: {}, retired: [], minutes: [], party: [], meso: null, boughtCost: 0, town: { trips: 0, ms: 0, open: null } };
 }
 
 const minuteOf = (s, t) => Math.max(0, Math.floor((t - s.t0) / 60000));
 function bucket(s, t) {
   const m = minuteOf(s, t);
-  while (s.minutes.length <= m) s.minutes.push({ m: s.minutes.length, exp: 0, pct: 0, used: {}, party: null, idle: true });
+  while (s.minutes.length <= m) s.minutes.push({ m: s.minutes.length, exp: 0, pct: 0, used: {}, party: null, idle: true, g: 0 });
   return s.minutes[m];
+}
+// a counted stretch between two kills, shared out to the minutes it ran through (g, grinding milliseconds): the part
+// since this minute began stays here, the rest goes to the minute of the kill before
+function creditGrind(s, t, gap) {
+  const now = bucket(s, t), here = Math.max(0, Math.min(gap, t - (s.t0 + now.m * 60000)));
+  now.g = (now.g || 0) + here;
+  if (gap > here) { const was = s.lastKillT != null ? bucket(s, s.lastKillT) : now; was.g = (was.g || 0) + gap - here; }
 }
 
 /* ---------- EXP ---------- */
@@ -685,7 +693,7 @@ function foundById(s) {
   for (const sl of Object.values(s.slots).concat(s.retired || [])) if (sl.id && sl.found) by[sl.id] = (by[sl.id] || 0) + sl.found;
   return by;
 }
-const snap = (s, t) => ({ t, exp: s.gainExp, pct: s.gainPct, active: s.activeMs, used: usedById(s), found: foundById(s) });
+const snap = (s, t) => ({ t, exp: s.gainExp, pct: s.gainPct, active: s.activeMs, grind: s.grindMs, free: s.expFree, lost: s.lostExp || 0, used: usedById(s), found: foundById(s) });
 // a snapshot every 10 seconds, kept back to one older than the longest window
 function keepTrail(s, t) {
   const tr = s.trail || (s.trail = []);
@@ -695,7 +703,10 @@ function keepTrail(s, t) {
 }
 // Reset average: a fresh average from now on, the session's own numbers untouched
 function mark(s, t) { s.mark = snap(s, t); }
-// rates from an earlier snapshot to now, over the active time between them; null under a minute of it
+// rates from an earlier snapshot to now; null under a minute of active time between them. Potions go over that active
+// time. EXP an hour goes over the grinding in it (the stretches between kills that counted, each credited at the kill
+// that ends it, so the kills and their stretches pair up with no fence post), less the EXP of a kill that ended an idle
+// spell, which came with no time; null under a minute of grinding, where the run's own number shows instead
 function between(s, a, now) {
   const act = now.active - a.active;
   if (act < 60000) return null;
@@ -703,8 +714,13 @@ function between(s, a, now) {
   for (const sl of (s.retired || []).concat(Object.values(s.slots))) if (sl.id) price[sl.id] = sl.price || 0;
   let cost = 0;
   for (const id of Object.keys(now.used)) cost += ((now.used[id] || 0) - (a.used[id] || 0)) * (price[id] || 0);
-  const pct = now.pct - a.pct;
-  return { t: a.t, mins: act / 60000, expHr: (now.exp - a.exp) / hrs, costHr: cost / hrs, per1: pct >= 0.3 && cost > 0 ? cost / pct : null };
+  const pct = now.pct - a.pct, exp = now.exp - a.exp;
+  const grind = a.grind == null || now.grind == null ? null : now.grind - a.grind, free = grind == null ? 0 : (now.free || 0) - (a.free || 0);
+  // expMsOf's rule for a window: the EXP that came with no time is left out while it is at most half of what the window
+  // earned (deaths aside); past half there is no number for it, and the switch shows the run's
+  const lost = a.lost == null || now.lost == null ? 0 : now.lost - a.lost, earned = exp + lost;
+  const expHr = grind == null || grind < 60000 || (free > 0 && free * 2 > earned) ? null : (free > 0 ? exp * (earned - free) / earned : exp) / (grind / 3600000);
+  return { t: a.t, mins: act / 60000, expHr, costHr: cost / hrs, per1: pct >= 0.3 && cost > 0 ? cost / pct : null };
 }
 
 /* ---------- which map a run belongs to ---------- */
@@ -812,6 +828,14 @@ function add(s, r) {
   if (r.pickup) { takePickup(s, t, r.pickup); if (Object.keys(r).every(k => k === 't' || k === 'pickup')) return s; }
   // a running session kept from before the EXP clock (no expFrom at all): the clock covers all of it, as its EXP does
   if (!('expFrom' in s)) { s.expFrom = s.gainExp || s.gainPct ? 0 : null; s.expTo = s.expFrom == null ? null : s.activeMs; }
+  // and one kept from before the grinding clock (no grindMs): the clock it had so far stays, idle time and all, and only
+  // what comes after is counted the new way. Its snapshots get the same, so the 5 and 10 minute numbers carry on
+  if (s.grindMs == null) {
+    s.grindMs = s.expFrom != null ? s.expTo - s.expFrom : 0; s.expFree = s.expFirst > 0 ? s.expFirst : 0;
+    for (const x of (s.trail || []).concat(s.mark ? [s.mark] : [])) if (x.grind == null) {
+      x.grind = s.expFrom != null ? Math.max(0, Math.min(x.active, s.expTo) - s.expFrom) : 0; x.free = x.exp > 0 ? s.expFree : 0;
+    }
+  }
   if (r.level && !s.levelByExp && (!s.level || r.level > s.level)) s.level = r.level;   // a stale level read never undoes a level up
   if (s.levelStart == null && s.level) s.levelStart = s.level;
   // the map the game shows: with no EXP yet the run follows it, after that the run is the map with the most EXP (creditMap)
@@ -833,8 +857,19 @@ function add(s, r) {
     if (e.ok) {
       if (s.lastValidT != null) { const dt = t - s.lastValidT; if (dt > 0 && dt <= CFG.maxGapMs) s.activeMs += dt; }
       s.lastValidT = t;
-      // the EXP clock: where the active clock stood at the first kill and at the latest (a death isn't a kill)
-      if (e.dExp > 0 || e.dPct > 0) { if (s.firstKillT == null) s.firstKillT = t; if (s.expFrom == null) { s.expFrom = s.activeMs; s.expFirst = e.dExp; } s.expTo = s.activeMs; s.lastKillT = t; { const tw = townIn(s); if (tw.open != null) { tw.ms += Math.max(0, s.activeMs - tw.open); tw.trips++; tw.open = null; } } }
+      // the EXP clock: a kill (a death isn't one) adds the active time since the kill before, when that is 45 seconds or
+      // less. A longer stretch is idle and left out whole, and its kill's EXP, like the first kill's, came with no time
+      // freeLast is what the latest gain added to that share: when the next reads take a misread back (EXP down, no
+      // death), the share gives it back too. A death gives nothing back, or a real one after a quest's EXP would flatter
+      if (e.dExp < 0 && !e.died && s.freeLast > 0) { const back = Math.min(s.freeLast, -e.dExp); s.expFree -= back; s.freeLast -= back; }
+      if (e.dExp > 0 || e.dPct > 0) {
+        if (s.firstKillT == null) s.firstKillT = t;
+        if (s.expFrom == null) { s.expFrom = s.activeMs; s.expFirst = e.dExp; s.expFree = s.freeLast = Math.max(0, e.dExp); }
+        else {
+          const gap = Math.max(0, s.activeMs - s.expTo);
+          if (gap <= CFG.idleMs) { s.grindMs += gap; creditGrind(s, t, gap); s.freeLast = 0; } else s.expFree += (s.freeLast = Math.max(0, e.dExp));
+        }
+        s.expTo = s.activeMs; s.lastKillT = t; { const tw = townIn(s); if (tw.open != null) { tw.ms += Math.max(0, s.activeMs - tw.open); tw.trips++; tw.open = null; } } }
       if (e.dExp) { b.exp += e.dExp; b.pct += e.dPct; b.idle = false; }
       if (e.dExp > 0) creditMap(s, e.dExp);
       if (e.died) b.died = true;
@@ -864,15 +899,39 @@ function add(s, r) {
 
 /* ---------- numbers ---------- */
 
-// EXP an hour runs from the first kill to the latest (Rimmah, 2026-11-02): town before the first and after the last isn't
-// grinding, a repot trip in between still is. Pauses stay out, since they never reach the active clock. N kills span N minus
-// 1 gaps, so the first kill's EXP came with no time spent earning it (the fence post): the clock stretches by that share,
-// only while the first gain is at most half of all of it, so one kill or a death soon after can't blow it up. Sessions
-// from before expFirst keep the plain clock
+// EXP an hour counts only while you're grinding (Rimmah, 2026-11-22; before that it ran from the first kill to the
+// latest, repot trips and all): the active time between one kill and the next counts when it is 45 seconds or less
+// (CFG.idleMs), and a longer stretch is left out whole, so town, a repot trip and standing around all drop out. Pauses
+// were never on the active clock. N kills span N minus 1 stretches, so the first kill's EXP came with no time spent
+// earning it (the fence post), and so did the EXP of each kill that ended an idle spell: the clock stretches by that
+// share (expFree) while it is at most half of the EXP earned (deaths aside: a death takes EXP away, not the time it took
+// to earn, so it can't flip the rule). Past half there is no honest clock, so there is none, and the run has no EXP an
+// hour until grinding catches up: dropping the stretch there (the first version) put ALL the EXP over the counted time,
+// and one quest's EXP after two idle minutes doubled the number. A saved run comes back with nothing free (fromRow).
+// A session read before its first add since the grinding clock (no grindMs) goes by the clock it had
 const expMsOf = s => {
-  const raw = s.expFrom != null ? s.expTo - s.expFrom : 0;
-  return s.expFirst > 0 && s.expFirst * 2 <= s.gainExp ? raw * s.gainExp / (s.gainExp - s.expFirst) : raw;
+  const old = s.grindMs == null, raw = old ? (s.expFrom != null ? s.expTo - s.expFrom : 0) : s.grindMs, free = old ? s.expFirst : s.expFree, earned = s.gainExp + (s.lostExp || 0);
+  if (!(free > 0)) return raw;
+  return free * 2 <= earned ? raw * earned / (earned - free) : 0;
 };
+// no kill for over 45 seconds of reading, after a first one: EXP an hour is waiting (the light says Idle)
+const idleNow = s => s.expTo != null && s.activeMs - s.expTo > CFG.idleMs;
+// a saved run's EXP minutes, what its EXP an hour goes over. A run saved since the grinding clock (its minutes carry a
+// sixth number, their grinding seconds) gives what it saved. An older one saved the first kill to last clock, idle time
+// in it, so it gives the smaller of that and its count of minutes that gained or lost EXP; with no minutes kept, what it
+// saved. A minute with EXP on both sides of it counts whole. One beside an idle minute, or at an end of the run, was
+// grinding for only part of it, so it counts as its EXP against a slow full minute's (the lower quartile, so the count
+// leans high and the rate low), one at most; with under three full minutes every minute counts whole. Measured
+// 2026-11-23 on made up runs: whole minutes read 62 minutes of grinding with 51 idle 11% low, this 1% low. Never
+// rewritten in the database: every reader goes through here (builds.js keeps a copy, a test checks they agree)
+function expMinOf(row) {
+  const saved = row.exp_min != null ? row.exp_min : row.active_min || 0, ms = row.minutes;
+  if (!Array.isArray(ms) || !ms.length || ms.some(m => !Array.isArray(m) || m.length > 5)) return saved;
+  const on = ms.filter(m => m[1]), has = new Set(on.map(m => m[0])), full = m => has.has(m[0] - 1) && has.has(m[0] + 1);
+  const usual = on.filter(full).map(m => Math.abs(m[1])).sort((a, b) => a - b), slow = usual[Math.floor((usual.length - 1) / 4)];
+  const n = usual.length < 3 ? on.length : on.reduce((a, m) => a + (full(m) ? 1 : Math.min(1, Math.abs(m[1]) / slow)), 0);
+  return Math.min(saved, Math.round(n * 1000) / 1000);
+}
 // avgExpPerKill: the map's average EXP a kill, for kills a minute (an estimate; a party shares EXP)
 function stats(s, t, avgExpPerKill) {
   const mins = s.activeMs / 60000, hrs = mins / 60, o = { exp: s.gainExp, pct: s.gainPct, mins, pausedMins: (s.pausedMs || 0) / 60000, deaths: s.deaths, levels: s.levels };
@@ -880,6 +939,9 @@ function stats(s, t, avgExpPerKill) {
   o.expHr = rated ? s.gainExp / (expMins / 60) : null;
   o.expMin = rated ? s.gainExp / expMins : null;
   o.pctHr = rated ? s.gainPct / (expMins / 60) : null;
+  // what the grinding clock left out, and the plain number over all the time tracked, so the idle is never dropped unseen
+  o.idleMins = Math.max(0, mins - expMins);
+  o.allHr = mins >= 2 ? s.gainExp / hrs : null;
   const size = s.sizes[s.level] || (s.last && s.last.pct >= 5 ? s.last.exp / (s.last.pct / 100) : null);
   o.expToLevel = size && s.last ? Math.max(0, size - s.last.exp) : null;
   o.hrsToLevel = size && s.last && o.expHr > 0 ? (size - s.last.exp) / o.expHr : null;   // never a time below zero
@@ -1138,7 +1200,7 @@ function usualOf(rows, { mapId, mode, exceptId }) {
 // one saved run's number for a metric, or null when it doesn't count (too short, no result, no potions)
 function rowValue(r, q) {
   if (q.metric === 'mesosHr') return (r.loot_mode || 'track') === q.mode && r.result != null && r.result_min >= BEST_MIN_RESULT ? r.result / (r.result_min / 60) : null;
-  if (q.metric === 'expHr') { const min = r.exp_min != null ? r.exp_min : r.active_min; return min >= BEST_MIN_RESULT ? r.exp / (min / 60) : null; }
+  if (q.metric === 'expHr') { const min = expMinOf(r); return min >= BEST_MIN_RESULT ? r.exp / (min / 60) : null; }   // 10 minutes of grinding
   if (q.metric === 'potPer1') {
     if (!(r.active_min >= BEST_MIN_RESULT) || !(r.pct >= 1) || !Array.isArray(r.potions)) return null;
     const used = r.potions.reduce((a, p) => a + ((q.potIds || []).includes(+p.id) ? p.used || 0 : 0), 0);
@@ -1216,8 +1278,9 @@ function toRow(s) {
     // active minutes to 0.001 (a coarser cut shifts the rates of a short session)
     exp: Math.round(s.gainExp), pct: r2(s.gainPct), active_min: Math.round(s.activeMs / 60) / 1000, exp_min: Math.round(expMsOf(s) / 60) / 1000, deaths: s.deaths, potions,
     mesos_earned: mesosOf(s).earned, meso_min: mesosOf(s).min, etc_value: etcOf(s).value, etc_min: etcOf(s).min,
-    // [minute, EXP, percent, party, { itemId: used }]
-    minutes: s.minutes.map(m => [m.m, Math.round(m.exp), r2(m.pct), m.party, m.used]) };
+    // [minute, EXP, percent, party, { itemId: used }, grinding seconds]. The sixth marks a run saved since the grinding
+    // clock: its exp_min is used as saved (expMinOf)
+    minutes: s.minutes.map(m => [m.m, Math.round(m.exp), r2(m.pct), m.party, m.used, Math.min(60, Math.round((m.g || 0) / 1000))]) };
 }
 // a saved session, for its charts and numbers (it can't take more readings). eat: as create's, for its Lemon and Meat
 function fromRow(row, eat) {
@@ -1225,13 +1288,13 @@ function fromRow(row, eat) {
   s.id = row.id; s.tLast = Date.parse(row.ended_at); s.levelStart = row.level_start; s.level = row.level_end;
   s.levels = (row.level_end || 0) - (row.level_start || 0);
   s.gainExp = row.exp; s.gainPct = row.pct; s.activeMs = row.active_min * 60000; s.deaths = row.deaths;
-  s.expFrom = 0; s.expTo = (row.exp_min != null ? row.exp_min : row.active_min) * 60000;   // saved before the EXP clock: all of it
+  s.expFrom = 0; s.expTo = s.grindMs = expMinOf(row) * 60000; s.expFree = 0;   // its EXP minutes, an older run's worked out from its minutes
   s.lostExp = s.lostPct = null;   // not saved: estimated from the minutes
   for (const p of row.potions || []) s.slots['p' + p.id] = { key: 'p' + p.id, id: p.id, name: p.name, price: p.price, count: 0, pend: null, used: p.used, bought: p.bought, missing: 0, uses: [], firstUse: null };
   if (row.mesos_earned != null) s.meso = { saved: true, looks: 2, pend: null, first: { t: s.t0, v: 0, bought: 0 }, last: { t: s.t0 + row.meso_min * 60000, v: row.mesos_earned, bought: 0 } };
   // a saved session keeps only the etc value and its minutes: stand them in as one item worth 1 a piece
   if (row.etc_value != null) s.etcs = { looks: 2, pend: null, first: { t: s.t0, key: '', items: { v: { n: 0, price: 1 } } }, last: { t: s.t0 + row.etc_min * 60000, key: 'v', items: { v: { n: row.etc_value, price: 1 } } } };
-  s.minutes = (row.minutes || []).map(([m, exp, pct, party, used]) => ({ m, exp, pct, party, used: used || {}, idle: !exp }));
+  s.minutes = (row.minutes || []).map(([m, exp, pct, party, used, g]) => ({ m, exp, pct, party, used: used || {}, idle: !exp, g: (g || 0) * 1000 }));
   s.mode = row.loot_mode || 'track';
   if (row.card && row.card.mode) s.savedCard = row.card;   // it opens to the card it showed
   else if (row.mesos_earned != null) s.savedCard = olderCard(s, row);
@@ -1254,5 +1317,5 @@ function wholeRows(minutes) {
   for (let i = 0; i < xs.length; i += 60) rows.push(xs.slice(i, i + 60));
   return rows;
 }
-window.GrindSession = { CFG, EXP_TABLE, levelOfExp, wholeRows, create, add, stats, countdown, countdowns, minuteOf, toRow, fromRow, mark, trade, keepMesos, rebase, lootOf, bagTabs, profitWords, shopOf, learnPrice, result, rateRun, soldAll, townOf, profitOf, usualOf, standing, bagListShows, pickMap, pickups, setWorth, worthOf, logOf, lineMesos };
+window.GrindSession = { CFG, EXP_TABLE, levelOfExp, wholeRows, create, add, stats, expMinOf, idleNow, countdown, countdowns, minuteOf, toRow, fromRow, mark, trade, keepMesos, rebase, lootOf, bagTabs, profitWords, shopOf, learnPrice, result, rateRun, soldAll, townOf, profitOf, usualOf, standing, bagListShows, pickMap, pickups, setWorth, worthOf, logOf, lineMesos };
 })();

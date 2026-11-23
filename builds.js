@@ -606,6 +606,18 @@ function hoursTo(s, cls, toLevel, sec = STEP_SEC, ap = planAP(s, cls)) {
   return h;
 }
 
+// A run's minutes are its grinding minutes, idle time left out: expMinOf is a copy of GrindSession.expMinOf (this file
+// never loads grind-session.js; builds-logic.test.js checks the two agree). A run saved with grinding seconds in its
+// minutes, or with no minutes, keeps its clock; an older one counts only its minutes that gained or lost EXP, and the
+// minute where grinding starts or stops as a part (its EXP against a slow full minute's).
+function expMinOf(row) {
+  const saved = row.exp_min != null ? row.exp_min : row.active_min || 0, ms = row.minutes;
+  if (!Array.isArray(ms) || !ms.length || ms.some(m => !Array.isArray(m) || m.length > 5)) return saved;
+  const on = ms.filter(m => m[1]), has = new Set(on.map(m => m[0])), full = m => has.has(m[0] - 1) && has.has(m[0] + 1);
+  const usual = on.filter(full).map(m => Math.abs(m[1])).sort((a, b) => a - b), slow = usual[Math.floor((usual.length - 1) / 4)];
+  const n = usual.length < 3 ? on.length : on.reduce((a, m) => a + (full(m) ? 1 : Math.min(1, Math.abs(m[1]) / slow)), 0);
+  return Math.min(saved, Math.round(n * 1000) / 1000);
+}
 // Seconds a step takes for this player, from their saved Grind sessions: those of 10 minutes or more within 5 levels of
 // the build (sessions don't say which character, and an alt or older, weaker stats would skew it), each scored with the
 // build's stats at the best monster the ranking has on that map. The median, or STEP_SEC when none fit.
@@ -613,7 +625,7 @@ const TUNE_MIN = 10, TUNE_LEVELS = 5;
 function tuneSeconds(s, cls, rows) {
   const rank = rankWith(s, cls, DATA), secs = [];
   for (const r of rows || []) {
-    const min = r.exp_min != null ? r.exp_min : r.active_min, lv = r.level_end || r.level_start;
+    const min = expMinOf(r), lv = r.level_end || r.level_start;
     if (!(min >= TUNE_MIN) || !(r.exp > 0) || !lv || Math.abs(lv - s.level) > TUNE_LEVELS) continue;
     const here = new Set(DATA.mobs.filter(m => m.maps.some(x => x[2] === Number(r.map_id))).map(m => m.id));
     const best = rank.filter(x => here.has(x.id)).reduce((b, x) => Math.max(b, x.pace), 0);
@@ -2906,7 +2918,7 @@ function mount(root, deps) {
 }
 const estimatedNote = () => E('p', { id: 'b-estimated', class: 'k-foot b-badge', hidden: '' }, E('b', {}, 'Estimated. '), "Damage for this weapon comes from meowdb's table and hasn't been checked against a real stat window yet.");
 
-window.Builds = { planSkills, skillsFor, skillsAt, slotOf, comparePaths, resetLine, roadBar, modelRoads, MODEL_ATTACKS, roadLine, ROADS, roadIds, roadState, recognize, ZERO_OK, REACH, HOLD, ROAD_KILLS, roadTarget, mainAttack, crowdHits, rankWith, attackModel, statsAt, planAP, pathClass, firstJobSkills, indieMagic, roadStats, tuneSeconds, EXP_TABLE, STEP_SEC, expHour, hoursTo, healRange, HEAL, standingText, KILL_GAP, CLASSES, BRANCHES, branchOf, weaponsFor, mastery, physRange, spellRange, weaponAttackFromMax, WEAPONS, CHECKED_WEAPONS, windowRange, levelScale, hitChance, defend, elemMult, makeRng, castsToKill,
+window.Builds = { planSkills, skillsFor, skillsAt, slotOf, comparePaths, resetLine, roadBar, modelRoads, MODEL_ATTACKS, roadLine, ROADS, roadIds, roadState, recognize, ZERO_OK, REACH, HOLD, ROAD_KILLS, roadTarget, mainAttack, crowdHits, rankWith, attackModel, statsAt, planAP, pathClass, firstJobSkills, indieMagic, roadStats, tuneSeconds, expMinOf, EXP_TABLE, STEP_SEC, expHour, hoursTo, healRange, HEAL, standingText, KILL_GAP, CLASSES, BRANCHES, branchOf, weaponsFor, mastery, physRange, spellRange, weaponAttackFromMax, WEAPONS, CHECKED_WEAPONS, windowRange, levelScale, hitChance, defend, elemMult, makeRng, castsToKill,
   validateStats, rankMobs, buildGuide, pointsPlan, mount, fill, refresh, signedOut, shrinkImage, take, classOf,
   dropGroups, findItems, droppers, meowMap, wearers, kindOf, gainRange, trusted, bestScroll, money, plural, mobFit };
 })();

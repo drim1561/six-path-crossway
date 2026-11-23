@@ -47,7 +47,7 @@ function model(q) {
     return { key, label, mine: mine == null ? null : fmtV(mine), usual: usual == null ? null : fmtV(usual), vs, rows, verdict: null, line };
   };
   const sign = n => (n < 0 ? '−' : n > 0 ? '+' : '') + q.fmtK(Math.abs(n));
-  const tabs = [tab('exp', 'EXP an hour', q.exp, q.fmtK, false, 'Needs ' + BEST_MIN + ' minutes from the first kill to rank.'),
+  const tabs = [tab('exp', 'EXP an hour', q.exp, q.fmtK, false, 'Needs ' + BEST_MIN + ' minutes of grinding to rank.'),
     tab('mesos', 'Mesos', q.mesos, sign, false, 'Needs ' + BEST_MIN + ' minutes of counted mesos to rank.')];
   tabs[1].verdict = q.verdict || null;
   // a rough Profit (pickup lines with no bag look to check them) says "about" beside its number

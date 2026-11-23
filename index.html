@@ -665,6 +665,7 @@ body.in-app .tabs > :not(#tab-grind, #tab-boxes, #tab-recipes), body.in-app #g-g
 #view-grind .g-gleft > .k-bar { min-height: 0; padding: 0; background: none; border: 0; }
 #view-grind .g-gleadrow { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; padding-bottom: 6px; border-bottom: 1px solid var(--at-line); }
 #view-grind .g-glead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; min-width: 0; }
+#view-grind .g-gclock { flex-basis: 100%; color: var(--muted); font-size: var(--fs-sm); }
 #view-grind .g-gbig { font: 700 var(--n-xl)/1.05 var(--font-num); font-variant-numeric: tabular-nums; color: var(--num-big); }
 #view-grind .g-glbl { color: var(--muted); font: 600 var(--fs-md) var(--font-body); }
 #view-grind .g-glead em { font-style: normal; font-size: var(--fs-sm); } #view-grind .g-glead em.up { color: var(--good); } #view-grind .g-glead em.down { color: var(--bad); }
@@ -2440,7 +2441,7 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
   <section>
   <h3>What each number means</h3>
   <div class="how-nums">
-    <div class="how-card"><div class="how-what"><b>EXP an hour</b><p>From your first kill to your latest. 5m and 10m show just the last few minutes.</p></div><span class="how-num how-big">118K</span></div>
+    <div class="how-card"><div class="how-what"><b>EXP an hour</b><p>Counts only while you're grinding. A break or a town trip is left out. 5m and 10m show just the last few minutes.</p></div><span class="how-num how-big">118K</span></div>
     <div class="how-card"><div class="how-what"><b>Kills a minute</b><p>Your EXP a minute over the map's average kill. It reads low in a party.</p></div><span class="how-num how-big">14</span></div>
     <div class="how-card"><div class="how-what"><b>Profit</b><p>Pickups and shop sales, minus potions and anything else you bought.</p></div><span class="how-num how-big">+2,410</span></div>
     <div class="how-card"><div class="how-what"><b>Potions</b><p>Counted off your quickslots, so keep every potion you drink on a slot.</p></div><span class="how-num how-big"><span class="how-lemon" aria-hidden="true"></span>240</span></div>
@@ -2578,7 +2579,7 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-22a',
+  version: '2026-11-23a',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
@@ -2798,7 +2799,7 @@ function makeSupabaseApi(cfg) {
       listPriceReports: down, addPriceReport: down, deletePriceReport: down, listPriceHistory: down, savePriceHistory: down };
   }
   const COLUMNS = 'id,boss_id,channel,kind,at,posted_at,user_id,user_name,hidden';
-  const GRIND_LIST = 'id,map_id,started_at,ended_at,level_start,level_end,exp,pct,active_min,deaths,mesos_earned,meso_min,etc_value,etc_min,potions,loot_mode,result,result_min,exp_min';
+  const GRIND_LIST = 'id,map_id,started_at,ended_at,level_start,level_end,exp,pct,active_min,deaths,mesos_earned,meso_min,etc_value,etc_min,potions,loot_mode,result,result_min,exp_min,minutes';
   const BUILD_COLUMNS = 'id,user_id,ign,class,level,stats,trains_at,note,shot_path,hidden,updated_at';
   // the Appraiser's tables never hand out who wrote a row (appraiser.sql grants no select on user_id)
   const REPORT_COLUMNS = 'id,item_id,bonus,slots_left,price,kind,reporter,created_at';

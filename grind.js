@@ -60,6 +60,14 @@ function parseMesos(v) {
   return m ? parseFloat(m[1]) * ({ k: 1e3, m: 1e6, b: 1e9 }[m[2]] || 1) : NaN;
 }
 const fmtDur = mins => { const m = Math.round(mins); return m < 60 ? m + ' min' : Math.floor(m / 60) + 'h ' + (m % 60) + 'm'; };
+// a saved run's EXP minutes: its grinding clock, with a run from before that clock rescored (GrindSession.expMinOf)
+const expMinOf = r => GS() ? GS().expMinOf(r) : r.exp_min != null ? r.exp_min : r.active_min || 0;
+// the small line beside EXP an hour (o: GrindSession.stats): EXP an hour counts only the time spent grinding, so from a
+// minute of idle it says how long each was and what the number would be with the idle time in. No idle, no line
+function clockLine(o) {
+  if (!o || o.expHr == null || !(o.idleMins >= 1)) return '';
+  return fmtDur(o.expMins) + ' grinding · ' + fmtDur(o.idleMins) + ' idle' + (o.allHr != null ? ' · ' + fmtK(o.allHr) + ' with the idle time' : '');
+}
 function clock(secs) {
   secs = Math.max(0, Math.round(secs));
   const h = Math.floor(secs / 3600), m = Math.floor(secs % 3600 / 60), s = String(secs % 60).padStart(2, '0');
@@ -123,6 +131,9 @@ function health(f) {
   if (f.meso.unclear) return say('wait', 'Mouse off mesos', "Can't read your meso total clearly yet. Move the mouse off it");
   if (f.meso.at == null) return say('wait', 'Open your bag', 'Open your inventory for a moment so mesos count');
   if (mesoStale) return say('wait', 'Open your bag', 'Mesos last seen ' + ago(f.meso.at) + '. Open your inventory for a moment');
+  // f.idle: everything is read, but no kill came for 45 s (GrindSession.idleNow), so EXP an hour is waiting. Grey, and
+  // only once a run has a kill: anything asked for above wins, and before the first kill the light stays Ready to grind
+  if (f.killed && f.idle) return say('idle', 'Idle', 'No kills for a bit, so EXP an hour is waiting. It picks up at your next kill');
   // green: everything is read. f.killed: the session has gained EXP
   return say('ok', f.killed ? 'Grinding' : 'Ready to grind', 'Reading everything');
 }
@@ -238,6 +249,7 @@ function eatLines(kind, g) {
 // and o.meat: the client ids with those names, since two items are named Lemon), the most trained maps, personal bests
 // and the last 30 days. Only what was tracked counts, so it's "since you started tracking", never the whole game
 const BEST_MIN = 10;   // a session shorter than this can't be a best (3 lucky minutes aren't an EXP an hour)
+const RATE_MIN = 2;    // and under this much grinding a saved run has no EXP an hour at all, like the live one (stats)
 const dayKey = ms => { const d = new Date(ms); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 function lifetime(rows, o) {
   const L = { sessions: rows.length, mins: 0, exp: 0, deaths: 0, levelFrom: null, levelTo: null, mesos: null, profit: null,
@@ -249,8 +261,8 @@ function lifetime(rows, o) {
   let perBest = null, perWorst = null;
   const maps = {}, byDay = {}, drank = {}, top = (k, v, row, low) => { const b = L.best[k]; if (!b || (low ? v < b.v : v > b.v)) L.best[k] = { v, row }; };
   for (const r of rows) {
-    // EXP an hour on the EXP clock (first kill to latest), hours on the session clock; a row from before it: all of it
-    const mins = r.active_min || 0, expMins = r.exp_min != null ? r.exp_min : mins, exp = r.exp || 0, pct = r.pct || 0;
+    // EXP an hour on the grinding clock (expMinOf), hours on the session clock; a row from before any EXP clock: all of it
+    const mins = r.active_min || 0, expMins = expMinOf(r), exp = r.exp || 0, pct = r.pct || 0;
     L.mins += mins; L.exp += exp; L.deaths += r.deaths || 0;
     if (r.level_start != null) L.levelFrom = L.levelFrom == null ? r.level_start : Math.min(L.levelFrom, r.level_start);
     if (r.level_end != null) L.levelTo = L.levelTo == null ? r.level_end : Math.max(L.levelTo, r.level_end);
@@ -272,7 +284,8 @@ function lifetime(rows, o) {
     else if (r.mesos_earned != null) L.profit = (L.profit || 0) + r.mesos_earned - cost;
     // a run saved with no map counts everywhere else, but it isn't a map
     if (r.map_id != null) {
-      const m = maps[r.map_id] || (maps[r.map_id] = { id: r.map_id, mins: 0, exp: 0, expMins: 0, first: Infinity }); m.mins += mins; m.exp += exp; m.expMins += expMins;
+      const m = maps[r.map_id] || (maps[r.map_id] = { id: r.map_id, mins: 0, exp: 0, rateExp: 0, expMins: 0, first: Infinity }); m.mins += mins; m.exp += exp;
+      if (expMins >= RATE_MIN) { m.rateExp += exp; m.expMins += expMins; }   // a run with no rate of its own adds none to its map's
       m.first = Math.min(m.first, Date.parse(r.started_at));   // the trail of signs goes in first trained order
     }
     if (expMins >= BEST_MIN) top('expHr', exp / (expMins / 60), r);
@@ -299,7 +312,7 @@ function lifetime(rows, o) {
   }
   for (const g of [L.lemon, L.meat]) { g.per1 = g.pct ? g.used / g.pct : null; delete g.pct; }
   for (const id of Object.keys(drank)) if (!L.thirst || drank[id] > L.thirst.n) L.thirst = { id: +id, n: drank[id] };
-  L.maps = Object.values(maps).map(m => Object.assign(m, { expHr: m.expMins ? m.exp / (m.expMins / 60) : null })).sort((a, b) => b.mins - a.mins);
+  L.maps = Object.values(maps).map(m => Object.assign(m, { expHr: m.expMins ? m.rateExp / (m.expMins / 60) : null })).sort((a, b) => b.mins - a.mins);
   // the three monsters on the podium, most kills first
   const killTops = Object.keys(kill.by).sort((a, b) => kill.by[b] - kill.by[a]).slice(0, 3).map(id => ({ id: +id, n: kill.by[id] }));
   L.kills = { n: kill.n, skipped: kill.skipped, top: killTops[0] || null, tops: killTops };
@@ -327,8 +340,8 @@ function lifetime(rows, o) {
 // there's no usual yet (3 other runs of 10 minutes or more), the run is too short, or it sits within 2% of the usual.
 // o: { lemon, meat, fmtK, shortMap?, mapName? }
 function runRow(r, rows, o) {
-  const min = r.exp_min != null ? r.exp_min : r.active_min || 0;
-  const expHr = min > 0 && r.exp > 0 ? r.exp / (min / 60) : null;
+  const min = expMinOf(r);
+  const expHr = min >= RATE_MIN && r.exp > 0 ? r.exp / (min / 60) : null;
   const count = ids => (r.potions || []).reduce((a, p) => a + (ids.includes(+p.id) ? p.used || 0 : 0), 0);
   const stand = window.GrindSession.standing(rows, { mapId: r.map_id, exceptId: r.id, metric: 'expHr', value: min >= 10 ? expHr : null });
   const diff = stand.usual && stand.value != null ? stand.value / stand.usual - 1 : null;
@@ -893,7 +906,8 @@ function mount(root, deps) {
   // charts) folded away until asked for (kept on the device); a saved session opened from the list always shows them
   // page G's left column: the lead (the big EXP an hour, against your usual, and Start fresh), then plain rows; before the first EXP one line
   V.nowLead = el('div', { class: 'g-glead' }); V.nowRows = el('div', { class: 'k-rows g-grows' }); V.nowSay = el('p', { class: 'g-nm', hidden: '' });
-  V.now = el('div', { class: 'g-nowv' }, el('div', { class: 'g-gleadrow' }, V.nowLead, V.freshBtn), V.nowRows, V.nowSay);
+  V.nowClock = el('span', { class: 'g-gclock', hidden: '' });   // the idle line (clockLine), a line of its own under the number, only when there is idle time
+  V.now = el('div', { class: 'g-nowv' }, el('div', { class: 'g-gleadrow' }, V.nowLead, V.freshBtn, V.nowClock), V.nowRows, V.nowSay);
   // the folds (page G): Run summary, All time, Your runs and Your record are rows on the trail, every one closed on load (never kept),
   // and a press opens only that one
   const foldOpen = {}, folds = {};
@@ -1638,9 +1652,9 @@ function mount(root, deps) {
     V.next.textContent = o.hrsToLevel != null ? fmtDur(o.hrsToLevel * 60) + ' to ' + ((s.level || 0) + 1) + ', at ' + timeOfDay(t + o.hrsToLevel * 3600000) : '';
     V.gain.textContent = fmt(o.exp) + ' · ' + o.pct.toFixed(2) + '%' + (o.deaths ? ' · ' + deathText(o) : '');
     // the clock runs only while the EXP bar is read; time left out for a pause says so, to square with a stopwatch, and
-    // so do the minutes EXP an hour ran on when town before the first kill or after the last left some out
+    // so does the time EXP an hour left out as idle (clockLine)
     V.time.textContent = fmtDur(o.mins);
-    V.timeSub.textContent = [o.pausedMins >= 1 ? fmtDur(o.pausedMins) + ' left out' : '', o.expHr != null && o.mins - o.expMins >= 1 ? 'EXP an hour over ' + fmtDur(o.expMins) + ', first kill to last' : ''].filter(Boolean).join(' · ');
+    V.timeSub.textContent = [o.pausedMins >= 1 ? fmtDur(o.pausedMins) + ' left out' : '', clockLine(o)].filter(Boolean).join(' · ');
     V.kpm.textContent = o.kpm != null ? 'about ' + o.kpm.toFixed(1) : '·';
     V.pots.textContent = o.potUsed ? fmt(o.potUsed) + ' · ' + fmtK(o.potCost) : '·';
     V.costHr.textContent = o.costHr != null ? fmtK(o.costHr) : '·';
@@ -1689,11 +1703,11 @@ function mount(root, deps) {
   // average (differences under 2% get no arrow)
   function paceParts(o) {
     const vs = r => {
-      if (!r || !o.expHr) return null;
+      if (!r || r.expHr == null || !o.expHr) return null;
       const d = r.expHr / o.expHr - 1;
       return Math.abs(d) < 0.02 ? null : { up: d > 0, text: (d > 0 ? '▲' : '▼') + Math.round(Math.abs(d) * 100) + '%' };
     };
-    const part = (label, r) => { const v = vs(r); return { label, value: r ? fmtK(r.expHr) : '·', vs: v && v.text, up: v && v.up }; };
+    const part = (label, r) => { const v = vs(r); return { label, value: r && r.expHr != null ? fmtK(r.expHr) : '·', vs: v && v.text, up: v && v.up }; };
     const parts = [part('Last 5 min', o.pace && o.pace[5]), part('last 10 min', o.pace && o.pace[10])];
     if (o.markT) {
       const p = part('since ' + timeOfDay(o.markT), o.since);
@@ -1718,12 +1732,12 @@ function mount(root, deps) {
   function renderHealth() {
     const s = session;
     const h = lastHealth = health({ t: Date.now(), app: !!app, sharing: st.sharing, stopped: !!st.stopped, hasSession: !!s, ended: !!ended, noGame: !st.reads && (st.noLine || 0) >= NO_GAME_TICKS, exp: st.h.exp, level: st.h.level, levelNow: st.level,
-      size: st.h.size, counts: st.h.counts, potNone: st.potNone, potCount: st.potCount, slotsHidden: !!st.slotsHidden, killed: !!s && (s.gainExp > 0 || s.gainPct > 0), cut: !!(s && s.cut && s.cut.n >= 3),
+      size: st.h.size, counts: st.h.counts, potNone: st.potNone, potCount: st.potCount, slotsHidden: !!st.slotsHidden, killed: !!s && (s.gainExp > 0 || s.gainPct > 0), idle: !!s && GS().idleNow(s), cut: !!(s && s.cut && s.cut.n >= 3),
       meso: { at: s && s.meso && s.meso.last ? s.meso.last.t : null, unclear: !!(st.mesoOpen && st.mesoUnclear) },
       loot: { on: lootOn, pictures: lootReady, started: !!(s && s.bag && s.bag.startT), rough: !!GS().CFG.ROUGH } });
     // the pill over the buttons goes by what the core numbers need (mesos only ever ask)
     const core = ['exp', 'level', 'potions'].map(k => h.checks[k].state);
-    const ps = ended || !st.sharing ? 'idle' : core.includes('bad') ? 'bad' : core.every(x => x === 'ok') ? 'ok' : 'wait';
+    const ps = h.nudge.state === 'idle' ? 'idle' : core.includes('bad') ? 'bad' : core.every(x => x === 'ok') ? 'ok' : 'wait';
     V.pill.className = 'k-lamp g-pill ' + ps + (ps === 'idle' ? ' off' : '');
     // its words are the light's (the pop out says the same), with the level once it's read
     const pillText = h.nudge.short + (ps !== 'idle' && ps !== 'bad' && st.level ? ' · Lv ' + st.level : '');
@@ -1832,7 +1846,7 @@ function mount(root, deps) {
     put(SP.ksfSub, s && avg ? fmt(Math.round(avg)) + ' EXP a kill here' : '');
     const tw = s && !saved ? GS().townOf(s, now) : null;
     show(SP.town, !!tw && tw.trips > 0);
-    put(SP.town, tw && tw.trips > 0 ? fmtDur(tw.ms / 60000) + ', ' + tw.trips + (tw.trips === 1 ? ' trip' : ' trips') + ', still counted' : '');
+    put(SP.town, tw && tw.trips > 0 ? fmtDur(tw.ms / 60000) + ', ' + tw.trips + (tw.trips === 1 ? ' trip' : ' trips') : '');
     put(SP.gain, s ? fmtK(o.exp) : '·');
     put(SP.gainSub, !s ? '' : minus(o.pct) + Math.abs(o.pct).toFixed(1) + '%' + (o.deaths ? ' · ' + o.deaths + ' death' + (o.deaths > 1 ? 's' : '') : s.level ? ' of Lv ' + s.level : ''));
     hoverText(SP.gainBox, o.deaths ? deathText(o) : '');
@@ -1879,9 +1893,11 @@ function mount(root, deps) {
     const e = ended, mapId = mapOfNow(e), o = GS().stats(e, e.tLast, avgExp(mapId)), R = GS().result(e, e.tLast), P = GS().profitOf(e, e.tLast);
     const usual = GS().standing(lastRows, { mapId, exceptId: e.id, metric: 'expHr', value: null }).usual;
     const r = GS().rateRun({ expHr: o.expHr, usual, mesosHr: P.perHr });
-    const n = Math.round(o.mins), K = v => v == null ? '·' : (v < 0 ? '−' : '') + fmtK(Math.abs(v));
+    const n = Math.round(o.expMins), K = v => v == null ? '·' : (v < 0 ? '−' : '') + fmtK(Math.abs(v));
     put(E.head, 'Run ended at ' + timeOfDay(e.tLast));
-    put(E.mins, n + (n === 1 ? ' minute' : ' minutes') + ' of grinding, ' + timeOfDay(e.t0) + ' to ' + timeOfDay(e.tLast) + '.');
+    // EXP came in but none of it steadily enough to put on a clock (expMsOf gave 0): say that, not 0 minutes and all idle
+    const untimed = o.expMins === 0 && o.exp > 0;
+    put(E.mins, (untimed ? 'No steady grinding to time, ' : n + (n === 1 ? ' minute' : ' minutes') + ' of grinding, ' + (o.idleMins >= 1 ? fmtDur(o.idleMins) + ' idle, ' : '')) + timeOfDay(e.t0) + ' to ' + timeOfDay(e.tLast) + '.');
     const pic = picOf(LEMON_IDS);
     if (E.lem.children.length !== 5) E.lem.replaceChildren(...[0, 1, 2, 3, 4].map(() => el('img', { alt: '' })));
     [...E.lem.children].forEach((img, i) => { picTo(img, pic, ''); img.classList.toggle('off', i >= r.lemons); });
@@ -2304,7 +2320,7 @@ function mount(root, deps) {
     const usual = GS().standing(lastRows, { mapId: mapOfNow(s), exceptId: s.id, metric: 'expHr', value: null }).usual;
     const pick = expPick(o, sinceFor === s.id ? 'since' : 'run', usual), main = mains[0];
     const count = (ids, name) => ({ pic: ids.find(id => pictures.Icons[id]), label: name, v: fmt(ids.reduce((a, id) => a + usedOf(s, id), 0)) });
-    return { lead: { v: pick.value != null ? fmtK(pick.value) : '·', vs: pick.vs && { up: pick.vs.up, text: pick.vs.text + ' vs usual' } },
+    return { lead: { v: pick.value != null ? fmtK(pick.value) : '·', vs: pick.vs && { up: pick.vs.up, text: pick.vs.text + ' vs usual' }, clock: clockLine(o) },
       rows: [{ label: 'Time', v: fmtDur(o.mins) }, { label: 'EXP', v: fmt(o.exp) }, count(LEMON_IDS, 'Lemons'), count(MEAT_IDS, 'Meat'),
         main && !LEMON_IDS.includes(+main.id) && !MEAT_IDS.includes(+main.id) ? count([+main.id], plural(main.name)) : null,
         o.hrsToLevel != null && s.level ? { label: 'Level ' + (s.level + 1) + ' in', v: fmtDur(o.hrsToLevel * 60) } : null].filter(Boolean) };
@@ -2319,6 +2335,7 @@ function mount(root, deps) {
     V.nowLead.parentNode.hidden = !parts.lead; V.nowRows.hidden = !parts.rows;
     if (parts.lead) V.nowLead.replaceChildren(el('b', { class: 'g-gbig' }, parts.lead.v), el('span', { class: 'g-glbl' }, 'EXP an hour'),
       ...(parts.lead.vs ? [arrowed(el('em', { class: parts.lead.vs.up ? 'up' : 'down' }), parts.lead.vs.text)] : []));
+    V.nowClock.hidden = !(parts.lead && parts.lead.clock); V.nowClock.textContent = parts.lead && parts.lead.clock || '';
     V.nowRows.replaceChildren(...(parts.rows || []).map(r => el('div', { class: 'k-row' },
       el('span', { class: 'g-nl' }, ...(r.pic ? [iconOf(r.pic, r.label)] : []), r.label), el('span', { class: 'g-nv' }, r.v))));
     void bandParts; void bandPart; void R;
@@ -2377,7 +2394,7 @@ function mount(root, deps) {
   }
   function openSession(r) {
     // older sessions kept on this device have no minutes any more: they open without charts
-    const full = r.minutes || jget(KEY_LOCAL, []).some(x => x.id === r.id) ? Promise.resolve(r) : api.getGrind(r.id);
+    const full = 'card' in r || jget(KEY_LOCAL, []).some(x => x.id === r.id) ? Promise.resolve(r) : api.getGrind(r.id);
     return full.then(row => { viewing = GS().fromRow(row, eatCfg()); render(); setFold('g-detail', true); detail.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, e => setStatus("Couldn't open that session (" + e.message + ').'));
   }
   // all time: the listed sessions with the running one as it is now (its last save swapped for the live numbers)
@@ -2461,5 +2478,5 @@ function mount(root, deps) {
   return reporter;
 }
 
-window.Grind = { mount, perFmt, perLine, runRow, railIcon, RAIL_ICONS, pixelSvg, arrowed, fmtK, clock, health, potionTile, potionTiles, expPick, killsPerMin, fmtKills, shroomLine, elapsedSecs, lifetime, lootItem, eatLines };
+window.Grind = { mount, perFmt, perLine, runRow, railIcon, RAIL_ICONS, pixelSvg, arrowed, fmtK, clock, health, potionTile, potionTiles, expPick, killsPerMin, fmtKills, shroomLine, elapsedSecs, lifetime, lootItem, eatLines, clockLine };
 })();
