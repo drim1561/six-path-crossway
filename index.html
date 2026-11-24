@@ -1840,6 +1840,10 @@ a.cozy:hover { border-color: var(--muted); }
 #view-boxes .bx-info p { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
 #view-boxes .bx-info p[hidden] { display: none; }
 #view-boxes a { color: var(--focus); text-decoration: underline; }
+#view-boxes .bx-read { display: grid; gap: 6px; }
+#view-boxes .bx-read[hidden] { display: none; }
+#view-boxes .bx-read .r-bar { padding-top: 0; }
+#view-boxes .bx-read p { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
 #view-boxes .bx-note { margin: 0; color: var(--ink); font-size: var(--fs-sm); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 #view-boxes .bx-note:empty { display: none; }
 #view-boxes .bx-round { display: grid; gap: 6px; }
@@ -2637,7 +2641,7 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-24c',
+  version: '2026-11-24d',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
@@ -3441,15 +3445,28 @@ function loadGuides() {
 }
 // box.js and data/box.json (npm run box:items) load the first time someone opens NX Crates. Picking a crate moves the
 // hash, so a crate can be linked; the pull log is the signed in player's box_opens rows (box-opens.sql).
-let boxesLoading = null, boxesView = null;
+let boxesLoading = null, boxesView = null, readerJs = null;
+// reader.js once, whichever tab asks first (Grind or NX Crates)
+function loadReaderJs() {
+  if (window.Reader) return Promise.resolve();
+  return readerJs || (readerJs = new Promise((resolve, reject) => {
+    document.head.append(el('script', { src: 'reader.js', onload: resolve, onerror: () => { readerJs = null; reject(new Error('reader.js')); } }));
+  }));
+}
 function loadBoxes() {
   if (boxesLoading) return boxesLoading;
+  // the crate reader (a share of the game logs each pull): NX Crates works without it, so a failed load only leaves the share out
+  const crateReader = Promise.all([loadReaderJs(),
+    new Promise((resolve, reject) => { document.head.append(el('script', { src: 'crate-reader.js', onload: resolve, onerror: () => reject(new Error('crate-reader.js')) })); }),
+    fetch('data/crate-window.json').then(r => { if (!r.ok) throw new Error('crate-window.json'); return r.json(); })])
+    .then(([, , art]) => window.CrateReader.create(art)).then(reader => ({ capture: window.Reader.capture, reader }));
+  crateReader.catch(() => window.track('load_failed', { what: 'crate-reader' }));
   const script = new Promise((resolve, reject) => {
     document.head.append(el('script', { src: 'box.js', onload: resolve, onerror: () => reject(new Error('box.js')) }));
   });
   const data = fetch('data/box.json').then(r => { if (!r.ok) throw new Error('box.json'); return r.json(); });
   boxesLoading = Promise.all([script, data]).then(([, d]) => {
-    boxesView = reporters.boxes = window.BoxOdds.mount($('boxes-root'), { el, store, api, data: d, session: state.session, signIn: () => signIn(), crate: boxesCrate(),
+    boxesView = reporters.boxes = window.BoxOdds.mount($('boxes-root'), { el, store, api, data: d, session: state.session, signIn: () => signIn(), crate: boxesCrate(), reader: crateReader, app: APP,
       report: async (words, details) => {
         const fd = new FormData();
         fd.append('kind', 'wrong'); fd.append('text', words); fd.append('details', details);
@@ -3509,7 +3526,7 @@ function loadGrind() {
     document.head.append(el('script', { src, onload: resolve, onerror: () => reject(new Error(src)) }));
   });
   const json = f => fetch('data/' + f).then(r => { if (!r.ok) throw new Error(f); return r.json(); });
-  const scripts = (window.Reader ? Promise.resolve() : script('reader.js')).then(() => Promise.all([script('screen.js'), script('grind-session.js'), script('grind-overlay.js'), script('grind-settings.js'), script('grind-now.js'), script('grind-card.js'), script('grind-alltime.js')])).then(() => script('grind.js'));
+  const scripts = loadReaderJs().then(() => Promise.all([script('screen.js'), script('grind-session.js'), script('grind-overlay.js'), script('grind-settings.js'), script('grind-now.js'), script('grind-card.js'), script('grind-alltime.js')])).then(() => script('grind.js'));
   // pickup lines (the live loot log from the game's pickup strip): on unless window.BT_PICKUPS is false
   const PICKUPS_ON = window.BT_PICKUPS !== false;
   const pickups = PICKUPS_ON ? Promise.all([script('pickup-lines.js'), json('pickup-templates.json')]).then(([, tpl]) => window.PickupLines.setTemplates(tpl)) : Promise.resolve();

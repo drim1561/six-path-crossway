@@ -47,6 +47,7 @@
     '<div class="bx-top"><h2>NX Crates</h2><p>Log what your crates give you and see what it was worth.</p></div>' +
     '<div class="bx-crates" id="bx-crates" role="group" aria-label="Crate"></div>' +
     '<div class="bx-info"><p id="bx-info"></p><p id="bx-nx" hidden></p><p id="bx-trend" hidden></p></div>' +
+    '<section class="bx-read" id="bx-read" hidden><div id="bx-read-bar"></div><p id="bx-read-note" role="status"></p></section>' +
     '<p class="bx-note" id="bx-note" role="status"></p>' +
     '<section class="bx-round" id="bx-round" aria-live="polite" hidden>' +
       '<h3 id="bx-round-head"></h3><div id="bx-round-list"></div><p class="bx-foot-sum" id="bx-round-foot"></p>' +
@@ -374,13 +375,15 @@
     }
 
     // ---------- doing ----------
-    function logOne(id) {
+    // fin (optional) hears true once the pull is saved and false if it wasn't (the crate reader counts by it)
+    function logOne(id, fin) {
+      var no = function () { if (fin) fin(false); };
       var c = crate(), it = c.items.filter(function (i) { return i.id === id; })[0];
-      if (!it) return;
-      if (!session) { signPrompt(); return; }
-      if (adding) { if (waiting.length < 30) waiting.push({ id: id, crate: c.key }); return; }
-      if (!ready()) return;
-      if (round && round.crate !== c.key) { finishPrompt(); return; }
+      if (!it) return no();
+      if (!session) { signPrompt(); return no(); }
+      if (adding) { if (waiting.length < 30) waiting.push({ id: id, crate: c.key, fin: fin }); else no(); return; }
+      if (!ready()) return no();
+      if (round && round.crate !== c.key) { finishPrompt(); return no(); }
       var fresh = !round;
       if (fresh) { round = { crate: c.key, round: Math.max(Date.now(), lastRound + 1) }; lastRound = round.round; }
       saveRound();
@@ -394,12 +397,13 @@
         logs.unshift(valid(d) && d.round != null ? d : { id: row && row.id, crate: c.key, itemId: id, ts: Date.now(), round: rnd, price: pr.price, est: pr.est, basis: pr.basis, win: pr.win, mine: null });
         $('bx-q').value = '';
         clearTransient(); render();
+        if (fin) fin(true);
         var nx = waiting.shift();
-        while (nx && nx.crate !== crate().key) nx = waiting.shift();
-        if (nx) logOne(nx.id);
+        while (nx && nx.crate !== crate().key) { if (nx.fin) nx.fin(false); nx = waiting.shift(); }
+        if (nx) logOne(nx.id, nx.fin);
       }, function (e) {
         if (g !== gen) return;
-        busy = false; adding = false; waiting = [];
+        busy = false; adding = false; no(); waiting.forEach(function (w) { if (w.fin) w.fin(false); }); waiting = [];
         if (fresh && round && round.round === rnd && !roundPulls().length) { round = null; saveRound(); }
         say(e && SERVER.indexOf(e.message) >= 0 ? e.message : TRANSIENT[0]); render();
       });
@@ -521,7 +525,7 @@
       // the same player again (a token refresh, the load's second auth event): keep the log and any save in flight
       var uid = uidOf(s);
       if (uid && uid === uidOf(session) && (logState === 'ready' || logState === 'loading')) { session = s; return; }
-      session = s || null; logs = []; costs = new Map(); past.edit = null; past.pe = null; past.del = null; past.thanks = null; past.fresh = null; past.open = new Set(); busy = false; adding = false; waiting = [];
+      session = s || null; logs = []; costs = new Map(); past.edit = null; past.pe = null; past.del = null; past.thanks = null; past.fresh = null; past.open = new Set(); busy = false; adding = false; waiting.forEach(function (w) { if (w.fin) w.fin(false); }); waiting = [];
       var g = ++gen;
       if (!session) { logState = 'off'; clearTransient(); render(); return; }
       logState = 'loading'; clearTransient(); render();
@@ -617,10 +621,73 @@
       if (d.open) past.open.add(d.dataset.key); else past.open.delete(d.dataset.key);
     }, true);
 
+    // ---------- the crate reader: while the game is shared, every pull logs itself (crate-reader.js) ----------
+    // o.reader is a promise of { capture: Reader.capture, reader: a CrateReader }; without it the share area stays away
+    var read = { on: false, reader: null, crate: null, set: false, count: 0, missed: 0, state: 'looking', seen: -1e9 };
+    var readSay = function (msg) { $('bx-read-note').textContent = msg; };
+    function readNote() {
+      if (!read.on) return readSay('Share the game and every crate you open logs itself.');
+      var said = [];
+      if (read.count) said.push('Read ' + read.count + (read.count === 1 ? ' pull.' : ' pulls.'));
+      if (read.missed) said.push("Couldn't read " + read.missed + '. Check the crate picked above, then tap what came out.');
+      if (!said.length) said.push(read.state === 'looking' ? 'Open a crate in the game. Looking for the Surprise window.' : 'Found the Surprise window. Open away.');
+      readSay(said.join(' '));
+    }
+    // a pull read off the game goes in like a tap; a save of another kind in flight (an undo) is waited out
+    function readIn(id, key, tries) {
+      if (key !== state.crate) { read.missed++; readNote(); return; }
+      if (session && !adding && !ready() && tries < 20) { setTimeout(function () { readIn(id, key, tries + 1); }, 300); return; }
+      logOne(id, function (saved) { if (saved) read.count++; else read.missed++; readNote(); });
+    }
+    function readFrame(src, m) {
+      if (read.crate !== state.crate) {
+        var key = read.crate = state.crate;
+        read.set = false;
+        read.reader.setItems(crate().items.filter(function (i) { return i.icon; }).map(function (i) { return { id: i.id, icon: i.icon }; }))
+          .then(function () { if (read.crate === key) read.set = true; }, function () {});
+      }
+      if (!read.set) return;
+      var r, now = performance.now();
+      try { r = read.reader.tick(src, m.w, m.h, now); } catch (e) { return; }
+      // the opening animation covers the window for a moment: it only counts as gone after three seconds without it
+      if (r.state !== 'looking') read.seen = now;
+      read.state = now - read.seen < 3000 ? 'watching' : 'looking';
+      read.missed += r.missed || 0;
+      if (r.pulls) { r.pulls.forEach(function (id) { readIn(id, state.crate, 0); }); }
+      readNote();
+    }
+    function readSetup(dep) {
+      var app = o.app || null;
+      if (!dep || !dep.capture || !dep.reader || (app && typeof app.findGame !== 'function')) return;
+      read.reader = dep.reader;
+      $('bx-read').hidden = false;
+      readNote();
+      read.share = dep.capture($('bx-read-bar'), { prefix: 'bx-', raw: true, limit: 0, keepWhenHidden: true, full: true, drop: false, every: 200,
+        el: function (t, a) { var k = [].slice.call(arguments, 2); return o.el.apply(null, [t, t === 'button' ? Object.assign({}, a, { class: 'k-btn sm' }) : a].concat(k)); },
+        copy: { share: 'Share game window', stop: 'Stop sharing', failed: "Couldn't start sharing the game window. Try again." },
+        // the Windows app finds the game itself; a browser asks the player
+        beforeStart: function () {
+          if (!session) { signPrompt(); return false; }
+          if (!app) return true;
+          var none = function () { readSay("Can't find MapleStory. Open the game, then try again."); return false; };
+          return Promise.resolve().then(function () { return app.findGame(); }).then(function (wins) {
+            if (!wins || !wins.length) return none();
+            return Promise.resolve(app.pickGame(wins[0].id)).then(function () { return true; }, none);
+          }, none);
+        },
+        onImage: readFrame, say: function (t) { if (t) readSay(t); },
+        onState: function (s, why) {
+          read.on = s === 'sharing';
+          if (read.on) { read.count = 0; read.missed = 0; read.state = 'looking'; read.seen = -1e9; read.crate = null; read.set = false; read.reader.reset(); }
+          if (read.on || (why !== 'denied' && why !== 'failed')) readNote();
+        } });
+    }
+    if (o.reader && o.el) Promise.resolve(o.reader).then(readSetup, function () {});
+
     refresh(session);
     scrollStrip();
     return {
-      refresh: refresh,
+      refresh: function (s) { refresh(s); if (!s && read.on && read.share) { read.share.stop(); readSay('Signed out, so the share stopped. Sign in and share again.'); } },
       show: show,
       // for Report a problem: what's picked and how big the log is, never the rows themselves
       report: function () {
