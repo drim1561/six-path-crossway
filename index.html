@@ -528,7 +528,7 @@ body.g-pip .credit, body.g-ov .credit, body.g-setwin .credit { display: none; }
 
 /* Grind tab (grind.js) */
 /* the tester link (?only=grind): just the Grind tab */
-body.only-grind #tab-timer, body.only-grind #tab-builds, body.only-grind #tab-guides, body.only-grind #tab-appraiser, body.only-grind #tab-boxes, body.only-grind #tab-recipes { display: none; }
+body.only-grind #tab-home, body.only-grind #tab-timer, body.only-grind #tab-builds, body.only-grind #tab-guides, body.only-grind #tab-appraiser, body.only-grind #tab-boxes, body.only-grind #tab-recipes { display: none; }
 /* the Timer is off for now (window.BT_TIMER turns it on): its tab and its parts of How it works go */
 body.timer-off #tab-timer, body.timer-off .timer-only { display: none; }
 /* the Appraiser is closed while it gets its new look (window.BT_APPRAISER turns it on): its sign fades, its view is one
@@ -541,7 +541,16 @@ body.path-off .path-only, body.guides-off .guides-only, body.appraiser-off .appr
 .closed-text .k-btn { margin-top: 4px; }
 @media (max-width: 759px) { .closed-body { grid-template-columns: minmax(0, 1fr); } }
 /* the Windows app has Grind, NX Crates and Recipes, and is the app already: no other tabs, no Get the app */
-body.in-app .tabs > :not(#tab-grind, #tab-boxes, #tab-recipes), body.in-app #g-getapp { display: none; }
+body.in-app .tabs > :not(#tab-home, #tab-grind, #tab-boxes, #tab-recipes), body.in-app #g-getapp { display: none; }
+/* Home (Rimmah, 2026-11-24): the page the app opens on, one column as wide as Grind's, the kit's one gap between its blocks, an empty block takes none */
+#home-root { max-width: 720px; width: calc(100% - 2 * var(--gap)); margin: 28px auto 40px; display: grid; gap: var(--gap); font-weight: 400; }
+#home-root [hidden] { display: none !important; }
+#home-name { margin: 0; font: 400 var(--tt-m) var(--font-title); }
+#home-welcome { margin: 0; color: var(--muted); }
+#home-boxes { padding: 10px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); }
+#home-boxes[role=button] { cursor: pointer; }
+#home-boxes > .muted { font: 400 var(--fs-sm) var(--font-body); color: var(--muted); }
+#home-doors { display: flex; flex-wrap: wrap; gap: var(--gap); }
 #view-grind [hidden] { display: none !important; }
 .g-lbl { font: 700 var(--fs-xs) var(--font-body); color: var(--muted); }
 .g-check { list-style: none; margin: 0; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); display: grid; gap: 6px; font-size: var(--fs-md); }
@@ -623,17 +632,17 @@ body.in-app .tabs > :not(#tab-grind, #tab-boxes, #tab-recipes), body.in-app #g-g
 #view-grind :is(.g-nums, .g-res-lead, .g-sc-big) { padding-inline: 4px; background: none; border: 0; border-bottom: 1px solid var(--at-line); border-radius: 0; }
 #view-grind #g-pots td { border-top: 1px solid var(--at-line); }
 #view-grind .g-res-nudge { padding: 8px 4px; border: 0; border-block: 1px solid var(--at-line); }
-#view-grind .g-at-sw button { margin: 0 2px 3px 0; min-height: 25px; border: 0; border-radius: var(--r-btn); --ledge: 3px; background-color: var(--stone); color: var(--ink); box-shadow: 0 var(--ledge) 0 var(--stone-lo), 0 0 0 2px var(--wood-o), inset 0 3px 0 var(--stone-moss), inset 0 5px 0 color-mix(in srgb, var(--wood-o) 30%, transparent); }
-#view-grind .g-at-sw button:hover { background-color: color-mix(in srgb, var(--stone-hi) 28%, var(--stone)); }
-#view-grind .g-at-sw button:active { --ledge: 1px; transform: translateY(2px); }
+:is(#view-grind, #view-home) .g-at-sw button { margin: 0 2px 3px 0; min-height: 25px; border: 0; border-radius: var(--r-btn); --ledge: 3px; background-color: var(--stone); color: var(--ink); box-shadow: 0 var(--ledge) 0 var(--stone-lo), 0 0 0 2px var(--wood-o), inset 0 3px 0 var(--stone-moss), inset 0 5px 0 color-mix(in srgb, var(--wood-o) 30%, transparent); }
+:is(#view-grind, #view-home) .g-at-sw button:hover { background-color: color-mix(in srgb, var(--stone-hi) 28%, var(--stone)); }
+:is(#view-grind, #view-home) .g-at-sw button:active { --ledge: 1px; transform: translateY(2px); }
 #view-grind .g-classpick { padding: 2px 0; border: 0; }
 #view-grind .g-classpick .g-pickt { border-bottom: 1px dashed var(--muted); }
 #view-grind .g-classpick::after { right: 0; }
 #view-grind .g-classpick .g-pickt { padding-right: 18px; }
 #view-grind .g-print { padding: 0 4px; background: none; border: 0; box-shadow: none; }
 #view-grind .g-print .g-note { color: var(--muted); }
-#view-grind .g-at-dots i { width: 7px; height: 7px; border-radius: 50%; }
-#view-grind :is(.g-tv, .k-row > :last-child, .g-run b) { font-variant-numeric: tabular-nums; }
+:is(#view-grind, #view-home) .g-at-dots i { width: 7px; height: 7px; border-radius: 50%; }
+:is(#view-grind, #view-home) :is(.g-tv, .k-row > :last-child, .g-run b) { font-variant-numeric: tabular-nums; }
 /* the trail's line and dots (Your Path shares these rules once its own trail ships) */
 .g-trail { list-style: none; display: grid; gap: 36px; min-width: 0; margin: 0 0 0 8px; padding: 0 0 0 30px; border-left: 2px dotted var(--card-o); }
 .g-stop { position: relative; display: grid; min-width: 0; }
@@ -2398,6 +2407,7 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
   <h1 class="logo">Six Path <b>Crossway</b></h1>
   <nav class="tabs" role="tablist" aria-label="Pages">
     <button id="tab-how" type="button" role="tab" aria-controls="view-how" aria-selected="true">How it works</button>
+    <button id="tab-home" type="button" role="tab" aria-controls="view-home" aria-selected="false">Home</button>
     <button id="tab-grind" type="button" role="tab" aria-controls="view-grind" aria-selected="false">Grind</button>
     <button id="tab-boxes" type="button" role="tab" aria-controls="view-boxes" aria-selected="false">NX Crates</button>
     <button id="tab-recipes" type="button" role="tab" aria-controls="view-recipes" aria-selected="false">Recipes</button>
@@ -2460,6 +2470,19 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
     </section>
   </div>
   <div id="appraiser-root"><p class="empty">Loading the appraiser...</p></div>
+</main>
+<main id="view-home" role="tabpanel" aria-labelledby="tab-home" hidden>
+  <div id="home-root">
+    <h2 id="home-name" hidden></h2>
+    <div id="home-record"></div>
+    <p id="home-welcome" hidden>Your record starts with your first run.</p>
+    <div id="home-boxes" class="k-row" hidden></div>
+    <div id="home-doors">
+      <button id="home-go-grind" type="button" class="k-btn key">Grind</button>
+      <button id="home-go-recipes" type="button" class="k-btn">Recipes</button>
+      <button id="home-go-boxes" type="button" class="k-btn">NX Crates</button>
+    </div>
+  </div>
 </main>
 <main id="view-grind" hidden>
   <div id="grind-root"><p class="empty">Loading the grind tracker...</p></div>
@@ -2942,6 +2965,11 @@ function makeSupabaseApi(cfg) {
       const { data, error } = await sb.from('box_opens').select('id, crate, item_id, created_at, round, price, est, basis, win, mine').order('created_at', { ascending: false }).order('id', { ascending: false }).range(from, to);
       if (error) throw new Error(error.message); return data;
     },
+    // how many boxes this player has opened (Home): a head count, no rows come back; row level security limits it to their own
+    async countBoxOpens() {
+      const { count, error } = await sb.from('box_opens').select('id', { count: 'exact', head: true });
+      if (error) throw new Error(error.message); return count || 0;
+    },
     async addBoxOpen(crate, itemId, round, price, est, basis, win) {
       const { data, error } = await sb.from('box_opens').insert({ crate, item_id: itemId, round, price, est, basis, win }).select('id, crate, item_id, created_at, round, price, est, basis, win, mine').single();
       if (error) throw new Error(error.message); return data;
@@ -3278,7 +3306,7 @@ function renderAuth() {
 const BACK = 'bt.back';
 function signIn() {
   window.track('sign_in_started', { view: viewNow() }); try { sessionStorage.setItem('bt.signing', '1'); } catch { /* fine */ }
-  try { if (location.hash) sessionStorage.setItem(BACK, JSON.stringify({ hash: location.hash, t: Date.now() })); } catch { /* storage blocked: the front page it is */ }
+  try { const at = location.hash || (viewNow() === 'home' ? '#home' : ''); if (at) sessionStorage.setItem(BACK, JSON.stringify({ hash: at, t: Date.now() })); } catch { /* storage blocked: the front page it is */ }
   return api.signIn();
 }
 function comeBack() {
@@ -3300,6 +3328,8 @@ async function setSession(s) {
   // Grind's runs, record and All time are the player's: signing in or out anywhere on the page lists them again
   if (reporters.grind && reporters.grind.refresh) reporters.grind.refresh();
   if (boxesView) boxesView.refresh(s);
+  sessionKnown = true;
+  if (viewNow() === 'home') { paintHome(); paintBoxes(); }
 }
 
 async function send(channel, kind, at) {
@@ -3340,8 +3370,8 @@ const ONLY = 'bt.only';
   const q = new URLSearchParams(location.search).get('only');
   if (q === 'grind' || q === 'all') { store.set(ONLY, q === 'grind' ? 'grind' : ''); history.replaceState(null, '', location.pathname + location.hash); }
 }
-// the app has Grind, NX Crates and Recipes; the tester link has Grind alone; elsewhere every tab (null)
-const APP_TABS = ['grind', 'boxes', 'recipes'];
+// the app has Home, Grind, NX Crates and Recipes; the tester link has Grind alone; elsewhere every tab (null)
+const APP_TABS = ['home', 'grind', 'boxes', 'recipes'];
 const appTabs = () => APP ? APP_TABS : store.get(ONLY) === 'grind' ? ['grind'] : null;
 const onlyGrind = () => !APP && store.get(ONLY) === 'grind';
 document.body.classList.toggle('in-app', !!APP);
@@ -3359,7 +3389,9 @@ if (GUIDES_ON) { $('tab-guides').removeAttribute('aria-label'); $('tab-guides').
 // the front page is How it works while the Timer is off; the tester link opens Grind wherever it lands, How it works aside
 function viewNow() {
   const how = /^#how(\/|$)/.test(location.hash);
-  const view = how ? 'how' : { '#builds': PATH_ON ? 'builds' : 'how', '#appraiser': 'appraiser', '#grind': 'grind' }[location.hash]
+  // the app opens on Home when no tab is asked for; the installed app's own start is site#grind (grind-app main.js START), so its
+  // first load in a window's session is sent to #home below, and a #grind after that (a restored hash, a reload) is a real #grind
+  const view = how ? 'how' : APP && !location.hash ? 'home' : { '#home': 'home', '#builds': PATH_ON ? 'builds' : 'how', '#appraiser': 'appraiser', '#grind': 'grind' }[location.hash]
     || (/^#boxes(\/|$)/.test(location.hash) ? 'boxes' : /^#recipes(\/|$)/.test(location.hash) ? 'recipes' : GUIDES_ON && /^#guides(\/|$)/.test(location.hash) ? 'guides' : TIMER_ON ? 'timer' : 'how');
   const tabs = appTabs();
   return tabs && !how && !tabs.includes(view) ? 'grind' : view;
@@ -3392,7 +3424,7 @@ document.addEventListener('click', e => {
 }, true);
 function showView() {
   const view = viewNow();
-  for (const v of ['timer', 'builds', 'guides', 'appraiser', 'grind', 'boxes', 'recipes', 'how']) {
+  for (const v of ['home', 'timer', 'builds', 'guides', 'appraiser', 'grind', 'boxes', 'recipes', 'how']) {
     $('view-' + v).hidden = v !== view;
     if ($('tab-' + v)) $('tab-' + v).setAttribute('aria-selected', String(v === view));
   }
@@ -3403,12 +3435,53 @@ function showView() {
   if (view === 'builds') loadBuilds();
   if (view === 'guides') loadGuides().then(() => guidesView && guidesView.setJob(guidesJob()));
   if (view === 'appraiser' && APPRAISER_ON) loadAppraiser();
+  // Home borrows Grind's All time window while it shows (one window, so the two pages can't disagree) and gives it back to Grind's fold after
+  if (view !== 'home') giveBackRecord();
+  if (view === 'home') showHome();
   if (view === 'grind') loadGrind();
   if (view === 'boxes') loadBoxes().then(() => boxesView && boxesView.show(boxesCrate()));
   if (view === 'recipes') loadRecipes().then(() => recipesView && recipesView.show(recipesItem()));
   if (view === 'how') openHowQuestion();
   // The stage has no size while hidden, so the sprite is sized again when it shows.
   if (view === 'timer' && sprite.lay) { placeSprite(); walk(); }
+}
+// Home (2026-11-24): the all time record is Grind's own window, moved in while Home shows. Nothing eaten yet, a welcome line instead.
+let homeWatch = null;
+function giveBackRecord() {
+  const g = reporters.grind, w = g && g.allTime;
+  if (w && w.el.parentNode !== w.home) w.home.append(w.el);
+}
+function paintHome() {
+  const g = reporters.grind, w = g && g.allTime;
+  if (!w || viewNow() !== 'home') return;
+  const who = (g.who && g.who()) || (state.session && state.session.user_name) || '';
+  $('home-name').textContent = who; $('home-name').hidden = !who;
+  $('home-welcome').hidden = !w.el.hidden || !homeListed || !sessionKnown;   // a signed in player's account runs are listed once the session is known
+}
+let homeListed = false, sessionKnown = false, boxesAsked = 0;
+// Boxes opened: the name on the left, the count right aligned; signed out the quiet line asks to sign in; a count that fails, or none yet, hides the row
+async function paintBoxes() {
+  const row = $('home-boxes'), mine = ++boxesAsked;
+  if (!state.session) {
+    row.replaceChildren(el('span', {}, 'Boxes opened'), el('span', { class: 'muted' }, 'Sign in to keep a box count'));
+    row.setAttribute('role', 'button'); row.tabIndex = 0; row.hidden = false; return;
+  }
+  if (row.getAttribute('role') === 'button') row.hidden = true;   // the sign in line goes while the count loads
+  row.removeAttribute('role'); row.removeAttribute('tabindex');
+  let n = 0;
+  try { n = await api.countBoxOpens(); } catch { n = 0; }
+  if (mine !== boxesAsked || !state.session) return;
+  row.replaceChildren(el('span', {}, 'Boxes opened'), el('span', { class: 'num' }, String(n)));
+  row.hidden = !(n > 0);
+}
+async function showHome() {
+  try { await loadGrind(); } catch { paintBoxes(); return; }   // Grind didn't load: Home still has its doors and boxes row
+  const g = reporters.grind, w = g && g.allTime;
+  if (!w || viewNow() !== 'home') return;
+  $('home-record').append(w.el);
+  if (!homeWatch) { homeWatch = new MutationObserver(paintHome); homeWatch.observe(w.el, { attributes: true, attributeFilter: ['hidden'] }); }
+  paintHome(); paintBoxes();
+  if (g.listed) g.listed.catch(() => {}).then(() => { homeListed = true; paintHome(); });
 }
 // builds.js and its game data only load the first time someone opens the Builds tab, so the timer stays quick.
 let buildsLoading = null;
@@ -3576,6 +3649,12 @@ $('flag').addEventListener('click', () => {
     .catch(() => { $('flag').disabled = false; });
 });
 $('tab-appraiser').addEventListener('click', () => { if (location.hash !== '#appraiser') location.hash = '#appraiser'; });
+$('tab-home').addEventListener('click', () => { if (location.hash !== '#home') location.hash = '#home'; });
+$('home-boxes').addEventListener('click', () => { if (!state.session) signIn(); });
+$('home-boxes').addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && !state.session) { e.preventDefault(); signIn(); } });
+$('home-go-grind').addEventListener('click', () => { location.hash = '#grind'; });
+$('home-go-recipes').addEventListener('click', () => { location.hash = '#recipes'; });
+$('home-go-boxes').addEventListener('click', () => { location.hash = '#boxes'; });
 $('tab-grind').addEventListener('click', () => { if (location.hash !== '#grind') location.hash = '#grind'; });
 // already on a crate, the tab keeps it
 $('tab-boxes').addEventListener('click', () => { if (!/^#boxes(\/|$)/.test(location.hash)) location.hash = '#boxes'; });
@@ -3586,6 +3665,7 @@ $('tab-builds').addEventListener('click', () => { if (PATH_ON && location.hash !
 $('tab-guides').addEventListener('click', () => { if (GUIDES_ON && !/^#guides(\/|$)/.test(location.hash)) location.hash = '#guides'; });
 $('tab-timer').addEventListener('click', () => { if (location.hash) history.pushState(null, '', location.pathname + location.search); showView(); });
 addEventListener('hashchange', showView);
+if (APP) { try { if (!sessionStorage.getItem('bt.appHomed')) { sessionStorage.setItem('bt.appHomed', '1'); if (location.hash === '#grind') history.replaceState(null, '', location.pathname + location.search + '#home'); } } catch { /* storage blocked: the app's own #grind it is */ } }
 addEventListener('popstate', showView);
 showView();
 

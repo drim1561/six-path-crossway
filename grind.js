@@ -981,9 +981,11 @@ function mount(root, deps) {
   // found can read why), and a saved run always shows it. With nothing to show the block takes no room
   // the other three fold rows show while a run is going, and otherwise once they have something (eaten, a saved run, a session counted)
   const foldHas = { life: false, runs: false, record: false };
+  let allTimeWin = null;   // the All time window, set once it is built; it follows its fold: shown with something eaten or while a run is going
   function showDetail() {
     detail.hidden = !(session || viewing || st.sharing);
     life.hidden = !(foldHas.life || session); runsWin.hidden = !(foldHas.runs || session); record.hidden = !(foldHas.record || session);
+    if (allTimeWin) allTimeWin.hidden = !(foldHas.life || session);
     const s = viewing || session;
     numbers.hidden = potWin.hidden = !s;
     notices.hidden = !!viewing || !(st.sharing || st.notes.length);
@@ -1033,7 +1035,7 @@ function mount(root, deps) {
         el('div', { class: 'g-lcard' }, el('h3', {}, 'Personal bests'), LF.bests = el('div', { class: 'k-rows g-bests', id: 'g-bests' }))),
       el('div', { class: 'g-lcard' }, el('h3', {}, 'Days you grinded'), LF.days = el('div', { class: 'g-days', id: 'g-days' }), LF.daysNote = el('p', { class: 'g-note' })))]);
   // All time's fold keeps grind-alltime.js's window (id g-alltime) inside it, its own title left out by the CSS
-  alltime.el.classList.remove('g-stop'); alltime.el.hidden = false;
+  alltime.el.classList.remove('g-stop');   // shown by renderLife once something has been eaten (Home borrows the window, so it hides itself)
   const life = foldOf('g-life', 'All time', [alltime.el]);
   // the trail (2026-11-16): the status line, then the stops (Now grinding, This run when open, All time, Your runs, Your record) on
   // one dotted trail, and the small print off it
@@ -2469,7 +2471,7 @@ function mount(root, deps) {
     LF.daysNote.textContent = 'The last 30 days, darker is more time.' + (L.streak > 1 ? ' Best streak: ' + L.streak + ' days in a row.' : '');
   }
 
-  showMap(); renderNotices(); render(); listSessions();
+  showMap(); renderNotices(); render(); const firstList = listSessions();
   // what the card needs comes after the page is up, each on its own: one that fails leaves the card as it was
   const dataFile = f => fetch('data/' + f).then(r => { if (!r.ok) throw new Error(f); return r.json(); });
   dataFile('grind-drops.json').then(D => { drops = D; fillClass(D); render(); }, () => {});
@@ -2507,6 +2509,11 @@ function mount(root, deps) {
     popout: () => overlay.win() ? overlay.win().document.body : null,
   };
   // the player signed in or out somewhere else on the page (the header's button): the runs listed are theirs, so list again
+  // Home (index.html) borrows the All time window while it shows: allTime.home is the fold's pad it goes back to; who is the claim name
+  allTimeWin = alltime.el; showDetail();
+  reporter.allTime = { el: alltime.el, home: alltime.el.parentNode };
+  reporter.who = () => claims.ign();
+  reporter.listed = firstList;   // the first listing of runs: until it lands, Home doesn't say there is no record
   reporter.refresh = () => listSessions();
   // the header's Sign out: the run you were looking at and this device's runs go with the player; a run still going stays
   reporter.signedOut = () => { viewing = null; ended = null; try { localStorage.removeItem(KEY_LOCAL); } catch { /* nothing kept */ } render(); };
