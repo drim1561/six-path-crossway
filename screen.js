@@ -435,11 +435,11 @@ function roughSpots(img, set, min) {
   return spots;
 }
 // the count digits' own stretch, scored by the mean of the 6 best spots (key labels like "Shift" only add noise)
-function sweepCounts(img, s, at) {
+function sweepCounts(img, s, at, hi = 1.08) {
   const spots = roughSpots(img, setAt('count', at), 0.6).sort((p, q) => q.score - p.score).slice(0, 24);
   let top = { sc: s, score: 0, hits: [] };
   if (!spots.length) return top;
-  for (let sc = s * 0.97; sc <= s * 1.08; sc += 0.0125) {
+  for (let sc = s * 0.97; sc <= s * hi; sc += 0.0125) {
     const set = setAt('count', sc), hits = spots.map(p => best(img, set, SLOT_KEYS, p.x - 3, p.x + 3, p.y - 3, p.y + 3));
     const scores = hits.map(h => h.score).sort((p, q) => q - p).slice(0, 6);
     const mean = scores.reduce((p, q) => p + q, 0) / scores.length;
@@ -453,10 +453,23 @@ function sweepCounts(img, s, at) {
 // scoring 0.77 as a 1 all the way down) scored over the digits it has, never fewer than 2. Frames that pass the first
 // sweep never get here, so they read as before (shop-full.png, at 0.799, now reads its five counts right)
 const SPOT_AT = 1.03;
+// A sweep that passes can still sit at the wrong stretch: a 1 or a thin edge fits at almost any size, so the mean of the best
+// six spots scored 0.904 at 1.255 on KitCats' 1920x1080 (2026-11-24) while her count digits are drawn near 1.4, 1.115 times
+// the level boxes' (past the 1.08 the sweep reached). 180, 106 and 179 read as 1, 1 and 17, and the Blue Potion slot went
+// unread: "Out of Blue Potions!". So a passing sweep is also tried with the spots looked for a little higher (the spots only
+// seed well near the real size: seeded at 1.1 times it scored 0.893, at 1.03 to 1.09 times 0.945 to 0.951), reaching 1.15
+// times, and the best of those wins when it fits clearly better (real digits at the right size score 0.92 to 0.95). Two
+// extra sweeps cost about a second once, when the size is measured
+const UP_AT = [1.03, 1.07], UP_TO = 1.15, UP_BY = 0.03;
 function fineCounts(src, line, s) {
   const a = slotArea(line, s), img = region(src, a.x, a.y, a.w, a.h);
   let top = sweepCounts(img, s, s);
-  if (top.score >= COUNTS_OK) return { sc: top.sc, score: top.score };
+  if (top.score >= COUNTS_OK) {
+    let up = top;
+    for (const k of UP_AT) { const t = sweepCounts(img, s, s * k, UP_TO); if (t.score > up.score) up = t; }
+    if (up.score >= top.score + UP_BY) top = up;
+    return { sc: top.sc, score: top.score };
+  }
   const up = sweepCounts(img, s, s * SPOT_AT);
   if (up.score > top.score) top = up;
   if (!top.hits.length) return { sc: top.sc, score: top.score };
@@ -492,14 +505,19 @@ function fineCounts(src, line, s) {
 // to read (Rimmah, 2026-11-16: the light went red with the bar closed and stayed red after it opened). It sits 340 to 362
 // base pixels right of atX and 29 to 34 above the EXP line on every frame we have
 const BAR_AT = { x: 325, y: -48, w: 60, h: 34 };
+// The arrow's pictures come in whole pixel sizes, so a stretch measured a little high can land between two (KitCats'
+// 1920x1080, 2026-11-24: 1.418 scored the down arrow 0.872, 1.400 scored 0.952): when neither arrow is clear it looks again
+// at one and two percent smaller, and frames that read at the first size never get that far
 function slotBar(src, line, m) {
   if (!raw.bar.up || !raw.bar.down) return null;
-  const s = m.s, set = setAt('bar', s), t0 = set.up;
-  const img = region(src, atX(line, s) + BAR_AT.x * s, line.y + BAR_AT.y * s, BAR_AT.w * s + t0.w, BAR_AT.h * s + t0.h);
-  const score = k => { const t = set[k]; return t ? best(img, set, [k], 0, img.w - t.w, 0, img.h - t.h).score : -1; };
-  const up = Math.max(score('up'), score('upOver')), down = Math.max(score('down'), score('downOver'));
-  if (up >= 0.9 && up - down >= 0.05) return 'hidden';
-  if (down >= 0.9 && down - up >= 0.05) return 'shown';
+  for (const f of [1, 0.99, 0.98]) {
+    const s = m.s * f, set = setAt('bar', s), t0 = set.up;
+    const img = region(src, atX(line, s) + BAR_AT.x * s, line.y + BAR_AT.y * s, BAR_AT.w * s + t0.w, BAR_AT.h * s + t0.h);
+    const score = k => { const t = set[k]; return t ? best(img, set, [k], 0, img.w - t.w, 0, img.h - t.h).score : -1; };
+    const up = Math.max(score('up'), score('upOver')), down = Math.max(score('down'), score('downOver'));
+    if (up >= 0.9 && up - down >= 0.05) return 'hidden';
+    if (down >= 0.9 && down - up >= 0.05) return 'shown';
+  }
   return null;
 }
 // three rows: the top one (under the chat buttons, Rimmah's 2026-11-10 setup keeps a potion in its 4th slot) sits at about -125 base
