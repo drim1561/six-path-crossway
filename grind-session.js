@@ -333,7 +333,7 @@ function bankSale(s, d, t) {
     let g = 0;
     for (const k of Object.keys(n)) {
       const it = T.items[k] || {};
-      if (n[k] <= 0 || (it.pot || []).some(id => pots.has(+id))) continue;
+      if (n[k] <= 0 || stockPic(it, pots)) continue;
       npcAll += n[k] * (it.price || 0); g += n[k] * (worthKey(it) - (it.price || 0));
     }
     gap[tab] = g;
@@ -479,6 +479,33 @@ function pageOf(bag) {
   // a row with a slot it can't read (the mouse cursor over it, a tooltip) is unknown: null, filled in by another page
   return { rows: rows.map((r, i) => unsure.has(i) ? null : r.join('|')), items, top: !!(bag.scroll && bag.scroll.top), bottom: !!(bag.scroll && bag.scroll.bottom) };
 }
+// One slot can read as two pictures depending on the page row it sits in (Rimmah's Etc, 2026-11-24: Etc? or E1619, E1464 or
+// E1455), so rows are matched slot by slot, not as strings: the same slots filled, a slot it couldn't name matching any
+// picture, and at most one slot naming a different picture while three others agree. counts: the counts must agree too.
+// wobble(x, y) is the slot that names a different picture in two rows that are alike, or -1
+const slotKey = x => x.slice(0, x.lastIndexOf(':')), slotN = x => x.slice(x.lastIndexOf(':') + 1), unsureKey = k => k.slice(-1) === '?';
+function wobble(x, y, counts) {
+  const a = x.split('|'), b = y.split('|');
+  let exact = 0, off = -1;
+  if (a.length !== b.length) return null;
+  for (let c = 0; c < a.length; c++) {
+    if (!a[c] || !b[c]) { if (a[c] || b[c]) return null; continue; }
+    if (counts && slotN(a[c]) !== slotN(b[c])) return null;
+    const ka = slotKey(a[c]), kb = slotKey(b[c]);
+    if (ka === kb) exact++;
+    else if (unsureKey(ka) || unsureKey(kb)) continue;
+    else if (off >= 0) return null;
+    else off = c;
+  }
+  return off >= 0 && exact < 3 ? null : off;
+}
+const alike = (x, y, counts) => x === y || wobble(x, y, counts) != null;
+// two reads of one row as one: a slot named on either read keeps its name
+function mergeRow(x, y) {
+  if (x == null || y == null || x === y) return x != null ? x : y;
+  const b = y.split('|');
+  return x.split('|').map((q, c) => q && b[c] && unsureKey(slotKey(q)) ? b[c] : q).join('|');
+}
 // where b's first row sits among a's rows, or null unless there's exactly one place: every shared row the same, at least
 // one of them with something in it (or both pinned to the same end), and never past a known top or bottom
 function fit(a, b) {
@@ -490,7 +517,7 @@ function fit(a, b) {
     for (let i = Math.max(0, k); i < Math.min(aEnd, bEnd); i++) {
       const x = a.rows[i], y = b.rows[i - k];
       if (x == null || y == null) continue;
-      if (x !== y) { same = false; break; }
+      if (!alike(x, y, true)) { same = false; break; }
       if (x !== EMPTY_ROW) solid = true;
     }
     if (same && (solid || (a.top && b.top) || (a.bottom && b.bottom))) { found = k; n++; }
@@ -506,7 +533,7 @@ function join(a, b, k) {
   const rows = [];
   for (let i = Math.min(0, k); i < Math.max(a.rows.length, k + b.rows.length); i++) {
     const x = i >= 0 && i < a.rows.length ? a.rows[i] : null, y = i - k >= 0 && i - k < b.rows.length ? b.rows[i - k] : null;
-    rows.push(x != null ? x : y);
+    rows.push(mergeRow(x, y));
   }
   return { rows, top: a.top || b.top, bottom: a.bottom || b.bottom, items: Object.assign({}, a.items, b.items) };
 }
@@ -521,9 +548,8 @@ function placeMid(T, pg) {
     for (let j = 0; j < pg.rows.length && same; j++) {
       const R = T.rows[k + j], y = pg.rows[j];
       if (!R || y == null) continue;
-      const kx = rowKeys(R.b);
-      if (kx !== rowKeys(y)) same = false;
-      else if (kx !== EMPTY_ROW) solid = true;
+      if (!alike(R.b, y, false)) same = false;
+      else if (rowKeys(R.b) !== EMPTY_ROW) solid = true;
     }
     if (same && solid) { found = k; n++; }
   }
@@ -551,6 +577,7 @@ function takeBag(s, t, r) {
   if (!s.bag || s.bag.v !== 2) s.bag = newBag();   // a run carried over with the old shape starts fresh
   const B = s.bag;
   if (r.bagOpen === false) { B.open = false; return; }
+  if (!B.open) { B.openT = t; B.seen = {}; B.countedT = null; }   // a new opening: no tab has been looked at yet in it (a tab read in full keeps its light, bagOpening)
   B.open = true;
   const bag = r.bag;
   if (!bag || !BAG_TABS.includes(bag.tab)) return;
@@ -559,6 +586,7 @@ function takeBag(s, t, r) {
   const T = B.tabs[bag.tab], pg = pageOf(bag);
   const sig = pg.rows.join('/') + (pg.top ? 'T' : '') + (pg.bottom ? 'B' : '');
   if (T.pend !== sig) { T.pend = sig; return; }
+  { const sn = (B.seen || (B.seen = {}))[bag.tab] || (B.seen[bag.tab] = {}); sn.any = true; if (pg.top) sn.top = true; if (pg.bottom) sn.bottom = true; }
   Object.assign(T.items, pg.items);
   if (T.len == null) {
     // no length yet: line the page up with every run of pages seen of the tab, joining runs it bridges
@@ -584,17 +612,19 @@ function takeBag(s, t, r) {
   // Against what the rows held at their last look, slot by slot. A slot it couldn't name on one read and could on the
   // other is a read put right, so it takes the name (never loot). One item where another was means the tab was laid out
   // anew (gathered, sorted, dragged about): what the tab came to so far is banked and its rows start over from this
-  // look, since items changing places are no loot
+  // look, since items changing places are no loot. A stack whose picture alone changed, in a row otherwise the same, is the
+  // reader wobbling between two pictures: it keeps the name it had (never moved, never loot)
   const unk = bag.tab + '?', keyOf = x => x.slice(0, x.lastIndexOf(':')), named = (x, key) => key + x.slice(x.lastIndexOf(':'));
   let moved = false;
   for (let j = 0; j < pg.rows.length; j++) {
     const R = T.rows[k + j];
     if (pg.rows[j] == null || !R) continue;
-    const x = R.b.split('|'), y = pg.rows[j].split('|'), a = R.a.split('|');
+    const x = R.b.split('|'), y = pg.rows[j].split('|'), a = R.a.split('|'), w = wobble(R.b, pg.rows[j], false);
     for (let c = 0; c < y.length; c++) {
       if (!x[c] || !y[c] || keyOf(x[c]) === keyOf(y[c])) continue;
       if (keyOf(y[c]) === unk) y[c] = named(y[c], keyOf(x[c]));
       else if (keyOf(x[c]) === unk) { x[c] = named(x[c], keyOf(y[c])); if (a[c] && keyOf(a[c]) === unk) a[c] = named(a[c], keyOf(y[c])); }
+      else if (c === w && slotN(x[c]) === slotN(y[c]) && +slotN(x[c]) > 1) y[c] = named(y[c], keyOf(x[c]));
       else moved = true;
     }
     pg.rows[j] = y.join('|'); R.b = x.join('|'); R.a = a.join('|');
@@ -626,10 +656,26 @@ function correctSale(s, T, t) {
   const after = linesBy(P.spanTo, t), before = linesBy(P.spanTo, P.t);
   for (const k of new Set(Object.keys(P.counts).concat(Object.keys(after)))) {
     const it = T.items[k] || {};
-    if ((it.pot || []).some(id => pots.has(+id))) continue;
+    if (stockPic(it, pots)) continue;
     const gone = (P.counts[k] || 0) + (after[k] || 0) - (now[k] || 0), loot = (P.loot[k] || 0) + (before[k] || 0);
     if (gone > 0 && loot > 0) B.banked = (B.banked || 0) + Math.min(loot, gone) * ((it.price || 0) - worthKey(it));
   }
+}
+// The bag's three tabs while it is open (the pop-out's lights): '' not looked at yet, 'fix' looked at in this opening but not
+// every row read yet, 'done' read in full. A tab read in full stays done, across openings too (Rimmah, 2026-11-24: Equip went
+// grey while flipping, as if it hadn't caught it). countedT: when all three were done with a tab looked at in this opening
+function bagOpening(s) {
+  const B = s && s.bag && s.bag.v === 2 ? s.bag : null;
+  if (!B || !B.open) return null;
+  return { openT: B.openT, countedT: B.countedT == null ? null : B.countedT, tabs: BAG_TABS.map(tab => { const n = (B.seen || {})[tab], T = B.tabs[tab];
+    // every row known: a long tab's top and bottom pages alone leave its middle unread
+    let done = T.len != null;
+    for (let i = 0; done && i < T.len; i++) if (!T.rows[i]) done = false;
+    return { tab, state: done ? 'done' : n && n.any ? 'fix' : '' }; }) };
+}
+function markCounted(s, t) {
+  const o = bagOpening(s), B = s.bag;
+  if (o && o.countedT == null && o.tabs.every(x => x.state === 'done') && Object.values(B.seen || {}).some(n => n.any)) B.countedT = t;
 }
 // which tabs have a length (the three ticks of the start flip)
 function bagTabs(s) {
@@ -649,6 +695,12 @@ function potIds(s) {
   for (const sl of Object.values(s.slots).concat(s.retired || [])) if (sl.id) pots.add(+sl.id);
   return pots;
 }
+// ammo the player uses up as they fight (arrows 206, stars 207, bullets 233): stock like the quickslot potions, never loot
+// (kev, 2026-11-23: an Assassin's thrown stars came off Profit as a loss)
+const AMMO = new Set([206, 207, 233]);
+const isAmmo = id => AMMO.has(Math.floor(+id / 10000));
+// a bag picture that is stock, not loot: one shared with a quickslot potion, or ammo
+const stockPic = (it, pots) => (it.pot || []).some(id => pots.has(+id)) || (it.ids || []).some(isAmmo);
 // With the rough Profit on (CFG.ROUGH), the bag counts at worth like the lines (an item on two pictures takes the lower),
 // and from the first tab with a length, not only once all three have one
 function lootOf(s) {
@@ -667,7 +719,7 @@ function lootOf(s) {
   const items = [];
   for (const k of Object.keys(n)) {
     const it = meta[k] || {};
-    if (!n[k] || (it.pot || []).some(id => pots.has(+id))) continue;
+    if (!n[k] || stockPic(it, pots)) continue;
     if (CFG.ROUGH) { const each = worthKey(it); items.push({ key: k, name: it.name, n: n[k], price: each, value: n[k] * each, kind: it.kind, rank: it.rank || 0, ids: it.ids || [] }); continue; }
     items.push({ key: k, name: it.name, n: n[k], price: it.price || 0, value: n[k] * (it.price || 0), kind: it.kind, rank: it.rank || 0 });
   }
@@ -771,7 +823,7 @@ function pickedItems(s, fromT, toT) {
   for (const [t, key, n] of K.ev) {
     if (!(t > fromT && t <= toT) || (typeof key === 'string' && key[0] === '?')) continue;
     const x = typeof key === 'string' ? K.items[key] : byId[key];
-    if (!x || (x.id != null && pots.has(+x.id))) continue;
+    if (!x || (x.id != null && (pots.has(+x.id) || isAmmo(x.id)))) continue;
     out.push({ t, id: x.id, name: x.name, tab: x.tab, n, npc: x.npc });
   }
   return out;
@@ -882,7 +934,7 @@ function add(s, r) {
   if (s.shop) settleShop(s, t);
   if (s.meso && s.meso.jumpPend) settleJump(s);
   if (r.etc) takeEtc(s, t, r.etc);
-  if ('bagOpen' in r) takeBag(s, t, r);
+  if ('bagOpen' in r) { takeBag(s, t, r); markCounted(s, t); }
   // the party size changes only when two party readings in a row agree (a tooltip over the list for one read
   // changes nothing); readings without a party read in between don't count
   if (r.party) {
@@ -1028,7 +1080,7 @@ function profitWords(P, now) {
   if (!P) return '';
   // the rough Profit (pickup lines lead): about until the looks check it, and how old the latest look is from a minute
   if (P.sure && P.lootOn !== false) {
-    if (P.lookT == null) return 'about, from pickups';
+    if (P.lookT == null) return 'from pickups';
     const mins = now != null ? Math.floor((now - P.lookT) / 60000) : 0;
     return (P.sure === 'rough' ? 'about, ' : '') + 'checked' + (mins >= 1 ? ' ' + mins + ' min ago' : '');
   }
@@ -1317,5 +1369,5 @@ function wholeRows(minutes) {
   for (let i = 0; i < xs.length; i += 60) rows.push(xs.slice(i, i + 60));
   return rows;
 }
-window.GrindSession = { CFG, EXP_TABLE, levelOfExp, wholeRows, create, add, stats, expMinOf, idleNow, countdown, countdowns, minuteOf, toRow, fromRow, mark, trade, keepMesos, rebase, lootOf, bagTabs, profitWords, shopOf, learnPrice, result, rateRun, soldAll, townOf, profitOf, usualOf, standing, bagListShows, pickMap, pickups, setWorth, worthOf, logOf, lineMesos };
+window.GrindSession = { CFG, EXP_TABLE, levelOfExp, wholeRows, create, add, stats, expMinOf, idleNow, countdown, countdowns, minuteOf, toRow, fromRow, mark, trade, keepMesos, rebase, lootOf, bagTabs, bagOpening, profitWords, shopOf, learnPrice, result, rateRun, soldAll, townOf, profitOf, usualOf, standing, bagListShows, pickMap, pickups, setWorth, worthOf, logOf, lineMesos };
 })();

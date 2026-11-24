@@ -127,12 +127,17 @@ function health(f) {
   if (f.loot && f.loot.on && f.loot.pictures === false) return say('wait', 'Loading pictures', 'Loading the item pictures for Count my loot');
   // flip: the pop out's light shows the three tabs' own checkmarks beside its words (bagTabStates in renderHealth);
   // with the rough Profit on (loot.rough) the pickup lines lead and nothing ever asks for a flip
+  // the bag is open: nothing to ask, the tab lights show their progress (bagOpening) and the light is green, so the pop out draws no words
+  if (f.loot && f.loot.on && !f.loot.started && !f.loot.rough && f.loot.bagOpen) return say('ok', 'Reading your bag', 'Reading your bag', { bag: true });
   if (f.loot && f.loot.on && !f.loot.started && !f.loot.rough) return say('wait', 'Flip your bag', 'Open your bag and flip through Equip, Use and Etc, scrolling to the bottom of each', { flip: true });
   if (f.meso.unclear) return say('wait', 'Mouse off mesos', "Can't read your meso total clearly yet. Move the mouse off it");
   if (f.meso.at == null) return say('wait', 'Open your bag', 'Open your inventory for a moment so mesos count');
   if (mesoStale) return say('wait', 'Open your bag', 'Mesos last seen ' + ago(f.meso.at) + '. Open your inventory for a moment');
   // f.idle: everything is read, but no kill came for 45 s (GrindSession.idleNow), so EXP an hour is waiting. Grey, and
   // only once a run has a kill: anything asked for above wins, and before the first kill the light stays Ready to grind
+  // the bag is open (f.loot.bagOpen, until Bag counted has been said): the page's lantern says so, the pop out shows the tab
+  // lights. A flip takes longer than 45 s without a kill, so it wins over Idle
+  if (f.loot && f.loot.on && f.loot.bagOpen) return say('ok', 'Reading your bag', 'Reading your bag', { bag: true });
   if (f.killed && f.idle) return say('idle', 'Idle', 'No kills for a bit, so EXP an hour is waiting. It picks up at your next kill');
   // green: everything is read. f.killed: the session has gained EXP
   return say('ok', f.killed ? 'Grinding' : 'Ready to grind', 'Reading everything');
@@ -140,30 +145,33 @@ function health(f) {
 
 // the panel's potion tiles. slots: Object.values(s.slots).concat(s.retired || []), where a retired slot is flagged
 // retired: true so its stale count is never shown (the caller adds the flag); cds: GrindSession.countdowns (sorted).
-// One tile per potion being drunk (both Lemon ids are one, Red and Blue each have their own), at most 2: the ones with a
-// clock by what runs out first, then the ones without by how much was drunk. prevKeys is the keys shown last time, so two
+// One tile per potion being drunk (both Lemon ids are one, Red and Blue each have their own), at most 2, the ones on the bar now. prevKeys is the keys shown last time, so two
 // close clocks keep their order instead of flipping. [null] while nothing has been drunk.
 const potionKind = name => /lemon/i.test(name || '') ? 'lemon' : /meat/i.test(name || '') ? 'meat' : 'other';
 const potionKey = (id, name) => { const k = potionKind(name); return k === 'other' ? 'id' + id : k; };
 const SWAP_GAP = 60;   // seconds of clock between two tiles before they trade places
-function potionTiles(slots, cds, prevKeys = [], t) {
+function potionTiles(slots, cds, prevKeys = [], t, saved) {
   const kinds = {}, fresh = GS() ? GS().CFG.minUse : 120000;
   for (const sl of slots) {
     if (!(sl.used > 0) || sl.id == null) continue;
-    const key = potionKey(sl.id, sl.name), g = kinds[key] || (kinds[key] = { key, kind: potionKind(sl.name), id: sl.id, name: sl.name, used: 0, count: undefined, full: 0, fresh: false, cd: null });
+    const key = potionKey(sl.id, sl.name), g = kinds[key] || (kinds[key] = { key, kind: potionKind(sl.name), id: sl.id, name: sl.name, used: 0, count: undefined, full: 0, fresh: false, cd: null, onBar: false });
     g.used += sl.used;
     // a big change still in its 15 second check shows at once (GrindSession books it once it holds)
     const n = sl.big ? sl.big.v : sl.count;
     if (!sl.retired && n != null && (g.count === undefined || n > g.count)) g.count = n;
     if (!sl.retired) {
+      g.onBar = true;
       g.full = Math.max(g.full, sl.full || 0, n || 0);
       if (sl.firstUse != null && t != null && t - sl.firstUse < fresh) g.fresh = true;
     }
   }
   for (const cd of cds || []) { const g = kinds[potionKey(cd.id, cd.name)]; if (g && !g.cd) { g.cd = cd; g.id = cd.id; g.name = cd.name; } }
-  // Lemons and Meat anchor the timers; other potions (Sap, Red, Blue...) only show when neither is being used
-  const all = Object.values(kinds), anchored = all.filter(g => g.kind !== 'other');
-  let top = (anchored.length ? anchored : all).sort((a, b) => a.cd && b.cd ? a.cd.secs - b.cd.secs : a.cd ? -1 : b.cd ? 1 : b.used - a.used).slice(0, 2);
+  // the tiles follow the quickslots: a potion that left the bar gives up its tile as soon as another potion on the bar has
+  // one, and keeps it (off your quickslots) only when nothing drunk is on the bar. Lemons and Meat come first, then the
+  // others, each group by what runs out first (or by how much was drunk with no clock)
+  const all = Object.values(kinds), live = all.filter(g => g.onBar), named = all.filter(g => g.kind !== 'other'), pool = live.length && !saved ? live : named.length ? named : all;   // a saved run shows its tiles as always
+  const byClock = (a, b) => a.cd && b.cd ? a.cd.secs - b.cd.secs : a.cd ? -1 : b.cd ? 1 : b.used - a.used;
+  let top = pool.filter(g => g.kind !== 'other').sort(byClock).concat(pool.filter(g => g.kind === 'other').sort(byClock)).slice(0, 2);
   const [a, b] = top;
   if (a && b && a.cd && b.cd && !a.cd.low && !b.cd.low && b.cd.secs - a.cd.secs < SWAP_GAP && prevKeys[0] === b.key) top = [b, a];
   return top.length ? top.map(g => ({ key: g.key, kind: g.kind, id: g.id, name: g.name, used: g.used, count: g.cd ? g.cd.left : g.count, full: g.full, cd: g.cd, fresh: g.fresh })) : [null];
@@ -464,10 +472,10 @@ function mount(root, deps) {
   // ⇆ Layout flips (kept on the device). EXP an hour leads every one, with four little columns (Mesos, EXP gained, Per 1%, Lv
   // in), a small timer tile for each potion being drunk (one or two), a top strip, and the one thing to do under them, only
   // when it needs you. Tile (timers stacked on the right), Bar (one slim row) and Column (down the side). Each layout has its
-  // own window width for one potion tile and for two (Bar's second tile sits in the row, so it's wider, the mockup's 1158),
+  // own window width for one potion tile and for two (Bar's second tile sits in the row, so it's wider, the mockup's 1230),
   // and the window is as tall as the panel shows, plus ROOM above it (round 2: the window fits what's showing)
   const SP = {};
-  const WIDTHS = { tile: { 1: 264, 2: 264 }, bar: { 1: 1093, 2: 1158 }, column: { 1: 344, 2: 344 } };
+  const WIDTHS = { tile: { 1: 264, 2: 264 }, bar: { 1: 998, 2: 1135 }, column: { 1: 344, 2: 344 } };
   // the text is never bigger than the mockups' 14 px (times the app's Size): a layout whose lines are shorter than its width
   // (Column) keeps the room beside them rather than taking a bigger font, one whose lines are longer (Tile) takes a smaller one
   const FONT = 16;
@@ -552,7 +560,7 @@ function mount(root, deps) {
     el('div', { class: 'g-top' }, SP.right = el('div', { class: 'g-right' },
       // the light: is it ready, in a colour and two or three words (green reading, amber it wants something, red paused,
       // grey not running), with the bag's three tabs ticking off beside it during a flip
-      // the map and how long sit under it in Tile; Bar gives them a cell of their own after the potions
+      // the map and how long sit under it in Tile; in Bar they're one quiet line under the light and the buttons
       SP.who = el('span', { class: 'g-who' },
         SP.lamp = el('span', { class: 'g-lamp idle', role: 'status' }, el('i', { class: 'g-dot', 'aria-hidden': 'true' }),
           el('span', { class: 'g-lw' }, SP.lampT = el('span', { class: 'g-lt' }))),
@@ -635,9 +643,11 @@ function mount(root, deps) {
     overlay.fit();
   }
   syncOpen();
-  // the map and run time: Tile puts them under EXP an hour's switch (round 8), Bar gives them a cell after the potions
-  // (round 9). The run buttons: Tile's foot, Bar's right cell under the light and the icons
+  // the map and run time: Tile puts them under EXP an hour's switch (round 8), Bar in its right cell as one line under the
+  // light and the icons (2026-11-24). The run buttons: Tile's foot, Bar's right cell under that line
   function placeEl() {
+    // the bag's tab lights take the map and how long's own place in every view while the bag is open (nothing resizes)
+    if (SP.lampF.parentNode !== SP.el) SP.el.append(SP.lampF);
     if (layout === 'tile' && ended) {
       // ended: map · how long goes up top, over the Lemon rating (round 7)
       if (SP.el.nextSibling !== SP.rate) SP.rate.before(SP.el);
@@ -646,8 +656,8 @@ function mount(root, deps) {
       if (SP.el.previousSibling !== SP.winRow) SP.winRow.after(SP.el);
       if (SP.runs.parentNode !== SP.body || SP.body.lastChild !== SP.runs) SP.body.append(SP.runs);
     } else {
-      if (SP.el.previousSibling !== SP.tilesBox) SP.tilesBox.after(SP.el);
       if (SP.runs.parentNode !== SP.right) SP.right.append(SP.runs);
+      if (SP.el.nextSibling !== SP.runs) SP.runs.before(SP.el);
     }
   }
   placeEl();
@@ -1274,11 +1284,23 @@ function mount(root, deps) {
     }
     takeReading(reading, mesos);
   }
+  // the sign of life: the pop-out's dot swells and settles (0.6 s) each time a read lands that found the EXP line. It runs on the
+  // dot alone (no class or text change on the light), green and amber beat, red and grey stay still, and not with reduced motion
+  function beat() {
+    const lamp = SP.lamp, dot = lamp && lamp.firstChild;
+    if (!dot || !dot.animate || !/(ok|wait)/.test(lamp.className)) return;
+    try {
+      const w = lamp.ownerDocument.defaultView || window;
+      if (w.matchMedia && w.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      dot.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.5)', offset: .35 }, { transform: 'scale(1)' }], { duration: 600, easing: 'ease-out' });
+    } catch { /* no beat */ }
+  }
   // one reading into the run: the first one starts it, except after End run, when nothing starts until New run
   function takeReading(reading, mesos) {
     if ((reading.exp != null || reading.counts.length) && !(ended && !session)) {
       if (!session) { session = GS().create({ mapId, t: reading.t, prices, eat: eatCfg() }); session.mode = lootOn ? 'loot' : 'track'; }
       GS().add(session, reading); st.reads++;
+      if (reading.exp != null) beat();
       if (reading.exp != null) { if (st.prevExp != null && reading.exp !== st.prevExp) st.movedT = reading.t; st.prevExp = reading.exp; }
       // once the EXP number has named the level, that's the level everywhere, and digits it no longer needs can't turn the lantern red
       if (session.levelByExp) { st.level = session.level; mark('level', true); setCheck('level', 'done', 'Level ' + st.level); }
@@ -1729,18 +1751,27 @@ function mount(root, deps) {
 
   /* ----- is it reading everything: the lantern and checks, and the one thing to do (on the card, and under
      the pop out's tiles) ----- */
+  const BAG_COUNTED_MS = 4000;
   function renderHealth() {
     const s = session;
+    // the bag's opening, in a live run with Count my loot on only; once Bag counted was said for its 4 seconds it's over
+    const savedRun = !!stripView();
+    const opening = lootOn && !savedRun ? GS().bagOpening(s) : null;
+    const bagNow = opening && !(opening.countedT != null && Date.now() - opening.countedT >= BAG_COUNTED_MS) ? opening : null;
     const h = lastHealth = health({ t: Date.now(), app: !!app, sharing: st.sharing, stopped: !!st.stopped, hasSession: !!s, ended: !!ended, noGame: !st.reads && (st.noLine || 0) >= NO_GAME_TICKS, exp: st.h.exp, level: st.h.level, levelNow: st.level,
       size: st.h.size, counts: st.h.counts, potNone: st.potNone, potCount: st.potCount, slotsHidden: !!st.slotsHidden, killed: !!s && (s.gainExp > 0 || s.gainPct > 0), idle: !!s && GS().idleNow(s), cut: !!(s && s.cut && s.cut.n >= 3),
       meso: { at: s && s.meso && s.meso.last ? s.meso.last.t : null, unclear: !!(st.mesoOpen && st.mesoUnclear) },
-      loot: { on: lootOn, pictures: lootReady, started: !!(s && s.bag && s.bag.startT), rough: !!GS().CFG.ROUGH } });
+      loot: { on: lootOn, pictures: lootReady, started: !!(s && s.bag && s.bag.startT), rough: !!GS().CFG.ROUGH, bagOpen: !!bagNow } });
     // the pill over the buttons goes by what the core numbers need (mesos only ever ask)
     const core = ['exp', 'level', 'potions'].map(k => h.checks[k].state);
     const ps = h.nudge.state === 'idle' ? 'idle' : core.includes('bad') ? 'bad' : core.every(x => x === 'ok') ? 'ok' : 'wait';
     V.pill.className = 'k-lamp g-pill ' + ps + (ps === 'idle' ? ' off' : '');
     // its words are the light's (the pop out says the same), with the level once it's read
-    const pillText = h.nudge.short + (ps !== 'idle' && ps !== 'bad' && st.level ? ' · Lv ' + st.level : '');
+    // the bag's three lights and Bag counted: only beside a green light that says Reading your bag (red, and amber that needs
+    // something else, win). A tab read in full stays lime, in a later opening too. Per opening: Bag counted is said once, for 4 seconds, then the words and the lights go
+    const open = h.nudge.bag ? bagNow : null, counted = !!open && open.countedT != null;
+    const short = counted ? 'Bag counted' : h.nudge.short;
+    const pillText = short + (ps !== 'idle' && ps !== 'bad' && st.level ? ' · Lv ' + st.level : '');
     // written only when it changes: the pill is a live region, and this runs on every frame
     if (V.pillText.textContent !== pillText) V.pillText.textContent = pillText;
     // the one thing to do, only when there is one (a saved session being looked at isn't live); a check that matters failing is
@@ -1759,15 +1790,17 @@ function mount(root, deps) {
     }
     // the pop out's light says it all in a colour and a few words, live only; a saved run being looked at is grey
     const jump = s && s.meso && s.meso.jump;
-    const savedRun = !!stripView();
     const ask = !!jump && !savedRun && h.nudge.state !== 'bad';   // a mesos jump to answer comes before anything amber
-    const lamp = ended ? ['idle', 'Run ended'] : savedRun ? ['idle', 'Saved run'] : ask ? ['wait', 'Check your mesos'] : [h.nudge.state, h.nudge.short];
-    const tabs = !savedRun && !ask && h.nudge.flip ? bagTabStates(s && s.bag) : null;
+    const lamp = ended ? ['idle', 'Run ended'] : savedRun ? ['idle', 'Saved run'] : ask ? ['wait', 'Check your mesos'] : [h.nudge.state, short];
+    const tabs = savedRun || ask ? null : h.nudge.flip ? bagTabStates(s && s.bag) : open ? open.tabs : null;
+    // green says nothing but Bag counted: the dot alone (its words stay for screen readers and the hover)
+    const quiet = lamp[0] === 'ok' && lamp[1] !== 'Bag counted';
     // drawn again only when what it says changes: this runs on every frame, and the light is a live region
     const lampKey = lamp.join() + (tabs ? tabs.map(x => x.tab + x.state).join() : '');
     if (SP.lampSays !== lampKey) {
       SP.lampSays = lampKey;
-      SP.lamp.className = 'g-lamp ' + lamp[0]; SP.lampT.textContent = lamp[1];
+      SP.lamp.className = 'g-lamp ' + lamp[0] + (quiet ? ' quiet' : ''); SP.lampT.textContent = lamp[1];
+      SP.lamp.title = quiet ? lamp[1] === 'Ready to grind' ? 'Ready to grind. Reads your game about every second' : 'Grinding. Reads your game about every second' : '';
       SP.lampF.hidden = !tabs;
       SP.lampF.replaceChildren(...(tabs || []).map(({ tab, state }) => { const says = tab + (state === 'done' ? ': seen' : state === 'fix' ? ': scroll to its top and bottom' : ': not seen yet');
         return el('b', { class: state, title: says, 'aria-label': says }, el('i', { 'aria-hidden': 'true' }), el('span', {}, tab)); }));
@@ -1821,7 +1854,7 @@ function mount(root, deps) {
     // slots are marked so a stale count never shows
     const slots = !s ? [] : Object.values(s.slots).map(sl => saved ? Object.assign({}, sl, { count: null }) : sl)
       .concat((s.retired || []).map(r => Object.assign({}, r, { retired: true })));
-    SP.tiles = potionTiles(slots, s && !saved ? GS().countdowns(s, now) : [], (SP.tiles || []).filter(Boolean).map(x => x.key), now);
+    SP.tiles = potionTiles(slots, s && !saved ? GS().countdowns(s, now) : [], (SP.tiles || []).filter(Boolean).map(x => x.key), now, !!saved);
     SP.main = mains[0] || null;   // the waiting tile shows the main potion's picture
     // one potion tile or two: the window takes that count's size when it can, and the panel fits it either way
     const n = SP.tiles.length;
@@ -1990,7 +2023,6 @@ function mount(root, deps) {
     const s = stripSession(), saved = !!stripView();
     (SP.tiles || [null]).forEach((tile, i) => {
       const P = SP.pots[i], x = potionTile(tile, now, saved), pic = tile ? pictures.Icons[tile.id] : SP.main && pictures.Icons[SP.main.id];
-      attr(P.box, 'class', 'g-pot ' + x.kind + (x.low ? ' low' : ''));
       show(P.juice, x.juice > 0);
       if (P.juice.style.height !== x.juice + '%') P.juice.style.height = x.juice + '%';
       picTo(P.img, pic, tile ? tile.name : SP.main ? SP.main.name : '');
@@ -2000,6 +2032,10 @@ function mount(root, deps) {
       // the one line each tile reads as: 95 Lemons last (the clock beside it), 95 Lemons left with no clock yet, 40 Lemons drunk
       // for a saved run, or the caption when there's no count
       const nm = k => k === 1 ? tile.name : plural(tile.name), c = tile && tile.cd;
+      // a caption in the label's place (starts once you drink, off your quickslots...) wraps inside its tile and never sets the
+      // panel's width, so the text is the same size on a fresh run and mid run (capl; the count lines keep their one line)
+      const capLbl = !tile || (saved ? !tile.used : !c && tile.count == null);
+      attr(P.box, 'class', 'g-pot ' + x.kind + (x.low ? ' low' : '') + (capLbl ? ' capl' : ''));
       put(P.lbl, !tile ? x.cap : saved ? (tile.used ? fmt(tile.used) + ' ' + nm(tile.used) + ' ' + x.verb : x.cap)
         : c ? fmt(c.left) + ' ' + nm(c.left) + ' last' : tile.count != null ? fmt(tile.count) + ' ' + nm(tile.count) + ' left' : x.cap);
       // each layout shows only some of these (Tile and Column the clock and what's left, Bar the clock and how many drunk),
@@ -2013,7 +2049,8 @@ function mount(root, deps) {
     if (strip.classList.contains('g-out') !== !!line) strip.classList.toggle('g-out', !!line);
     // no map known: the spot stays empty, and how long runs on its own
     const pm = mapOfNow(s);
-    put(SP.elMap, pm ? panelMap(pm) : '');
+    const pmW = pm ? panelMap(pm) : '';
+    put(SP.elMap, pmW); if (SP.elMap.title !== pmW) SP.elMap.title = pmW;   // Bar cuts a long name with dots: whole in the hover
     put(SP.elDot, pm ? ' · ' : '');
     put(SP.elTime, fmtDur(s ? elapsedSecs(s, now, !saved && st.sharing) / 60 : 0));
   }
@@ -2469,10 +2506,10 @@ function mount(root, deps) {
         rough: !!GS().CFG.ROUGH, pickups: PICKUPS && session ? GS().pickups(session) : null } }),
     popout: () => overlay.win() ? overlay.win().document.body : null,
   };
-  // the header's Sign out: the run you were looking at and this device's runs go with the player; a run still going stays
-  reporter.signedOut = () => { viewing = null; ended = null; try { localStorage.removeItem(KEY_LOCAL); } catch { /* nothing kept */ } render(); };
   // the player signed in or out somewhere else on the page (the header's button): the runs listed are theirs, so list again
   reporter.refresh = () => listSessions();
+  // the header's Sign out: the run you were looking at and this device's runs go with the player; a run still going stays
+  reporter.signedOut = () => { viewing = null; ended = null; try { localStorage.removeItem(KEY_LOCAL); } catch { /* nothing kept */ } render(); };
   window.Grind.debug.refresh = reporter.refresh;
   window.Grind.debug.report = reporter.report;
   return reporter;
