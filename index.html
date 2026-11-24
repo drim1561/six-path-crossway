@@ -541,7 +541,9 @@ body.path-off .path-only, body.guides-off .guides-only, body.appraiser-off .appr
 .closed-text .k-btn { margin-top: 4px; }
 @media (max-width: 759px) { .closed-body { grid-template-columns: minmax(0, 1fr); } }
 /* the Windows app has Grind, NX Crates and Recipes, and is the app already: no other tabs, no Get the app */
-body.in-app .tabs > :not(#tab-home, #tab-grind, #tab-boxes, #tab-recipes), body.in-app #g-getapp { display: none; }
+/* Your Path joins them when the app switches it on (window.BT_PATH, set by the app's startup script from 1.0.2) */
+body.in-app:not(.path-on) .tabs > :not(#tab-home, #tab-grind, #tab-boxes, #tab-recipes),
+body.in-app.path-on .tabs > :not(#tab-home, #tab-grind, #tab-builds, #tab-boxes, #tab-recipes), body.in-app #g-getapp { display: none; }
 /* Home (Rimmah, 2026-11-24): the page the app opens on, one column as wide as Grind's, the kit's one gap between its blocks, an empty block takes none */
 #home-root { max-width: 720px; width: calc(100% - 2 * var(--gap)); margin: 28px auto 40px; display: grid; gap: var(--gap); font-weight: 400; }
 #home-root [hidden] { display: none !important; }
@@ -2664,7 +2666,7 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-24f',
+  version: '2026-11-24g',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
@@ -3372,7 +3374,7 @@ const ONLY = 'bt.only';
 }
 // the app has Home, Grind, NX Crates and Recipes; the tester link has Grind alone; elsewhere every tab (null)
 const APP_TABS = ['home', 'grind', 'boxes', 'recipes'];
-const appTabs = () => APP ? APP_TABS : store.get(ONLY) === 'grind' ? ['grind'] : null;
+const appTabs = () => APP ? (PATH_ON ? [...APP_TABS, 'builds'] : APP_TABS) : store.get(ONLY) === 'grind' ? ['grind'] : null;
 const onlyGrind = () => !APP && store.get(ONLY) === 'grind';
 document.body.classList.toggle('in-app', !!APP);
 document.body.classList.toggle('only-grind', onlyGrind());
@@ -3383,6 +3385,7 @@ document.body.classList.toggle('appraiser-off', !APPRAISER_ON);
 if (APPRAISER_ON) $('tab-appraiser').removeAttribute('aria-label');
 document.body.classList.toggle('guides-off', !GUIDES_ON);
 document.body.classList.toggle('path-off', !PATH_ON);
+document.body.classList.toggle('path-on', PATH_ON);
 if (PATH_ON) { $('tab-builds').removeAttribute('aria-label'); $('tab-builds').querySelector('.soon').remove(); }
 else { $('tab-builds').setAttribute('aria-disabled', 'true'); document.querySelectorAll('[data-path-off]').forEach(e => { e.textContent = e.dataset.pathOff; }); }
 if (GUIDES_ON) { $('tab-guides').removeAttribute('aria-label'); $('tab-guides').querySelector('.soon').remove(); } else $('tab-guides').setAttribute('aria-disabled', 'true');
