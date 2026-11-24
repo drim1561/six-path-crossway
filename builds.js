@@ -2635,6 +2635,15 @@ function tuckReader(tuck) {
   const btn = ui.root.querySelector('#b-readbtn');
   btn.hidden = !tuck; btn.disabled = false;
 }
+// In the app: find MapleStory and pick it (the first one when there are several, as Box Odds does). None: say so, ask for nothing.
+async function findGameForReader() {
+  const app = window.sixPathApp, none = () => { rd.status = "Can't find MapleStory. Open the game, then press Share again."; renderReader(); return false; };
+  let wins = [];
+  try { wins = (await app.findGame()) || []; } catch (e) { /* the same as none */ }
+  if (!wins.length) return none();
+  try { await app.pickGame(wins[0].id); } catch (e) { return none(); }
+  return true;
+}
 function openReader() {
   const panel = ui.root.querySelector('#b-reader'), btn = ui.root.querySelector('#b-readbtn'), note = panel.querySelector('#b-readnote');
   // read again: the panel is already built, so open it back up for a fresh read
@@ -2646,6 +2655,8 @@ function openReader() {
     const area = E('div', { class: 'r-area' });
     panel.append(area, E('ul', { id: 'r-check' }), E('p', { id: 'r-status' }), E('div', { id: 'r-msg' }));
     ui.capture = window.Reader.capture(area, { el: (t, a, ...k) => E(t, t === 'button' ? { ...a, class: 'k-btn sm' } : a, ...k), onImage,
+      // the Windows app shares only a window it picked just before (its shim refuses the rest), so find the game first, as Grind does
+      beforeStart: window.sixPathApp && typeof window.sixPathApp.findGame === 'function' ? findGameForReader : null,
       say: t => { rd.status = t; renderReader(); },
       onState: (state, why) => {
         if (state === 'sharing') { rd = newSession(); rd.status = 'Watching your game window. It stops by itself once everything is read.'; }
