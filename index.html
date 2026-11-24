@@ -2653,7 +2653,7 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
   <p class="small smallprint">Fan made, not affiliated with Nexon. Game art comes from the MapleStory client and belongs to Nexon. Item prices come from Cozy Markets, and damage formulas and drop lists from meowdb and community players.</p>
   </div>
 </main>
-<p id="credit" class="credit">Fan project, not affiliated with or endorsed by Nexon. MapleStory belongs to Nexon. · Prices from <a href="https://cozy.markets" target="_blank" rel="noopener">Cozy Markets</a> · <a href="https://meowdb.com" target="_blank" rel="noopener">meowdb</a> · <span id="credit-ver"></span></p>
+<p id="credit" class="credit">Fan project, not affiliated with or endorsed by Nexon. MapleStory belongs to Nexon. · Prices from <a href="https://cozy.markets" target="_blank" rel="noopener">Cozy Markets</a> · <a href="https://meowdb.com" target="_blank" rel="noopener">meowdb</a> · <span id="credit-ver"></span><span id="credit-appwrap" hidden> · <span id="credit-app"></span></span></p>
 <button id="flag" class="flag k-btn key" type="button" aria-label="Report a problem"><span class="flag-ico" aria-hidden="true"></span><span class="flag-txt">Report a problem</span></button>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
 <script>
@@ -2666,13 +2666,23 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-24g',
+  version: '2026-11-24h',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
 document.getElementById('credit-ver').textContent = CONFIG.version;
 // the Windows app (grind-app/): its preload hands the page this bridge, and the page turns into the app's Grind page
 const APP = window.sixPathApp || null;
+// the app's version at the bottom of every tab, with what its own update check found, so a player can see an old one (2026-11-24h);
+// a plain browser has none, and a check that can't be made shows just the version
+if (APP && APP.version) {
+  const putApp = t => { document.getElementById('credit-app').textContent = 'App ' + APP.version + (t ? ', ' + t : ''); document.getElementById('credit-appwrap').hidden = false; };
+  putApp('');
+  new Promise(res => res(APP.checkUpdate())).then(r => {
+    const v = r && r.version ? r.version : 'a new version';
+    putApp(!r ? '' : r.state === 'latest' ? 'up to date' : r.state === 'available' ? v + ' is downloading' : r.state === 'ready' ? v + ' installs when you close the app' : '');
+  }, () => putApp(''));
+}
 
 /* BOSSES:START */
 const BOSSES = [
