@@ -477,7 +477,7 @@ function pageOf(bag) {
     if (q.ids && q.ids.length) items[q.key].ids = q.ids;
   }
   // a row with a slot it can't read (the mouse cursor over it, a tooltip) is unknown: null, filled in by another page
-  return { rows: rows.map((r, i) => unsure.has(i) ? null : r.join('|')), items, top: !!(bag.scroll && bag.scroll.top), bottom: !!(bag.scroll && bag.scroll.bottom) };
+  return { rows: rows.map((r, i) => unsure.has(i) ? null : r.join('|')), items, top: !!(bag.scroll && bag.scroll.top), bottom: !!(bag.scroll && bag.scroll.bottom), known: !!bag.scroll };
 }
 // One slot can read as two pictures depending on the page row it sits in (Rimmah's Etc, 2026-11-24: Etc? or E1619, E1464 or
 // E1455), so rows are matched slot by slot, not as strings: the same slots filled, a slot it couldn't name matching any
@@ -573,6 +573,14 @@ function lineInBag(T, t) {
 function rowCounts(n, row, sign) {
   for (const x of row.split('|')) { if (!x) continue; const i = x.lastIndexOf(':'), k = x.slice(0, i); n[k] = (n[k] || 0) + sign * +x.slice(i + 1); }
 }
+// the two reads as one page, or null when they disagree on a row both are sure of or on where the scrollbar is
+function samePage(a, b) {
+  if (!a || typeof a !== 'object' || a.rows.length !== b.rows.length) return null;
+  if (a.known && b.known && (a.top !== b.top || a.bottom !== b.bottom)) return null;
+  if (!a.rows.every((x, i) => x == null || b.rows[i] == null || alike(x, b.rows[i], true))) return null;
+  const k = b.known ? b : a;
+  return { rows: b.rows.map((x, i) => mergeRow(x, a.rows[i])), items: Object.assign({}, a.items, b.items), top: k.top, bottom: k.bottom, known: a.known || b.known };
+}
 function takeBag(s, t, r) {
   if (!s.bag || s.bag.v !== 2) s.bag = newBag();   // a run carried over with the old shape starts fresh
   const B = s.bag;
@@ -583,9 +591,13 @@ function takeBag(s, t, r) {
   if (!bag || !BAG_TABS.includes(bag.tab)) return;
   // not while the shop is open: its sales move rows about, and a row read half way through one would count twice
   if (s.shop && s.shop.open && t - s.shop.seen <= SHOP_GONE_MS) return;
-  const T = B.tabs[bag.tab], pg = pageOf(bag);
-  const sig = pg.rows.join('/') + (pg.top ? 'T' : '') + (pg.bottom ? 'B' : '');
-  if (T.pend !== sig) { T.pend = sig; return; }
+  const T = B.tabs[bag.tab], read = pageOf(bag);
+  // a page counts on its second read in a row. The two agree wherever both are sure: a row unsure on one (the pointer
+  // over a slot) and a scrollbar hidden on one (a tooltip over it) take the other read's (Rimmah's Etc flip, 2026-11-24:
+  // the top page never came twice alike, so the tab never got a length)
+  const pg = samePage(T.pend, read);
+  if (!pg) { T.pend = read; return; }
+  T.pend = pg;
   { const sn = (B.seen || (B.seen = {}))[bag.tab] || (B.seen[bag.tab] = {}); sn.any = true; if (pg.top) sn.top = true; if (pg.bottom) sn.bottom = true; }
   Object.assign(T.items, pg.items);
   if (T.len == null) {

@@ -95,8 +95,11 @@ function classifyExp(grid, aspect) {
 // a glyph is sure when it's close to an example and clearly closer than to any other label, or a little further but at
 // least twice as close (a 7 drawn at a new stretch sat at 0.053, with the next best, a 2, at 0.136). Close alone isn't
 // enough: a 9 in a 1920x1080 window sat at 0.043 from a 3 and 0.051 from a 9, and 276,933 read as 276,333
-const EXP_SURE = 0.05, EXP_MARGIN = 1.25, EXP_NEAR = 0.08, EXP_RATIO = 2;
-const sureGlyph = g => g.label != null && ((g.dist <= EXP_SURE && g.second >= EXP_MARGIN * g.dist) || (g.dist <= EXP_NEAR && g.second >= EXP_RATIO * g.dist));
+// The further from any example, the clearer the lead must be: past EXP_CLOSE a glyph needs EXP_CLEAR times. The 2 of
+// 54,200 blurred in a 2560x1440 video (Rimmah's 2026-11-24 recording) sat at 0.033 from a 7 and 0.047 from a 2 (1.43
+// times) and read 54,700; every right glyph in the fixtures past 0.025 leads by 1.64 times or more
+const EXP_SURE = 0.05, EXP_MARGIN = 1.25, EXP_CLOSE = 0.025, EXP_CLEAR = 1.6, EXP_NEAR = 0.08, EXP_RATIO = 2;
+const sureGlyph = g => g.label != null && ((g.dist <= EXP_SURE && g.second >= (g.dist <= EXP_CLOSE ? EXP_MARGIN : EXP_CLEAR) * g.dist) || (g.dist <= EXP_NEAR && g.second >= EXP_RATIO * g.dist));
 // how white a pixel is, 0..1
 function whiteMap(img) {
   const m = new Float32Array(img.w * img.h);
@@ -785,10 +788,20 @@ function confirmBox(src, x0, yRow, len) {
   if (b.score < 0.5) return null;
   return { x: x0, y: img.y + b.y, w: Math.round(G.fw * s), h: Math.round(G.fh * s), s, score: b.score };
 }
-const atHome = src => lastBox && invGeometry() ? confirmBox(src, lastBox.x, lastBox.y + Math.round(lastBox.h / 2), lastBox.w - 1) : null;
+function atHome(src) {
+  if (!lastBox || !invGeometry()) return null;
+  const c = confirmBox(src, lastBox.x, lastBox.y + Math.round(lastBox.h / 2), lastBox.w - 1);
+  if (c) return c;
+  // an item's tooltip over the MESOS label (Rimmah's Etc flip, 2026-11-24: the inventory was gone for most of it, the
+  // flip closing each time): the box's empty left third still white across the middle and an open tab above it are the
+  // window. covered: its total may be half hidden, so it's never read
+  const b = lastBox, s = b.s, img = region(src, b.x + 2 * s, b.y + b.h / 2 - 1, b.w * 0.3, 3), d = img.data;
+  let n = 0; for (let i = 0; i < img.w * img.h; i++) if (Math.min(d[i * 4], d[i * 4 + 1], d[i * 4 + 2]) >= 236) n++;
+  return n >= 0.95 * img.w * img.h && readTab(src, windowOf(b)) ? Object.assign({}, b, { covered: true }) : null;
+}
 function findMesoBox(src) {
   const c = atHome(src);   // the window seldom moves: check where it was first
-  if (c) return (lastBox = c);
+  if (c) { if (!c.covered) lastBox = c; return c; }
   const f = scanBoxes(src, b => b);
   if (f) lastBox = f;
   return f;
@@ -867,13 +880,18 @@ function readMesos(src, opts) {
   const miss = home ? mesoTotal(src, home) : null;
   if (miss && miss.ok) { lastBox = home; return miss; }
   if (opts && opts.search === false) return miss || { ok: false, reason: 'no inventory' };
-  const r = scanBoxes(src, b => { const r = mesoTotal(src, b); return r.ok ? r : null; });
+  // a box with a total in it that has a digit it can't make out is still the inventory (it was no inventory until
+  // 2026-11-24, and a bag flipped before its total ever read went uncounted); a box with nothing in it isn't
+  let dim = null;
+  const r = scanBoxes(src, b => { const r = mesoTotal(src, b); if (!r.ok && !r.empty && !dim) dim = r; return r.ok ? r : null; });
   if (r) { lastBox = r.box; return r; }
+  if (!miss && dim) { lastBox = dim.box; return dim; }
   return miss || { ok: false, reason: 'no inventory' };
 }
 function mesoTotal(src, box) {
+  if (box.covered) return { ok: false, reason: 'unsure', box };
   const gs = mesoGlyphs(src, box).filter(q => q.h >= 0.25 * q.tall);
-  if (!gs.length) return { ok: false, reason: 'unsure', box };
+  if (!gs.length) return { ok: false, reason: 'unsure', box, empty: true };
   let text = '';
   for (const q of gs) {
     if (q.comma) { text += ','; continue; }
@@ -952,7 +970,10 @@ function slotNumber(src, rect, sc, guardLeft) {
   }
   // a slot's count sits at an exact spot (empty slots score about 0.35), so 0.8 is enough here; the quickslot
   // reader wants one digit at 0.85 because its search area also holds key labels
-  return { value: parseInt(n.map(q => q.d[0]).join(''), 10), score: Math.min(...n.map(q => q.score)) };
+  // where the digits sit on the frame, and how wide one is, so the bag reader can look for the pointer just past them
+  const f = n[0], l = n[n.length - 1];
+  return { value: parseInt(n.map(q => q.d[0]).join(''), 10), score: Math.min(...n.map(q => q.score)),
+    at: { x0: img.x + f.x, x1: img.x + l.x + l.t.w, y0: img.y + f.y, y1: img.y + f.y + t0.h, dw: t0.w } };
 }
 // the item in a slot, by colour against an icon set, at base size, ignoring the bottom rows where the count is drawn
 function slotIcon(src, rect, s, set) {
@@ -1137,6 +1158,13 @@ function pointerOn(src, rect, s) {
     return false;
   } };
 }
+// any of the pointer's pixels in the digit wide spot left of a number or right of it, on the digits' rows
+function pointerNear(pt, at) {
+  const w = at.dw + 2;
+  for (let y = Math.round(at.y0); y < at.y1; y++)
+    for (const [a, b] of [[at.x0 - w, at.x0], [at.x1, at.x1 + w]]) for (let x = Math.round(a); x < b; x++) if (pt.has(x, y)) return true;
+  return false;
+}
 const lumStd = (d, list) => { let a = 0, b = 0; for (const k of list) { const L = lumAt(d, k); a += L; b += L * L; } const m = a / list.length; return Math.sqrt(Math.max(0, b / list.length - m * m)); };
 function bagIcon(src, rect, s, set) {
   const W = 37, H = 37, g = ctx2d(W, H); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
@@ -1217,10 +1245,17 @@ function readBag(src) {
   // and re-reading all 30 counts each time was most of the work)
   const m = Math.ceil(3 * win.s) + 3, g0 = slotRect(win, 0, 0), g1 = slotRect(win, SLOT.rows - 1, SLOT.cols - 1);
   const grid = region(src, g0.x - m, g0.y - m, g1.x + g1.w - g0.x + 2 * m, g1.y + g1.h - g0.y + 2 * m);
+  let pt0;
   for (let r = 0; r < SLOT.rows; r++) for (let c = 0; c < SLOT.cols; c++) {
     const rect = slotRect(win, r, c), rc = r + ',' + c, fp = pixelsOf(grid, rect, m), prev = bagCache.slots[rc];
     if (prev && samePixels(prev.fp, fp)) { if (prev.out) slots.push(Object.assign({}, prev.out, { kept: true })); continue; }
-    const n = slotNumber(src, rect, sc, true);
+    let n = slotNumber(src, rect, sc, true);
+    // the pointer where one more digit would sit, just left or right of the number, may be hiding it (its glove over the 1
+    // of 81 read 8, Rimmah's 2026-11-24 recording): unsure, as a slot with no count. The pointer is found once a read
+    if (n) {
+      if (pt0 === undefined) pt0 = pointerOn(src, { x: g0.x, y: g0.y, w: g1.x + g1.w - g0.x, h: g1.y + g1.h - g0.y }, box.s);
+      if (pt0 && pointerNear(pt0, n.at)) n = null;
+    }
     const box4 = { x: Math.round(rect.x), y: Math.round(rect.y), w: Math.round(rect.w), h: Math.round(rect.h) };
     // something there without a count it can read (covered, or too small to trust): unsure, so its row waits. Under the
     // pointer, only what it leaves showing says whether anything's there
