@@ -536,17 +536,24 @@ function readCounts(src, line, m) {
   const a = slotArea(line, m.s), img = region(src, a.x, a.y, a.w, a.h), set = setAt('count', m.sc), t0 = set['0'];
   // grow a first digit into its number: each digit starts where the one before it ends (a 1 is narrower). A number counts
   // when every digit matches at NEXT and at least one at DIGIT ("61" over a White Potion: the 1 at 0.84, the 6 at 0.92).
+  // Blank beats a wrong number: when the spot after the last digit, or before the first, still scores TRAIL or more (just
+  // short of a digit), the number is cut short (180 measured too small reads 1, 106 reads 1, 179 reads 17: 0.595 to 0.695
+  // after the 1, and the 5 of 51 missed on the left; over every frame we have a real count scored 0.532 at most after its
+  // last digit and 0.47 before its first), so it reads nothing
+  const TRAIL = 0.58;
   const grow = sd => {
-    const n = [sd];
+    const n = [sd]; let after = -1, before = -1;
     for (let k = 0; k < 5; k++) {
       const l = n[n.length - 1], r = best(img, set, SLOT_KEYS, l.x + l.t.w - 2, l.x + l.t.w + 2, l.y - 1, l.y + 1);
-      if (r.score < NEXT) break; n.push(r);
+      if (r.score < NEXT) { after = r.score; break; } n.push(r);
     }
+    if (after >= TRAIL) return null;
     for (let k = 0; k < 5; k++) {
       const f = n[0]; let lb = { score: -1 };
       for (const d of SLOT_KEYS) { const t = set[d], c = best(img, set, [d], f.x - t.w - 2, f.x - t.w + 2, f.y - 1, f.y + 1); if (c.score > lb.score) lb = c; }
-      if (lb.score < NEXT) break; n.unshift(lb);
+      if (lb.score < NEXT) { before = lb.score; break; } n.unshift(lb);
     }
+    if (before >= TRAIL) return null;
     return n.some(q => q.score >= DIGIT) ? n : null;
   };
   const out = n => {

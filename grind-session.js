@@ -1016,11 +1016,15 @@ function stats(s, t, avgExpPerKill) {
   o.earnedPct = o.pct + o.lostPct;
   o.kpm = o.expMin && avgExpPerKill ? o.expMin / avgExpPerKill : null;
   o.potUsed = 0; o.potCost = 0;
-  const usedBy = {};
+  const usedBy = {}, by = {};
   for (const sl of Object.values(s.slots).concat(s.retired || [])) {
     o.potUsed += sl.used; o.potCost += sl.used * (sl.price || 0);
     if (sl.id && sl.used) usedBy[sl.id] = (usedBy[sl.id] || 0) + sl.used;
+    // each potion drunk with what it cost, a slot taken off the bar too (kev, 2026-11-24: his Lemons left the tiles
+    // once he swapped to Blues, so it looked like they weren't counted). Both Lemon ids are one
+    if (sl.used > 0) { const nm = /lemon/i.test(sl.name || '') ? 'Lemon' : sl.name || 'Unknown item'; const g = by[nm] || (by[nm] = { name: nm, used: 0, cost: 0 }); g.used += sl.used; g.cost += sl.used * (sl.price || 0); }
   }
+  o.potBy = Object.values(by).sort((a, b) => b.cost - a.cost);
   // each potion drunk for every 1% of EXP (Lemons per 1%), once there's a little EXP to divide by
   o.perPct = {};
   if (s.gainPct >= 0.3) for (const id of Object.keys(usedBy)) o.perPct[id] = usedBy[id] / s.gainPct;

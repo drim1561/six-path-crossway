@@ -41,7 +41,7 @@ function mesoLine(o) {
   const sign = n => (n >= 0 ? '+' : '−') + fmtK(Math.abs(n));
   const math = o.mesoFrom != null ? ' (' + fmt(o.mesoFrom) + ' to ' + fmt(o.mesoTo) + (o.refills ? ', plus ' + fmt(o.refills) + ' spent on potions' : '') +
     (o.traded ? ', leaving out ' + signed(o.traded) + ' traded' : '') + ')' : '';
-  return [o.mesosEarned != null ? 'Mesos ' + sign(o.mesosEarned) + math : null, o.etcValue != null ? 'Etc ' + sign(o.etcValue) : null, 'Potions ' + sign(-o.potCost)].filter(Boolean).join(' · ');
+  return [o.mesosEarned != null ? 'Mesos ' + sign(o.mesosEarned) + math : null, o.etcValue != null ? 'Etc ' + sign(o.etcValue) : null, 'Potions ' + sign(-o.potCost) + (o.potBy && o.potBy.length ? ' (' + o.potBy.map(g => fmt(g.used) + ' ' + g.name).join(', ') + ')' : '')].filter(Boolean).join(' · ');
 }
 // potions per 1%, whole (Rimmah, 2026-11-05: 11 and 2 read faster than 11.4 and 1.6); a real value under a half is "under 1"
 const perFmt = n => n >= 0.5 ? String(Math.round(n)) : 'under 1';
