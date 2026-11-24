@@ -1,17 +1,13 @@
-// Box Odds on the site (#boxes, #boxes/<crate>): every Mystery Fashion Crate with its rates and FM prices, ticks for
-// "any one" and "all of them" odds, and a pull log per player in Supabase (box_opens, box-opens.sql) while signed in.
-// Ported from the Box Odds artifact (box-odds/index.html): the odds and the crate order are copied unchanged, the db is
-// the page's api (listBoxOpens, addBoxOpen, removeBoxOpen) and ticks and filters stay on the device under bt.box.
-// window.BoxOdds = { anyOdds, allOdds, statusOf, orderCrates, mount, mes, priceHtml }; the data is data/box.json from
-// npm run box:items.
+// NX Crates on the site (#boxes, #boxes/<crate>): tap what each Mystery Fashion Crate gave, Done, and see the round's worth at
+// Cozy Markets prices. Rounds live in Supabase (box_opens, box_rounds; box-opens.sql and box-rounds.sql) under the Discord
+// sign in. Rates come from Nexon only; the data is data/box.json from npm run box:items.
+// window.BoxOdds = { priceOf, madeWord, parseMesos, rounds, roundTotal, result, allItems, suggestCost, ageOf, statusOf,
+// orderCrates, mount, mes }.
 (function () {
   'use strict';
-  var KEY = 'bt.box';
-  var SLOT_ORDER = ['Hat', 'Face', 'Eye', 'Earring', 'Top', 'Overall', 'Bottom', 'Shoes', 'Gloves', 'Cape', 'Ring', 'Weapon'];
-  var DEFER_STATES = 5000;   // "all of them" sets bigger than this fill in after the rest of the card
+  var CRATE_KEY = 'box-crate-v1', ROUND_KEY = 'box-round-v1', OFF_KEY = 'box-off-v1';
   var esc = function (s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
   var fmt = function (n) { return Math.round(n).toLocaleString('en-US'); };
-  var pct = function (p) { return (Math.round(p * 1000) / 10) + '%'; };
   var day = function (ms) { return new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
   // mesos the recipe book's way: 9,999 / 10K / 100K / 1.5M
   function mes(n) {
@@ -19,78 +15,12 @@
     if (a < 10) return s + (Math.round(a * 100) / 100).toLocaleString('en-US');
     if (a < 10000) return s + Math.round(a).toLocaleString('en-US');
     if (a < 100000) return s + String(Math.round(a / 100) / 10) + 'K';
-    if (a < 1000000) return s + Math.round(a / 1000) + 'K';
+    if (a < 999500) return s + Math.round(a / 1000) + 'K';
     return s + String(Math.round(a / 10000) / 100) + 'M';
   }
   var cozyUrl = function (cz) { return +cz > 0 ? 'https://cozy.markets/items/' + (+cz) : ''; };
-  // the slot line's price: real FM price, a rarity guess, or no price (nothing at all when the data carries no prices)
-  function priceHtml(i, on) {
-    if (on === false) return '';
-    var inner = i.fm && +i.fm.price > 0 ? '<span class="fm">' + mes(+i.fm.price) + '</span> on the FM'
-      : i.est && +i.est.lo > 0 ? 'est. ' + mes(+i.est.lo) + ' to ' + mes(+i.est.hi) : '';
-    if (!inner) return ' · no price';
-    var u = cozyUrl(i.cz);
-    return ' · ' + (u ? '<a href="' + u + '" target="_blank" rel="noopener" title="See ' + esc(i.name) + ' on Cozy Markets">' + inner + '</a>' : inner);
-  }
-  function worthHtml(c, on) {
-    var w = c.worth;
-    if (!on || !w || !(+w.mesos > 0)) return '';
-    var g = +w.guesses || 0;
-    return '<p class="worth">About <b>' + mes(+w.mesos) + '</b> mesos a crate' + (g ? ', rough while ' + (g === 1 ? '1 price is a guess' : g + ' prices are guesses') : '') + '</p>';
-  }
-
-  // ---------- the odds ----------
-  // any one of a set with total rate p: every crate is a fresh roll at p
-  function anyOdds(p) {
-    if (p >= 1 - 1e-12) return { mean: 1, half: 1, nine: 1 };
-    return { mean: 1 / p, half: Math.ceil(Math.log(0.5) / Math.log(1 - p)), nine: Math.ceil(Math.log(0.1) / Math.log(1 - p)) };
-  }
-  // rates grouped by whole hundredths of a percent, so float noise never splits a tier
-  function tiersOf(rates) {
-    var g = new Map();
-    rates.forEach(function (r) { var k = Math.round(r * 10000); g.set(k, (g.get(k) || 0) + 1); });
-    return Array.from(g).sort(function (a, b) { return a[0] - b[0]; }).map(function (e) { return { r: e[0] / 10000, m: e[1] }; });
-  }
-  var tierKey = function (tiers) { return tiers.map(function (t) { return t.r + 'x' + t.m; }).join(); };
-  var stateCount = function (tiers) { return tiers.reduce(function (a, t) { return a * (t.m + 1); }, 1); };
-  var allCache = new Map();
-  // all of a set: walk the chance of every "how many of each rate I have so far" state forward one crate at a time
-  function allOdds(rates) {
-    var tiers = tiersOf(rates), key = tierKey(tiers);
-    if (allCache.has(key)) return allCache.get(key);
-    var T = tiers.length, dims = tiers.map(function (t) { return t.m + 1; }), size = stateCount(tiers);
-    var nextIdx = new Int32Array(size * T), nextQ = new Float64Array(size * T), stay = new Float64Array(size);
-    for (var s = 0; s < size; s++) {
-      var rem = s, st = 1, stride = 1;
-      for (var k = 0; k < T; k++) {
-        var c = rem % dims[k]; rem = (rem - c) / dims[k];
-        var q = (tiers[k].m - c) * tiers[k].r;
-        nextIdx[s * T + k] = q > 0 ? s + stride : -1; nextQ[s * T + k] = q; st -= q;
-        stride *= dims[k];
-      }
-      stay[s] = st;
-    }
-    var P = new Float64Array(size), Q = new Float64Array(size), tmp;
-    P[0] = 1;
-    var mean = 1, half = 0, nine = 0;
-    for (var n = 1; n < 200000; n++) {
-      Q.fill(0);
-      for (s = 0; s < size; s++) {
-        var v = P[s]; if (!v) continue;
-        Q[s] += v * stay[s];
-        for (k = 0; k < T; k++) { var j = nextIdx[s * T + k]; if (j >= 0) Q[j] += v * nextQ[s * T + k]; }
-      }
-      tmp = P; P = Q; Q = tmp;
-      var done = P[size - 1];
-      if (!half && done >= 0.5) half = n;
-      if (!nine && done >= 0.9) nine = n;
-      mean += 1 - done;
-      if (1 - done < 1e-9) break;
-    }
-    var out = { mean: mean, half: half, nine: nine };
-    allCache.set(key, out);
-    return out;
-  }
+  // a price as the rows print it: 125K, est. 60K, or nothing
+  var priceText = function (price, est) { return price == null ? '' : (est ? 'est. ' : '') + mes(price); };
 
   // ---------- crates and when they sell ----------
   function statusOf(crate, now) {
@@ -114,29 +44,35 @@
   var TRANSIENT = ['Could not save that. Try again.', 'Could not undo that. Try again.', 'Your log did not load. Reload the page to try again.'].concat(SERVER);
   var SHELL =
     '<div class="bx">' +
-    '<div class="bx-top"><h2>Box Odds</h2><p>Mystery Fashion Crate odds and FM prices. Tick what you\'re after.</p></div>' +
+    '<div class="bx-top"><h2>NX Crates</h2><p>Log what your crates give you and see what it was worth.</p></div>' +
     '<div class="bx-crates" id="bx-crates" role="group" aria-label="Crate"></div>' +
-    '<div class="bx-info" id="bx-info"></div>' +
-    '<div class="bx-logbar" id="bx-logbar" hidden><span id="bx-log-line">Loading your log…</span>' +
-      '<button type="button" class="bx-linkish" id="bx-undo" disabled>Undo last crate</button></div>' +
+    '<div class="bx-info"><p id="bx-info"></p><p id="bx-nx" hidden></p><p id="bx-trend" hidden></p></div>' +
     '<p class="bx-note" id="bx-note" role="status"></p>' +
-    '<section class="bx-sum" id="bx-sum" aria-live="polite"></section>' +
-    '<div class="bx-tools"><div class="bx-bar-row"><div class="bx-pills" id="bx-sort" role="group" aria-label="Sort by">' +
-      '<button type="button" class="k-btn sm" data-sort="rate">Rate</button><button type="button" class="k-btn sm" data-sort="name">Name</button>' +
-      '<button type="button" class="k-btn sm" data-sort="slot">Slot</button></div>' +
-      '<button type="button" class="bx-linkish" id="bx-clear">Clear ticks</button></div>' +
-      '<div class="bx-filters"><select id="bx-slot" aria-label="Slot"></select><select id="bx-rate" aria-label="Rate"></select>' +
-      '<input id="bx-q" type="search" placeholder="Find an item" aria-label="Find an item" autocomplete="off"></div></div>' +
+    '<section class="bx-round" id="bx-round" aria-live="polite" hidden>' +
+      '<h3 id="bx-round-head"></h3><div id="bx-round-list"></div><p class="bx-foot-sum" id="bx-round-foot"></p>' +
+      '<div class="bx-costbar" id="bx-cost" hidden><div class="bx-cost-edit">' +
+        '<span class="bx-costlab">What did these cost?<small>optional</small></span>' +
+        '<div class="bx-costrow"><input id="bx-cost-in" type="text" inputmode="text" autocomplete="off" aria-label="What these crates cost" placeholder="35,000">' +
+        '<span class="bx-units" id="bx-cost-unit" role="group" aria-label="Unit"></span><button type="button" class="k-btn sm" id="bx-cost-chip" hidden></button></div>' +
+        '<p class="bx-bad" id="bx-cost-bad" role="alert" hidden></p></div></div>' +
+      '<div class="bx-donebar" id="bx-donebar"></div></section>' +
+    '<section class="bx-past" id="bx-past" hidden><h3>Past rounds</h3>' +
+      '<div class="bx-views" id="bx-past-view" role="group" aria-label="View"></div><p class="bx-past-head" id="bx-past-head"></p>' +
+      '<div id="bx-past-list"></div><div class="bx-morerow" id="bx-morerow"></div></section>' +
+    '<input id="bx-q" type="search" placeholder="Find an item" aria-label="Find an item" autocomplete="off">' +
     '<div class="bx-list" id="bx-list"></div>' +
     '<p class="bx-empty" id="bx-empty" hidden>No items match.</p>' +
-    '<p class="bx-foot"><span id="bx-credit"></span>Rates from Nexon\'s rate pages, pictures from the game\'s own files. Ticks and filters stay on this device, your log is kept with your Discord sign in.</p>' +
+    '<div class="bx-prices"><a id="bx-prices" href="https://cozy.markets" target="_blank" rel="noopener"></a>' +
+    '<details id="bx-how"><summary>How prices are made</summary><p>The middle of what each item sold for over the last day.</p>' +
+    '<p>When a day is too thin, the last 3 days or the week.</p>' +
+    '<p>When nothing sold, the listed price, shown as estimated. Cozy remakes them every 6 hours.</p></details></div>' +
+    '<p class="bx-foot">Rates from Nexon\'s rate pages, pictures from the game\'s own files. Your log is kept with your Discord sign in.</p>' +
     '</div>';
 
   function mount(root, o) {
     o = o || {};
     var data = o.data || {}, CRATES = Array.isArray(data.crates) ? data.crates : [];
     var api = o.api || {}, store = o.store || { get: function () { return null; }, set: function () {} };
-    var HAS_PRICES = typeof data.priced === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data.priced);
     if (!CRATES.length) {
       root.innerHTML = '<p class="empty">No crates to show yet.</p>';
       return { refresh: function () {}, show: function () {}, report: function () { return { crates: 0 }; } };
@@ -145,66 +81,64 @@
     var byKey = new Map(CRATES.map(function (c) { return [c.key, c]; }));
     root.innerHTML = SHELL;
     var $ = function (id) { return root.querySelector('#' + id); };
-    if (HAS_PRICES) $('bx-credit').innerHTML = '<a href="https://cozy.markets" target="_blank" rel="noopener">Prices from Cozy Markets</a>, ' +
-      new Date(data.priced + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }) + '. ';
+    var rd = function (k) { try { return store.get(k); } catch (e) { return null; } };
+    var wr = function (k, v) { try { store.set(k, v); } catch (e) { /* this visit only */ } };
+    var drop = function (k) { try { if (store.remove) store.remove(k); else store.set(k, ''); } catch (e) { /* this visit only */ } };
 
     // ---------- what this device remembers ----------
-    function load() {
-      var s = null;
-      try { s = JSON.parse(store.get(KEY)); } catch (e) { s = null; }
-      if (!s || typeof s !== 'object') s = {};
-      var per = s.per && typeof s.per === 'object' ? s.per : {}, out = {
-        crate: byKey.has(s.crate) ? s.crate : ordered[0].key,
-        sort: ['rate', 'name', 'slot'].indexOf(s.sort) >= 0 ? s.sort : 'rate',
-        per: {}
-      };
-      CRATES.forEach(function (c) {
-        var v = per[c.key] && typeof per[c.key] === 'object' ? per[c.key] : {}, ids = new Set(c.items.map(function (i) { return i.id; }));
-        var str = function (x) { return typeof x === 'string' ? x : ''; };
-        out.per[c.key] = { ticks: Array.isArray(v.ticks) ? v.ticks.filter(function (id) { return ids.has(id); }) : [], slot: str(v.slot), rate: str(v.rate), q: str(v.q) };
-      });
-      return out;
-    }
-    function save() { try { store.set(KEY, JSON.stringify(state)); } catch (e) { /* this visit only */ } }
-    var state = load();
+    var state = { crate: byKey.has(rd(CRATE_KEY)) ? rd(CRATE_KEY) : ordered[0].key };
+    var round = null;   // { crate, round } while a round is open
+    try {
+      var r0 = JSON.parse(rd(ROUND_KEY));
+      if (r0 && byKey.has(r0.crate) && +r0.round >= 1600000000000) round = { crate: r0.crate, round: +r0.round };
+    } catch (e) { round = null; }
+    if (!round) drop(ROUND_KEY);
+    var saveCrate = function () { wr(CRATE_KEY, state.crate); };
+    var saveRound = function () { if (round) wr(ROUND_KEY, JSON.stringify(round)); else drop(ROUND_KEY); };
     // a crate from the hash wins; one it doesn't know opens the first; no crate keeps the one remembered here
     var resolve = function (key) { return !key ? state.crate : byKey.has(key) ? key : ordered[0].key; };
     state.crate = resolve(o.crate);
+    if (o.crate) saveCrate();
     var crate = function () { return byKey.get(state.crate); };
-    var mine = function () { return state.per[state.crate]; };
+    var HAS_PRICES = isFinite(Date.parse(data.priced));
+    var priceFor = function (it) { return HAS_PRICES ? priceOf(it) : { price: null, est: null, basis: null, win: null }; };
 
     // ---------- the log: the player's box_opens rows, while signed in ----------
-    var session = o.session || null, logs = [], logState = 'off', busy = false, gen = 0;
+    var session = o.session || null, logs = [], logState = 'off', busy = false, gen = 0, lastRound = 0;
+    var adding = false, waiting = [];   // one save at a time: taps made during a save wait their turn
+    var costs = new Map();                                   // round -> { cost, unit }, the player's box_rounds rows
+    var costUnit = 'nx', BAD = "That doesn't look like a number.";
+    var past = { view: 'rounds', rounds: 5, items: 20, fresh: null, open: new Set(), edit: null, editUnit: 'nx', editText: '', editErr: '', pe: null, del: null, thanks: null };
     var say = function (msg) { $('bx-note').textContent = msg || ''; };
-    var clearTransient = function () { var n = $('bx-note'); if (TRANSIENT.indexOf(n.textContent) >= 0 || n.querySelector('#bx-signin')) say(''); };
-    var crateLogs = function () { return logs.filter(function (d) { return d.crate === state.crate; }); };
-    var norm = function (r) { r = r || {}; return { id: r.id, crate: r.crate, itemId: +r.item_id, ts: Date.parse(r.created_at) }; };
+    var clearTransient = function () { var n = $('bx-note'); if (TRANSIENT.indexOf(n.textContent) >= 0 || n.querySelector('#bx-signin') || n.querySelector('#bx-done')) say(''); };
+    var num = function (x) { return x == null || x === '' || !isFinite(+x) ? null : +x; };
+    var norm = function (r) {
+      r = r || {};
+      return { id: r.id, crate: r.crate, itemId: +r.item_id, ts: Date.parse(r.created_at), round: num(r.round), price: num(r.price),
+        est: typeof r.est === 'boolean' ? r.est : null, basis: r.basis || null, win: r.win || null, mine: num(r.mine) };
+    };
     var valid = function (d) { return d.id != null && typeof d.crate === 'string' && d.itemId > 0 && isFinite(d.ts); };
     var ready = function () { return !!session && logState === 'ready' && !busy; };
-    function counts() {
-      var m = new Map();
-      crateLogs().forEach(function (d) { m.set(d.itemId, (m.get(d.itemId) || 0) + 1); });
-      return m;
+    // a round is a past round once it's Done: the open one stays in its own panel
+    var doneLogs = function () { return round ? logs.filter(function (d) { return d.round !== round.round; }) : logs; };
+    var roundPulls = function () { return round ? logs.filter(function (d) { return d.round === round.round; }) : []; };
+    function button(id, text, cls) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = cls || 'k-btn sm'; b.id = id; b.textContent = text;
+      return b;
     }
     function signPrompt() {
       var n = $('bx-note');
       n.textContent = 'Sign in to keep a log of what came out. ';
-      var b = document.createElement('button');
-      b.type = 'button'; b.className = 'k-btn sm'; b.id = 'bx-signin'; b.textContent = 'Sign in with Discord';
-      n.append(b);
+      n.append(button('bx-signin', 'Sign in with Discord'));
+    }
+    function finishPrompt() {
+      var n = $('bx-note');
+      n.textContent = 'Finish your ' + day(round.round) + ' round first. ';
+      n.append(button('bx-done', 'Done'));
     }
 
     // ---------- drawing ----------
-    function visibleItems() {
-      var c = crate(), f = mine(), q = f.q.trim().toLowerCase();
-      var rows = c.items.filter(function (i) {
-        return (!f.slot || i.slot === f.slot) && (!f.rate || String(i.rate) === f.rate) && (!q || i.name.toLowerCase().indexOf(q) >= 0);
-      });
-      var byName = function (a, b) { return a.name.localeCompare(b.name); };
-      return rows.sort(state.sort === 'name' ? byName
-        : state.sort === 'slot' ? function (a, b) { return SLOT_ORDER.indexOf(a.slot) - SLOT_ORDER.indexOf(b.slot) || b.rate - a.rate || byName(a, b); }
-        : function (a, b) { return b.rate - a.rate || byName(a, b); });
-    }
     function drawCrates() {
       $('bx-crates').innerHTML = ordered.map(function (c) {
         var st = statusOf(c, Date.now());
@@ -212,86 +146,225 @@
           '<img src="' + c.icon + '" alt="" width="32" height="32"><span class="c-name">' + esc(c.short) + '</span>' +
           '<span class="bx-chip ' + st.state + '">' + esc(st.label) + '</span></button>';
       }).join('');
+    }
+    function drawInfo() {
       var c = crate(), st = statusOf(c, Date.now());
-      $('bx-info').innerHTML = '<h3>' + esc(c.name) + '</h3><p class="meta">' + esc(c.price) + ' · ' + c.items.length + ' items · ' + esc(st.label) +
-        ' · <a href="' + esc(c.source) + '" target="_blank" rel="noopener">' + (/nexon\.com/.test(c.source) ? 'Nexon\'s rates' : 'Rates on meowdb') + '</a></p>' + worthHtml(c, HAS_PRICES);
+      $('bx-info').innerHTML = esc(c.price) + ' · ' + c.items.length + ' items · ' + esc(st.label) +
+        ' · <a href="' + esc(c.source) + '" target="_blank" rel="noopener">Nexon\'s rates</a>';
+      var nx = $('bx-nx'); nx.hidden = !(+c.nx1k > 0);
+      nx.textContent = +c.nx1k > 0 ? '1,000 NX is about ' + mes(+c.nx1k) + ' mesos here, on average' : '';
+      var tr = (Array.isArray(c.trend) ? c.trend : []).filter(function (t) { return t && +t.nx1k > 0; }).slice(-5), tl = $('bx-trend');
+      tl.hidden = tr.length < 2;
+      tl.textContent = tr.length < 2 ? '' : tr.map(function (t) {
+        return new Date(t.date + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }) + ' ' + mes(+t.nx1k);
+      }).join(' · ');
     }
-    function fillSelect(el, values, label, every, current) {
-      el.innerHTML = '<option value="">' + every + '</option>' + values.map(function (v) {
-        return '<option value="' + esc(v) + '">' + esc(label(v)) + '</option>';
-      }).join('');
-      el.value = values.indexOf(current) >= 0 ? current : '';
-      return el.value;
+    function drawPrices() {
+      var a = $('bx-prices'), ms = Date.parse(data.priced);
+      if (!a) return;
+      if (!isFinite(ms)) { if (a.parentNode) a.remove(); return; }
+      var age = ageOf(data.priced, Date.now());
+      a.className = age.old ? 'old' : '';
+      a.textContent = 'Prices from Cozy Markets, made ' + new Date(ms).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) +
+        (age.old ? ' · ' + age.days + (age.days === 1 ? ' day old' : ' days old') : '');
     }
-    function drawControls() {
-      var c = crate(), f = mine();
-      Array.prototype.forEach.call(root.querySelectorAll('#bx-sort [data-sort]'), function (b) { b.setAttribute('aria-pressed', String(b.dataset.sort === state.sort)); });
-      var slots = SLOT_ORDER.filter(function (s) { return c.items.some(function (i) { return i.slot === s; }); });
-      var rates = Array.from(new Set(c.items.map(function (i) { return i.rate; }))).sort(function (a, b) { return a - b; }).map(String);
-      f.slot = fillSelect($('bx-slot'), slots, function (s) { return s; }, 'Every slot', f.slot);
-      f.rate = fillSelect($('bx-rate'), rates, function (r) { return r + '%'; }, 'Every rate', f.rate);
-      if ($('bx-q').value !== f.q) $('bx-q').value = f.q;
+    function visibleItems() {
+      var q = $('bx-q').value.trim().toLowerCase();
+      return crate().items.filter(function (i) { return !q || i.name.toLowerCase().indexOf(q) >= 0; })
+        .sort(function (a, b) { return a.rate - b.rate || a.name.localeCompare(b.name); });
     }
-    // signed out, + stays pressable and asks for a sign in; signed in, it waits for the log and for the last save
-    var gotOff = function () { return !!session && !ready(); };
+    var listOff = function () { return busy || logState === 'loading'; };
     function drawList() {
-      var ticks = new Set(mine().ticks), rows = visibleItems(), have = counts(), off = gotOff();
-      $('bx-list').innerHTML = rows.map(function (i) {
-        var on = ticks.has(i.id), n = have.get(i.id) || 0;
-        return '<div class="bx-row' + (on ? ' on' : '') + '" data-id="' + i.id + '">' +
-          '<input type="checkbox" id="bx-t-' + i.id + '"' + (on ? ' checked' : '') + '>' +
-          '<img src="' + i.icon + '" alt="" width="32" height="32">' +
-          '<div class="mid"><div class="line"><label class="name" for="bx-t-' + i.id + '">' + esc(i.name) + '</label>' +
-          (n ? '<span class="got">got ' + n + '</span>' : '') + '</div>' +
-          '<span class="slot">' + esc(i.slot) + priceHtml(i, HAS_PRICES) + '</span></div>' +
-          '<div class="num">' + i.rate + '%<small>1 in ' + fmt(100 / i.rate) + '</small></div>' +
-          '<button type="button" class="k-sq bx-got" id="bx-g-' + i.id + '" aria-label="Got ' + esc(i.name) + '"' + (off ? ' disabled' : '') + '>+</button></div>';
+      var rows = visibleItems(), el = $('bx-list');
+      el.classList.toggle('busy', listOff());
+      el.setAttribute('aria-busy', String(listOff()));
+      el.innerHTML = rows.map(function (i) {
+        var p = priceFor(i), u = cozyUrl(i.cz);
+        return '<div class="bx-row" data-id="' + i.id + '"><button type="button" class="bx-log" id="bx-l-' + i.id + '" aria-label="Got ' + esc(i.name) + '" title="' + esc(i.name) + '">' +
+          '<img src="' + i.icon + '" alt="" width="32" height="32"><span class="mid"><span class="name">' + esc(i.name) + '</span>' +
+          '<span class="made">' + esc(madeWord(p.basis, p.win)) + '</span></span>' +
+          '<span class="num">' + esc(priceText(p.price, p.est)) + '</span></button>' +
+          (u ? '<a class="bx-cozy bx-cz" href="' + u + '" target="_blank" rel="noopener" title="See ' + esc(i.name) + ' on Cozy Markets">Cozy ↗</a>' : '') + '</div>';
       }).join('');
       $('bx-empty').hidden = rows.length > 0;
     }
-    function setGotDisabled() {
-      var off = gotOff();
-      Array.prototype.forEach.call(root.querySelectorAll('.bx-got'), function (b) { b.disabled = off; });
-      $('bx-undo').disabled = !ready() || !crateLogs().length;
+    function drawUnits(el, unit) {
+      el.innerHTML = ['nx', 'mesos'].map(function (u) {
+        return '<button type="button" class="k-btn sm bx-unit" data-unit="' + u + '" aria-pressed="' + (u === unit) + '">' + (u === 'nx' ? 'NX' : 'Mesos') + '</button>';
+      }).join('');
     }
-    var tiles = function (o) {
-      var b = function (x) { return o ? fmt(x) : '…'; };
-      return '<div class="bx-tiles"><div class="bx-tile"><b>' + b(o && o.mean) + '</b><span>crates on average</span></div>' +
-        '<div class="bx-tile"><b>' + b(o && o.half) + '</b><span>half the time by</span></div>' +
-        '<div class="bx-tile"><b>' + b(o && o.nine) + '</b><span>9 times in 10 by</span></div></div>';
+    // typed cost: { none } for empty or 0, { bad }, or { cost }
+    function costOf(text) {
+      text = String(text == null ? '' : text).trim();
+      if (!text) return { none: true };
+      var n = parseMesos(text);
+      if (n == null) return { bad: true };
+      return n === 0 ? { none: true } : { cost: n };
+    }
+    function resultLine(total, cost, c) {
+      var line = 'Worth ' + mes(total), r = result(total, cost, c && +c.nx1k > 0 ? +c.nx1k : null);
+      if (cost && cost.unit === 'mesos') {
+        line += ' · Cost ' + mes(cost.cost) + ' · Profit <span class="' + (r.profit >= 0 ? 'up' : 'dn') + '">' + (r.profit >= 0 ? '+' : '') + mes(r.profit) + '</span>';
+      } else if (cost && cost.unit === 'nx') {
+        line += ' · Cost ' + fmt(cost.cost) + ' NX';
+        if (r.per1k != null) line += ' · <span class="' + (r.above ? 'up' : '') + '">' + mes(r.per1k) + ' per 1,000 NX</span>' + (r.avg != null ? " · the crate's average is " + mes(r.avg) : '');
+      }
+      return line;
+    }
+    var findPull = function (id) { return logs.filter(function (d) { return String(d.id) === String(id); })[0] || null; };
+    var cozyLink = function (it) {
+      var u = it ? cozyUrl(it.cz) : '';
+      return u ? '<a class="bx-cz" href="' + u + '" target="_blank" rel="noopener" title="See ' + esc(it.name) + ' on Cozy Markets">Cozy ↗</a>' : '';
     };
-    var head = function (title, odds) { return '<div class="head"><h4>' + esc(title) + '</h4> <span class="odds">' + odds + '</span></div>'; };
-    var sumJob = 0;
-    function drawSum() {
-      var job = ++sumJob, c = crate(), ticks = new Set(mine().ticks), el = $('bx-sum');
-      var sel = c.items.filter(function (i) { return ticks.has(i.id); });
-      if (!sel.length) { el.innerHTML = '<p class="hint">Tick one item, or a few, to see your odds.</p>'; return; }
-      var total = sel.reduce(function (a, i) { return a + i.rate; }, 0), p = total / 100;
-      var odds = pct(p) + ' a crate, 1 in ' + fmt(1 / p);
-      var shown = new Set(visibleItems().map(function (i) { return i.id; }));
-      var hidden = sel.filter(function (i) { return !shown.has(i.id); }).length;
-      var note = hidden ? '<p class="note">' + hidden + ' ticked ' + (hidden === 1 ? 'is' : 'are') + ' hidden by your filters.</p>' : '';
-      // what the log says you already have: the "all of them" tiles count from here
-      var have = counts(), left = sel.filter(function (i) { return !have.get(i.id); });
-      if (!left.length) { el.innerHTML = '<h4>' + (sel.length === 1 ? 'You have ' + esc(sel[0].name) + '.' : 'You have all ' + sel.length + '.') + '</h4>' + note; return; }
-      if (sel.length === 1) { el.innerHTML = '<div class="block">' + head(sel[0].name, odds) + tiles(anyOdds(p)) + '</div>' + note; return; }
-      var rates = left.map(function (i) { return i.rate / 100; }), tiers = tiersOf(rates), all = null;
-      if (allCache.has(tierKey(tiers)) || stateCount(tiers) <= DEFER_STATES) all = allOdds(rates);
-      else setTimeout(function () { if (job !== sumJob) return; allOdds(rates); if (job === sumJob) drawSum(); }, 120);
-      var sofar = left.length < sel.length ? (sel.length - left.length) + ' of ' + sel.length + ' so far' : 'the whole set';
-      el.innerHTML = '<div class="block">' + head('Any one of these ' + sel.length, odds) + tiles(anyOdds(p)) + '</div>' +
-        '<div class="block">' + head('All ' + sel.length + ' of them', sofar) + tiles(all) + '</div>' + note;
+    // one item's row in a round: the price is a button that opens the edit line; an item out twice edits its newest pull
+    function pullRow(x, it, byId, early) {
+      var n = x.pulls.length, newest = x.pulls[n - 1], t = roundTotal(x.pulls, byId, early), pe = past.pe;
+      var cp = early ? priceOf(it) : { price: newest.price, est: newest.est === true };
+      var shown = newest.mine != null
+        ? '<span class="mine">yours ' + esc(mes(newest.mine)) + '</span> <s>' + esc(priceText(cp.price, cp.est)) + '</s>'
+        : esc(t.missing === n ? 'set price' : priceText(t.total, t.estimated > 0));
+      var html = '<div class="bx-pull" data-pid="' + esc(newest.id) + '"><span class="name">' + esc(it ? it.name : 'Unknown item') + (n > 1 ? ' ×' + n : '') + '</span>' +
+        '<span class="rate">' + (it ? it.rate + '%' : '') + '</span>' +
+        '<button type="button" class="bx-price num" aria-label="Your price for ' + esc(it ? it.name : 'this item') + '">' + shown + '</button>' + cozyLink(it);
+      if (past.thanks != null && String(past.thanks) === String(newest.id)) html += '<span class="bx-thanks" role="status">Thanks, sent.</span>';
+      if (pe && String(pe.id) === String(newest.id)) {
+        html += '<div class="bx-edit"><label class="bx-editlab">Your price <input id="bx-mine" class="bx-mine" type="text" autocomplete="off" value="' + esc(pe.text) + '"></label>' +
+          '<span class="bx-editbtns"><button type="button" class="k-btn sm key bx-save">Save</button><button type="button" class="k-btn sm bx-clear">Clear</button>' +
+          '<button type="button" class="k-btn sm bx-remove">Remove</button></span>' +
+          '<label class="bx-offl"><input type="checkbox" class="bx-off"' + (pe.on ? ' checked' : '') + '> Tell us Cozy\'s price looks off</label></div>';
+      }
+      return html + '</div>';
     }
-    function drawLog() {
-      var n = crateLogs().length;
-      $('bx-logbar').hidden = !session || logState === 'failed';
-      $('bx-log-line').textContent = logState !== 'ready' ? 'Loading your log…' : !n ? 'No crates logged yet. Tap + on what came out.'
-        : fmt(n) + (n === 1 ? ' crate opened' : ' crates opened');
-      $('bx-undo').disabled = !ready() || !n;
+    function pastRound(g) {
+      var c = byKey.get(g.crate), byId = {};
+      (c ? c.items : []).forEach(function (i) { byId[i.id] = i; });
+      var key = g.early ? 'e:' + g.crate : String(g.round), n = g.pulls.length;
+      var t = roundTotal(g.pulls, byId, g.early), cost = g.early ? null : costs.get(g.round);
+      var r = cost ? result(t.total, cost, c && +c.nx1k > 0 ? +c.nx1k : null) : {};
+      var groups = [], seen = {};
+      g.pulls.forEach(function (p) {
+        var x = seen[p.itemId];
+        if (!x) { x = seen[p.itemId] = { itemId: p.itemId, pulls: [] }; groups.push(x); }
+        x.pulls.push(p);
+      });
+      groups.forEach(function (x) { x.t = roundTotal(x.pulls, byId, g.early); });
+      groups.sort(function (a, b) { return b.t.total - a.t.total; });
+      var crates = n + (n === 1 ? ' crate' : ' crates'), who = c ? c.short : 'Unknown crate';
+      var title = g.early ? 'Earlier pulls · ' + who + ' · ' + crates : day(g.round) + ' · ' + who + ' crate · ' + crates;
+      var html = '<details class="bx-pr' + (past.fresh === key ? ' fresh' : '') + '" data-key="' + esc(key) + '"' + (past.open.has(key) ? ' open' : '') + '><summary>' +
+        '<span class="bx-pr-t">' + esc(title) + '</span>' +
+        '<span class="num">' + esc(t.missing === n ? '' : priceText(t.total, t.estimated > 0)) + '</span>' +
+        (r.profit != null ? '<span class="num ' + (r.profit >= 0 ? 'up' : 'dn') + '">' + (r.profit >= 0 ? '+' : '') + mes(r.profit) + '</span>' : '') +
+        (g.early ? '<span class="bx-pr-s">at today\'s prices</span>' : '') + '</summary><div class="bx-pr-b">' +
+        '<p class="bx-result">' + resultLine(t.total, cost, c) + '</p>';
+      html += groups.map(function (x) {
+        return pullRow(x, byId[x.itemId], byId, g.early);
+      }).join('');
+      if (!g.early) {
+        if (past.del === key) {
+          html += '<div class="bx-delrow"><span class="bx-delq">Delete this round of ' + n + "? This can't be undone.</span>" +
+            '<button type="button" class="k-btn sm bx-del-yes">Delete</button><button type="button" class="k-btn sm bx-del-no">Keep</button></div>';
+        } else {
+          html += '<div class="bx-delrow"><button type="button" class="k-btn sm bx-del">Delete round</button></div>';
+        }
+        if (past.edit === key) {
+          html += '<div class="bx-cost-edit"><span class="bx-costlab">What did these cost?</span><div class="bx-costrow">' +
+            '<input class="bx-costin" type="text" autocomplete="off" aria-label="What these crates cost" value="' + esc(past.editText) + '">' +
+            '<span class="bx-units">' + ['nx', 'mesos'].map(function (u) {
+              return '<button type="button" class="k-btn sm bx-unit" data-unit="' + u + '" aria-pressed="' + (u === past.editUnit) + '">' + (u === 'nx' ? 'NX' : 'Mesos') + '</button>';
+            }).join('') + '</span><button type="button" class="k-btn sm key bx-cost-save">Save</button><button type="button" class="k-btn sm bx-cost-cancel">Cancel</button></div>' +
+            '<p class="bx-bad" role="alert"' + (past.editErr ? '' : ' hidden') + '>' + esc(past.editErr) + '</p></div>';
+        } else {
+          html += '<div class="bx-chgrow"><button type="button" class="k-btn sm bx-chg">' + (cost ? 'Change cost' : 'Add cost') + '</button></div>';
+        }
+      }
+      return html + '</div></details>';
+    }
+    function drawPast() {
+      var done = doneLogs(), sec = $('bx-past'), has = !!session && done.length > 0;
+      sec.hidden = !has;
+      if (!has) { $('bx-past-list').innerHTML = ''; $('bx-morerow').innerHTML = ''; return; }
+      var view = past.view, list = $('bx-past-list'), head = $('bx-past-head'), more = $('bx-morerow');
+      var v = $('bx-past-view');
+      v.innerHTML = [['rounds', 'Rounds'], ['items', 'All items']].map(function (x) {
+        return '<button type="button" class="k-btn sm" data-view="' + x[0] + '" aria-pressed="' + (x[0] === view) + '">' + x[1] + '</button>';
+      }).join('');
+      var total = 0, shown = 0, all = 0;
+      if (view === 'rounds') {
+        var gs = rounds(done), real = gs.filter(function (g) { return !g.early; });
+        var nx = { cost: 0, worth: 0 }, mesosSpent = 0, worth = 0, crates = 0;
+        real.forEach(function (g) {
+          var c = byKey.get(g.crate), byId = {}, cost = costs.get(g.round);
+          (c ? c.items : []).forEach(function (i) { byId[i.id] = i; });
+          var t = roundTotal(g.pulls, byId, false);
+          worth += t.total; crates += g.pulls.length;
+          if (cost && cost.unit === 'nx' && cost.cost > 0) { nx.cost += cost.cost; nx.worth += t.total; }
+          else if (cost && cost.unit === 'mesos') mesosSpent += cost.cost;
+        });
+        var spent = [];
+        if (nx.cost > 0) spent.push(fmt(nx.cost) + ' NX');
+        if (mesosSpent > 0) spent.push(mes(mesosSpent));
+        head.textContent = real.length + (real.length === 1 ? ' round, ' : ' rounds, ') + crates + (crates === 1 ? ' crate' : ' crates') + ' · worth ' + mes(worth) +
+          (spent.length ? ' · spent ' + spent.join(' and ') : '') +
+          (nx.cost > 0 ? ' · your NX rounds average ' + mes(Math.round(nx.worth / (nx.cost / 1000))) + ' per 1,000 NX' : '');
+        all = gs.length; shown = Math.min(all, past.rounds);
+        list.innerHTML = gs.slice(0, shown).map(pastRound).join('');
+      } else {
+        var items = allItems(done, CRATES), wsum = 0, cn = 0;
+        items.forEach(function (x) { wsum += x.worth; cn += x.count; });
+        head.textContent = cn + (cn === 1 ? ' crate' : ' crates') + ' · ' + items.length + ' different items · worth ' + mes(wsum);
+        all = items.length; shown = Math.min(all, past.items);
+        list.innerHTML = items.slice(0, shown).map(function (x) {
+          var c = byKey.get(x.crate);
+          return '<div class="bx-it"><span class="name">' + esc(x.name) + (x.count > 1 ? ' ×' + x.count : '') + '</span>' +
+            '<span class="rate">' + esc(c ? c.short : '') + '</span><span class="num">' + esc(priceText(x.worth, x.estimated)) + '</span>' +
+            cozyLink({ cz: x.cz, name: x.name }) + '</div>';
+        }).join('');
+      }
+      more.innerHTML = '';
+      if (shown < all) more.append(button('bx-more', 'Show more', 'k-btn sm'));
+    }
+    function drawRound() {
+      var panel = $('bx-round');
+      panel.hidden = !session;
+      if (!session) return;
+      var pulls = roundPulls(), c = round && byKey.get(round.crate), byId = {};
+      (c ? c.items : []).forEach(function (i) { byId[i.id] = i; });
+      var n = pulls.length;
+      $('bx-round-head').textContent = 'This round · ' + n + (n === 1 ? ' crate' : ' crates');
+      var groups = [], seen = {};
+      pulls = pulls.slice().reverse().sort(function (a, b) { return a.ts - b.ts; });
+      pulls.forEach(function (p) {
+        var g = seen[p.itemId];
+        if (!g) { g = seen[p.itemId] = { itemId: p.itemId, pulls: [] }; groups.push(g); }
+        g.pulls.push(p);
+      });
+      var list = $('bx-round-list');
+      var costBox = $('bx-cost'), bar = $('bx-donebar');
+      bar.innerHTML = '';
+      if (!groups.length) {
+        list.innerHTML = '<p class="hint">Tap what came out to start a round.</p>';
+        $('bx-round-foot').textContent = '';
+        costBox.hidden = true;
+        return;
+      }
+      list.innerHTML = groups.map(function (g) {
+        return pullRow(g, byId[g.itemId], byId, false);
+      }).join('');
+      bar.append(button('bx-done', 'Done', 'k-btn key'));
+      costBox.hidden = false;
+      drawUnits($('bx-cost-unit'), costUnit);
+      var sug = suggestCost(c, n), chip = $('bx-cost-chip');
+      chip.hidden = sug == null;
+      chip.textContent = sug == null ? '' : fmt(sug) + ' NX';
+      var tot = roundTotal(pulls, byId, false);
+      $('bx-round-foot').textContent = 'So far ' + mes(tot.total) +
+        (tot.estimated ? ', ' + tot.estimated + (tot.estimated === 1 ? ' price is' : ' prices are') + ' estimated' : '') +
+        (tot.missing ? ', ' + tot.missing + ' with no price' : '');
     }
     function render() {
       var focused = document.activeElement && root.contains(document.activeElement) && document.activeElement.id;
-      drawCrates(); drawControls(); drawList(); drawSum(); drawLog();
+      drawCrates(); drawInfo(); drawPrices(); drawList(); drawRound(); drawPast();
       var back = focused && $(focused);
       if (back && back !== document.activeElement) back.focus({ preventScroll: true });
     }
@@ -301,48 +374,134 @@
     }
 
     // ---------- doing ----------
-    function setTick(id, on) {
-      var f = mine(), at = f.ticks.indexOf(id);
-      if (on && at < 0) f.ticks.push(id);
-      if (!on && at >= 0) f.ticks.splice(at, 1);
-      save();
-      var row = root.querySelector('#bx-list .bx-row[data-id="' + id + '"]');
-      if (row) row.classList.toggle('on', on);
-      drawSum();
-    }
     function logOne(id) {
       var c = crate(), it = c.items.filter(function (i) { return i.id === id; })[0];
       if (!it) return;
       if (!session) { signPrompt(); return; }
+      if (adding) { if (waiting.length < 30) waiting.push({ id: id, crate: c.key }); return; }
       if (!ready()) return;
-      busy = true; setGotDisabled();
+      if (round && round.crate !== c.key) { finishPrompt(); return; }
+      var fresh = !round;
+      if (fresh) { round = { crate: c.key, round: Math.max(Date.now(), lastRound + 1) }; lastRound = round.round; }
+      saveRound();
+      var pr = priceFor(it), rnd = round.round;
+      busy = true; adding = true; render();
       var g = gen;
-      Promise.resolve().then(function () { return api.addBoxOpen(c.key, id); }).then(function (row) {
+      Promise.resolve().then(function () { return api.addBoxOpen(c.key, id, rnd, pr.price, pr.est, pr.basis, pr.win); }).then(function (row) {
         if (g !== gen) return;
-        busy = false;
+        busy = false; adding = false;
         var d = norm(row);
-        logs.unshift(valid(d) ? d : { id: row && row.id, crate: c.key, itemId: id, ts: Date.now() });
+        logs.unshift(valid(d) && d.round != null ? d : { id: row && row.id, crate: c.key, itemId: id, ts: Date.now(), round: rnd, price: pr.price, est: pr.est, basis: pr.basis, win: pr.win, mine: null });
+        $('bx-q').value = '';
         clearTransient(); render();
+        var nx = waiting.shift();
+        while (nx && nx.crate !== crate().key) nx = waiting.shift();
+        if (nx) logOne(nx.id);
+      }, function (e) {
+        if (g !== gen) return;
+        busy = false; adding = false; waiting = [];
+        if (fresh && round && round.round === rnd && !roundPulls().length) { round = null; saveRound(); }
+        say(e && SERVER.indexOf(e.message) >= 0 ? e.message : TRANSIENT[0]); render();
+      });
+    }
+    function finish(rnd) {
+      round = null; saveRound(); past.fresh = String(rnd); past.open.add(String(rnd)); past.view = 'rounds';
+      $('bx-cost-in').value = ''; costUnit = 'nx';
+      var bad = $('bx-cost-bad'); bad.hidden = true; bad.textContent = '';
+      clearTransient(); render();
+    }
+    function done() {
+      if (!round || busy) return;
+      var typed = costOf($('bx-cost-in').value), bad = $('bx-cost-bad'), rnd = round.round;
+      if (typed.bad) { bad.textContent = BAD; bad.hidden = false; return; }
+      bad.hidden = true; bad.textContent = '';
+      if (typed.none) { finish(rnd); return; }
+      var unit = costUnit, g = gen;
+      busy = true; render();
+      Promise.resolve().then(function () { return api.setBoxRound(rnd, typed.cost, unit); }).then(function () {
+        if (g !== gen) return;
+        busy = false; costs.set(rnd, { cost: typed.cost, unit: unit }); finish(rnd);
       }, function (e) {
         if (g !== gen) return;
         busy = false;
         say(e && SERVER.indexOf(e.message) >= 0 ? e.message : TRANSIENT[0]); render();
       });
     }
-    function undo() {
-      var list = crateLogs();
-      if (!ready() || !list.length) return;
-      var newest = list.reduce(function (a, d) { return d.ts > a.ts || (d.ts === a.ts && d.id > a.id) ? d : a; });
-      busy = true; setGotDisabled();
-      var g = gen;
-      Promise.resolve().then(function () { return api.removeBoxOpen(newest.id); }).then(function () {
+    function saveEdit() {
+      var key = past.edit, rnd = +key, typed = costOf(past.editText), g = gen;
+      if (typed.bad) { past.editErr = BAD; render(); return; }
+      past.editErr = '';
+      var had = costs.has(rnd);
+      if (typed.none && !had) { past.edit = null; render(); return; }
+      var cost = typed.none ? null : typed.cost, unit = typed.none ? null : past.editUnit;
+      Promise.resolve().then(function () { return api.setBoxRound(rnd, cost, unit); }).then(function () {
         if (g !== gen) return;
-        busy = false; logs = logs.filter(function (d) { return d !== newest; });
-        clearTransient(); render();
-      }, function () {
+        if (cost == null) costs.delete(rnd); else costs.set(rnd, { cost: cost, unit: unit });
+        past.edit = null; render();
+      }, function (e) {
         if (g !== gen) return;
-        busy = false; say(TRANSIENT[1]); render();
+        past.editErr = e && SERVER.indexOf(e.message) >= 0 ? e.message : TRANSIENT[0]; render();
       });
+    }
+    var fail = function (e) { say(e && SERVER.indexOf(e.message) >= 0 ? e.message : TRANSIENT[0]); };
+    var today = function () { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); };
+    var offMap = function () { try { var m = JSON.parse(rd(OFF_KEY)); return m && typeof m === 'object' ? m : {}; } catch (e) { return {}; } };
+    // one "looks off" note a day per item per device; a failed send is not recorded, so the next Save tries again
+    function sendOff(d, n) {
+      if (typeof o.report !== 'function') return;
+      var c = byKey.get(d.crate), it = c && c.items.filter(function (i) { return i.id === d.itemId; })[0];
+      if (!it) return;
+      var key = d.crate + ':' + d.itemId, map = offMap();
+      if (map[key] === today()) return;
+      var p = priceOf(it), g = gen;
+      var words = 'NX Crates price looks off: ' + it.name + ' in ' + c.short + '. Ours ' + (p.price == null ? 'no price' : priceText(p.price, p.est)) +
+        ' (' + (madeWord(p.basis, p.win) || 'no price') + ', Cozy file ' + (data.priced || 'unknown') + '). Player says ' + mes(n) + '.';
+      var details = JSON.stringify({ tab: 'boxes', crate: d.crate, itemId: d.itemId, ours: p.price, basis: p.basis, window: p.win, priced: data.priced || null, mine: n });
+      Promise.resolve().then(function () { return o.report(words, details); }).then(function () {
+        map = offMap(); map[key] = today(); wr(OFF_KEY, JSON.stringify(map));
+        if (g !== gen) return;
+        past.thanks = d.id; render();
+      }, function () { /* the saved price stands; the next Save tries again */ });
+    }
+    function setMine(d, n, tick) {
+      var g = gen;
+      Promise.resolve().then(function () { return api.setBoxOpenMine(d.id, n); }).then(function () {
+        if (g !== gen) return;
+        d.mine = n; past.pe = null; past.thanks = null; clearTransient(); render();
+        if (n != null && tick) sendOff(d, n);
+      }, function (e) { if (g !== gen) return; fail(e); render(); });
+    }
+    function savePrice() {
+      var pe = past.pe, d = pe && findPull(pe.id);
+      if (!d) { past.pe = null; render(); return; }
+      var typed = costOf(pe.text);
+      if (typed.bad) { say(BAD); render(); return; }
+      if (typed.none) { if (d.mine == null) { past.pe = null; render(); } else setMine(d, null, false); return; }
+      setMine(d, typed.cost, pe.on);
+    }
+    function removePull() {
+      var pe = past.pe, d = pe && findPull(pe.id), g = gen;
+      if (!d) { past.pe = null; render(); return; }
+      Promise.resolve().then(function () { return api.removeBoxOpen(d.id); }).then(function () {
+        if (g !== gen) return;
+        logs = logs.filter(function (x) { return x !== d; });
+        if (round && d.round === round.round && !roundPulls().length) { round = null; saveRound(); }
+        past.pe = null; clearTransient(); render();
+      }, function (e) { if (g !== gen) return; fail(e); render(); });
+    }
+    function deleteRound() {
+      var rnd = +past.del, g = gen;
+      if (!isFinite(rnd)) { past.del = null; render(); return; }
+      Promise.resolve().then(function () { return api.removeBoxRoundOpens(rnd); }).then(function () {
+        if (g !== gen) return;
+        logs = logs.filter(function (x) { return x.round !== rnd; });
+        costs.delete(rnd);
+        if (round && round.round === rnd) { round = null; saveRound(); }
+        past.open.delete(String(rnd)); past.del = null; past.pe = null;
+        // the cost row is tidied too; if that fails the round is already gone from the list
+        if (typeof api.setBoxRound === 'function') Promise.resolve().then(function () { return api.setBoxRound(rnd, null, null); }).catch(function () {});
+        clearTransient(); render();
+      }, function (e) { if (g !== gen) return; fail(e); render(); });
     }
     var uidOf = function (s) { return s && s.user && s.user.id || null; };
     // the server sends at most PAGE rows a request (Supabase's Max rows), so a long log comes in pages until a short one
@@ -362,13 +521,25 @@
       // the same player again (a token refresh, the load's second auth event): keep the log and any save in flight
       var uid = uidOf(s);
       if (uid && uid === uidOf(session) && (logState === 'ready' || logState === 'loading')) { session = s; return; }
-      session = s || null; logs = []; busy = false;
+      session = s || null; logs = []; costs = new Map(); past.edit = null; past.pe = null; past.del = null; past.thanks = null; past.fresh = null; past.open = new Set(); busy = false; adding = false; waiting = [];
       var g = ++gen;
       if (!session) { logState = 'off'; clearTransient(); render(); return; }
       logState = 'loading'; clearTransient(); render();
-      Promise.resolve().then(listAll).then(function (rows) {
+      // a player whose box_rounds table isn't there yet still gets the log; costs just stay empty
+      var loadCosts = function () {
+        return typeof api.listBoxRounds !== 'function' ? [] : Promise.resolve(api.listBoxRounds()).then(function (r) { return Array.isArray(r) ? r : []; }, function () { return []; });
+      };
+      Promise.resolve().then(function () { return Promise.all([listAll(), loadCosts()]); }).then(function (both) {
         if (g !== gen) return;
+        var rows = both[0];
+        both[1].forEach(function (r) {
+          var rd = num(r && r.round), cs = num(r && r.cost);
+          if (rd != null && cs != null && cs > 0 && (r.unit === 'nx' || r.unit === 'mesos')) costs.set(rd, { cost: cs, unit: r.unit });
+        });
         logs = rows.map(norm).filter(valid);
+        logs.forEach(function (d) { if (d.round != null && d.round > lastRound) lastRound = d.round; });
+        // a remembered round the log doesn't hold is dropped
+        if (round && !roundPulls().length) { round = null; saveRound(); }
         logState = 'ready'; clearTransient(); render();
       }, function () {
         if (g !== gen) return;
@@ -378,40 +549,73 @@
     function show(key) {
       var k = resolve(key);
       if (k === state.crate) return;
-      state.crate = k; save(); render(); scrollStrip();
+      state.crate = k; saveCrate(); render(); scrollStrip();
     }
 
     root.addEventListener('click', function (e) {
       var t = e.target;
       var b = t.closest('#bx-crates [data-crate]');
       if (b) {
-        if (b.dataset.crate !== state.crate) { state.crate = b.dataset.crate; save(); render(); }
+        if (b.dataset.crate !== state.crate) { state.crate = b.dataset.crate; saveCrate(); render(); }
         if (o.onCrate) o.onCrate(state.crate);
         return;
       }
-      var s = t.closest('#bx-sort [data-sort]');
-      if (s) { state.sort = s.dataset.sort; save(); render(); return; }
-      if (t.closest('#bx-clear')) { mine().ticks = []; save(); render(); return; }
-      if (t.closest('#bx-undo')) { undo(); return; }
       if (t.closest('#bx-signin')) { if (o.signIn) o.signIn(); return; }
-      var g = t.closest('.bx-got');
+      if (t.closest('#bx-done')) { done(); return; }
+      var u = t.closest('.bx-unit');
+      if (u) {
+        if (u.closest('#bx-cost-unit')) { costUnit = u.dataset.unit; drawUnits($('bx-cost-unit'), costUnit); }
+        else { past.editUnit = u.dataset.unit; render(); }
+        return;
+      }
+      if (t.closest('#bx-cost-chip')) {
+        var sg = suggestCost(round && byKey.get(round.crate), roundPulls().length);
+        if (sg != null) { $('bx-cost-in').value = fmt(sg); costUnit = 'nx'; drawUnits($('bx-cost-unit'), costUnit); $('bx-cost-bad').hidden = true; }
+        return;
+      }
+      var pv = t.closest('#bx-past-view [data-view]');
+      if (pv) { past.view = pv.dataset.view; drawPast(); return; }
+      if (t.closest('#bx-more')) { if (past.view === 'rounds') past.rounds += 5; else past.items += 20; drawPast(); return; }
+      var chg = t.closest('.bx-chg');
+      if (chg) {
+        var key = chg.closest('.bx-pr').dataset.key, cur = costs.get(+key);
+        past.edit = key; past.editUnit = cur ? cur.unit : 'nx'; past.editText = cur ? String(cur.cost) : ''; past.editErr = '';
+        render(); return;
+      }
+      if (t.closest('.bx-cost-save')) { saveEdit(); return; }
+      if (t.closest('.bx-cost-cancel')) { past.edit = null; past.editErr = ''; render(); return; }
+      var pb = t.closest('.bx-price');
+      if (pb) {
+        var pid = pb.closest('.bx-pull').dataset.pid, pd = findPull(pid);
+        past.thanks = null;
+        if (past.pe && String(past.pe.id) === String(pid)) past.pe = null;
+        else if (pd) past.pe = { id: pd.id, text: pd.mine != null ? String(pd.mine) : '', on: false };
+        render(); return;
+      }
+      if (t.closest('.bx-save')) { savePrice(); return; }
+      if (t.closest('.bx-clear')) { var pc = past.pe && findPull(past.pe.id); if (pc && pc.mine != null) setMine(pc, null, false); else { past.pe = null; render(); } return; }
+      if (t.closest('.bx-remove')) { removePull(); return; }
+      if (t.closest('.bx-del-yes')) { deleteRound(); return; }
+      if (t.closest('.bx-del-no')) { past.del = null; render(); return; }
+      if (t.closest('.bx-del')) { past.del = t.closest('.bx-pr').dataset.key; render(); return; }
+      var g = t.closest('.bx-log');
       if (g) { logOne(+g.closest('.bx-row').dataset.id); return; }
-      // a click anywhere else on a row ticks it
-      if (t.closest('input, label, button, a')) return;
-      var row = t.closest('.bx-row'); if (!row) return;
-      var cb = row.querySelector('input[type=checkbox]');
-      cb.checked = !cb.checked; setTick(+row.dataset.id, cb.checked);
-    });
-    root.addEventListener('change', function (e) {
-      var t = e.target;
-      if (t.id === 'bx-slot') { mine().slot = t.value; save(); render(); return; }
-      if (t.id === 'bx-rate') { mine().rate = t.value; save(); render(); return; }
-      var row = t.closest('.bx-row');
-      if (row && t.type === 'checkbox') setTick(+row.dataset.id, t.checked);
     });
     root.addEventListener('input', function (e) {
-      if (e.target.id === 'bx-q') { mine().q = e.target.value; save(); drawList(); drawSum(); }
+      if (e.target.id === 'bx-q') drawList();
+      else if (e.target.id === 'bx-cost-in') { var b = $('bx-cost-bad'); b.hidden = true; b.textContent = ''; }
+      else if (e.target.classList && e.target.classList.contains('bx-costin')) past.editText = e.target.value;
+      else if (e.target.classList && e.target.classList.contains('bx-mine') && past.pe) {
+        past.pe.text = e.target.value;
+        if (e.target.value.trim()) { past.pe.on = true; var ob = root.querySelector('.bx-off'); if (ob) ob.checked = true; }
+      } else if (e.target.classList && e.target.classList.contains('bx-off') && past.pe) past.pe.on = e.target.checked;
     });
+    // a round the player opened stays open when the page redraws
+    root.addEventListener('toggle', function (e) {
+      var d = e.target;
+      if (!d.classList || !d.classList.contains('bx-pr')) return;
+      if (d.open) past.open.add(d.dataset.key); else past.open.delete(d.dataset.key);
+    }, true);
 
     refresh(session);
     scrollStrip();
@@ -420,11 +624,96 @@
       show: show,
       // for Report a problem: what's picked and how big the log is, never the rows themselves
       report: function () {
-        var f = mine();
-        return { crate: state.crate, sort: state.sort, ticks: f.ticks.slice(), slot: f.slot, rate: f.rate, q: f.q, signedIn: !!session, log: logState, logCount: crateLogs().length };
+        return { crate: state.crate, signedIn: !!session, logState: logState, logCount: logs.length, roundOpen: !!round, roundSize: roundPulls().length };
       }
     };
   }
 
-  window.BoxOdds = { anyOdds: anyOdds, allOdds: allOdds, statusOf: statusOf, orderCrates: orderCrates, mount: mount, mes: mes, priceHtml: priceHtml };
+  // ---- NX Crates round maths (pure) ----
+  // what an item is worth today, and how Cozy made that number
+  function priceOf(item) {
+    var fm = item && item.fm, est = item && item.est;
+    if (fm && +fm.price > 0) return fm.basis === 'listed' ? { price: +fm.price, est: true, basis: 'listed', win: fm.window || null } : { price: +fm.price, est: false, basis: 'sold', win: fm.window || null };
+    if (est && +est.mid > 0) return { price: +est.mid, est: true, basis: 'peers', win: null };
+    return { price: null, est: null, basis: null, win: null };
+  }
+  function madeWord(basis, win) {
+    if (basis === 'sold') return win === 'day' ? 'sold today' : win === '3d' ? 'sold, last 3 days' : win === 'week' ? 'sold this week' : 'sold';
+    if (basis === 'listed') return 'listed, not sold';
+    if (basis === 'peers') return 'from similar items';
+    return '';
+  }
+  // 250k, 1.5m, 2b, commas and spaces -> whole mesos, or null for anything that is not a sane amount
+  function parseMesos(text) {
+    var m = /^(\d+(?:\.\d+)?|\.\d+)([kmb])?$/i.exec(String(text == null ? '' : text).replace(/[,\s]/g, ''));
+    if (!m) return null;
+    var n = parseFloat(m[1]) * ({ k: 1e3, m: 1e6, b: 1e9 }[(m[2] || '').toLowerCase()] || 1);
+    n = Math.round(n);
+    return isFinite(n) && n >= 0 && n <= 1000000000000 ? n : null;
+  }
+  // real rounds newest first, then one early group per crate (pulls logged before rounds existed)
+  function rounds(pulls) {
+    var by = {}, list = [], early = {}, order = [];
+    var cmp = function (a, b) { return (a.ts - b.ts) || (a.id - b.id); };
+    (pulls || []).forEach(function (p) {
+      if (p.round != null) { var g = by[p.round] || (by[p.round] = { round: p.round, crate: p.crate, early: false, pulls: [] }); g.pulls.push(p); }
+      else { if (!early[p.crate]) { early[p.crate] = { round: null, crate: p.crate, early: true, pulls: [] }; order.push(p.crate); } early[p.crate].pulls.push(p); }
+    });
+    Object.keys(by).forEach(function (k) { list.push(by[k]); });
+    list.sort(function (a, b) { return b.round - a.round; });
+    list.forEach(function (g) { g.pulls.sort(cmp); });
+    order.forEach(function (c) { early[c].pulls.sort(cmp); list.push(early[c]); });
+    return list;
+  }
+  // what a pull counts as: your own price, else the price saved with it, else (early pulls) today's
+  function countedPrice(p, itemsById, today) {
+    if (p.mine != null) return { price: +p.mine, est: false };
+    if (today) { var pr = priceOf(itemsById && itemsById[p.itemId]); return { price: pr.price, est: pr.est === true }; }
+    if (p.price != null) return { price: +p.price, est: p.est === true };
+    return { price: null, est: false };
+  }
+  function roundTotal(pulls, itemsById, today) {
+    var total = 0, estimated = 0, missing = 0;
+    (pulls || []).forEach(function (p) {
+      var c = countedPrice(p, itemsById, today);
+      if (c.price == null) { missing++; return; }
+      total += c.price; if (c.est) estimated++;
+    });
+    return { total: total, estimated: estimated, missing: missing };
+  }
+  function result(total, cost, nx1k) {
+    if (!cost || !(+cost.cost >= 0)) return {};
+    if (cost.unit === 'mesos') return { profit: total - cost.cost };
+    if (cost.unit === 'nx' && cost.cost > 0) {
+      var per1k = Math.round(total / (cost.cost / 1000));
+      return { per1k: per1k, avg: nx1k, above: nx1k != null && per1k > nx1k };
+    }
+    return {};
+  }
+  // every item you have pulled, per crate, highest worth first; early pulls are worth today's price
+  function allItems(pulls, crates) {
+    var byCrate = {}, map = {}, out = [];
+    (crates || []).forEach(function (c) { var m = {}; (c.items || []).forEach(function (i) { m[i.id] = i; }); byCrate[c.key] = m; });
+    (pulls || []).forEach(function (p) {
+      var key = p.crate + ':' + p.itemId, item = (byCrate[p.crate] || {})[p.itemId];
+      var c = countedPrice(p, byCrate[p.crate], p.round == null);
+      var r = map[key] || (map[key] = { crate: p.crate, itemId: p.itemId, name: item ? item.name : 'Unknown item', cz: item ? item.cz : null, count: 0, worth: 0, estimated: false });
+      r.count++; if (c.price != null) r.worth += c.price; if (c.est) r.estimated = true;
+    });
+    Object.keys(map).forEach(function (k) { out.push(map[k]); });
+    out.sort(function (a, b) { return (b.worth - a.worth) || String(a.name).localeCompare(String(b.name)); });
+    return out;
+  }
+  // the NX for a number of crates: 11 for the pack price, the rest one by one
+  function suggestCost(crate, count) {
+    var nx = crate && crate.nx;
+    if (!nx || !(count > 0)) return null;
+    return Math.floor(count / 11) * nx.pack + (count % 11) * nx.each;
+  }
+  function ageOf(priced, now) {
+    var ms = now - Date.parse(priced);
+    return { days: Math.max(0, Math.floor(ms / 86400000)), old: ms > 86400000 };
+  }
+
+  window.BoxOdds = { priceOf: priceOf, madeWord: madeWord, parseMesos: parseMesos, rounds: rounds, roundTotal: roundTotal, result: result, allItems: allItems, suggestCost: suggestCost, ageOf: ageOf, statusOf: statusOf, orderCrates: orderCrates, mount: mount, mes: mes };
 })();

@@ -540,7 +540,7 @@ body.path-off .path-only, body.guides-off .guides-only, body.appraiser-off .appr
 .closed-text p { margin: 4px 0 12px; color: var(--muted); }
 .closed-text .k-btn { margin-top: 4px; }
 @media (max-width: 759px) { .closed-body { grid-template-columns: minmax(0, 1fr); } }
-/* the Windows app has Grind, Box Odds and Recipes, and is the app already: no other tabs, no Get the app */
+/* the Windows app has Grind, NX Crates and Recipes, and is the app already: no other tabs, no Get the app */
 body.in-app .tabs > :not(#tab-grind, #tab-boxes, #tab-recipes), body.in-app #g-getapp { display: none; }
 #view-grind [hidden] { display: none !important; }
 .g-lbl { font: 700 var(--fs-xs) var(--font-body); color: var(--muted); }
@@ -1822,8 +1822,8 @@ a.cozy:hover { border-color: var(--muted); }
 
 /* How it works: the frameless page. One 720 column straight on the forest, each section a stop on a dotted trail, and
    the reading text is Cabin 400 (names, labels and buttons stay 600 or 700) */
-/* Box Odds (#boxes, box.js): frameless on the forest like How it works, a 720 column; rows are ring, name, number and one
-   faint --at-line under each, no list box; the sum card keeps a surface so its numbers read over the scene */
+/* NX Crates (#boxes, box.js): frameless on the forest like How it works, a 720 column; rows are picture, name, number and one
+   faint --at-line under each, no boxes */
 #view-boxes { max-width: 720px; width: calc(100% - 2 * var(--gap)); margin: 28px auto 40px; padding: 0; }
 #view-boxes .bx { display: grid; gap: var(--gap); min-width: 0; }
 #view-boxes .bx-top { display: grid; gap: 4px; }
@@ -1837,51 +1837,88 @@ a.cozy:hover { border-color: var(--muted); }
 #view-boxes .bx-crate[aria-pressed="true"] .bx-chip { color: inherit; }
 #view-boxes .bx-chip.on::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 5px; border-radius: 50%; background: var(--lime); vertical-align: 1px; }
 #view-boxes .bx-info { display: grid; gap: 2px; }
-#view-boxes .bx-info h3 { margin: 0; font: 400 var(--tt-m) var(--font-title); color: var(--ink); }
-#view-boxes .bx-info .meta, #view-boxes .bx-info .worth { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
-#view-boxes .bx-info .worth b { font: 600 var(--n-s) var(--font-num); color: var(--num); }
+#view-boxes .bx-info p { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
+#view-boxes .bx-info p[hidden] { display: none; }
 #view-boxes a { color: var(--focus); text-decoration: underline; }
-#view-boxes .bx-logbar { display: flex; align-items: center; justify-content: space-between; gap: var(--gap); padding-bottom: 8px; border-bottom: 1px solid var(--at-line); color: var(--ink); }
-#view-boxes .bx-logbar[hidden] { display: none; }
 #view-boxes .bx-note { margin: 0; color: var(--ink); font-size: var(--fs-sm); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 #view-boxes .bx-note:empty { display: none; }
-#view-boxes .bx-linkish { border: 0; padding: 0; background: none; color: var(--focus); text-decoration: underline; cursor: pointer; font: 600 var(--fs-sm) var(--font-body); }
-#view-boxes .bx-linkish:disabled { color: var(--credit); text-decoration: none; cursor: default; }
-#view-boxes .bx-sum { position: sticky; top: 8px; z-index: 2; display: grid; gap: var(--gap); padding: 14px 16px; border-radius: var(--r-glass); background: var(--surface); border: 2px solid var(--card-o); }
-#view-boxes .bx-sum .hint, #view-boxes .bx-sum .note { margin: 0; color: var(--muted); }
-#view-boxes .bx-sum h4 { margin: 0; font: 400 var(--tt-s) var(--font-title); color: var(--ink); }
-#view-boxes .bx-sum .block { display: grid; gap: 8px; }
-#view-boxes .bx-sum .head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
-#view-boxes .bx-sum .odds { color: var(--muted); font-size: var(--fs-sm); }
-#view-boxes .bx-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-#view-boxes .bx-tile { display: grid; gap: 2px; padding: 8px 10px; border-radius: var(--r-card); background: var(--card); }
-#view-boxes .bx-tile b { font: 600 var(--n-m) var(--font-num); color: var(--num); }
-#view-boxes .bx-tile span { color: var(--muted); font-size: var(--fs-xs); }
-#view-boxes .bx-tools { display: grid; gap: 8px; }
-#view-boxes .bx-bar-row { display: flex; align-items: center; justify-content: space-between; gap: var(--gap); flex-wrap: wrap; }
-#view-boxes .bx-pills { display: flex; gap: 8px; }
-#view-boxes .bx-filters { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 8px; }
-#view-boxes .bx-filters select, #view-boxes .bx-filters input { min-width: 0; padding: 7px 10px; border-radius: var(--r-card); border: 2px solid var(--card-o); background: var(--card); color: var(--ink); font: 600 var(--fs-sm) var(--font-body); }
-#view-boxes .bx-filters select option { background: var(--page); color: var(--ink); }
-#view-boxes .bx-list { display: grid; }
-#view-boxes .bx-row { display: grid; grid-template-columns: 22px 32px 1fr auto 40px; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--at-line); cursor: pointer; }
-#view-boxes .bx-row input { width: 18px; height: 18px; margin: 0; accent-color: var(--lime); }
-#view-boxes .bx-row img { image-rendering: pixelated; }
-#view-boxes .bx-row .mid { display: grid; gap: 2px; min-width: 0; }
-#view-boxes .bx-row .line { display: flex; align-items: center; gap: 8px; min-width: 0; }
-#view-boxes .bx-row .name { font: 700 var(--fs-md) var(--font-body); color: var(--ink); cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#view-boxes .bx-row .slot { color: var(--muted); font-size: var(--fs-sm); }
-#view-boxes .bx-row .slot .fm { font: 600 var(--fs-sm) var(--font-num); color: var(--num); }
-#view-boxes .bx-row .got { flex: none; padding: 0 7px; border-radius: var(--r-pill); background: var(--lime); color: var(--lime-ink); font: 700 var(--fs-xs) var(--font-body); line-height: 20px; }
-#view-boxes .bx-row .num { display: grid; justify-items: end; font: 600 var(--n-s) var(--font-num); color: var(--num); }
-#view-boxes .bx-row .num small { font: 600 var(--fs-xs) var(--font-body); color: var(--muted); }
-#view-boxes .bx-row.on .name { color: var(--lime); }
-#view-boxes .bx-got.k-sq { width: 40px; height: 40px; font: 700 var(--fs-lg) var(--font-num); }
-#view-boxes .bx-got:disabled { opacity: .45; cursor: default; }
+#view-boxes .bx-round { display: grid; gap: 6px; }
+#view-boxes .bx-round[hidden] { display: none; }
+#view-boxes .bx-round h3 { margin: 0; font: 400 var(--tt-m) var(--font-title); color: var(--ink); }
+#view-boxes .bx-round .hint { margin: 0; color: var(--muted); }
+#view-boxes .bx-pull { display: grid; grid-template-columns: 1fr auto auto auto; align-items: baseline; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--at-line); }
+#view-boxes .bx-pull .name { font: 700 var(--fs-md) var(--font-body); color: var(--ink); }
+#view-boxes .bx-pull .rate { color: var(--muted); font-size: var(--fs-sm); }
+#view-boxes .bx-pull .num { font: 600 var(--n-s) var(--font-num); color: var(--num); min-width: 4ch; text-align: right; }
+#view-boxes .bx-donebar { display: flex; justify-content: flex-end; padding-top: 6px; }
+#view-boxes .bx-foot-sum { margin: 0; font: 600 var(--fs-md) var(--font-body); color: var(--ink); }
+#view-boxes .bx-foot-sum:empty { display: none; }
+#view-boxes #bx-q { min-width: 0; padding: 7px 10px; border-radius: var(--r-card); border: 2px solid var(--card-o); background: var(--card); color: var(--ink); font: 600 var(--fs-sm) var(--font-body); }
+/* the items are square tiles, five across, in a box that scrolls inside: the page stays the same length for any crate */
+#view-boxes .bx-list { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; grid-auto-rows: max-content; align-content: start; max-height: 486px; overflow-y: auto; padding: 2px 6px 2px 2px; scrollbar-width: thin; scrollbar-color: var(--card-o) transparent; scrollbar-gutter: stable; }
+#view-boxes .bx-list.busy { opacity: .55; }
+#view-boxes .bx-row { position: relative; aspect-ratio: 1; min-width: 0; overflow: hidden; display: grid; border: 1px solid var(--at-line); border-radius: var(--r-card); background: color-mix(in srgb, var(--card) 55%, transparent); transition: border-color .15s, background .15s; }
+#view-boxes .bx-row:hover, #view-boxes .bx-row:focus-within { border-color: var(--card-o); background: var(--card); }
+#view-boxes .bx-log { display: grid; justify-items: center; align-content: center; gap: 4px; width: 100%; min-width: 0; min-height: 0; padding: 10px 6px 8px; border: 0; background: none; color: inherit; text-align: center; cursor: pointer; font: inherit; }
+#view-boxes .bx-log img { image-rendering: pixelated; }
+#view-boxes .bx-row .mid { display: contents; }
+#view-boxes .bx-row .name { font: 700 var(--fs-sm) var(--font-body); line-height: 1.2; min-height: 2.4em; color: var(--ink); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+#view-boxes .bx-row .num { order: 2; font: 600 var(--n-s) var(--font-num); line-height: 1.15; color: var(--num); }
+#view-boxes .bx-row .made { order: 3; color: var(--muted); font-size: var(--fs-xs); line-height: 1.15; }
+#view-boxes .bx-row .made:empty { display: none; }
+#view-boxes .bx-cozy { font-size: var(--fs-xs); white-space: nowrap; }
+#view-boxes .bx-row > .bx-cozy { position: absolute; top: 6px; right: 8px; line-height: 1.15; }
 #view-boxes .bx-empty { margin: 0; color: var(--muted); }
 #view-boxes .bx-empty[hidden] { display: none; }
+#view-boxes .bx-prices { display: grid; gap: 6px; font-size: var(--fs-sm); }
+#view-boxes #bx-prices.old { color: var(--key-hi); }
+#view-boxes #bx-how summary { cursor: pointer; color: var(--muted); }
+#view-boxes #bx-how p { margin: 4px 0 0; color: var(--muted); }
 #view-boxes .bx-foot { margin: 0; color: var(--credit); font-size: var(--fs-xs); }
 #view-boxes .bx-foot a { color: inherit; }
+#view-boxes .bx-costbar { display: grid; gap: 8px; padding-top: 4px; }
+#view-boxes .bx-costbar[hidden] { display: none; }
+#view-boxes .bx-cost-edit { display: grid; gap: 6px; }
+#view-boxes .bx-costlab { font: 600 var(--fs-sm) var(--font-body); color: var(--ink); }
+#view-boxes .bx-costlab small { color: var(--muted); font-weight: 400; margin-left: 6px; }
+#view-boxes .bx-costrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+#view-boxes .bx-costrow input { min-width: 0; width: 9em; padding: 7px 10px; border-radius: var(--r-card); border: 2px solid var(--card-o); background: var(--card); color: var(--ink); font: 600 var(--fs-sm) var(--font-num); }
+#view-boxes .bx-units { display: inline-flex; gap: 6px; }
+#view-boxes .bx-bad { margin: 0; color: var(--bad); font-size: var(--fs-sm); }
+#view-boxes .bx-past { display: grid; gap: 8px; }
+#view-boxes .bx-past[hidden] { display: none; }
+#view-boxes .bx-past h3 { margin: 0; font: 400 var(--tt-m) var(--font-title); color: var(--ink); }
+#view-boxes .bx-past-head { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
+#view-boxes .bx-views { display: flex; gap: 6px; }
+#view-boxes .bx-pr { border-bottom: 1px solid var(--at-line); }
+#view-boxes .bx-pr > summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 8px 0; cursor: pointer; list-style: none; }
+#view-boxes .bx-pr > summary::-webkit-details-marker { display: none; }
+#view-boxes .bx-pr-t { flex: 1 1 12em; font: 700 var(--fs-md) var(--font-body); color: var(--ink); }
+#view-boxes .bx-pr-s { color: var(--muted); font-size: var(--fs-xs); flex-basis: 100%; }
+#view-boxes .bx-pr .num, #view-boxes .bx-it .num { font: 600 var(--n-s) var(--font-num); color: var(--num); }
+#view-boxes .bx-pr.fresh { background: color-mix(in srgb, var(--lime) 10%, transparent); }
+#view-boxes .bx-pr-b { display: grid; gap: 4px; padding: 0 0 10px; }
+#view-boxes .bx-result { margin: 0 0 4px; font: 600 var(--fs-md) var(--font-body); color: var(--ink); }
+#view-boxes .bx-result .up { color: var(--lime); }
+#view-boxes .bx-result .dn { color: var(--bad); }
+#view-boxes .bx-chgrow { display: flex; justify-content: flex-end; padding-top: 4px; }
+#view-boxes .bx-it { display: grid; grid-template-columns: 1fr auto auto auto; align-items: baseline; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--at-line); }
+#view-boxes .bx-it .name { font: 700 var(--fs-md) var(--font-body); color: var(--ink); }
+#view-boxes .bx-it .rate { color: var(--muted); font-size: var(--fs-sm); }
+#view-boxes .bx-morerow { display: flex; justify-content: center; }
+#view-boxes .bx-price { font: 600 var(--n-s) var(--font-num); color: var(--num); background: none; border: 0; padding: 2px 4px; cursor: pointer; min-width: 4ch; text-align: right; border-radius: var(--r-card); }
+#view-boxes .bx-price:hover, #view-boxes .bx-price:focus-visible { background: var(--at-line); }
+#view-boxes .bx-price s { color: var(--muted); font-weight: 400; margin-left: 6px; }
+#view-boxes .bx-price .mine { color: var(--lime); }
+#view-boxes .bx-cz { font-size: var(--fs-xs); white-space: nowrap; color: var(--muted); }
+#view-boxes .bx-pull .bx-edit { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 6px 0 2px; }
+#view-boxes .bx-editlab { display: inline-flex; align-items: center; gap: 8px; font: 600 var(--fs-sm) var(--font-body); color: var(--ink); }
+#view-boxes .bx-mine { width: 9em; min-width: 0; padding: 7px 10px; border-radius: var(--r-card); border: 2px solid var(--card-o); background: var(--card); color: var(--ink); font: 600 var(--fs-sm) var(--font-num); }
+#view-boxes .bx-editbtns { display: inline-flex; gap: 6px; }
+#view-boxes .bx-offl { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: var(--fs-sm); }
+#view-boxes .bx-thanks { grid-column: 1 / -1; color: var(--lime); font-size: var(--fs-sm); }
+#view-boxes .bx-delrow { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; padding-top: 4px; }
+#view-boxes .bx-delq { color: var(--bad); font-size: var(--fs-sm); }
 /* Recipes (#recipes, recipes.js): frameless on the forest, a 1120 column. List (one line a recipe, the open one's panel
    right under it) or Shelf (a picture grid with the open recipe in a sticky column beside it); word tabs for the view,
    the craft and the level; rows are one faint --at-line under each, no boxes; profit lime when up, --bad when down. */
@@ -2358,7 +2395,7 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
   <nav class="tabs" role="tablist" aria-label="Pages">
     <button id="tab-how" type="button" role="tab" aria-controls="view-how" aria-selected="true">How it works</button>
     <button id="tab-grind" type="button" role="tab" aria-controls="view-grind" aria-selected="false">Grind</button>
-    <button id="tab-boxes" type="button" role="tab" aria-controls="view-boxes" aria-selected="false">Box Odds</button>
+    <button id="tab-boxes" type="button" role="tab" aria-controls="view-boxes" aria-selected="false">NX Crates</button>
     <button id="tab-recipes" type="button" role="tab" aria-controls="view-recipes" aria-selected="false">Recipes</button>
     <button id="tab-builds" type="button" role="tab" aria-controls="view-builds" aria-selected="false" aria-label="Your Path, soon">Your Path<span class="soon" aria-hidden="true">Soon</span></button>
     <button id="tab-guides" type="button" role="tab" aria-controls="view-guides" aria-selected="false" aria-label="Guides, soon">Guides<span class="soon" aria-hidden="true">Soon</span></button>
@@ -2552,7 +2589,7 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
   </section>
   <section id="how-also">
   <h3>Also here</h3>
-  <p><a class="how-link" href="#boxes">Box Odds</a> shows every crate's odds and what each item sells for, and keeps a log of what you pull.</p>
+  <p><a class="how-link" href="#boxes">NX Crates</a> keeps a log of the crates you open and what they were worth.</p>
   <p><a class="how-link" href="#recipes">Recipes</a> has every crafting recipe with its materials, cost and what it sells for.</p>
   </section>
   <div class="guides-only">
@@ -2600,7 +2637,7 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-24a',
+  version: '2026-11-24b',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
@@ -2896,16 +2933,27 @@ function makeSupabaseApi(cfg) {
       if (error && error.code !== '23505') throw new Error(error.message);
     },
     async removeQuestDone(buildId, questId) { check(await sb.from('quest_done').delete().eq('build_id', buildId).eq('quest_id', questId)); },
-    // Box Odds pull log: the player's own rows only (box-opens.sql), newest first, rows from to to (box.js pages through)
+    // NX Crates pull log: the player's own rows only (box-opens.sql, box-rounds.sql), newest first, rows from to to (box.js pages through)
     async listBoxOpens(from = 0, to = 999) {
-      const { data, error } = await sb.from('box_opens').select('id, crate, item_id, created_at').order('created_at', { ascending: false }).order('id', { ascending: false }).range(from, to);
+      const { data, error } = await sb.from('box_opens').select('id, crate, item_id, created_at, round, price, est, basis, win, mine').order('created_at', { ascending: false }).order('id', { ascending: false }).range(from, to);
       if (error) throw new Error(error.message); return data;
     },
-    async addBoxOpen(crate, itemId) {
-      const { data, error } = await sb.from('box_opens').insert({ crate, item_id: itemId }).select('id, crate, item_id, created_at').single();
+    async addBoxOpen(crate, itemId, round, price, est, basis, win) {
+      const { data, error } = await sb.from('box_opens').insert({ crate, item_id: itemId, round, price, est, basis, win }).select('id, crate, item_id, created_at, round, price, est, basis, win, mine').single();
       if (error) throw new Error(error.message); return data;
     },
     async removeBoxOpen(id) { check(await sb.from('box_opens').delete().eq('id', id)); },
+    async setBoxOpenMine(id, mine) { check(await sb.from('box_opens').update({ mine }).eq('id', id)); },
+    async removeBoxRoundOpens(round) { check(await sb.from('box_opens').delete().eq('round', round)); },
+    // what a round cost (box-rounds.sql): own rows, one per round; a null cost takes the row away
+    async listBoxRounds() {
+      const { data, error } = await sb.from('box_rounds').select('round, cost, unit').order('round', { ascending: false }).limit(1000);
+      if (error) throw new Error(error.message); return data;
+    },
+    async setBoxRound(round, cost, unit) {
+      if (cost == null) { check(await sb.from('box_rounds').delete().eq('round', round)); return; }
+      check(await sb.from('box_rounds').upsert({ round, cost, unit }, { onConflict: 'user_id,round' }));
+    },
     // Appraiser: prices players report (the last 14 days, like Cozy) and the tab's daily estimates. The database stamps
     // who wrote each row itself, so nothing here sends or reads user_id.
     async listPriceReports(itemId) {
@@ -3006,6 +3054,7 @@ const $ = id => document.getElementById(id);
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch { /* private window */ } },
+  remove(k) { try { localStorage.removeItem(k); } catch { /* private window */ } },
 };
 const savedBoss = +store.get('bt.boss');
 const savedChannel = +store.get('bt.channel');
@@ -3287,7 +3336,7 @@ const ONLY = 'bt.only';
   const q = new URLSearchParams(location.search).get('only');
   if (q === 'grind' || q === 'all') { store.set(ONLY, q === 'grind' ? 'grind' : ''); history.replaceState(null, '', location.pathname + location.hash); }
 }
-// the app has Grind, Box Odds and Recipes; the tester link has Grind alone; elsewhere every tab (null)
+// the app has Grind, NX Crates and Recipes; the tester link has Grind alone; elsewhere every tab (null)
 const APP_TABS = ['grind', 'boxes', 'recipes'];
 const appTabs = () => APP ? APP_TABS : store.get(ONLY) === 'grind' ? ['grind'] : null;
 const onlyGrind = () => !APP && store.get(ONLY) === 'grind';
@@ -3390,7 +3439,7 @@ function loadGuides() {
   });
   return guidesLoading;
 }
-// box.js and data/box.json (npm run box:items) load the first time someone opens Box Odds. Picking a crate moves the
+// box.js and data/box.json (npm run box:items) load the first time someone opens NX Crates. Picking a crate moves the
 // hash, so a crate can be linked; the pull log is the signed in player's box_opens rows (box-opens.sql).
 let boxesLoading = null, boxesView = null;
 function loadBoxes() {
@@ -3401,10 +3450,18 @@ function loadBoxes() {
   const data = fetch('data/box.json').then(r => { if (!r.ok) throw new Error('box.json'); return r.json(); });
   boxesLoading = Promise.all([script, data]).then(([, d]) => {
     boxesView = reporters.boxes = window.BoxOdds.mount($('boxes-root'), { el, store, api, data: d, session: state.session, signIn: () => signIn(), crate: boxesCrate(),
+      report: async (words, details) => {
+        const fd = new FormData();
+        fd.append('kind', 'wrong'); fd.append('text', words); fd.append('details', details);
+        const token = typeof api.token === 'function' ? await api.token().catch(() => null) : null;
+        if (token) fd.append('token', token);
+        const r = await fetch(CONFIG.reportUrl, { method: 'POST', body: fd });
+        if (!r.ok) throw new Error('report');
+      },
       onCrate: key => { if (location.hash !== '#boxes/' + key) location.hash = '#boxes/' + key; } });
   }).catch(() => {
     boxesLoading = null; window.track('load_failed', { what: 'boxes' });
-    $('boxes-root').replaceChildren(el('p', { class: 'empty' }, "Box Odds didn't load. Try reloading the page."));
+    $('boxes-root').replaceChildren(el('p', { class: 'empty' }, "NX Crates didn't load. Try reloading the page."));
   });
   return boxesLoading;
 }
