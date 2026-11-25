@@ -1948,9 +1948,25 @@ a.cozy:hover { border-color: var(--muted); }
 #view-boxes .bx-info { display: grid; gap: 2px; }
 #view-boxes .bx-info p { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
 #view-boxes .bx-info p[hidden] { display: none; }
+/* the NX Crates pop-out over the game (box.js popView): one row per pull, newest on top, the round's worth at the foot */
+body.bx-pip { margin: 0; padding: 0; background: var(--wood-o); }
+body.bx-pip .credit { display: none; }
+body.bx-pip #view-boxes { max-width: none; min-height: 100vh; box-sizing: border-box; padding: 12px; background: var(--surface); }
+#view-boxes .bx-pop { display: grid; gap: 12px; }
+#view-boxes .bx-pop-h { margin: 0; font: 400 var(--fs-lg) var(--font-title); color: var(--ink); }
+#view-boxes .bx-pop-r { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding-top: 12px; border-top: 1px solid var(--at-line); }
+#view-boxes .bx-pop-h + .bx-pop-r { padding-top: 0; border-top: 0; }
+#view-boxes .bx-pop-r img { image-rendering: pixelated; }
+#view-boxes .bx-pop-r i { width: 32px; height: 32px; }
+#view-boxes .bx-pop-r .name { min-width: 0; font: 700 var(--fs-md) var(--font-body); color: var(--ink); overflow-wrap: anywhere; }
+#view-boxes .bx-pop-r small { display: block; font: 400 var(--fs-sm) var(--font-body); color: var(--muted); }
+#view-boxes .bx-pop-r .num { font: 600 var(--n-s) var(--font-num); color: var(--num); text-align: right; white-space: nowrap; }
+#view-boxes .bx-pop-wait, #view-boxes .bx-pop-miss { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
+#view-boxes .bx-pop-foot { margin: 0; display: flex; justify-content: space-between; gap: 12px; padding-top: 12px; border-top: 1px solid var(--at-line); color: var(--muted); font-size: var(--fs-sm); }
+#view-boxes .bx-pop-foot b { font: 700 var(--n-s) var(--font-num); color: var(--ink); }
 #view-boxes a { color: var(--focus); text-decoration: underline; }
 #view-boxes .bx-read { display: grid; gap: 6px; }
-#view-boxes .bx-read[hidden] { display: none; }
+#view-boxes .bx-read[hidden], #view-boxes .bx-read [hidden] { display: none !important; }
 #view-boxes .bx-read .r-bar { padding-top: 0; }
 #view-boxes .bx-read p { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
 #view-boxes .bx-note { margin: 0; color: var(--ink); font-size: var(--fs-sm); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -2764,7 +2780,7 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-25a',
+  version: '2026-11-25b',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };

@@ -2,7 +2,7 @@
 // Cozy Markets prices. Rounds live in Supabase (box_opens, box_rounds; box-opens.sql and box-rounds.sql) under the Discord
 // sign in. Rates come from Nexon only; the data is data/box.json from npm run box:items.
 // window.BoxOdds = { priceOf, madeWord, parseMesos, rounds, roundTotal, result, allItems, suggestCost, ageOf, statusOf,
-// orderCrates, mount, mes }.
+// orderCrates, popView, mount, mes }.
 (function () {
   'use strict';
   var CRATE_KEY = 'box-crate-v1', ROUND_KEY = 'box-round-v1', OFF_KEY = 'box-off-v1';
@@ -21,6 +21,29 @@
   var cozyUrl = function (cz) { return +cz > 0 ? 'https://cozy.markets/items/' + (+cz) : ''; };
   // a price as the rows print it: 125K, est. 60K, or nothing
   var priceText = function (price, est) { return price == null ? '' : (est ? 'est. ' : '') + mes(price); };
+
+  // the pop-out's inside: this round's pulls, newest on top (picture, name, chance, the price saved with the pull), then
+  // how many crates and their worth by the round's own rules (roundTotal), and a line for pulls the reader couldn't read
+  function popView(pulls, c, missed) {
+    var byId = {};
+    (c ? c.items : []).forEach(function (i) { byId[i.id] = i; });
+    var list = (pulls || []).slice().sort(function (a, b) { return b.ts - a.ts; });
+    var html = '<h3 class="bx-pop-h">' + esc(c ? c.name || c.short : 'NX Crates') + '</h3>';
+    if (!list.length) html += '<p class="bx-pop-wait">Open a crate in the game.</p>';
+    html += list.map(function (p) {
+      var it = byId[p.itemId];
+      var price = p.mine != null ? 'yours ' + mes(p.mine) : priceText(p.price, p.est === true);
+      return '<div class="bx-pop-r">' + (it && it.icon ? '<img src="' + it.icon + '" alt="" width="32" height="32">' : '<i></i>') +
+        '<span class="name">' + esc(it ? it.name : 'Unknown item') + '<small>' + (it ? esc(it.rate) + '% chance' : '') + '</small></span>' +
+        '<span class="num">' + esc(price) + '</span></div>';
+    }).join('');
+    if (missed) html += '<p class="bx-pop-miss">Couldn\'t read ' + missed + '. Tap ' + (missed === 1 ? 'it' : 'them') + ' on the site.</p>';
+    if (list.length) {
+      var t = roundTotal(list, byId, false), n = list.length;
+      html += '<p class="bx-pop-foot"><span>' + n + (n === 1 ? ' crate' : ' crates') + '</span><span>worth <b>' + esc(mes(t.total)) + '</b></span></p>';
+    }
+    return html;
+  }
 
   // ---------- crates and when they sell ----------
   function statusOf(crate, now) {
@@ -365,7 +388,7 @@
     }
     function render() {
       var focused = document.activeElement && root.contains(document.activeElement) && document.activeElement.id;
-      drawCrates(); drawInfo(); drawPrices(); drawList(); drawRound(); drawPast();
+      drawCrates(); drawInfo(); drawPrices(); drawList(); drawRound(); drawPast(); drawPop();
       var back = focused && $(focused);
       if (back && back !== document.activeElement) back.focus({ preventScroll: true });
     }
@@ -626,18 +649,68 @@
     var read = { on: false, reader: null, crate: null, set: false, count: 0, missed: 0, state: 'looking', seen: -1e9 };
     var readSay = function (msg) { $('bx-read-note').textContent = msg; };
     function readNote() {
-      if (!read.on) return readSay('Share the game and every crate you open logs itself.');
+      if (!read.on) { readSay(canPop ? 'Press Start opening and pick the game. Every crate you open shows over the game with its chance and price.' : 'Share the game and every crate you open logs itself.'); return; }
       var said = [];
       if (read.count) said.push('Read ' + read.count + (read.count === 1 ? ' pull.' : ' pulls.'));
       if (read.missed) said.push("Couldn't read " + read.missed + '. Check the crate picked above, then tap what came out.');
       if (!said.length) said.push(read.state === 'looking' ? 'Open a crate in the game. Looking for the Surprise window.' : 'Found the Surprise window. Open away.');
       readSay(said.join(' '));
+      drawPop();
+    }
+
+    // ---------- the pop-out: Start opening shares the game and opens a small window over it with each pull ----------
+    // One click asks for both (Chrome allows it, 2026-11-25 spike); a browser that refuses the window gets a Pop out button
+    // once sharing. Closing the window stops the share and finishes the round, as Done with no cost.
+    var pop = { win: null, failed: false, live: false, pulled: false, html: '', leaving: false };   // live: the game was shared while this window was up; pulled: a crate was read in that time
+    var canPop = !!window.documentPictureInPicture && !o.app;
+    function drawPop() {
+      if (!pop || !pop.win) return;
+      var body = pop.win.document.getElementById('bx-pop');
+      var h = popView(roundPulls(), byKey.get(round ? round.crate : state.crate), read.missed);
+      if (body && h !== pop.html) { body.innerHTML = h; pop.html = h; }
+    }
+    function openPop() {
+      if (!canPop || pop.win) return;
+      pop.failed = false;
+      Promise.resolve().then(function () { return window.documentPictureInPicture.requestWindow({ width: 340, height: 420 }); }).then(function (win) {
+        pop.win = win; pop.html = '';
+        if (read.on) pop.live = true;
+        var d = win.document;
+        for (var i = 0; i < document.styleSheets.length; i++) {
+          try { var s = d.createElement('style'); s.textContent = Array.from(document.styleSheets[i].cssRules).map(function (r) { return r.cssText; }).join('\n'); d.head.append(s); } catch (e) { /* a stylesheet from another site */ }
+        }
+        try { var inl = document.documentElement.style; for (var k = 0; k < inl.length; k++) if (inl[k].indexOf('--night-') === 0) d.documentElement.style.setProperty(inl[k], inl.getPropertyValue(inl[k])); } catch (e) { /* the data pictures stay */ }
+        d.title = 'NX Crates';
+        d.body.className = 'bx-pip';
+        d.body.innerHTML = '<div id="view-boxes"><div class="bx-pop" id="bx-pop"></div></div>';
+        win.addEventListener('pagehide', function () { popGone(win); });
+        window.addEventListener('pagehide', function () { pop.leaving = true; }, { once: true });
+        drawPop(); popButton();
+      }, function () { pop.failed = true; popButton(); });
+    }
+    // the window closed (by the player, or by the share ending): the share stops and the round is finished
+    function popGone(win) {
+      if (pop.win !== win) return;
+      pop.win = null;
+      var live = pop.live && pop.pulled; pop.live = false; pop.pulled = false;
+      if (read.on && read.share) read.share.stop();
+      // as Done: a cost typed on the tab goes with it; a round tapped before sharing, or the page itself closing, stays open
+      if (live && !pop.leaving && round && roundPulls().length) done();
+      popButton();
+    }
+    function closePop() { var w = pop.win; if (w) { try { w.close(); } catch (e) { /* already gone */ } popGone(w); } }
+    // while sharing with no window up, an amber Pop out opens it
+    function popButton() {
+      var bar = $('bx-read-bar'), b = $('bx-pop-btn');
+      var want = canPop && read.on && !pop.win;
+      if (want && !b && bar) { b = button('bx-pop-btn', 'Pop out over the game', 'k-btn sm key'); b.onclick = openPop; bar.querySelector('.r-bar').append(b); }
+      if (b) b.hidden = !want;
     }
     // a pull read off the game goes in like a tap; a save of another kind in flight (an undo) is waited out
     function readIn(id, key, tries) {
       if (key !== state.crate) { read.missed++; readNote(); return; }
       if (session && !adding && !ready() && tries < 20) { setTimeout(function () { readIn(id, key, tries + 1); }, 300); return; }
-      logOne(id, function (saved) { if (saved) read.count++; else read.missed++; readNote(); });
+      logOne(id, function (saved) { if (saved) { read.count++; if (pop.live) pop.pulled = true; } else read.missed++; readNote(); });
     }
     function readFrame(src, m) {
       if (read.crate !== state.crate) {
@@ -664,7 +737,7 @@
       readNote();
       read.share = dep.capture($('bx-read-bar'), { prefix: 'bx-', raw: true, limit: 0, keepWhenHidden: true, full: true, drop: false, every: 200,
         el: function (t, a) { var k = [].slice.call(arguments, 2); return o.el.apply(null, [t, t === 'button' ? Object.assign({}, a, { class: 'k-btn sm' }) : a].concat(k)); },
-        copy: { share: 'Share game window', stop: 'Stop sharing', failed: "Couldn't start sharing the game window. Try again." },
+        copy: { share: canPop ? 'Start opening' : 'Share game window', stop: 'Stop sharing', failed: "Couldn't start sharing the game window. Try again." },
         // the Windows app finds the game itself; a browser asks the player
         beforeStart: function () {
           if (!session) { signPrompt(); return false; }
@@ -680,7 +753,18 @@
           read.on = s === 'sharing';
           if (read.on) { read.count = 0; read.missed = 0; read.state = 'looking'; read.seen = -1e9; read.crate = null; read.set = false; read.reader.reset(); }
           if (read.on || (why !== 'denied' && why !== 'failed')) readNote();
+          if (read.on && pop.win) pop.live = true;
+          if (!read.on) closePop();
+          popButton();
         } });
+      // Start opening: the window opens in the same click that asks for the game (signed out, only the sign in shows)
+      if (canPop) {
+        var sb = $('bx-share');
+        if (sb) sb.classList.add('key');
+        $('bx-read-bar').addEventListener('click', function (e) {
+          if (e.target.closest && e.target.closest('#bx-share') && session && !read.on && !app) openPop();
+        }, true);
+      }
     }
     if (o.reader && o.el) Promise.resolve(o.reader).then(readSetup, function () {});
 
@@ -782,5 +866,5 @@
     return { days: Math.max(0, Math.floor(ms / 86400000)), old: ms > 86400000 };
   }
 
-  window.BoxOdds = { priceOf: priceOf, madeWord: madeWord, parseMesos: parseMesos, rounds: rounds, roundTotal: roundTotal, result: result, allItems: allItems, suggestCost: suggestCost, ageOf: ageOf, statusOf: statusOf, orderCrates: orderCrates, mount: mount, mes: mes };
+  window.BoxOdds = { priceOf: priceOf, madeWord: madeWord, parseMesos: parseMesos, rounds: rounds, roundTotal: roundTotal, result: result, allItems: allItems, suggestCost: suggestCost, ageOf: ageOf, statusOf: statusOf, orderCrates: orderCrates, popView: popView, mount: mount, mes: mes };
 })();
