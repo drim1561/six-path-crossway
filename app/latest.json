@@ -1,15 +1,15 @@
 {
-  "version": "1.0.2",
-  "notes": "Your Path is open in the app",
-  "pub_date": "2026-11-24T14:27:40.764Z",
+  "version": "1.0.3",
+  "notes": "The app is now called Six Path Overlay",
+  "pub_date": "2026-11-25T02:05:53.094Z",
   "platforms": {
     "windows-x86_64-nsis": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSMHJGMVNjdnNQWU9Hb0ZMT3VGZXJpMFdGczdSWUFZaVlkUVJyRG55Q1VjVHc0TW9GTXB3Z09VWmNtTjIxR2dlRExBeGY3NWYyeTQrVE04QzdTNG5xTExrNkZRd0diS3dZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1NTMwNDYwCWZpbGU6U2l4UGF0aEVYUFRyYWNrZXJfMS4wLjJfeDY0LXNldHVwLmV4ZQl2ZXJzaW9uOjEuMC4yCkZTNEJ6Z2ltUnBGQyswQzVla0NVUjd2MzZWMVFJL0ZGSUdGMHQrMU15UGQ0ejB1em1ucmpXeEppYVg5MmNwVzNHNUZqekI1cE42c3ljUUIwNlgwQ0F3PT0K",
-      "url": "https://sixpathcrossway.pages.dev/app/SixPathEXPTracker_1.0.2_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSMHJGMVNjdnNQWUNmcFZQa0oxSDVxRjQrMDBtVnlaOUtxT2hEWXJwanpnTnZ5WWVHSVU1N3JPUEptUHVLUVlSbnpDT1lrd3Vnd3ZhVmdCcVVESjZtVHlNYjVqdmt2L2drPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1NTcyMzUzCWZpbGU6U2l4UGF0aE92ZXJsYXlfMS4wLjNfeDY0LXNldHVwLmV4ZQl2ZXJzaW9uOjEuMC4zCjkzbzgxQnZDTmVxTmdESEl0Tjl1cG9YTkxoeGF5ZTlNbzFEZzB6L0tjeUNFTlp2T2NBM2pNV2hCVFBXdEhMNXhmV2ZXY3oyYndRSk0zUitwU1BkRUFnPT0K",
+      "url": "https://sixpathcrossway.pages.dev/app/SixPathOverlay_1.0.3_x64-setup.exe"
     },
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSMHJGMVNjdnNQWU9Hb0ZMT3VGZXJpMFdGczdSWUFZaVlkUVJyRG55Q1VjVHc0TW9GTXB3Z09VWmNtTjIxR2dlRExBeGY3NWYyeTQrVE04QzdTNG5xTExrNkZRd0diS3dZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1NTMwNDYwCWZpbGU6U2l4UGF0aEVYUFRyYWNrZXJfMS4wLjJfeDY0LXNldHVwLmV4ZQl2ZXJzaW9uOjEuMC4yCkZTNEJ6Z2ltUnBGQyswQzVla0NVUjd2MzZWMVFJL0ZGSUdGMHQrMU15UGQ0ejB1em1ucmpXeEppYVg5MmNwVzNHNUZqekI1cE42c3ljUUIwNlgwQ0F3PT0K",
-      "url": "https://sixpathcrossway.pages.dev/app/SixPathEXPTracker_1.0.2_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSMHJGMVNjdnNQWUNmcFZQa0oxSDVxRjQrMDBtVnlaOUtxT2hEWXJwanpnTnZ5WWVHSVU1N3JPUEptUHVLUVlSbnpDT1lrd3Vnd3ZhVmdCcVVESjZtVHlNYjVqdmt2L2drPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1NTcyMzUzCWZpbGU6U2l4UGF0aE92ZXJsYXlfMS4wLjNfeDY0LXNldHVwLmV4ZQl2ZXJzaW9uOjEuMC4zCjkzbzgxQnZDTmVxTmdESEl0Tjl1cG9YTkxoeGF5ZTlNbzFEZzB6L0tjeUNFTlp2T2NBM2pNV2hCVFBXdEhMNXhmV2ZXY3oyYndRSk0zUitwU1BkRUFnPT0K",
+      "url": "https://sixpathcrossway.pages.dev/app/SixPathOverlay_1.0.3_x64-setup.exe"
     }
   }
 }
