@@ -1,7 +1,7 @@
 // The Now grinding card on top of the Grind page. First its "what is worth catching here" logic, pure functions on the data
 // files: each monster's drops in a column, the gear that is for you, and which of your picked-up items were the ones to catch.
 // Then build, which draws the card from them.
-// window.GrindNow = { shortName, dropColumns, wantedOf, forYou, pickedRows, build }
+// window.GrindNow = { shortName, dropColumns, dropList, wantedOf, forYou, pickedRows, build }
 //   D = data/grind-drops.json, L = data/loot-icons.json, mobName(id) -> a monster's name
 (function () {
 'use strict';
@@ -47,6 +47,26 @@ function dropColumns(mobIds, D, mobName, clsId, level) {
   const all = columns.flatMap(c => c.rows), top = all.filter(r => r.cozy).reduce((b, r) => !b || r.price > b.price ? r : b, null);
   if (top) for (const r of all) if (r.id === top.id && r.cozy) r.gold = true;
   return { columns, also: ids.slice(COLUMNS), any: all.length > 0, anyCozy: all.some(r => r.cozy), anyGearCozy: all.some(r => r.cozy && item(r.id).lv) };
+}
+
+// The app window's Drops here: like dropColumns with no cap. Every monster gets a group (mobIds most numerous first) with all its
+// drops: FM priced ones first, priciest first, then the ones with an NPC price (labeled NPC), then the ones with no price, by
+// name. The priciest FM item is gold on every row it has; the For you piece (forYou over all the monsters) is marked on its rows.
+// caught = Map<itemId, count> from the live loot log, or null; each row's n is that count. Returns { groups: [{ mob, rows: [{ id,
+// name, short, price, cozy, npc, gold, you, about, n }] }], any, anyCozy, anyGearCozy }
+function dropList(mobIds, D, clsId, level, caught) {
+  const ids = mobIds || [], item = id => D.items[id] || {};
+  const rank = id => item(id).p ? 0 : item(id).npc ? 1 : 2;
+  const groups = ids.map(m => ({ mob: m, rows: [...new Set(D.mobs[m] || [])]
+    .sort((a, b) => rank(a) - rank(b) || (item(b).p || item(b).npc || 0) - (item(a).p || item(a).npc || 0) || String(item(a).n || '').localeCompare(String(item(b).n || '')))
+    .map(id => { const p = item(id).p, npc = !p && !!item(id).npc;
+      return { id: +id, name: item(id).n, short: shortName(item(id).n), price: p || item(id).npc, cozy: p ? item(id).c : undefined, npc, gold: false, you: false, about: undefined, n: (caught && caught.get(+id)) || 0 }; }) }));
+  const all = groups.flatMap(g => g.rows);
+  const fy = forYou(ids, D, clsId, level);
+  if (fy) { const about = ['Lv ' + fy.level, fy.stat].filter(Boolean).join(' · '); for (const r of all) if (r.id === fy.id) { r.you = true; r.about = about; } }
+  const top = all.filter(r => r.cozy).reduce((b, r) => !b || r.price > b.price ? r : b, null);
+  if (top) for (const r of all) if (r.id === top.id) r.gold = true;
+  return { groups, any: all.length > 0, anyCozy: all.some(r => r.cozy), anyGearCozy: all.some(r => r.cozy && item(r.id).lv) };
 }
 
 // the flat list pickedRows takes (what a bag pickup could be): every row's item once
@@ -244,5 +264,5 @@ function build({ el, band, tools, runs, right, under, lamp, mapPick, classPick, 
   return { el: card, update };
 }
 
-window.GrindNow = { shortName, dropColumns, wantedOf, forYou, pickedRows, logRows, build };
+window.GrindNow = { shortName, dropColumns, dropList, wantedOf, forYou, pickedRows, logRows, build };
 })();

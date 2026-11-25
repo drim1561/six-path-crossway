@@ -923,7 +923,8 @@ function mount(root, deps) {
   // page G's left column: the lead (the big EXP an hour, against your usual, and Start fresh), then plain rows; before the first EXP one line
   V.nowLead = el('div', { class: 'g-glead' }); V.nowRows = el('div', { class: 'k-rows g-grows' }); V.nowSay = el('p', { class: 'g-nm', hidden: '' });
   V.nowClock = el('span', { class: 'g-gclock', hidden: '' });   // the idle line (clockLine), a line of its own under the number, only when there is idle time
-  V.now = el('div', { class: 'g-nowv' }, el('div', { class: 'g-gleadrow' }, V.nowLead, V.freshBtn, V.nowClock), V.nowRows, V.nowSay);
+  V.nowSmall = el('span', { class: 'g-gsmall', hidden: '' });   // the app window's one quiet line under the number (time, kills a minute) in place of the rows
+  V.now = el('div', { class: 'g-nowv' }, el('div', { class: 'g-gleadrow' }, V.nowLead, V.freshBtn, V.nowClock, V.nowSmall), V.nowRows, V.nowSay);
   // the folds (page G): Run summary, All time, Your runs and Your record are rows on the trail, every one closed on load (never kept),
   // and a press opens only that one
   const foldOpen = {}, folds = {};
@@ -1047,6 +1048,15 @@ function mount(root, deps) {
   // one dotted trail, and the small print off it
   root.replaceChildren(el('div', { class: 'k-col g-col' }, status, el('div', { class: 'g-trail', id: 'g-trail' }, nowCard.el, detail, life, runsWin, record),
     el('div', { class: 'g-print' }, el('p', { class: 'g-note' }, 'Item and UI pictures are from MapleStory, which belongs to Nexon.'), verLine)), strip);
+  // the app window (grind-app-view.js, 2026-11-24): the same nodes laid out as one window in the trail's place, What it earned and the
+  // other stops under its More row. The site in a browser never builds it
+  const appView = app && window.GrindAppView ? window.GrindAppView.build({ el, K: fmtK, pic: id => lootIdx && lootIdx.items[id] ? cellPic(lootIdx.items[id][3]) : null,
+    parts: { strip: nowCard.el.querySelector('.g-ground'), where: nowCard.el.querySelector('.g-ghead'), nums: nowCard.el.querySelector('#g-now'), tools, runs: runsRow, steps,
+      view: viewBar, lines: [V.problem, V.nudge, V.trade, bagCheck, check], loot: V.resLoot, foot: root.querySelector('.g-print') },
+    more: [{ key: 'summary', label: 'Run summary', el: detail, show: () => setFold('g-detail', true), ended: true }, { key: 'earned', label: 'What it earned', el: nowCard.el.querySelector('.g-gres') },
+      { key: 'runs', label: 'Your runs', el: runsWin, show: () => setFold('g-runs', true) }, { key: 'record', label: 'Your record', el: record, show: () => setFold('g-record', true) },
+      { key: 'life', label: 'All time', el: life, show: () => setFold('g-life', true) }] }) : null;
+  if (appView) { const trail = root.querySelector('#g-trail'); trail.before(appView.el); trail.hidden = true; }
 
   const setStatus = msg => { status.textContent = msg; };
   function setCheck(k, state, text) {
@@ -2170,7 +2180,7 @@ function mount(root, deps) {
   const tone = n => n == null || n === 0 ? '' : n > 0 ? 'pos' : 'neg';
   const COZY = 'https://cozy.markets/items/', PICKED_SHOWN = 5, LOG_SHOWN = 8, SLOW_NOTE = 'The pickup lines are read too slowly to count every one.',
     ROUGH_OFFER = 'Open your bag at the start and the end for exact numbers.';
-  let lootOpen = false, lootKey = null, potsKey = null, tradeKey = null;
+  let lootOpen = !!appView, lootTotal = null, lootKey = null, potsKey = null, tradeKey = null;
   const creditOf = date => {
     const day = date && new Date(date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     return el('p', { class: 'g-note g-credit' }, 'Prices from ', el('a', { href: 'https://cozy.markets/', target: '_blank', rel: 'noopener' }, 'Cozy Markets'), day ? ', ' + day + '.' : '.');
@@ -2183,7 +2193,7 @@ function mount(root, deps) {
     const log = viewing ? { rows: R.log, unnamed: 0, equips: 0, date: null } : GS().logOf(s);
     if (!log.rows.length && !log.unnamed && !log.equips) return null;
     const slow = !!st.pickupSlow;
-    return { key: 'log' + JSON.stringify([log, lootOpen, !!lootImg, slow]), build() {
+    return { key: 'log' + JSON.stringify([log, lootOpen, !!lootImg, slow]), total: log.rows.reduce((a, r) => a + r.value, 0), build() {
       const L = window.GrindNow.logRows(log, lootOpen ? Infinity : LOG_SHOWN, { el, fmtK, pic: id => lootIdx && lootIdx.items[id] ? cellPic(lootIdx.items[id][3]) : null });
       const nodes = [el('div', { class: 'g-res-h' }, 'What you picked up'), el('div', { class: 'k-rows' }, ...L.nodes)];
       if (L.more || lootOpen) nodes.push(el('button', { type: 'button', class: 'linkish', id: 'g-lootmore', 'aria-expanded': String(lootOpen), onclick: () => { lootOpen = !lootOpen; render(); } }, lootOpen ? 'Show fewer' : 'Show ' + L.more + ' more'));
@@ -2225,6 +2235,7 @@ function mount(root, deps) {
     // what you picked up: the catches first, then by value, each with its ring (a gold ring is the best one), five rows then show more
     V.resLoot.hidden = !loot;
     const lg = loot ? logBlock(s, R) : null;
+    lootTotal = !loot ? null : lg ? lg.total : R.loot ? R.loot.value : null;
     if (lg) {
       // redrawn only when what it shows changes, like the bag's list below
       if (lg.key !== lootKey) { lootKey = lg.key; V.resLoot.replaceChildren(...lg.build()); }
@@ -2365,7 +2376,9 @@ function mount(root, deps) {
     const usual = GS().standing(lastRows, { mapId: mapOfNow(s), exceptId: s.id, metric: 'expHr', value: null }).usual;
     const pick = expPick(o, sinceFor === s.id ? 'since' : 'run', usual), main = mains[0];
     const count = (ids, name) => ({ pic: ids.find(id => pictures.Icons[id]), label: name, v: fmt(ids.reduce((a, id) => a + usedOf(s, id), 0)) });
-    return { lead: { v: pick.value != null ? fmtK(pick.value) : '·', vs: pick.vs && { up: pick.vs.up, text: pick.vs.text + ' vs usual' }, clock: clockLine(o) },
+    const avg = app ? avgExp(mapOfNow(s)) : null, kp = avg && pick.value != null ? killsPerMin(pick.value, avg) : null;
+    return { lead: { v: pick.value != null ? fmtK(pick.value) : '·', vs: pick.vs && { up: pick.vs.up, text: pick.vs.text + ' vs usual' }, clock: clockLine(o),
+      small: app ? fmtDur(o.mins) + (kp ? ' · ' + fmtKills(kp.perMin) + ' kills a minute' : '') : null },
       rows: [{ label: 'Time', v: fmtDur(o.mins) }, { label: 'EXP', v: fmt(o.exp) }, count(LEMON_IDS, 'Lemons'), count(MEAT_IDS, 'Meat'),
         main && !LEMON_IDS.includes(+main.id) && !MEAT_IDS.includes(+main.id) ? count([+main.id], plural(main.name)) : null,
         o.hrsToLevel != null && s.level ? { label: 'Level ' + (s.level + 1) + ' in', v: fmtDur(o.hrsToLevel * 60) } : null].filter(Boolean) };
@@ -2381,6 +2394,7 @@ function mount(root, deps) {
     if (parts.lead) V.nowLead.replaceChildren(el('b', { class: 'g-gbig' }, parts.lead.v), el('span', { class: 'g-glbl' }, 'EXP an hour'),
       ...(parts.lead.vs ? [arrowed(el('em', { class: parts.lead.vs.up ? 'up' : 'down' }), parts.lead.vs.text)] : []));
     V.nowClock.hidden = !(parts.lead && parts.lead.clock); V.nowClock.textContent = parts.lead && parts.lead.clock || '';
+    V.nowSmall.hidden = !(parts.lead && parts.lead.small); V.nowSmall.textContent = parts.lead && parts.lead.small || '';
     V.nowRows.replaceChildren(...(parts.rows || []).map(r => el('div', { class: 'k-row' },
       el('span', { class: 'g-nl' }, ...(r.pic ? [iconOf(r.pic, r.label)] : []), r.label), el('span', { class: 'g-nv' }, r.v))));
     void bandParts; void bandPart; void R;
@@ -2399,6 +2413,26 @@ function mount(root, deps) {
      
       mobs: mapMobs, mobIds: mapMobs.map(m => m.id), D: drops, sprites: mobSprites, L: lootIdx, cls: classId, level: levelNow(),
       noMap: !mapId, lemon: pictures.Icons[LEMON_IDS[0]] || null });
+    if (appView) appView.update({ session: !!session, sharing: st.sharing, noMap: !mapId, mobs: mapMobs, D: drops, cls: classId, level: levelNow(), lootOn,
+      log: PICKUPS && session && !viewing ? GS().logOf(session) : null, total: session && !viewing ? lootTotal : null,
+      ended: viewing ? endedOf(viewing) : ended && !session ? { empty: true, onNew: startNew } : null });
+  }
+  const startNew = () => newRun().then(() => Object.keys(folds).forEach(id => setFold(id, false)));
+  // How it went in the app: the Run summary's own numbers (renderEndSum), one row each, for the run that just ended or a saved one
+  function endedOf(e) {
+    const mapId = mapOfNow(e), o = GS().stats(e, e.tLast, avgExp(mapId)), R = GS().result(e, e.tLast), P = GS().profitOf(e, e.tLast);
+    const usual = GS().standing(lastRows, { mapId, exceptId: e.id, metric: 'expHr', value: null }).usual;
+    const r = GS().rateRun({ expHr: o.expHr, usual, mesosHr: P.perHr }), sold = GS().soldAll(R, soldPrice);
+    const K = v => v == null ? '·' : (v < 0 ? '−' : '') + fmtK(Math.abs(v)), today = new Date(e.tLast).toDateString() === new Date().toDateString();
+    const row = (label, value, sub, t) => ({ label, value, sub: sub || '', tone: t || '' });
+    return { id: e.id, head: e === ended || today ? 'Run ended at ' + timeOfDay(e.tLast) : 'Run ended ' + dateOf(e.tLast),
+      expHr: o.expHr != null ? fmtK(o.expHr) : '·', small: fmtDur(o.mins) + (o.kpm != null ? ' · about ' + o.kpm.toFixed(1) + ' kills a minute' : ''),
+      lemons: r.lemons, title: r.title, lemon: picOf(LEMON_IDS),
+      rows: [row('EXP an hour', o.expHr != null ? fmtK(o.expHr) : '·', usual ? 'your usual here is ' + fmtK(usual) : '', o.expHr != null && usual && o.expHr > usual ? 'gold' : ''),
+        row('EXP gained', fmt(o.exp), o.pct.toFixed(2) + '%'), row('Mesos an hour', P.perHr != null ? sgnK(P.perHr) : '·', 'after potions', tone(P.perHr)),
+        row('Picked up', K(R.pickedUp), R.pickedUp != null ? 'mesos off the ground' : ''), row('Potions used', K(R.potions == null ? null : -R.potions), o.potUsed ? fmt(o.potUsed) + ' potions' : ''),
+        row('Kept', K(P.total), '', tone(P.total))],
+      sold: 'If you sold everything ' + (sold != null ? (sold >= 0 ? '+' : '−') + fmtK(Math.abs(sold)) : 'is not counted'), onNew: e === ended ? startNew : null };   // only the run that just ended offers Start a new run, as on the site
   }
 
   /* ----- saved sessions, and all time from them ----- */

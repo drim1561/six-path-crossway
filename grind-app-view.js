@@ -1,0 +1,150 @@
+// The Grind tab in the Six Path Overlay window (2026-11-24): one window that fills the app, no page scroll. grind.js builds the
+// same nodes as on the site and hands them in; this only lays them out, under body.in-app. Top to bottom: the walking strip, one
+// line (Now grinding with the map's pick and the light, EXP an hour, the buttons), the first time steps and the lines that need
+// you, then Drops here beside What you picked up (each scrolls by itself), a quiet More row, and the small print.
+// window.GrindAppView.build({ el, parts, more, K, pic }) -> { el, update(state), open(key) }
+//   parts = { strip, where, nums, tools, runs, steps, view, lines, loot, foot }: grind.js's own nodes (loot is What you picked up's
+//   block, view the bar over a run being looked at (Back to live, Delete: it joins the buttons, the line names the run), foot the tab's own small print, which joins the drops' credit)
+//   more = [{ key, label, el, show, ended }]: blocks that open one at a time in place of the panes (show() runs as one opens; an
+//   ended one is offered only once a run has ended)
+//   state = { session, sharing, noMap, mobs, D, cls, level, lootOn, log, total, ended }, ended = null | { empty: true, onNew } (a
+//   run with no EXP ended: an idle window) | { id, head, expHr, small, lemons, title, lemon, rows: [{ label, value, sub, tone }], sold, onNew } (onNew
+//   only for the run that just ended; null for a saved one)
+(function () {
+'use strict';
+
+const COZY = 'https://cozy.markets/items/';
+const fmt = n => Math.round(n).toLocaleString('en-US');
+
+function build({ el, parts, more, K, pic }) {
+  const N = window.GrindNow;
+  const strip = el('div', { class: 'ga-strip' }, parts.strip);
+  const lbl = parts.where && parts.where.querySelector('h2');
+  if (lbl) lbl.classList.add('ga-lbl');   // Now grinding, or Run ended at 12:08 PM
+  // after End run the line keeps the run's final numbers here (the live number card stops drawing once a run is being looked at)
+  const endBig = el('b', { class: 'g-gbig' }), endSmall = el('span', { class: 'g-gsmall' });
+  const endNums = el('div', { class: 'ga-endnums', hidden: '' }, el('div', { class: 'g-gleadrow' }, endBig, el('span', { class: 'g-glbl' }, 'EXP an hour'), endSmall));
+  const startBtn = el('button', { type: 'button', class: 'k-btn key', id: 'ga-startrun', hidden: '', onclick: () => { open(null); if (last && last.ended) last.ended.onNew(); } }, 'Start a new run');
+  const line = el('div', { class: 'ga-line' }, parts.where, parts.nums, endNums, el('div', { class: 'ga-btns' }, parts.tools, parts.runs || null, parts.view || null, startBtn));
+  const needs = el('div', { class: 'ga-needs' }, parts.steps, ...(parts.lines || []));
+  const pane = (id, title, small) => {
+    const body = el('div', { class: 'ga-scroll' });
+    const sec = el('section', { class: 'ga-pane', id }, el('div', { class: 'ga-ph' }, el('h3', {}, title), small), body);
+    return { sec, body };
+  };
+  const dropsSmall = el('small', {});
+  const total = el('small', { id: 'ga-total' }), sold = el('small', { id: 'ga-sold', hidden: '' });
+  const drops = pane('ga-drops', 'Drops here', dropsSmall), picked = pane('ga-picked', 'What you picked up', el('span', {}, total, sold));
+  const wentSmall = el('small', {}), went = pane('ga-went', 'How it went', wentSmall);
+  went.sec.hidden = true;
+  const lem = el('div', { class: 'ga-lem', role: 'img' }), wentRows = el('div', { class: 'k-rows' });
+  went.body.append(lem, wentRows);
+  const noLoot = el('p', { class: 'g-note ga-noloot', hidden: '' });
+  picked.body.append(parts.loot, noLoot);
+  const panes = el('div', { class: 'ga-panes', id: 'ga-panes' }, drops.sec, went.sec, picked.sec);
+  const back = el('button', { type: 'button', class: 'linkish', id: 'ga-back', onclick: () => open(null) }, 'Back to this run');
+  const holder = el('div', { class: 'ga-holder' });
+  const moreView = el('div', { class: 'ga-moreview', id: 'ga-moreview', hidden: '' }, back, holder);
+  const btns = {};
+  const moreRow = el('nav', { class: 'ga-more', id: 'ga-more', 'aria-label': 'More' }, ...more.map(m => btns[m.key] = el('button', { type: 'button', class: 'linkish', 'data-key': m.key, 'aria-expanded': 'false', onclick: () => open(openKey === m.key ? null : m.key) }, m.label)));
+  const credit = el('div', { class: 'ga-credit', hidden: '' });
+  const print = el('div', { class: 'ga-print' }, credit, parts.foot || null);
+  const win = el('section', { class: 'ga-win', id: 'ga-win' }, strip, line, needs, panes, moreView, moreRow, print);
+  const home = new Map(more.map(m => [m.key, { parent: m.el.parentNode, next: m.el.nextSibling }]));
+
+  let openKey = null, last = null, endId = null;
+  function open(key) {
+    if (openKey && openKey !== key) { const m = more.find(x => x.key === openKey), h = home.get(openKey); if (h && h.parent) h.parent.insertBefore(m.el, h.next && h.next.parentNode === h.parent ? h.next : null); }
+    openKey = key || null;
+    for (const m of more) btns[m.key].setAttribute('aria-expanded', String(m.key === openKey));
+    const m = more.find(x => x.key === openKey);
+    if (m) { holder.replaceChildren(m.el); if (m.show) m.show(); }
+    moreView.hidden = !m; win.classList.toggle('more', !!m);   // a block from More has the room: the lines that need you come back with the panes
+    if (last) update(last, true);
+  }
+
+  // a drop row: the ring (gold for the priciest FM item), the short name with its For you tag, then the lime count once one was
+  // picked up this run and the price (an FM price links to Cozy, an NPC one is labeled)
+  const ring = r => { const src = pic(r.id); return el('span', { class: 'k-ring' + (r.gold ? ' gold' : '') }, src ? el('img', { src, alt: '' }) : null); };
+  const rowOf = r => el('div', { class: 'k-row' + (r.gold ? ' gold' : ''), 'data-item': r.id }, ring(r),
+    el('span', { class: 'g-nnm' }, el('span', { class: 'g-nn' }, r.short), r.you ? el('span', { class: 'k-tag y' }, 'For you') : null, r.about ? el('small', {}, r.about) : null),
+    el('span', { class: 'ga-r' }, r.n > 0 ? el('span', { class: 'ga-got' }, '×' + fmt(r.n)) : null,
+      r.cozy ? el('span', { class: 'g-np' }, el('a', { href: COZY + r.cozy, target: '_blank', rel: 'noopener', 'aria-label': r.short + ' on Cozy Markets, ' + K(r.price) }, K(r.price)))
+        : el('span', { class: 'g-np npc' }, r.price ? 'NPC ' + K(r.price) : '')));
+  const headOf = m => el('h4', { class: 'ga-mob', 'data-mob': m.id }, el('b', {}, m.name),
+    el('span', { class: 'g-mobs' }, 'Lv ' + m.level + ' · ' + fmt(m.exp) + ' EXP · ' + m.count + ' here'),
+    m.undead ? el('span', { class: 'k-tag' }, 'undead · Heal hits it') : null);
+
+  const drawn = {};
+  const changed = (part, ...now) => { const k = JSON.stringify(now); if (drawn[part] === k) return false; drawn[part] = k; return true; };
+  function drawDrops(x) {
+    const mobs = x.mobs || [], caught = x.log && x.log.rows ? new Map(x.log.rows.map(r => [r.id, r.count])) : null;
+    const L = x.D ? N.dropList(mobs.map(m => m.id), x.D, x.cls, x.level, caught) : null;
+    if (!changed('drops', mobs, L, x.D && x.D.date)) return L;
+    const top = drops.body.scrollTop;
+    drops.body.replaceChildren(...(L && !L.any && mobs.length ? [el('p', { class: 'g-nline ga-none' }, 'No drops logged for these monsters yet.')] : []),
+      ...mobs.map((m, i) => { const g = L && L.groups[i], rows = g ? g.rows : [];
+        return el('div', { class: 'ga-group' }, headOf(m), rows.length ? el('div', { class: 'k-rows' }, ...rows.map(rowOf)) : L && L.any ? el('p', { class: 'g-nline' }, 'No drops logged for this one yet.') : null); }));
+    drops.body.scrollTop = top;
+    dropsSmall.textContent = mobs.length > 1 ? mobs.length + ' monsters' : '';
+    const date = x.D && new Date(x.D.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    credit.replaceChildren(...(L && L.any ? [el('p', { class: 'g-note' }, 'Seen dropping here, no drop rates yet.' + (L.anyCozy ? ' Prices from ' : ''),
+      L.anyCozy ? [el('a', { href: 'https://cozy.markets/', target: '_blank', rel: 'noopener' }, 'Cozy Markets'), ', ' + date + '.' + (L.anyGearCozy ? ' Gear varies by stats.' : '')] : null)] : []));
+    return L;
+  }
+
+  // How it went: the Lemon rating, then one row each (name, one quiet line, right aligned number)
+  function drawWent(E) {
+    if (!changed('went', E.id, E.rows, E.lemons, E.lemon)) return;
+    lem.replaceChildren(...[0, 1, 2, 3, 4].map(i => el('img', { src: E.lemon || '', alt: '', class: i >= E.lemons ? 'off' : '' })), el('span', { class: 'ga-lemt' }, E.title));
+    lem.setAttribute('aria-label', E.title);
+    wentRows.replaceChildren(...E.rows.map(r => el('div', { class: 'k-row' }, el('span', { class: 'g-nnm' }, el('span', { class: 'g-nl' }, r.label), r.sub ? el('small', {}, r.sub) : null),
+      el('span', { class: 'g-nv' + (r.tone ? ' ' + r.tone : '') }, r.value))));
+  }
+
+  function update(x, force) {
+    last = x;
+    if (force) for (const k of Object.keys(drawn)) delete drawn[k];
+    const E = x.ended || null, done = !!E && !E.empty;
+    // a run that just ended (or one opened from Your runs) takes the window back from whatever More had open
+    if (done && E.id !== endId) { endId = E.id; if (openKey) return open(null); } else if (!done) endId = null;
+    win.classList.toggle('ended', !!E); win.classList.toggle('done', done);
+    strip.classList.toggle('still', !!E);
+    startBtn.hidden = !(E && E.onNew);   // a saved run being looked at has Back to live instead
+    endNums.hidden = !done;
+    if (done) { if (endBig.textContent !== E.expHr) endBig.textContent = E.expHr; if (endSmall.textContent !== E.small) endSmall.textContent = E.small; drawWent(E); }
+    if (lbl && done && lbl.textContent !== E.head) lbl.textContent = E.head;
+    const live = !x.noMap && !!(x.session || x.sharing);
+    const L = live && !done ? drawDrops(x) : null;
+    drops.sec.hidden = done; went.sec.hidden = !done;
+    sold.hidden = !done; if (done && sold.textContent !== E.sold) sold.textContent = E.sold;
+    total.hidden = done;
+    panes.hidden = !(live || done) || !!openKey;
+    credit.hidden = panes.hidden || !(L && L.any);
+    print.hidden = credit.hidden && !parts.foot;
+    noLoot.hidden = !parts.loot.hidden;
+    const say = x.lootOn === false ? 'Turn on Count my loot under What it earned to list what you pick up.' : 'Nothing picked up yet.';
+    if (noLoot.textContent !== say) noLoot.textContent = say;
+    const t = x.total != null ? K(x.total) : '';
+    if (total.textContent !== t) total.textContent = t;
+    for (const m of more) btns[m.key].hidden = (!!m.el.hidden || (!!m.ended && !done)) && m.key !== openKey;
+    fit();
+  }
+
+  // the window fills what the app leaves under the tabs: its height is the view's less everything else on the page
+  function fit() {
+    if (!win.isConnected) return;
+    // measured around the window, never by shrinking it, so a pane's scroll is never reset
+    const r = win.getBoundingClientRect(), b = document.body.getBoundingClientRect(), mb = parseFloat(getComputedStyle(document.body).marginBottom) || 0;
+    const h = Math.max(320, Math.floor(innerHeight - (r.top + scrollY) - (b.bottom - r.bottom) - mb)) + 'px';
+    if (win.style.height !== h) win.style.height = h;
+  }
+  addEventListener('resize', fit);
+  // and again whenever something around it changes size (a line that comes up, the foot wrapping): the window's own new height
+  // measures the same, so this settles at once
+  if (window.ResizeObserver) new ResizeObserver(() => fit()).observe(document.body);
+  return { el: win, update, open, fit };
+}
+
+window.GrindAppView = { build };
+})();
