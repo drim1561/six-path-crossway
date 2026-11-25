@@ -1,20 +1,23 @@
-// The Grind tab in the Six Path Overlay window (2026-11-24): one window that fills the app, no page scroll. grind.js builds the
-// same nodes as on the site and hands them in; this only lays them out, under body.in-app. Top to bottom: the walking strip, one
-// line (Now grinding with the map's pick and the light, EXP an hour, the buttons), the first time steps and the lines that need
-// you, then Drops here beside What you picked up (each scrolls by itself), a quiet More row, and the small print.
-// window.GrindAppView.build({ el, parts, more, K, pic }) -> { el, update(state), open(key) }
-//   parts = { strip, where, nums, tools, runs, steps, view, lines, loot, foot }: grind.js's own nodes (loot is What you picked up's
+// The Grind tab in the Six Path Overlay window (2026-11-24): one window that fills the app. grind.js builds the same nodes as on
+// the site and hands them in; this only lays them out, under body.in-app. Top to bottom: the walking strip, one bar (2026-11-25:
+// the map's pick with the light and the run's length under it, EXP an hour, Profit an hour, the run buttons, a thin rule, then
+// Settings and Quit as icon squares), the first time steps and the lines that need you (never the bag's Equip, Use, Etc rows: the
+// overlay asks for the bag), then Drops here beside What you picked up (each scrolls by itself and keeps at least 280px, a window
+// too short for that scrolls the page), a quiet More row, and the small print.
+// window.GrindAppView.build({ el, parts, more, K, pic }) -> { el, update(state), live({ len, profit, tone }), open(key) }
+//   parts = { strip, where, nums, share, pop, set, quit, runs, steps, view, lines, loot, foot }: grind.js's own nodes (loot is What you picked up's
 //   block, view the bar over a run being looked at (Back to live, Delete: it joins the buttons, the line names the run), foot the tab's own small print, which joins the drops' credit)
 //   more = [{ key, label, el, show, ended }]: blocks that open one at a time in place of the panes (show() runs as one opens; an
 //   ended one is offered only once a run has ended)
 //   state = { session, sharing, noMap, mobs, D, cls, level, lootOn, log, total, ended }, ended = null | { empty: true, onNew } (a
-//   run with no EXP ended: an idle window) | { id, head, expHr, small, lemons, title, lemon, rows: [{ label, value, sub, tone }], sold, onNew } (onNew
+//   run with no EXP ended: an idle window) | { id, head, expHr, profit, tone, small, lemons, title, lemon, rows: [{ label, value, sub, tone }], sold, onNew } (onNew
 //   only for the run that just ended; null for a saved one)
 (function () {
 'use strict';
 
 const COZY = 'https://cozy.markets/items/';
 const fmt = n => Math.round(n).toLocaleString('en-US');
+const FLOOR = 280;   // each list keeps at least this much (Rimmah, 2026-11-25)
 
 function build({ el, parts, more, K, pic }) {
   const N = window.GrindNow;
@@ -24,8 +27,23 @@ function build({ el, parts, more, K, pic }) {
   // after End run the line keeps the run's final numbers here (the live number card stops drawing once a run is being looked at)
   const endBig = el('b', { class: 'g-gbig' }), endSmall = el('span', { class: 'g-gsmall' });
   const endNums = el('div', { class: 'ga-endnums', hidden: '' }, el('div', { class: 'g-gleadrow' }, endBig, el('span', { class: 'g-glbl' }, 'EXP an hour'), endSmall));
+  // Profit an hour beside EXP an hour: live from grind.js (live()), the run's own once it has ended
+  const profBig = el('b', { class: 'g-gbig' });
+  const profit = el('div', { class: 'ga-profit', hidden: '' }, profBig, el('span', { class: 'g-glbl' }, 'Profit an hour'));
   const startBtn = el('button', { type: 'button', class: 'k-btn key', id: 'ga-startrun', hidden: '', onclick: () => { open(null); if (last && last.ended) last.ended.onNew(); } }, 'Start a new run');
-  const line = el('div', { class: 'ga-line' }, parts.where, parts.nums, endNums, el('div', { class: 'ga-btns' }, parts.tools, parts.runs || null, parts.view || null, startBtn));
+  // the run's length beside the light, under the map's pick
+  const len = el('span', { class: 'ga-len' });
+  const lamp = parts.where && parts.where.querySelector('.push');
+  if (lamp) lamp.append(len);
+  const where = el('div', { class: 'ga-where' }, parts.where);
+  // Settings and Quit as icon squares: the words stay for screen readers, and name the square on hover
+  const ico = b => { if (!b) return null; const t = b.textContent.trim(); b.title = t; b.setAttribute('aria-label', t); b.classList.add('ga-ico'); return b; };
+  const icons = [ico(parts.set), ico(parts.quit)].filter(Boolean);
+  // New run and End run are bark buttons here, the same as Stop (on the site they're plain words)
+  if (parts.runs) for (const b of parts.runs.querySelectorAll('button')) b.classList.add('k-btn');
+  const runBtns = el('div', { class: 'ga-runbtns' }, parts.share || null, parts.runs || null, parts.pop || null, parts.view || null, startBtn);
+  const line = el('div', { class: 'ga-line' }, where, parts.nums, endNums, profit,
+    el('div', { class: 'ga-btns' }, runBtns, icons.length ? el('span', { class: 'ga-rule', 'aria-hidden': 'true' }) : null, ...icons));
   const needs = el('div', { class: 'ga-needs' }, parts.steps, ...(parts.lines || []));
   const pane = (id, title, small) => {
     const body = el('div', { class: 'ga-scroll' });
@@ -112,7 +130,8 @@ function build({ el, parts, more, K, pic }) {
     strip.classList.toggle('still', !!E);
     startBtn.hidden = !(E && E.onNew);   // a saved run being looked at has Back to live instead
     endNums.hidden = !done;
-    if (done) { if (endBig.textContent !== E.expHr) endBig.textContent = E.expHr; if (endSmall.textContent !== E.small) endSmall.textContent = E.small; drawWent(E); }
+    if (done) { if (endBig.textContent !== E.expHr) endBig.textContent = E.expHr; if (endSmall.textContent !== E.small) endSmall.textContent = E.small; setProfit(E.profit, E.tone); if (len.textContent !== E.len) len.textContent = E.len; drawWent(E); }
+    else if (E || !x.session) setProfit('', '');
     if (lbl && done && lbl.textContent !== E.head) lbl.textContent = E.head;
     const live = !x.noMap && !!(x.session || x.sharing);
     const L = live && !done ? drawDrops(x) : null;
@@ -131,19 +150,41 @@ function build({ el, parts, more, K, pic }) {
     fit();
   }
 
-  // the window fills what the app leaves under the tabs: its height is the view's less everything else on the page
+  function setProfit(v, tone) {
+    profit.hidden = !v;
+    if (profBig.textContent !== v) profBig.textContent = v;
+    const c = 'g-gbig' + (tone ? ' ' + tone : '');
+    if (profBig.className !== c) profBig.className = c;
+  }
+  // grind.js's live numbers for the bar, each frame: the run's length and Profit an hour (empty with no run)
+  function live(v) {
+    if (last && last.ended) return;   // an ended run keeps its own length and profit
+    if (len.textContent !== v.len) len.textContent = v.len;
+    setProfit(v.profit, v.tone);
+  }
+
+  // the window fills what the app leaves under the tabs: its height is the view's less everything else on the page, but never so
+  // little that a list drops under FLOOR (then the page scrolls)
   function fit() {
     if (!win.isConnected) return;
     // measured around the window, never by shrinking it, so a pane's scroll is never reset
     const r = win.getBoundingClientRect(), b = document.body.getBoundingClientRect(), mb = parseFloat(getComputedStyle(document.body).marginBottom) || 0;
-    const h = Math.max(320, Math.floor(innerHeight - (r.top + scrollY) - (b.bottom - r.bottom) - mb)) + 'px';
+    let h = Math.max(320, Math.floor(innerHeight - (r.top + scrollY) - (b.bottom - r.bottom) - mb));
+    // the lists grow and shrink with the window one for one (two stacked ones share it): what the window needs so the shortest has FLOOR
+    const lists = panes.hidden ? [] : [...panes.querySelectorAll('.ga-pane:not([hidden]) .ga-scroll')];
+    if (lists.length) {
+      const stacked = lists.length > 1 && new Set(lists.map(e => Math.round(e.getBoundingClientRect().left))).size === 1;
+      const short = Math.min(...lists.map(e => e.getBoundingClientRect().height));
+      h = Math.max(h, Math.ceil(r.height + (FLOOR - short) * (stacked ? lists.length : 1)));
+    }
+    h += 'px';
     if (win.style.height !== h) win.style.height = h;
   }
   addEventListener('resize', fit);
   // and again whenever something around it changes size (a line that comes up, the foot wrapping): the window's own new height
   // measures the same, so this settles at once
   if (window.ResizeObserver) new ResizeObserver(() => fit()).observe(document.body);
-  return { el: win, update, open, fit };
+  return { el: win, update, live, open, fit };
 }
 
 window.GrindAppView = { build };

@@ -549,7 +549,8 @@ body.path-off .path-only, body.guides-off .guides-only, body.appraiser-off .appr
 /* Your Path joins them when the app switches it on (window.BT_PATH, set by the app's startup script from 1.0.2) */
 body.in-app:not(.path-on) .tabs > :not(#tab-home, #tab-grind, #tab-boxes, #tab-recipes),
 body.in-app.path-on .tabs > :not(#tab-home, #tab-grind, #tab-builds, #tab-boxes, #tab-recipes), body.in-app #g-getapp { display: none; }
-/* the Grind tab in the app window (grind-app-view.js, 2026-11-24): one window, no page scroll, each pane scrolls by itself */
+/* the Grind tab in the app window (grind-app-view.js, 2026-11-24): one window, each pane scrolls by itself and keeps 280px (2026-11-25: a
+   window too short for that scrolls the page, fit() works it out) */
 #ga-win { display: flex; flex-direction: column; gap: var(--gap); min-height: 0; }
 /* the page around it gives the window its room: the column as wide as the app, no tall foot, the credit kept clear of the flag */
 body.in-app:has(#ga-win) #view-grind .g-col { max-width: none; padding: var(--gap) 0 0; gap: var(--gap); }
@@ -558,21 +559,49 @@ body.in-app:has(#view-grind:not([hidden]) #ga-win) .credit { margin: var(--gap) 
 #ga-win[hidden], #ga-win [hidden] { display: none !important; }
 #ga-win .ga-strip { flex: none; }
 #ga-win .ga-strip .g-ground { height: 70px; margin-inline: 0; border: 2px solid var(--card-o); border-radius: var(--r-card); }
-#ga-win .ga-line { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap); }
+/* the one bar (2026-11-25): a glass window, left to right the map's pick with the light and the run's length under it, EXP an hour,
+   Profit an hour, the run buttons, a thin rule, Settings and Quit as icon squares. A narrow window wraps the buttons to a second row */
+#ga-win .ga-line { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap) 20px; padding: 10px 14px; background: var(--surface); border: 2px solid var(--card-o); border-radius: var(--r-card); }
 #ga-win .ga-line > * { margin: 0; }
-#ga-win .ga-btns { display: flex; flex-wrap: wrap; gap: var(--gap); margin-left: auto; }
-/* the lines that need you give way first when the window is short (they scroll inside themselves), so the two lists stay readable;
-   the bag's three looks sit side by side here */
-#ga-win .ga-needs { flex: 0 100 auto; min-height: 36px; max-height: 30%; overflow-y: auto; display: flex; flex-direction: column; gap: var(--gap); }
-#ga-win .ga-needs .g-bagcheck { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0 var(--gap); margin: 0; padding: 6px 14px; }
-#ga-win .ga-needs .g-bagcheck li { padding: 2px 0; background: none; border: 0; }
+#ga-win .ga-where .g-ghead { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin: 0; padding: 0; border: 0; background: none; min-height: 0; }
+#ga-win .ga-where .g-ghead > .push { display: flex; align-items: center; gap: 10px; margin: 0; }
+#ga-win:not(.done) .ga-where .ga-lbl { display: none; }
+#ga-win .ga-len { color: var(--ink); font: 600 var(--fs-sm) var(--font-num); font-variant-numeric: tabular-nums; }
+#ga-win .ga-len:empty { display: none; }
+#ga-win .ga-line #g-now, #ga-win .ga-endnums { flex: none; width: auto; min-width: 0; padding: 0 0 0 20px; border: 0; border-left: 1px solid var(--div); border-radius: 0; background: none; box-shadow: none; }
+/* the big number over its label, the refresh and the vs usual beside the label */
+#ga-win .ga-line .g-glead { display: contents; }
+#ga-win .ga-line .g-gleadrow { display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; max-width: 260px; }
+#ga-win .ga-line .g-gleadrow .g-gbig, #ga-win .ga-line .g-gclock { flex-basis: 100%; }
+#ga-win .ga-endnums .g-gleadrow { flex-direction: column; align-items: flex-start; }
+#ga-win .ga-line .g-gsmall { display: none !important; }
+#ga-win .ga-line .g-glbl { color: var(--muted); font: 600 var(--fs-sm) var(--font-body); }
+#ga-win .ga-profit { display: flex; flex-direction: column; }
+#ga-win .ga-profit .g-gbig { color: var(--ink); }
+#ga-win .ga-profit .g-gbig.pos { color: var(--good); }
+#ga-win .ga-profit .g-gbig.neg { color: var(--bad); }
+#ga-win .ga-btns { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap); margin-left: auto; }
+#ga-win .ga-runbtns { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap); }
+#ga-win .ga-runbtns .k-btn, #ga-win .ga-btns .ga-ico { margin: 0; }
+#ga-win .ga-runbtns .k-btn { padding-inline: 14px; }
+#ga-win .ga-runbtns #g-share > i { display: none; }
+#ga-win .ga-runbtns #g-sharearea { display: contents; }
+#ga-win .ga-runbtns .g-gruns { display: contents; }
+#ga-win .ga-runbtns .g-rundiv { display: none; }
+#ga-win .ga-runbtns .g-runb.k-btn { padding: 8px 14px calc(8px + 3px); color: var(--btn-ink); text-decoration: none; }
+#ga-win .ga-runbtns .g-runb.k-btn:disabled { color: var(--muted); }
+#ga-win .ga-rule { align-self: stretch; width: 1px; margin-block: 4px; background: var(--div); }
+#ga-win .ga-ico { width: 42px; height: 42px; padding: 0 0 3px; }
+#ga-win .ga-ico > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+/* the lines that need you: one line each, the bag's rows never here (the overlay asks for the bag) */
+#ga-win .ga-needs { flex: none; display: flex; flex-direction: column; gap: var(--gap); }
 #ga-win .ga-needs > * { flex: none; margin: 0; }
 #ga-win .ga-needs > .g-check:not(:has(> :not([hidden]))) { display: none; }
 #ga-win.more .ga-needs { display: none; }
 #ga-win .ga-needs:not(:has(> :not([hidden]))) { display: none; }
 #ga-win .ga-panes { flex: 1 1 180px; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); }
 /* stacked, each pane keeps room for a few rows: a window too small for that scrolls the page rather than squeezing them away */
-@media (max-width: 700px) { #ga-win { min-height: min-content; } #ga-win .ga-panes { flex-basis: auto; grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } #ga-win .ga-pane { min-height: 160px; } }
+@media (max-width: 700px) { #ga-win .ga-panes { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } }
 #ga-win .ga-pane { min-height: 0; display: flex; flex-direction: column; background: var(--surface); border: 2px solid var(--card-o); border-radius: var(--r-card); overflow: hidden; }
 #ga-win .ga-ph { flex: none; display: flex; align-items: baseline; gap: var(--gap); padding: 10px 14px; border-bottom: 1px solid var(--div); }
 #ga-win .ga-ph h3 { margin: 0; font: 400 var(--fs-md) var(--font-title); color: var(--ink); }
@@ -590,20 +619,17 @@ body.in-app:has(#view-grind:not([hidden]) #ga-win) .credit { margin: var(--gap) 
 #ga-win .ga-more { flex: none; display: flex; flex-wrap: wrap; gap: 4px 18px; }
 #ga-win .ga-more [aria-expanded="true"] { color: var(--lime); }
 #ga-win .ga-strip .g-walker { bottom: 6px; }
-/* the line: EXP an hour with one quiet line under it, no rows (Your record and What it earned hold the rest) */
-#ga-win .ga-line #g-now { margin: 0; padding: 0 14px; }
+/* the bar's numbers: no rows (Your record and What it earned hold the rest) */
+#ga-win .ga-line #g-now { margin: 0; }
 #ga-win .ga-line .g-grows { display: none; }
-#ga-win .ga-line .g-gleadrow { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; padding: 0; border: 0; }
-#ga-win .ga-line .g-gsmall { flex-basis: 100%; contain: inline-size; color: var(--muted); font: 600 var(--fs-sm) var(--font-num); font-variant-numeric: tabular-nums; }
+#ga-win .ga-line .g-gleadrow { padding: 0; border: 0; }
 #ga-win .ga-line .g-gbig { font-size: var(--n-l); line-height: 1.1; }
 #ga-win .ga-strip .g-mob { zoom: .62; }
 /* after End run: the strip stands still and dims, the live buttons and number card make way for the run's own numbers and Start a new run */
 #ga-win .ga-strip.still { opacity: .6; }
 #ga-win .ga-strip.still .g-walker, #ga-win .ga-strip.still .g-mob { animation-play-state: paused; }
-#ga-win.ended .ga-btns > :not(#ga-startrun, .g-viewing), #ga-win.done .ga-line > #g-now, #ga-win.ended .g-bagcheck { display: none; }
+#ga-win.ended .ga-runbtns > :not(#ga-startrun, .g-viewing), #ga-win.done .ga-line > #g-now { display: none; }
 #ga-win .ga-endnums[hidden], #ga-win .ga-pane[hidden] { display: none; }
-#ga-win .ga-endnums { padding: 6px 14px; }
-#ga-win .ga-endnums .g-gleadrow { justify-content: flex-start; align-items: baseline; gap: 0 10px; }
 #ga-win .ga-btns .g-viewing { display: flex; gap: var(--gap); align-items: center; margin: 0; padding: 0; border: 0; background: none; }
 #ga-win .ga-btns .g-viewing[hidden] { display: none; }
 #ga-win .ga-btns .g-viewing > span:first-child { display: none; }
@@ -615,7 +641,7 @@ body.in-app:has(#view-grind:not([hidden]) #ga-win) .credit { margin: var(--gap) 
 #ga-win #ga-went .g-nv.gold { color: var(--gold, var(--lime)); }
 #ga-win .ga-print { flex: none; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--gap); }
 #ga-win .ga-print .g-print { display: contents; }
-#ga-win .ga-print .g-note, #ga-win .ga-print p { margin: 0; }
+#ga-win .ga-print .g-note, #ga-win .ga-print p { margin: 0; font-size: 12px; }
 /* Home (Rimmah, 2026-11-24): the page the app opens on, one column as wide as Grind's, the kit's one gap between its blocks, an empty block takes none */
 #home-root { max-width: 720px; width: calc(100% - 2 * var(--gap)); margin: 28px auto 40px; display: grid; gap: var(--gap); font-weight: 400; }
 #home-root [hidden] { display: none !important; }
@@ -2738,7 +2764,7 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-24r',
+  version: '2026-11-25a',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };

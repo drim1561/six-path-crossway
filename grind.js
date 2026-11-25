@@ -1051,8 +1051,8 @@ function mount(root, deps) {
   // the app window (grind-app-view.js, 2026-11-24): the same nodes laid out as one window in the trail's place, What it earned and the
   // other stops under its More row. The site in a browser never builds it
   const appView = app && window.GrindAppView ? window.GrindAppView.build({ el, K: fmtK, pic: id => lootIdx && lootIdx.items[id] ? cellPic(lootIdx.items[id][3]) : null,
-    parts: { strip: nowCard.el.querySelector('.g-ground'), where: nowCard.el.querySelector('.g-ghead'), nums: nowCard.el.querySelector('#g-now'), tools, runs: runsRow, steps,
-      view: viewBar, lines: [V.problem, V.nudge, V.trade, bagCheck, check], loot: V.resLoot, foot: root.querySelector('.g-print') },
+    parts: { strip: nowCard.el.querySelector('.g-ground'), where: nowCard.el.querySelector('.g-ghead'), nums: nowCard.el.querySelector('#g-now'), share: shareArea, pop: popBtn, set: setBtn, quit: quitBtn, runs: runsRow, steps,
+      view: viewBar, lines: [V.problem, V.nudge, V.trade, check], loot: V.resLoot, foot: root.querySelector('.g-print') },
     more: [{ key: 'summary', label: 'Run summary', el: detail, show: () => setFold('g-detail', true), ended: true }, { key: 'earned', label: 'What it earned', el: nowCard.el.querySelector('.g-gres') },
       { key: 'runs', label: 'Your runs', el: runsWin, show: () => setFold('g-runs', true) }, { key: 'record', label: 'Your record', el: record, show: () => setFold('g-record', true) },
       { key: 'life', label: 'All time', el: life, show: () => setFold('g-life', true) }] }) : null;
@@ -1179,11 +1179,13 @@ function mount(root, deps) {
     // the whole frame is searched every third tick until it's been seen, then once a minute in case it moved (a search
     // takes a quarter second on a big window). With Count my loot, gone from its spot moments after it was there
     // (dragged mid flip, or put beside a shop's window), it's searched for every third tick again; a peek just closed
-    // costs a few searches, not a minute of them
+    // costs a few searches, not a minute of them. While the run has no total, or a stale one (the light is asking for
+    // the bag), every third tick too: it may open somewhere other than where it was last time
     if (!st.homeTried) { st.homeTried = true; const hm = jget(KEY_HOME, null); if (hm && hm.w === w && hm.h === h && hm.box && !S.mesoHome()) S.mesoHome(hm.box); }
     let mesos = null;
     const home = S.mesoHome(), lost = lootOn && home && !st.mesoOpen && Date.now() - (st.mesoSeen || -Infinity) < LOST_MS,
-      search = st.ticks % (home && !lost && !st.mesoUnclear ? MESO_SEARCH_EVERY : 3) === 1;   // unclear at its spot: look around soon
+      seen = session && session.meso && session.meso.last, asking = !seen || Date.now() - seen.t > STALE_MS,
+      search = st.ticks % (home && !lost && !asking && !st.mesoUnclear ? MESO_SEARCH_EVERY : 3) === 1;   // unclear at its spot: look around soon
     if (home || search) {
       const mr = S.readMesos(src, { search });
       st.mesoOpen = mr.reason !== 'no inventory';
@@ -1795,7 +1797,9 @@ function mount(root, deps) {
     // the one thing to do, only when there is one (a saved session being looked at isn't live); a check that matters failing is
     // the problem line instead, with Find my game again at its end
     const problem = h.nudge.state === 'bad' && !appOld;
-    V.nudge.hidden = !!viewing || problem || h.nudge.state === 'ok' || (h.nudge.state === 'idle' && !s);
+    // in the app the overlay's light and tab lights ask for the bag, so the main window's amber line only does while it's closed (2026-11-25)
+    const bagAsk = !!h.nudge.flip || h.nudge.short === 'Open your bag';
+    V.nudge.hidden = !!viewing || problem || h.nudge.state === 'ok' || (h.nudge.state === 'idle' && !s) || (!!appView && bagAsk && !!overlay.win());
     V.problem.hidden = !!viewing || !problem;
     if (V.problemText.textContent !== h.nudge.text) V.problemText.textContent = h.nudge.text;
     reshareBtn.hidden = !h.nudge.reshare; refindBtn.hidden = !!h.nudge.reshare;
@@ -1885,7 +1889,10 @@ function mount(root, deps) {
     renderClocks(now);
     const ep = renderExp(s, o, saved, now);
     const minus = v => v < 0 ? '−' : '';
-    renderMeso(s ? GS().profitOf(s, saved ? s.tLast : now) : null);
+    const P = s ? GS().profitOf(s, saved ? s.tLast : now) : null;
+    renderMeso(P);
+    // the app window's bar: the run's length beside the light and Profit an hour, the pop-out's own number (a saved run's come from endedOf)
+    if (appView && !saved) appView.live({ len: s ? fmtDur(o.mins) : '', profit: !s ? '' : P.perHr != null ? sgnK(P.perHr) : '·', tone: !s || !P.perHr ? '' : P.perHr > 0 ? 'pos' : 'neg' });
     // Kills a minute: the number the switch shows, over the map's average EXP a kill. No map known, no average: a dot. A saved run has no window
     const avg = s ? avgExp(mapOfNow(s)) : null, kp = !saved && avg ? killsPerMin(ep.value, avg) : null;
     show(SP.killsBox, !saved && !isEnd);
@@ -2426,7 +2433,7 @@ function mount(root, deps) {
     const K = v => v == null ? '·' : (v < 0 ? '−' : '') + fmtK(Math.abs(v)), today = new Date(e.tLast).toDateString() === new Date().toDateString();
     const row = (label, value, sub, t) => ({ label, value, sub: sub || '', tone: t || '' });
     return { id: e.id, head: e === ended || today ? 'Run ended at ' + timeOfDay(e.tLast) : 'Run ended ' + dateOf(e.tLast),
-      expHr: o.expHr != null ? fmtK(o.expHr) : '·', small: fmtDur(o.mins) + (o.kpm != null ? ' · about ' + o.kpm.toFixed(1) + ' kills a minute' : ''),
+      expHr: o.expHr != null ? fmtK(o.expHr) : '·', profit: P.perHr != null ? sgnK(P.perHr) : '·', tone: tone(P.perHr), len: fmtDur(o.mins), small: fmtDur(o.mins) + (o.kpm != null ? ' · about ' + o.kpm.toFixed(1) + ' kills a minute' : ''),
       lemons: r.lemons, title: r.title, lemon: picOf(LEMON_IDS),
       rows: [row('EXP an hour', o.expHr != null ? fmtK(o.expHr) : '·', usual ? 'your usual here is ' + fmtK(usual) : '', o.expHr != null && usual && o.expHr > usual ? 'gold' : ''),
         row('EXP gained', fmt(o.exp), o.pct.toFixed(2) + '%'), row('Mesos an hour', P.perHr != null ? sgnK(P.perHr) : '·', 'after potions', tone(P.perHr)),
