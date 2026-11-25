@@ -1410,8 +1410,11 @@ function loadMaps(sheet, index) {
   mapSpot = null;
 }
 function mapArea(src, s, x0 = 0, y0 = 0) {
+  // cut out 1:1 before shrinking: shrunk straight from the share the sampling changes with the share's width, and a 3440 wide
+  // one took a real minimap from 0.84 to 0.72 (2026-11-24)
+  const w = Math.round(MAP_W * 2 * s), h = Math.round(MAP_H * 2 * s), cut = ctx2d(w, h); cut.drawImage(src, x0, y0, w, h, 0, 0, w, h);
   const g = ctx2d(MAP_W, MAP_H); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
-  g.drawImage(src, x0, y0, MAP_W * 2 * s, MAP_H * 2 * s, 0, 0, MAP_W, MAP_H);
+  g.drawImage(cut.canvas, 0, 0, MAP_W * 2 * s, MAP_H * 2 * s, 0, 0, MAP_W, MAP_H);
   const f = g.getImageData(0, 0, MAP_W, MAP_H).data;
   f.skip = mapDots(f);
   return f;
@@ -1456,11 +1459,14 @@ function mapDots(f) {
 // 2026-11-13: every window and the 4:3 and 16:10 Full Screens missed their minimap). A whole screen with a window on it is lit
 // all round, so this gives null or the whole share, and windowAround finds the window instead
 const ASPECTS = [9 / 16, 10 / 16, 3 / 4, 4 / 5];
-function gameRect(d, W, H) {
+// a black bar's column with a counter or the pointer on it is lit 3% at most, the game's own edge columns 27% and up
+const BAR_LIT = 0.05;
+// least: the share of a column that has to be lit for it to count (0: one pixel does)
+function gameRect(d, W, H, least = 0) {
   const lit = i => Math.max(d[i], d[i + 1], d[i + 2]) > 24;
-  const colLit = x => { for (let y = 0; y < H; y += 3) if (lit((y * W + x) * 4)) return true; return false; };
-  const rowLit = y => { for (let x = 0; x < W; x += 3) if (lit((y * W + x) * 4)) return true; return false; };
+  const colLit = x => { let n = 0; for (let y = 0; y < H; y += 3) if (lit((y * W + x) * 4) && ++n > least * H / 3) return true; return false; };
   let L = 0, R = W - 1, T = 0, B = H - 1;
+  const rowLit = y => { for (let x = L; x <= R; x += 3) if (lit((y * W + x) * 4)) return true; return false; };
   while (L < R && !colLit(L)) L++;
   while (R > L && !colLit(R)) R--;
   while (T < B && !rowLit(T)) T++;
@@ -1597,7 +1603,11 @@ function readMap(src, frameH, opts) {
   const H = sizeOf(src).h, cv = ctx2d(W, H); cv.drawImage(src, 0, 0);
   const d = cv.getImageData(0, 0, W, H).data, line = opts && opts.line, hs = line && (opts.s || line.digitH / 6.8);
   let g = gameRect(d, W, H);
-  if (line && !(g && lineFits(g, line, hs))) g = windowAround(d, W, H, line, hs) || g;
+  if (line && !(g && lineFits(g, line, hs))) {
+    // or black bars with something small in them (an FPS counter, the pointer: a 3440 x 1440 share, 2026-11-24)
+    const barred = () => { const b = gameRect(d, W, H, BAR_LIT); return b && lineFits(b, line, hs) ? b : null; };
+    g = windowAround(d, W, H, line, hs) || barred() || g;
+  }
   g = g || { x: 0, y: 0, w: W, h: frameH };
   const tall = g.w / g.h < 1.4;
   const scales = [g.h / 768, g.h / 720].concat(tall ? [g.h / 600] : []);
