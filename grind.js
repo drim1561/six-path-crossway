@@ -139,6 +139,8 @@ function health(f) {
   // lights. A flip takes longer than 45 s without a kill, so it wins over Idle
   if (f.loot && f.loot.on && f.loot.bagOpen) return say('ok', 'Reading your bag', 'Reading your bag', { bag: true });
   if (f.killed && f.idle) return say('idle', 'Idle', 'No kills for a bit, so EXP an hour is waiting. It picks up at your next kill');
+  // f.timing (not GrindSession.rated): kills are counting, but there is no EXP an hour yet. Green, with its words up
+  if (f.killed && f.timing) return say('ok', 'Timing your EXP', 'Reading everything. EXP an hour shows after 2 minutes of kills', { timing: true });
   // green: everything is read. f.killed: the session has gained EXP
   return say('ok', f.killed ? 'Grinding' : 'Ready to grind', 'Reading everything');
 }
@@ -1765,7 +1767,7 @@ function mount(root, deps) {
     const opening = lootOn && !savedRun ? GS().bagOpening(s) : null;
     const bagNow = opening && !(opening.countedT != null && Date.now() - opening.countedT >= BAG_COUNTED_MS) ? opening : null;
     const h = lastHealth = health({ t: Date.now(), app: !!app, sharing: st.sharing, stopped: !!st.stopped, hasSession: !!s, ended: !!ended, noGame: !st.reads && (st.noLine || 0) >= NO_GAME_TICKS, exp: st.h.exp, level: st.h.level, levelNow: st.level,
-      size: st.h.size, counts: st.h.counts, potNone: st.potNone, potCount: st.potCount, slotsHidden: !!st.slotsHidden, killed: !!s && (s.gainExp > 0 || s.gainPct > 0), idle: !!s && GS().idleNow(s), cut: !!(s && s.cut && s.cut.n >= 3),
+      size: st.h.size, counts: st.h.counts, potNone: st.potNone, potCount: st.potCount, slotsHidden: !!st.slotsHidden, killed: !!s && (s.gainExp > 0 || s.gainPct > 0), idle: !!s && GS().idleNow(s), timing: !!s && !GS().rated(s), cut: !!(s && s.cut && s.cut.n >= 3),
       meso: { at: s && s.meso && s.meso.last ? s.meso.last.t : null, unclear: !!(st.mesoOpen && st.mesoUnclear) },
       loot: { on: lootOn, pictures: lootReady, started: !!(s && s.bag && s.bag.startT), rough: !!GS().CFG.ROUGH, bagOpen: !!bagNow } });
     // the pill over the buttons goes by what the core numbers need (mesos only ever ask)
@@ -1799,14 +1801,14 @@ function mount(root, deps) {
     const ask = !!jump && !savedRun && h.nudge.state !== 'bad';   // a mesos jump to answer comes before anything amber
     const lamp = ended ? ['idle', 'Run ended'] : savedRun ? ['idle', 'Saved run'] : ask ? ['wait', 'Check your mesos'] : [h.nudge.state, short];
     const tabs = savedRun || ask ? null : h.nudge.flip ? bagTabStates(s && s.bag) : open ? open.tabs : null;
-    // green says nothing but Bag counted: the dot alone (its words stay for screen readers and the hover)
-    const quiet = lamp[0] === 'ok' && lamp[1] !== 'Bag counted';
+    // green says nothing but Bag counted and Timing your EXP: the dot alone (its words stay for screen readers and the hover)
+    const timing = lamp[1] === 'Timing your EXP', quiet = lamp[0] === 'ok' && lamp[1] !== 'Bag counted' && !timing;
     // drawn again only when what it says changes: this runs on every frame, and the light is a live region
     const lampKey = lamp.join() + (tabs ? tabs.map(x => x.tab + x.state).join() : '');
     if (SP.lampSays !== lampKey) {
       SP.lampSays = lampKey;
       SP.lamp.className = 'g-lamp ' + lamp[0] + (quiet ? ' quiet' : ''); SP.lampT.textContent = lamp[1];
-      SP.lamp.title = quiet ? lamp[1] === 'Ready to grind' ? 'Ready to grind. Reads your game about every second' : 'Grinding. Reads your game about every second' : '';
+      SP.lamp.title = quiet ? lamp[1] === 'Ready to grind' ? 'Ready to grind. Reads your game about every second' : 'Grinding. Reads your game about every second' : timing ? h.nudge.text : '';
       SP.lampF.hidden = !tabs;
       SP.lampF.replaceChildren(...(tabs || []).map(({ tab, state }) => { const says = tab + (state === 'done' ? ': seen' : state === 'fix' ? ': scroll to its top and bottom' : ': not seen yet');
         return el('b', { class: state, title: says, 'aria-label': says }, el('i', { 'aria-hidden': 'true' }), el('span', {}, tab)); }));

@@ -980,6 +980,8 @@ const expMsOf = s => {
 };
 // no kill for over 45 seconds of reading, after a first one: EXP an hour is waiting (the light says Idle)
 const idleNow = s => s.expTo != null && s.activeMs - s.expTo > CFG.idleMs;
+// whether the run has an EXP an hour yet: 2 minutes on the grinding clock (until then the light says Timing your EXP)
+const rated = s => expMsOf(s) >= 120000;
 // a saved run's EXP minutes, what its EXP an hour goes over. A run saved since the grinding clock (its minutes carry a
 // sixth number, their grinding seconds) gives what it saved. An older one saved the first kill to last clock, idle time
 // in it, so it gives the smaller of that and its count of minutes that gained or lost EXP; with no minutes kept, what it
@@ -999,10 +1001,10 @@ function expMinOf(row) {
 // avgExpPerKill: the map's average EXP a kill, for kills a minute (an estimate; a party shares EXP)
 function stats(s, t, avgExpPerKill) {
   const mins = s.activeMs / 60000, hrs = mins / 60, o = { exp: s.gainExp, pct: s.gainPct, mins, pausedMins: (s.pausedMs || 0) / 60000, deaths: s.deaths, levels: s.levels };
-  const expMins = o.expMins = expMsOf(s) / 60000, rated = expMins >= 2;
-  o.expHr = rated ? s.gainExp / (expMins / 60) : null;
-  o.expMin = rated ? s.gainExp / expMins : null;
-  o.pctHr = rated ? s.gainPct / (expMins / 60) : null;
+  const expMins = o.expMins = expMsOf(s) / 60000, has = rated(s);
+  o.expHr = has ? s.gainExp / (expMins / 60) : null;
+  o.expMin = has ? s.gainExp / expMins : null;
+  o.pctHr = has ? s.gainPct / (expMins / 60) : null;
   // what the grinding clock left out, and the plain number over all the time tracked, so the idle is never dropped unseen
   o.idleMins = Math.max(0, mins - expMins);
   o.allHr = mins >= 2 ? s.gainExp / hrs : null;
@@ -1385,5 +1387,5 @@ function wholeRows(minutes) {
   for (let i = 0; i < xs.length; i += 60) rows.push(xs.slice(i, i + 60));
   return rows;
 }
-window.GrindSession = { CFG, EXP_TABLE, levelOfExp, wholeRows, create, add, stats, expMinOf, idleNow, countdown, countdowns, minuteOf, toRow, fromRow, mark, trade, keepMesos, rebase, lootOf, bagTabs, bagOpening, profitWords, shopOf, learnPrice, result, rateRun, soldAll, townOf, profitOf, usualOf, standing, bagListShows, pickMap, pickups, setWorth, worthOf, logOf, lineMesos };
+window.GrindSession = { CFG, EXP_TABLE, levelOfExp, wholeRows, create, add, stats, expMinOf, idleNow, rated, countdown, countdowns, minuteOf, toRow, fromRow, mark, trade, keepMesos, rebase, lootOf, bagTabs, bagOpening, profitWords, shopOf, learnPrice, result, rateRun, soldAll, townOf, profitOf, usualOf, standing, bagListShows, pickMap, pickups, setWorth, worthOf, logOf, lineMesos };
 })();
