@@ -1797,9 +1797,10 @@ function mount(root, deps) {
     // the one thing to do, only when there is one (a saved session being looked at isn't live); a check that matters failing is
     // the problem line instead, with Find my game again at its end
     const problem = h.nudge.state === 'bad' && !appOld;
-    // in the app the overlay's light and tab lights ask for the bag, so the main window's amber line only does while it's closed (2026-11-25)
+    // in the app the overlay's light and tab lights ask for the bag, so the main window's amber line only does while it's closed
+    // (2026-11-25), or Always on top is off and it can be out of sight behind the game
     const bagAsk = !!h.nudge.flip || h.nudge.short === 'Open your bag';
-    V.nudge.hidden = !!viewing || problem || h.nudge.state === 'ok' || (h.nudge.state === 'idle' && !s) || (!!appView && bagAsk && !!overlay.win());
+    V.nudge.hidden = !!viewing || problem || h.nudge.state === 'ok' || (h.nudge.state === 'idle' && !s) || (!!appView && bagAsk && !!overlay.win() && prefs.onTop);
     V.problem.hidden = !!viewing || !problem;
     if (V.problemText.textContent !== h.nudge.text) V.problemText.textContent = h.nudge.text;
     reshareBtn.hidden = !h.nudge.reshare; refindBtn.hidden = !!h.nudge.reshare;

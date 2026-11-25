@@ -561,18 +561,23 @@ body.in-app:has(#view-grind:not([hidden]) #ga-win) .credit { margin: var(--gap) 
 #ga-win .ga-strip .g-ground { height: 70px; margin-inline: 0; border: 2px solid var(--card-o); border-radius: var(--r-card); }
 /* the one bar (2026-11-25): a glass window, left to right the map's pick with the light and the run's length under it, EXP an hour,
    Profit an hour, the run buttons, a thin rule, Settings and Quit as icon squares. A narrow window wraps the buttons to a second row */
-#ga-win .ga-line { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap) 20px; padding: 10px 14px; background: var(--surface); border: 2px solid var(--card-o); border-radius: var(--r-card); }
+#ga-win .ga-line { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap) 10px; padding: 10px 12px; background: var(--surface); border: 2px solid var(--card-o); border-radius: var(--r-card); }
 #ga-win .ga-line > * { margin: 0; }
 #ga-win .ga-where .g-ghead { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin: 0; padding: 0; border: 0; background: none; min-height: 0; }
-#ga-win .ga-where .g-ghead > .push { display: flex; align-items: center; gap: 10px; margin: 0; }
+#ga-win .ga-where .g-ghead > .push { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; margin: 0; }
 #ga-win:not(.done) .ga-where .ga-lbl { display: none; }
+#ga-win .ga-where { min-width: 0; max-width: 196px; }
+#ga-win .ga-where .g-pickw { max-width: 100%; }
+#ga-win .ga-where .g-pickt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #ga-win .ga-len { color: var(--ink); font: 600 var(--fs-sm) var(--font-num); font-variant-numeric: tabular-nums; }
 #ga-win .ga-len:empty { display: none; }
-#ga-win .ga-line #g-now, #ga-win .ga-endnums { flex: none; width: auto; min-width: 0; padding: 0 0 0 20px; border: 0; border-left: 1px solid var(--div); border-radius: 0; background: none; box-shadow: none; }
+#ga-win .ga-line #g-now, #ga-win .ga-endnums { flex: none; width: auto; min-width: 0; padding: 0 0 0 12px; border: 0; border-left: 1px solid var(--div); border-radius: 0; background: none; box-shadow: none; }
 /* the big number over its label, the refresh and the vs usual beside the label */
 #ga-win .ga-line .g-glead { display: contents; }
-#ga-win .ga-line .g-gleadrow { display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; max-width: 260px; }
-#ga-win .ga-line .g-gleadrow .g-gbig, #ga-win .ga-line .g-gclock { flex-basis: 100%; }
+#ga-win .ga-line .g-gleadrow { display: grid; grid-template-columns: auto auto; justify-content: start; align-items: center; gap: 0 6px; }
+#ga-win .ga-line .g-gleadrow .g-gbig { grid-row: 1; }
+#ga-win .ga-line .g-gleadrow .g-fresh { grid-row: 1; grid-column: 2; }
+#ga-win .ga-line .g-gleadrow .g-glbl, #ga-win .ga-line .g-gclock { grid-column: 1 / -1; }
 #ga-win .ga-endnums .g-gleadrow { flex-direction: column; align-items: flex-start; }
 #ga-win .ga-line .g-gsmall { display: none !important; }
 #ga-win .ga-line .g-glbl { color: var(--muted); font: 600 var(--fs-sm) var(--font-body); }
@@ -580,19 +585,19 @@ body.in-app:has(#view-grind:not([hidden]) #ga-win) .credit { margin: var(--gap) 
 #ga-win .ga-profit .g-gbig { color: var(--ink); }
 #ga-win .ga-profit .g-gbig.pos { color: var(--good); }
 #ga-win .ga-profit .g-gbig.neg { color: var(--bad); }
-#ga-win .ga-btns { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap); margin-left: auto; }
-#ga-win .ga-runbtns { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap); }
+#ga-win .ga-btns { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-left: auto; }
+#ga-win .ga-runbtns { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 #ga-win .ga-runbtns .k-btn, #ga-win .ga-btns .ga-ico { margin: 0; }
-#ga-win .ga-runbtns .k-btn { padding-inline: 14px; }
+#ga-win .ga-runbtns .k-btn { padding-inline: 10px; }
 #ga-win .ga-runbtns #g-share > i { display: none; }
 #ga-win .ga-runbtns #g-sharearea { display: contents; }
 #ga-win .ga-runbtns .g-gruns { display: contents; }
 #ga-win .ga-runbtns .g-rundiv { display: none; }
-#ga-win .ga-runbtns .g-runb.k-btn { padding: 8px 14px calc(8px + 3px); color: var(--btn-ink); text-decoration: none; }
+#ga-win .ga-runbtns .g-runb.k-btn { padding: 8px 10px calc(8px + 3px); color: var(--btn-ink); text-decoration: none; }
 #ga-win .ga-runbtns .g-runb.k-btn:disabled { color: var(--muted); }
 #ga-win .ga-rule { align-self: stretch; width: 1px; margin-block: 4px; background: var(--div); }
-#ga-win .ga-ico { width: 42px; height: 42px; padding: 0 0 3px; }
-#ga-win .ga-ico > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+#ga-win .ga-ico { width: 40px; height: 40px; padding: 0 0 3px; }
+#ga-win .ga-ico > span, #ga-win .ga-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 /* the lines that need you: one line each, the bag's rows never here (the overlay asks for the bag) */
 #ga-win .ga-needs { flex: none; display: flex; flex-direction: column; gap: var(--gap); }
 #ga-win .ga-needs > * { flex: none; margin: 0; }
@@ -623,7 +628,7 @@ body.in-app:has(#view-grind:not([hidden]) #ga-win) .credit { margin: var(--gap) 
 #ga-win .ga-line #g-now { margin: 0; }
 #ga-win .ga-line .g-grows { display: none; }
 #ga-win .ga-line .g-gleadrow { padding: 0; border: 0; }
-#ga-win .ga-line .g-gbig { font-size: var(--n-l); line-height: 1.1; }
+#ga-win .ga-line .g-gbig { font-size: calc(var(--n-l) * 0.9); line-height: 1.1; }
 #ga-win .ga-strip .g-mob { zoom: .62; }
 /* after End run: the strip stands still and dims, the live buttons and number card make way for the run's own numbers and Start a new run */
 #ga-win .ga-strip.still { opacity: .6; }
@@ -641,7 +646,7 @@ body.in-app:has(#view-grind:not([hidden]) #ga-win) .credit { margin: var(--gap) 
 #ga-win #ga-went .g-nv.gold { color: var(--gold, var(--lime)); }
 #ga-win .ga-print { flex: none; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--gap); }
 #ga-win .ga-print .g-print { display: contents; }
-#ga-win .ga-print .g-note, #ga-win .ga-print p { margin: 0; font-size: 12px; }
+#ga-win .ga-print .g-note, #ga-win .ga-print p { margin: 0; font-size: var(--fs-xs); }
 /* Home (Rimmah, 2026-11-24): the page the app opens on, one column as wide as Grind's, the kit's one gap between its blocks, an empty block takes none */
 #home-root { max-width: 720px; width: calc(100% - 2 * var(--gap)); margin: 28px auto 40px; display: grid; gap: var(--gap); font-weight: 400; }
 #home-root [hidden] { display: none !important; }
@@ -2780,7 +2785,7 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-25c',
+  version: '2026-11-25d',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };

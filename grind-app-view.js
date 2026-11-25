@@ -41,6 +41,12 @@ function build({ el, parts, more, K, pic }) {
   const icons = [ico(parts.set), ico(parts.quit)].filter(Boolean);
   // New run and End run are bark buttons here, the same as Stop (on the site they're plain words)
   if (parts.runs) for (const b of parts.runs.querySelectorAll('button')) b.classList.add('k-btn');
+  // Show the overlay reads Overlay so the bar keeps one row at 953: "Show the" stays for screen readers and hover
+  const popWords = parts.pop && parts.pop.querySelector('span');
+  if (popWords && /^Show the overlay$/.test(popWords.textContent)) {
+    popWords.replaceChildren(el('span', { class: 'ga-sr' }, 'Show the '), 'Overlay');
+    parts.pop.title = 'Show the overlay';
+  }
   const runBtns = el('div', { class: 'ga-runbtns' }, parts.share || null, parts.runs || null, parts.pop || null, parts.view || null, startBtn);
   const line = el('div', { class: 'ga-line' }, where, parts.nums, endNums, profit,
     el('div', { class: 'ga-btns' }, runBtns, icons.length ? el('span', { class: 'ga-rule', 'aria-hidden': 'true' }) : null, ...icons));
