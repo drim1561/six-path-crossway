@@ -561,14 +561,18 @@ body.in-app:has(#view-grind:not([hidden]) #ga-win) .credit { margin: var(--gap) 
 #ga-win .ga-line { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap); }
 #ga-win .ga-line > * { margin: 0; }
 #ga-win .ga-btns { display: flex; flex-wrap: wrap; gap: var(--gap); margin-left: auto; }
-/* the lines that need you scroll inside themselves when tall (the bag check), so the panes and More keep the rest */
-#ga-win .ga-needs { flex: none; max-height: 30%; overflow-y: auto; display: flex; flex-direction: column; gap: var(--gap); }
-#ga-win .ga-needs > * { flex: none; }
+/* the lines that need you give way first when the window is short (they scroll inside themselves), so the two lists stay readable;
+   the bag's three looks sit side by side here */
+#ga-win .ga-needs { flex: 0 100 auto; min-height: 36px; max-height: 30%; overflow-y: auto; display: flex; flex-direction: column; gap: var(--gap); }
+#ga-win .ga-needs .g-bagcheck { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0 var(--gap); margin: 0; padding: 6px 14px; }
+#ga-win .ga-needs .g-bagcheck li { padding: 2px 0; background: none; border: 0; }
+#ga-win .ga-needs > * { flex: none; margin: 0; }
+#ga-win .ga-needs > .g-check:not(:has(> :not([hidden]))) { display: none; }
 #ga-win.more .ga-needs { display: none; }
 #ga-win .ga-needs:not(:has(> :not([hidden]))) { display: none; }
-#ga-win .ga-panes { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); }
+#ga-win .ga-panes { flex: 1 1 180px; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); }
 /* stacked, each pane keeps room for a few rows: a window too small for that scrolls the page rather than squeezing them away */
-@media (max-width: 700px) { #ga-win { min-height: min-content; } #ga-win .ga-panes { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } #ga-win .ga-pane { min-height: 160px; } }
+@media (max-width: 700px) { #ga-win { min-height: min-content; } #ga-win .ga-panes { flex-basis: auto; grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } #ga-win .ga-pane { min-height: 160px; } }
 #ga-win .ga-pane { min-height: 0; display: flex; flex-direction: column; background: var(--surface); border: 2px solid var(--card-o); border-radius: var(--r-card); overflow: hidden; }
 #ga-win .ga-ph { flex: none; display: flex; align-items: baseline; gap: var(--gap); padding: 10px 14px; border-bottom: 1px solid var(--div); }
 #ga-win .ga-ph h3 { margin: 0; font: 400 var(--fs-md) var(--font-title); color: var(--ink); }
@@ -587,10 +591,10 @@ body.in-app:has(#view-grind:not([hidden]) #ga-win) .credit { margin: var(--gap) 
 #ga-win .ga-more [aria-expanded="true"] { color: var(--lime); }
 #ga-win .ga-strip .g-walker { bottom: 6px; }
 /* the line: EXP an hour with one quiet line under it, no rows (Your record and What it earned hold the rest) */
-#ga-win .ga-line #g-now { margin: 0; padding: 6px 14px; }
+#ga-win .ga-line #g-now { margin: 0; padding: 0 14px; }
 #ga-win .ga-line .g-grows { display: none; }
 #ga-win .ga-line .g-gleadrow { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; padding: 0; border: 0; }
-#ga-win .ga-line .g-gsmall { flex-basis: 100%; color: var(--muted); font: 600 var(--fs-sm) var(--font-num); font-variant-numeric: tabular-nums; }
+#ga-win .ga-line .g-gsmall { flex-basis: 100%; contain: inline-size; color: var(--muted); font: 600 var(--fs-sm) var(--font-num); font-variant-numeric: tabular-nums; }
 #ga-win .ga-line .g-gbig { font-size: var(--n-l); line-height: 1.1; }
 #ga-win .ga-strip .g-mob { zoom: .62; }
 /* after End run: the strip stands still and dims, the live buttons and number card make way for the run's own numbers and Start a new run */
