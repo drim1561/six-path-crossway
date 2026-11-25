@@ -1,7 +1,7 @@
 // This run, the session card at the top of Session details (a Trail Signs Window): where a run ranks among your own runs at
 // that map. First model, pure functions that turn the standings (GrindSession.standing) into what the card says; then
 // build, which draws it.
-// window.GrindCard = { ordinal, model, build }
+// window.GrindCard = { ordinal, partyLine, model, build }
 (function () {
 'use strict';
 
@@ -13,10 +13,26 @@ const ordinal = n => {
 };
 const dateOf = ms => ms ? new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
 
-// q = { live, map, mins, gained, levelFrom, levelTo, exp, mesos, verdict, pot, potName, lemon, meat, fmtK, fmtDur, fmtPer }
+// The party line (2026-11-24), from the party size saved with each minute ({ exp, party }): only minutes with EXP count,
+// and no reading or a party of one is solo. All solo says nothing, one size says it, a mix names the party size held
+// longest (the bigger on a tie) and its minutes out of all of them.
+function partyLine(minutes) {
+  const by = new Map(); let all = 0;
+  for (const m of minutes || []) {
+    if (!(m.exp > 0)) continue;
+    all++;
+    if (m.party > 1) by.set(m.party, (by.get(m.party) || 0) + 1);
+  }
+  let size = 0, n = 0;
+  for (const [s, c] of by) if (c > n || (c === n && s > size)) { size = s; n = c; }
+  return !n ? '' : n === all ? 'In a party of ' + size : 'In a party of ' + size + ' for ' + n + ' of ' + all + ' minutes';
+}
+
+// q = { live, map, mins, gained, levelFrom, levelTo, exp, mesos, verdict, pot, potName, lemon, meat, minutes, fmtK, fmtDur, fmtPer }
 // exp, mesos and pot are GrindSession.standing results (or null), lemon and meat are { n, quip }, gained the run's EXP.
 // fmtPer is the page's one rule for potions per 1% (Grind.perFmt).
-// -> { badge, title, sub, bar, of, line, tabs: [{ key, label, mine, usual, vs, rows: [{ label, note, value, lit, rank }], verdict, line }], lemon, meat }
+// minutes is the session's own (for the party line).
+// -> { badge, title, sub, bar, of, party, line, tabs: [{ key, label, mine, usual, vs, rows: [{ label, note, value, lit, rank }], verdict, line }], lemon, meat }
 function model(q) {
   const exp = q.exp || { value: null, rank: null, of: 0, best: null, usual: null };
   // no map (Rimmah, 2026-11-09: a map the reader can't name stays blank): nothing to rank against, and the live card says how to get one
@@ -55,7 +71,7 @@ function model(q) {
   if (q.pot && q.potName) tabs.push(tab('pot', q.potName + ' per 1%', q.pot, fmtPer, true, 'Needs ' + BEST_MIN + ' minutes and a whole 1% of EXP to rank.'));
   // sub is the whole line; bar is what the title bar says (the same without how many runs) and of what sits under the rank ring
   const bar = [q.live ? 'So far' : 'Session done', q.mins != null ? q.fmtDur(q.mins) : '', lv].filter(Boolean).join(' · ');
-  return { badge: place == null ? null : '#' + place, title, sub, bar, of: exp.of > 1 ? 'out of ' + exp.of + ' runs here' : '', line: place == null && short ? 'Runs under ' + BEST_MIN + ' minutes are not ranked.' : '', tabs, lemon: q.lemon || { n: 0, quip: '' }, meat: q.meat || { n: 0, quip: '' } };
+  return { badge: place == null ? null : '#' + place, title, sub, bar, of: exp.of > 1 ? 'out of ' + exp.of + ' runs here' : '', party: partyLine(q.minutes), line: place == null && short ? 'Runs under ' + BEST_MIN + ' minutes are not ranked.' : '', tabs, lemon: q.lemon || { n: 0, quip: '' }, meat: q.meat || { n: 0, quip: '' } };
 }
 
 /* ---------- the card ---------- */
@@ -69,13 +85,13 @@ function model(q) {
 function build({ el, pics, whole }) {
   const arrow = (node, text) => { if (window.PixelIcons) window.PixelIcons.arrowed(node, text); else node.textContent = text; };
   const barSub = el('small', {});
-  const rank = el('span', { class: 'k-ring big g-sc-rank' }), title = el('h3', { class: 'g-sc-title' }), of = el('p', { class: 'g-sc-sub' });
+  const rank = el('span', { class: 'k-ring big g-sc-rank' }), title = el('h3', { class: 'g-sc-title' }), of = el('p', { class: 'g-sc-sub' }), party = el('p', { class: 'g-sc-sub g-sc-party', hidden: '' });
   const tabsBox = el('div', { class: 'g-sc-tabs', role: 'tablist' }), panel = el('div', { class: 'g-sc-panel', role: 'tabpanel' });
   const pots = el('div', { class: 'g-sc-pots' });
   const card = el('section', { class: 'g-win g-sc', id: 'g-scard', hidden: '', 'aria-label': 'Where this run ranks' },
     el('div', { class: 'k-bar' }, el('h2', {}, 'Where it ranks'), barSub),
     el('div', { class: 'k-pad g-sc-body' },
-      el('div', { class: 'g-sc-head' }, rank, el('div', { class: 'g-sc-hd' }, title, of), tabsBox), panel, whole || null, pots));
+      el('div', { class: 'g-sc-head' }, rank, el('div', { class: 'g-sc-hd' }, title, of, party), tabsBox), panel, whole || null, pots));
 
   const drawn = {};
   const changed = (part, ...now) => { const k = JSON.stringify(now); if (drawn[part] === k) return false; drawn[part] = k; return true; };
@@ -118,7 +134,8 @@ function build({ el, pics, whole }) {
   function draw(m) {
     const t = m.tabs.find(x => x.key === picked) || m.tabs[0];
     if (t.key !== picked) picked = t.key;
-    if (changed('head', m.badge, m.title, m.bar, m.of)) {
+    if (changed('head', m.badge, m.title, m.bar, m.of, m.party)) {
+      party.textContent = m.party || ''; party.hidden = !m.party;
       rank.classList.toggle('gold', !!m.badge); rank.textContent = m.badge || ''; title.textContent = m.title; of.textContent = m.of; of.hidden = !m.of; barSub.textContent = m.bar;
     }
     drawTabs(m);
@@ -134,5 +151,5 @@ function build({ el, pics, whole }) {
   return { el: card, update };
 }
 
-window.GrindCard = { ordinal, model, build };
+window.GrindCard = { ordinal, partyLine, model, build };
 })();

@@ -546,33 +546,41 @@ const KILL_GAP = 2;
 // multi-target skill that kills a group (every monster in reach takes the same casts) for one walk.
 // road (Skill paths only; Train leaves it out): reach caps the monsters a cast of every skill, and first also tries the
 // class's 1st job attack in 2nd job (Magic Claw until Thunder Bolt overtakes it).
-function rankWith(s, cls, data, n, seed, road) {
-  const out = [], cap = road && road.reach || Infinity, P = phaseOf(cls, s.level);
-  if (seed === undefined) seed = hash(JSON.stringify(s));
+function fightModels(s, cls, road) {
+  const P = phaseOf(cls, s.level);
   // the lead attack first; a multi target skill that is the lead (Bolt first) isn't ranked twice
   const lead = attackModel(s, cls);
   const multi = MULTI.filter(id => id !== lead.skill && s.skills[id] >= 1 && DATA.skills[id]).map(id => attackModel(s, cls, undefined, id));
   const one = road && road.first && P.phase === 2 && cls.attack1 && s.skills[cls.attack1] >= 1 && DATA.skills[cls.attack1]
     && ![lead, ...multi].some(m => m.skill === cls.attack1) ? [attackModel(s, cls, undefined, cls.attack1)] : [];
-  const models = [lead].concat(multi, one, hasHeal(s, cls) ? [attackModel(s, cls, undefined, HEAL)] : []);
+  return [lead].concat(multi, one, hasHeal(s, cls) ? [attackModel(s, cls, undefined, HEAL)] : []);
+}
+// The best way this build fights one monster. countFor(am): how many monsters the skill has around it to gather.
+function bestFight(s, mob, models, countFor, cap, seed, n) {
+  let best = null;
+  // A skill whose pace on average damage is well behind another's isn't worth simulating.
+  const fights = models.filter(am => !am.undeadOnly || mob.undead).map(am => {
+    const hit = hitChance(s.acc, s.level, mob), mult = defend(1, mob[am.def]) * elemMult(mob, am.element) * levelScale(mob.level, s.level);
+    const k = crowdHits(countFor(am), am.targets, cap), range = am.rangeFor ? am.rangeFor(k) : am.range;
+    const avg = am.hits * hit * mult * (range[0] + range[1]) / 2 * (1 + am.crit.rate * am.crit.dmg);
+    return { am, hit, mult, k, range, guess: avg > 0 ? k * mob.exp / (Math.max(1, mob.hp / avg) + groupGap(k)) : 0 };
+  });
+  const top = Math.max(...fights.map(f => f.guess));
+  for (const { am, hit, mult, k, range, guess } of fights) {
+    if (guess < 0.8 * top) continue;
+    const casts = castsToKill({ hp: mob.hp, range, hits: am.hits, crit: am.crit, hit, mult }, makeRng(seed ^ mob.id), n);
+    if (casts === null) continue;
+    const pace = k * mob.exp / (casts + groupGap(k));
+    if (best && best.pace >= pace) continue;
+    best = { pace, casts, k, hit, am };
+  }
+  return best;
+}
+function rankWith(s, cls, data, n, seed, road) {
+  const out = [], cap = road && road.reach || Infinity, models = fightModels(s, cls, road);
+  if (seed === undefined) seed = hash(JSON.stringify(s));
   for (const mob of data.mobs) {
-    let best = null;
-    // A skill whose pace on average damage is well behind another's isn't worth simulating.
-    const fights = models.filter(am => !am.undeadOnly || mob.undead).map(am => {
-      const hit = hitChance(s.acc, s.level, mob), mult = defend(1, mob[am.def]) * elemMult(mob, am.element) * levelScale(mob.level, s.level);
-      const k = crowdHits(mob.maps[0][1], am.targets, cap), range = am.rangeFor ? am.rangeFor(k) : am.range;
-      const avg = am.hits * hit * mult * (range[0] + range[1]) / 2 * (1 + am.crit.rate * am.crit.dmg);
-      return { am, hit, mult, k, range, guess: avg > 0 ? k * mob.exp / (Math.max(1, mob.hp / avg) + groupGap(k)) : 0 };
-    });
-    const top = Math.max(...fights.map(f => f.guess));
-    for (const { am, hit, mult, k, range, guess } of fights) {
-      if (guess < 0.8 * top) continue;
-      const casts = castsToKill({ hp: mob.hp, range, hits: am.hits, crit: am.crit, hit, mult }, makeRng(seed ^ mob.id), n);
-      if (casts === null) continue;
-      const pace = k * mob.exp / (casts + groupGap(k));
-      if (best && best.pace >= pace) continue;
-      best = { pace, casts, k, hit, am };
-    }
+    const best = bestFight(s, mob, models, () => mob.maps[0][1], cap, seed, n);
     if (!best) continue;
     const { casts, k, hit, am } = best;
     out.push({ id: mob.id, name: mob.name, level: mob.level, hp: mob.hp, exp: mob.exp, def: mob[am.def], casts: Math.round(casts * 100) / 100,
@@ -580,6 +588,36 @@ function rankWith(s, cls, data, n, seed, road) {
       hit: Math.round(hit * 100), map: mob.maps[0][0], mapId: mob.maps[0][2], count: mob.maps[0][1] });
   }
   return out.sort((a, b) => b.pace - a.pace || b.exp - a.exp);
+}
+// Where to train (2026-11-24): maps, not monsters. Everything on a map that this build can kill counts, by how many of it
+// live there: a skill gathers from the whole map's crowd (Heal from its undead), each monster is fought the way rankWith
+// fights it, and the map's pace is all their EXP over all the casts and walks it takes to clear them once. So a map of one
+// monster gives rankWith's number. Monsters the build can't kill are left out, of the crowd too.
+function rankMaps(s, cls, data, n, seed) {
+  const models = fightModels(s, cls), byId = new Map(data.mobs.map(m => [m.id, m])), memo = new Map(), out = [];
+  if (seed === undefined) seed = hash(JSON.stringify(s));
+  const mobOf = id => byId.get(id) || (data.mapMobs && data.mapMobs[id] ? { id, ...data.mapMobs[id] } : null);
+  const fight = (mob, all, undead) => {
+    // the crowd only matters through how many each skill gathers, so most maps share a monster's fight
+    const key = mob.id + ':' + models.map(am => crowdHits(am.undeadOnly ? undead : all, am.targets)).join();
+    if (!memo.has(key)) memo.set(key, bestFight(s, mob, models, am => am.undeadOnly ? undead : all, Infinity, seed, n));
+    return memo.get(key);
+  };
+  for (const [mapId, map, list] of data.maps || []) {
+    let live = list.map(([id, count]) => ({ mob: mobOf(id), count })).filter(x => x.mob && x.mob.exp > 0), rows = [];
+    for (let pass = 0; pass < 2 && live.length; pass++) {
+      const all = live.reduce((a, x) => a + x.count, 0), undead = live.reduce((a, x) => a + (x.mob.undead ? x.count : 0), 0);
+      rows = live.map(x => ({ ...x, f: fight(x.mob, all, undead) }));
+      if (rows.every(r => r.f)) break;
+      live = rows.filter(r => r.f); rows = [];
+    }
+    if (!rows.length || rows.some(r => !r.f)) continue;
+    const exp = rows.reduce((a, r) => a + r.count * r.mob.exp, 0), steps = rows.reduce((a, r) => a + r.count * (r.f.casts + groupGap(r.f.k)) / r.f.k, 0);
+    out.push({ mapId, map, pace: Math.round(exp / steps * 10) / 10, count: rows.reduce((a, r) => a + r.count, 0),
+      mobs: rows.map(r => ({ id: r.mob.id, name: r.mob.name, level: r.mob.level, count: r.count, share: r.count * r.mob.exp / exp,
+        casts: Math.round(r.f.casts * 100) / 100, hits: r.f.k, hit: Math.round(r.f.hit * 100), skill: r.f.am.skill })).sort((a, b) => b.share - a.share || a.id - b.id) });
+  }
+  return out.sort((a, b) => b.pace - a.pace || b.count - a.count || a.mapId - b.mapId);
 }
 // A Cleric in 2nd job with at least a point in Heal.
 const hasHeal = (s, cls) => cls.id === 'cleric' && s.level >= ADVANCE && s.skills[HEAL] >= 1 && !!DATA.skills[HEAL];
@@ -618,22 +656,89 @@ function expMinOf(row) {
   const n = usual.length < 3 ? on.length : on.reduce((a, m) => a + (full(m) ? 1 : Math.min(1, Math.abs(m[1]) / slow)), 0);
   return Math.min(saved, Math.round(n * 1000) / 1000);
 }
+// Where to train: the player's own saved Grind sessions as EXP an hour for each map, solo apart from party. A run's
+// grinding minutes and EXP are split by the party size saved with each of its minutes (a party of only you, or no party
+// reading, is solo), so a run all one way gives the Grind's own number. A number counts when the run ended within
+// RUN_LEVELS below the build's level and its solo or party minutes on the map, pooled over runs, reach RUN_MIN. Of several
+// party sizes the one held longest shows. Runs outside those levels give old (the nearest level's, never today's number),
+// and only while the map has no real number. Sessions don't say which character played.
+const RUN_LEVELS = 3, RUN_MIN = 10;
+function mapRuns(rows, level) {
+  const maps = {}, out = {};
+  for (const r of rows || []) {
+    if (!r) continue;
+    const id = Number(r.map_id), lv = r.level_end || r.level_start, min = expMinOf(r);
+    if (!id || !lv || !(r.exp > 0) || !(min > 0)) continue;
+    let parts = new Map(), W = 0, E = 0;
+    // a minute weighs its grinding seconds; a run whose minutes carry none (an older run, or all zeros) weighs each minute with EXP as one
+    const list = (Array.isArray(r.minutes) ? r.minutes : []).filter(Array.isArray), timed = list.some(m => m[5] > 0);
+    for (const m of list) {
+      const size = m[3] > 1 ? m[3] : 0, w = timed ? m[5] || 0 : m[1] ? 1 : 0, p = parts.get(size) || { w: 0, e: 0 };
+      p.w += w; p.e += m[1] || 0; W += w; E += m[1] || 0; parts.set(size, p);
+    }
+    if (!(W > 0)) { parts = new Map([[0, { w: 1, e: 1 }]]); W = E = 1; }
+    const key = lv >= level - RUN_LEVELS && lv <= level ? 'now' : lv, at = maps[id] || (maps[id] = {}), pool = at[key] || (at[key] = new Map());
+    for (const [size, p] of parts) {
+      if (!(p.w > 0)) continue;
+      const b = pool.get(size) || { min: 0, exp: 0, runs: 0, size, ids: new Set() };
+      b.min += min * p.w / W; b.exp += r.exp * (E > 0 ? p.e / E : p.w / W); b.runs++; b.ids.add(r); pool.set(size, b);
+    }
+  }
+  const hour = b => Math.round(b.exp / b.min * 60 / 100) * 100, row = b => ({ expHour: hour(b), min: Math.round(b.min * 10) / 10, runs: b.runs });
+  const pick = pool => {
+    const ok = [...pool.values()].filter(b => b.min >= RUN_MIN && b.exp > 0);
+    return { solo: ok.find(b => !b.size), party: ok.filter(b => b.size).sort((a, b) => b.min - a.min || a.size - b.size)[0] };
+  };
+  for (const id of Object.keys(maps)) {
+    const now = pick(maps[id].now || new Map()), o = {};
+    if (now.solo) o.solo = row(now.solo);
+    if (now.party) o.party = { ...row(now.party), size: now.party.size };
+    // sessions behind the numbers shown (one that was solo then a party counts once)
+    if (now.solo || now.party) o.runs = new Set([...(now.solo ? now.solo.ids : []), ...(now.party ? now.party.ids : [])]).size;
+    if (!o.solo && !o.party) {
+      const lvs = Object.keys(maps[id]).filter(k => k !== 'now').map(Number).sort((a, b) => Math.abs(a - level) - Math.abs(b - level) || a - b);
+      for (const lv of lvs) {
+        const p = pick(maps[id][lv]), b = p.solo || p.party;
+        if (b) { o.old = { expHour: hour(b), level: lv, size: b.size }; break; }
+      }
+    }
+    if (o.solo || o.party || o.old) out[id] = o;
+  }
+  return out;
+}
+// The one list: maps by the player's solo number, else their party number, else the estimate (est). A map is listed when
+// it has WHERE_MIN or more monsters the build can kill, or a run of the player's own (an old one too, which never sorts).
+const WHERE_MIN = 8, WHERE_ROWS = 5, WHERE_MORE = 15;
+function whereList(maps, runs) {
+  const out = [];
+  for (const m of maps || []) {
+    const r = runs && runs[m.mapId] || {}, real = !!(r.solo || r.party);
+    if (m.count < WHERE_MIN && !real && !r.old) continue;
+    out.push({ mapId: m.mapId, map: m.map, count: m.count, mobs: m.mobs, est: m.expHour, solo: r.solo || null, party: r.party || null, old: r.old || null, real, runs: r.runs || 0,
+      sort: r.solo ? r.solo.expHour : r.party ? r.party.expHour : m.expHour });
+  }
+  return out.sort((a, b) => b.sort - a.sort || b.count - a.count || a.mapId - b.mapId);
+}
 // Seconds a step takes for this player, from their saved Grind sessions: those of 10 minutes or more within 5 levels of
 // the build (sessions don't say which character, and an alt or older, weaker stats would skew it), each scored with the
 // build's stats at the best monster the ranking has on that map. The median, or STEP_SEC when none fit.
+// With maps (rankMaps rows) tuneSeconds also gives the map list's own clock, mapSec: the same runs scored against their
+// whole map's pace (lower than its best monster's), so a map's estimate lands on what the player got there. Null when none fit.
 const TUNE_MIN = 10, TUNE_LEVELS = 5;
-function tuneSeconds(s, cls, rows) {
-  const rank = rankWith(s, cls, DATA), secs = [];
+function tuneSeconds(s, cls, rows, maps) {
+  const rank = rankWith(s, cls, DATA), secs = [], mapSecs = [], paceOf = new Map((maps || []).map(m => [m.mapId, m.pace]));
   for (const r of rows || []) {
     const min = expMinOf(r), lv = r.level_end || r.level_start;
     if (!(min >= TUNE_MIN) || !(r.exp > 0) || !lv || Math.abs(lv - s.level) > TUNE_LEVELS) continue;
     const here = new Set(DATA.mobs.filter(m => m.maps.some(x => x[2] === Number(r.map_id))).map(m => m.id));
     const best = rank.filter(x => here.has(x.id)).reduce((b, x) => Math.max(b, x.pace), 0);
     if (best > 0) secs.push(best * 60 / (r.exp / min));
+    const mp = paceOf.get(Number(r.map_id));
+    if (mp > 0) mapSecs.push(mp * 60 / (r.exp / min));
   }
-  secs.sort((a, b) => a - b);
-  const n = secs.length;
-  return { sec: n ? (n % 2 ? secs[(n - 1) / 2] : (secs[n / 2 - 1] + secs[n / 2]) / 2) : STEP_SEC, n };
+  const mid = a => { a.sort((x, y) => x - y); const n = a.length; return n ? (n % 2 ? a[(n - 1) / 2] : (a[n / 2 - 1] + a[n / 2]) / 2) : null; };
+  const n = secs.length, mapSec = mid(mapSecs);
+  return { sec: n ? mid(secs) : STEP_SEC, n, mapSec, mapN: mapSecs.length };
 }
 /* ---------- Skill paths ---------- */
 
@@ -1178,13 +1283,22 @@ function buildGuide(raw, clsId, data, roads) {
   const held = cls.family === 'phys' && DATA.gear.find(x => x.id === s.weapon);
   const weapon = physical(cls) ? { id: held ? held.id : null, slot, name: held ? held.name : null, wat: held ? held.inc.wat || 0 : null, W: am.W } : null;
   for (const r of rank) r.expHour = expHour(r.pace);
-  return { ok: true, sec: STEP_SEC, phase: P.phase, estimated: cls.family === 'phys' && !CHECKED_WEAPONS.has(slot), weapon, assumed: v.assumed, stats: s,
+  return withMaps({ ok: true, sec: STEP_SEC, phase: P.phase, estimated: cls.family === 'phys' && !CHECKED_WEAPONS.has(slot), weapon, assumed: v.assumed, stats: s,
     attack: { min: Math.round(am.range[0]), max: Math.round(am.range[1]), avg: Math.round(sum / 2 * am.hits), skill: am.skill },
     heal: hasHeal(s, cls) ? (h => ({ min: h.range[0], max: h.range[1], level: s.skills[HEAL], targets: h.targets }))(attackModel(s, cls, undefined, HEAL)) : null,
     paths, overview: overviewSpots(s, cls, rank), ranked: rank, train: rank.slice(0, 10), here: rank[0] || null, tryNext: worthTry(rank, s.level, rank[0] && rank[0].id), stages,
     stageHours: stageHours(s, stages),
     skills, ap, gear, next: planNext(s, cls, P, skills, physical(cls) ? am.W : bestWeapon(slot, s.level, 'mad')),
-    scrolls: planScrolls(s, cls, gear, spot), standing: standing(s, cls, spot), worth: worthTable(s, cls, spot), prices: data.prices || null };
+    scrolls: planScrolls(s, cls, gear, spot), standing: standing(s, cls, spot), worth: worthTable(s, cls, spot), prices: data.prices || null }, s, cls, data);
+}
+// g.maps, ranked the first time it is asked for: a guide is built far more often (every forecast, every test) than the
+// Train page is opened, and ranking every map costs about as much as the rest of the guide.
+function withMaps(g, s, cls, data) {
+  let maps = null;
+  return Object.defineProperty(g, 'maps', { enumerable: false, get() {
+    if (!maps) { DATA = data; maps = rankMaps(s, cls, data); for (const m of maps) m.expHour = expHour(m.pace); }
+    return maps;
+  } });
 }
 
 /* ---------- The road ahead ---------- */
@@ -1686,8 +1800,9 @@ function tuneFor(g) {
   const t = tuneSeconds(g.stats, CLASSES[ui.form.cls], ui.grind.rows);
   return { ...t, why: t.n ? 'tuned' : 'none' };
 }
-function loadGrind() {
-  const g = ui.grind = { user: me().user_id, rows: null };
+// again: a reload (coming back to Your Path after a run was saved) keeps the rows it has until the new ones land
+function loadGrind(again) {
+  const g = ui.grind = { user: me().user_id, rows: again && ui.grind && ui.grind.user === me().user_id ? ui.grind.rows : null };
   if (!ui.deps.api.listGrind) { g.rows = []; return; }
   ui.deps.api.listGrind().then(r => { g.rows = r || []; }, () => { g.rows = []; }).then(() => { if (ui.grind === g) renderGuide(); });
 }
@@ -1698,9 +1813,25 @@ const TUNE_TEXT = {
   signedout: () => 'A rough guess. Sign in and save a Grind session to tune it to how fast you play.',
   none: () => "A rough guess until you've saved a Grind session near this level." };
 const tuneText = t => TUNE_TEXT[t.why](t);
-// Puts the tuned clock on every ranking row the guide shows.
-function applyTune(g, t) {
+// Where to train's real numbers: the signed in player's own runs, for any build but a friend's (sessions don't say which
+// character played, so a build typed in by hand gets them too).
+function runsFor(g) {
+  if (ui.form.from === 'friend' || !me()) return {};
+  if (!ui.grind || ui.grind.user !== me().user_id) loadGrind();
+  return ui.grind.rows ? mapRuns(ui.grind.rows, g.stats.level) : {};
+}
+// The map list's clock: wherever the list shows the player's runs, its estimates run on the clock those runs set (a typed
+// build too), so an About number can be read against a You got number. Null: the page's clock.
+function mapClock(g) {
+  if (ui.form.from === 'friend' || !me() || !ui.grind || !ui.grind.rows) return null;
+  return tuneSeconds(g.stats, CLASSES[ui.form.cls], ui.grind.rows, g.maps).mapSec;
+}
+// Puts the tuned clock on every ranking row the guide shows, and builds Where to train (g.where) from the tuned map
+// estimates and the player's runs.
+function applyTune(g, t, runs, mapSec) {
   g.sec = t.sec; g.tune = t;
+  for (const m of g.maps) m.expHour = expHour(m.pace, mapSec || t.sec);
+  g.where = whereList(g.maps, runs);
   const o = g.overview;
   // g.ranked too, so the item finder's numbers match the ranking's
   for (const r of [...g.ranked, ...g.train, ...g.tryNext, ...g.stages.flatMap(st => st.picks), ...o.spots.map(x => x.row), ...(o.maxed ? [o.maxed.row] : [])]) r.expHour = expHour(r.pace, t.sec);
@@ -1805,62 +1936,54 @@ function drawFind() {
 function renderPanels(g) {
   loadPics();
   const lv = g.stats.level;
-  const train = ui.root.querySelector('#train'), h = g.here;
+  const train = ui.root.querySelector('#train');
   const sec = text => E('h4', { class: 'b-sec' }, text), ahead = g.stages.length ? g.stages[g.stages.length - 1].to - lv : 0;
   const where = m => shortMap(m.map);
-  const crowd = m => m.hits > 1 ? ui.data.skills[m.skill].name + ' hits about ' + m.hits + ' at a time' : '';
-  // See all on Train here now opens under its own card; on Worth a try, one shared list under the grid, refilled by
-  // another card's button and closed by the same one.
-  const openHere = (btn, m, dg) => {
-    const box = btn.closest('.b-here'), cur = box.querySelector('.b-dropall');
+  // Where to train (2026-11-24): one list of maps. A row is its place, the map, the number (the player's own where they
+  // have one, solo then party, else the estimate with any old run greyed under it) and one quiet line: the two monsters
+  // with the most EXP there, and the runs behind a real number. The drops line is the top monster's; See all opens its
+  // list under its own row.
+  const openDrops = (btn, m, dg) => {
+    const box = btn.closest('.b-wmap'), cur = box.querySelector('.b-dropall');
     if (cur) { cur.remove(); btn.textContent = btn.dataset.label; return; }
     box.append(E('div', { class: 'b-dropall' }, dropList(m, dg, lv)));
     btn.textContent = 'Hide drops';
   };
-  const tryAll = E('section', { id: 'b-tryall', class: 'b-dropall k-card', hidden: '' });
-  const openTry = (btn, m, dg) => {
-    const again = !tryAll.hidden && tryAll.dataset.mob === String(m.id);
-    train.querySelectorAll('.b-tryone .b-seeall').forEach(b => { b.textContent = b.dataset.label; });
-    if (again) { tryAll.hidden = true; return; }
-    tryAll.replaceChildren(...dropList(m, dg, lv));
-    tryAll.dataset.mob = String(m.id); tryAll.hidden = false;
-    btn.textContent = 'Hide drops';
+  const got = (r, party) => E('div', { class: 'b-wgot' }, E('span', { class: 'small' }, 'You got '), E('b', { class: 'num b-hr' }, perHour(r.expHour)),
+    party ? E('span', { class: 'small' }, ' in a party of ' + r.size) : null);
+  const mapRow = (w, place, i) => {
+    const top = w.mobs[0], runs = w.runs;
+    return E('div', { class: 'b-wmap' + (i ? '' : ' first') },
+      E('div', { class: 'b-wrow k-row' }, mobPic(top.id),
+        E('div', { class: 'b-wbody' }, E('div', { class: 'b-wname' }, E('span', { class: 'b-wn' }, String(place)), ' ', E('b', { class: 'b-name' }, where(w))),
+          E('div', { class: 'small b-wline' }, w.mobs.slice(0, 2).map(m => m.name).join(', ') + (runs ? ' · ' + plain(runs, 'run') : ''))),
+        E('div', { class: 'b-wnum' }, w.solo ? got(w.solo) : null, w.party ? got(w.party, true) : null,
+          w.real ? null : E('div', { class: 'b-west' }, E('span', { class: 'small' }, 'About '), E('b', { class: 'num b-hr' }, perHour(w.est))),
+          w.real || !w.old ? null : E('div', { class: 'small b-wold' }, 'You got ' + perHour(w.old.expHour) + ' at level ' + w.old.level + (w.old.size ? ' in a party of ' + w.old.size : '')))),
+      dropsLine(top, lv, i ? 1 : 3, openDrops));
   };
+  // five rows, then show more: the next ten, and any map further down with a number of the player's own
+  const whereBox = E('div', { id: 'b-where' }, g.where.map((w, i) => ({ w, place: i + 1 })).filter(x => x.place <= WHERE_MORE || x.w.real).map((x, i) => extra(mapRow(x.w, x.place, i), i, WHERE_ROWS)));
+  moreButton(whereBox, 'Show more maps');
   // The finder stays first and is never taken out of the page (taking it out, even to put it straight back, drops its
   // focus), so everything after it is cleared and redrawn.
-  const why = E('span', { class: 'b-why' }, 'Casts to kill, from a few thousand simulated kills with your damage range, crits, monster defense and hit chance, plus about 2 casts of walking between kills. So a monster you one shot only wins if its EXP holds up. ',
+  const why = E('span', { class: 'b-why' }, 'A map counts every monster on it that you can kill, by how many of each live there. Casts to kill come from a few thousand simulated kills with your damage range, crits, monster defense and hit chance, plus about 2 casts of walking between kills. So a monster you one shot only wins if its EXP holds up. ',
     'Skills that hit several monsters get credit for about one monster in reach for every ' + CROWD + ' the map spawns, and each extra one costs a cast of walking to gather. ',
-    'Only "Train here now" and "Worth a try" use your numbers. The next levels assume you follow this guide: its AP, skill points and the best weapon you can wear.');
+    'A number that says You got is your own, from your saved Grind sessions on that map within ' + RUN_LEVELS + ' levels of this build (up to ' + RUN_LEVELS + ' levels below), ' + RUN_MIN + ' minutes or more. ',
+    'Only "Where to train" uses your numbers. The next levels assume you follow this guide: its AP, skill points and the best weapon you can wear.');
   const finder = findBox();
   for (const c of [...train.childNodes]) if (c !== finder) c.remove();
   if (train.firstChild !== finder) train.prepend(finder);
   train.append(
-    sec('Train here now'),
-    h ? E('div', { class: 'b-here k-card' }, E('div', {}, E('b', { class: 'b-name' }, h.name), ' ', E('span', { class: 'small' }, 'lv ' + h.level)),
-      E('div', { class: 'small' }, [where(h), castsText(h), h.hit + '% hit', fmt(h.exp) + ' EXP each', crowd(h)].filter(Boolean).join(', ')),
-      E('div', { class: 'b-hrbig' }, 'About ', E('b', { class: 'num' }, perHour(h.expHour)), h.skill === HEAL ? ' with Heal' : ''),
-      dropsLine(h, lv, 3, openHere))
-      : E('p', { class: 'small' }, 'Nothing you can kill yet.'),
+    sec('Where to train'),
+    g.where.length ? whereBox : E('p', { class: 'small' }, 'Nothing you can kill yet.'),
     E('p', { class: 'small b-tune' }, 'EXP an hour: ' + tuneText(g.tune)),
-    sec('Worth a try'),
-    g.tryNext.length ? E('div', { class: 'b-try' }, g.tryNext.map(m => E('div', { class: 'b-tryone k-card' },
-      E('b', {}, m.name), ' ', E('span', { class: 'small' }, 'lv ' + m.level), E('div', { class: 'small' }, [where(m), castsText(m), m.hit + '% hit', crowd(m)].filter(Boolean).join(', ')),
-      dropsLine(m, lv, 1, openTry))))
-      : E('p', { class: 'small' }, 'Nothing up to 8 levels above you that you hit often enough yet.'),
-    ...(g.tryNext.length ? [tryAll] : []),
     sec(ahead > 0 ? 'Your next ' + ahead + ' levels' : 'From here'),
     E('ul', { class: 'b-time' }, g.stages.map(st => E('li', { class: 'b-ev b-stage' }, E('span', { class: 'num' }, range(st.from, st.to)),
       E('span', {}, E('b', {}, st.picks.map(m => m.name).join(', ')), ' ', E('span', { class: 'small' }, st.picks.map(where).filter((x, i, a) => a.indexOf(x) === i).join(', ')),
         st.why ? [' ', E('span', { class: 'k-tag' }, st.why)] : null)))),
-    sec('Every map, ranked'),
-    ...g.train.map((m, i) => extra(E('div', { class: 'b-mob' },
-      E('div', {}, E('div', {}, E('b', { class: 'b-name' }, m.name), ' ', E('span', { class: 'small' }, 'lv ' + m.level)),
-        E('div', { class: 'small' }, [m.map, castsText(m), m.hit + '% hit', fmt(m.hp) + ' HP', crowd(m)].filter(Boolean).join(', '))),
-      E('div', { class: 'num' }, E('div', { class: 'n b-hr' }, perHour(m.expHour)), E('div', { class: 'small' }, fmt(m.exp) + ' EXP a kill'))), i, 0)),
     E('p', { class: 'small b-foot' }, 'Ranked by EXP over time, using your damage, crits and hit chance. ',
       fold("How it's ranked", why), ' ', why));
-  moreButton(train, 'Show all ' + g.train.length + ' maps');
-  train.append(train.querySelector('.b-foot'));
   renderFind(g);
 
   const pts = pointsPlan(g), chip = { ap: 'AP', sp: 'SP', up: 'upgrade', job: 'job' };
@@ -2426,7 +2549,7 @@ function renderGuide() {
     for (const [id] of TABS) ui.root.querySelector('[data-tab="' + id + '"]').hidden = false;
     showTab(ui.deps.store.get('bt.btab'));
   }
-  applyTune(g, tuneFor(g));
+  { const runs = runsFor(g); applyTune(g, tuneFor(g), runs, mapClock(g)); }
   const guessed = [...new Set(g.assumed.map(k => ASSUMED_LABEL[k]))];
   if (guessed.length) {
     msg.className = 'note';
@@ -2866,6 +2989,8 @@ function mount(root, deps) {
   ui.root = root; ui.deps = deps; ui.data = deps.data; DATA = deps.data;
   ui.editing = null; ui.loaded = null; ui.mineRows = null; ui.done = {}; ui.fresh = { build: null, ids: new Set() }; ui.busy = new Set(); ui.tickNote = null; ui.qArgs = null; ui.limited = false; ui.lastIgn = ''; try { ui.lastIgn = ui.deps.store.get('bt.ign') || ''; } catch { /* no saved name */ } ui.listGen = 0; ui.who = null; ui.filter = { cls: '', minLv: '', maxLv: '', sort: 'level' };
   loadForm(); loadRoads();
+  // coming back to Your Path (from the Grind tab, say): a run saved since then should show, so the sessions load again
+  if (!ui.hashed && window.addEventListener) { ui.hashed = true; window.addEventListener('hashchange', () => { if (location.hash === '#builds' && ui.root && me() && ui.grind && ui.grind.rows) loadGrind(true); }); }
   const shut = open => open ? {} : { hidden: '' };
   const P = window.PixelIcons;
   // a wood sign button with its pixel picture (the Grind page's buttons); the minus is built from the same bitmap tool
@@ -2930,6 +3055,6 @@ function mount(root, deps) {
 const estimatedNote = () => E('p', { id: 'b-estimated', class: 'k-foot b-badge', hidden: '' }, E('b', {}, 'Estimated. '), "Damage for this weapon comes from meowdb's table and hasn't been checked against a real stat window yet.");
 
 window.Builds = { planSkills, skillsFor, skillsAt, slotOf, comparePaths, resetLine, roadBar, modelRoads, MODEL_ATTACKS, roadLine, ROADS, roadIds, roadState, recognize, ZERO_OK, REACH, HOLD, ROAD_KILLS, roadTarget, mainAttack, crowdHits, rankWith, attackModel, statsAt, planAP, pathClass, firstJobSkills, indieMagic, roadStats, tuneSeconds, expMinOf, EXP_TABLE, STEP_SEC, expHour, hoursTo, healRange, HEAL, standingText, KILL_GAP, CLASSES, BRANCHES, branchOf, weaponsFor, mastery, physRange, spellRange, weaponAttackFromMax, WEAPONS, CHECKED_WEAPONS, windowRange, levelScale, hitChance, defend, elemMult, makeRng, castsToKill,
-  validateStats, rankMobs, buildGuide, pointsPlan, mount, fill, refresh, signedOut, shrinkImage, take, classOf,
+  validateStats, rankMobs, rankMaps, mapRuns, whereList, buildGuide, pointsPlan, mount, fill, refresh, signedOut, shrinkImage, take, classOf,
   dropGroups, findItems, droppers, meowMap, wearers, kindOf, gainRange, trusted, bestScroll, money, plural, mobFit };
 })();

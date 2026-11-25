@@ -353,8 +353,7 @@ body.g-pip .credit, body.g-ov .credit, body.g-setwin .credit { display: none; }
 .b-more, .b-dmore { display: block; background: none; border: 0; padding: 8px 0 0; color: var(--focus); font: 700 var(--fs-sm) var(--font-body); text-align: left; text-decoration: underline; cursor: pointer; }
 .b-seeall { font-weight: 700; }
 /* a row title reads in one size; the rows start at the heading's left edge */
-.b-ovrow .b-name, .b-mob .b-name, .b-stop .b-name { font: inherit; }
-.b-mob > :first-child > :first-child { font: 700 var(--fs-md) var(--font-body); }
+.b-ovrow .b-name, .b-stop .b-name { font: inherit; }
 @media (max-width: 559px) {
   .b-ovrow.k-row { flex-direction: column; align-items: stretch; gap: 0; }
   .b-ovrow.k-row > .b-hr:last-child { margin-left: 0; align-self: flex-end; }
@@ -367,10 +366,16 @@ body.g-pip .credit, body.g-ov .credit, body.g-setwin .credit { display: none; }
 .b-nowt { min-width: 0; }
 .b-nowt .v { margin: 2px 0; font: 400 var(--tt-m)/1.2 var(--font-title); overflow-wrap: anywhere; }
 .b-nowt .s { font: 600 var(--fs-sm) var(--font-body); color: var(--muted); overflow-wrap: anywhere; }
-.b-mob { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 6px 4px; }
-.b-mob + .b-mob { background: var(--night-dots) left top / 8px 2px repeat-x; }
-.b-mob .num { text-align: right; }
-.b-mob .num .small { white-space: nowrap; }
+/* Where to train: a map a row (place, picture, name, one quiet line, the number right), its drops line under it */
+.b-wmap { padding: 8px 4px; }
+.b-wmap + .b-wmap { background: var(--night-dots) left top / 8px 2px repeat-x; }
+.b-wmap > .k-row { background: none; padding: 0; }
+.b-wname { font: 700 var(--fs-md) var(--font-body); }
+.b-wname .b-name { font: inherit; }
+.b-wn { display: inline-block; min-width: 1.3em; color: var(--muted); font: 700 var(--fs-md) var(--font-num); }
+.k-row > .b-wnum:last-child { display: grid; justify-items: end; gap: 2px; flex-shrink: 0; font: 600 var(--fs-sm) var(--font-body); white-space: nowrap; }
+.b-wold { color: var(--muted); }
+.b-wmap > .b-drops { margin: 6px 0 0 calc(52px + var(--gap)); padding-top: 0; border-top: 0; }
 .b-time { list-style: none; margin: 6px 0 0; padding: 0; }
 .b-ev { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 12px; padding: 6px 4px; }
 .b-ev + .b-ev { background: var(--night-dots) left top / 8px 2px repeat-x; }
@@ -2666,7 +2671,7 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-24o',
+  version: '2026-11-24q',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };

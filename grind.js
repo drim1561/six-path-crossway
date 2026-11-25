@@ -1727,7 +1727,7 @@ function mount(root, deps) {
       pot: main ? gs.standing(lastRows, Object.assign({ metric: 'potPer1', potIds, value: o.pct >= 1 && o.mins >= 10 && potUsed > 0 ? potUsed / o.pct : null }, base)) : null,
       potName: main ? plural(main.name) : null,
       lemon: { n: used(LEMON_IDS), quip: lastLine('lemon', used(LEMON_IDS)) }, meat: { n: used(MEAT_IDS), quip: lastLine('meat', used(MEAT_IDS)) },
-      fmtK, fmtDur, fmtPer: perFmt }) : null);
+      minutes: s.minutes, fmtK, fmtDur, fmtPer: perFmt }) : null);
   }
   // the card's pace line: EXP an hour over the last 5 and 10 minutes and since Reset average, each against the session's
   // average (differences under 2% get no arrow)
