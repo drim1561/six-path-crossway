@@ -533,7 +533,7 @@ body.g-pip .credit, body.g-ov .credit, body.g-setwin .credit { display: none; }
 
 /* Grind tab (grind.js) */
 /* the tester link (?only=grind): just the Grind tab */
-body.only-grind #tab-home, body.only-grind #tab-timer, body.only-grind #tab-builds, body.only-grind #tab-guides, body.only-grind #tab-appraiser, body.only-grind #tab-boxes, body.only-grind #tab-recipes { display: none; }
+body.only-grind #tab-app, body.only-grind #tab-home, body.only-grind #tab-timer, body.only-grind #tab-builds, body.only-grind #tab-guides, body.only-grind #tab-appraiser, body.only-grind #tab-boxes, body.only-grind #tab-recipes { display: none; }
 /* the Timer is off for now (window.BT_TIMER turns it on): its tab and its parts of How it works go */
 body.timer-off #tab-timer, body.timer-off .timer-only { display: none; }
 /* the Appraiser is closed while it gets its new look (window.BT_APPRAISER turns it on): its sign fades, its view is one
@@ -2161,21 +2161,31 @@ body.bx-pip #view-boxes { max-width: none; min-height: 100vh; box-sizing: border
 #view-recipes .lr-n.up { color: var(--lime); }
 #view-recipes .lr-n small { color: var(--muted); font: 600 var(--fs-xs) var(--font-body); }
 #view-recipes .rc-note { padding-top: 6px; max-width: 760px; }
-#view-how { --how-gap: 40px; max-width: 720px; width: calc(100% - 2 * var(--gap)); margin: 28px auto var(--how-gap); padding: 0; font-weight: 400; line-height: 1.55; }
+:is(#view-how, #view-app) { --how-gap: 40px; max-width: 720px; width: calc(100% - 2 * var(--gap)); margin: 28px auto var(--how-gap); padding: 0; font-weight: 400; line-height: 1.55; }
+/* Get the app (#app): the download, the two pictures, why, and how to install */
+#view-app { max-width: 900px; }
+.app-get { display: flex; align-items: center; flex-wrap: wrap; gap: var(--gap); }
+#view-app a.k-btn { color: var(--key-ink); text-decoration: none; margin: 0; }
+.app-shots { display: grid; gap: var(--gap); min-width: 0; }
+.app-shot { display: grid; gap: 6px; margin: 0; min-width: 0; }
+.app-shot img { display: block; width: 100%; height: auto; border: 2px solid var(--card-o); border-radius: var(--r-card); }
+.app-shot figcaption, #view-app .small { font-size: var(--fs-sm); color: var(--muted); }
+.app-shot figcaption b { color: var(--ink); font-weight: 600; }
+.app-steps { display: grid; gap: 6px; margin: 0; padding-left: 22px; }
 .how-page, .how-hero { display: grid; min-width: 0; }
 .how-page { gap: var(--how-gap); }
 .how-hero { gap: var(--gap); }
-#view-how h2 { margin: 0; font: 400 var(--tt-logo) / 1.15 var(--font-title); color: var(--ink); text-wrap: balance; }
+:is(#view-how, #view-app) h2 { margin: 0; font: 400 var(--tt-logo) / 1.15 var(--font-title); color: var(--ink); text-wrap: balance; }
 .how-hero .lead { color: var(--muted); }
 .how-trail { display: grid; gap: var(--how-gap); min-width: 0; margin-left: 8px; padding-left: 30px; border-left: 2px dotted var(--card-o); }
-#view-how section { position: relative; display: grid; gap: var(--gap); min-width: 0; }
-#view-how section::before { content: ""; position: absolute; left: -38px; top: 9px; box-sizing: border-box; width: 14px; height: 14px; border-radius: 50%; background: var(--page); border: 2px solid var(--mint-line); box-shadow: 0 0 10px var(--card-o); }
+:is(#view-how, #view-app) section { position: relative; display: grid; gap: var(--gap); min-width: 0; }
+:is(#view-how, #view-app) section::before { content: ""; position: absolute; left: -38px; top: 9px; box-sizing: border-box; width: 14px; height: 14px; border-radius: 50%; background: var(--page); border: 2px solid var(--mint-line); box-shadow: 0 0 10px var(--card-o); }
 body:not(.timer-off) #view-how .timer-only, body:not(.appraiser-off) #view-how .appraiser-only, body:not(.guides-off) #view-how .guides-only { display: contents; }
-#view-how h3 { margin: 0; font: 400 var(--tt-m) var(--font-title); }
-#view-how p, #view-how li { margin: 0; color: var(--ink); }
-#view-how .lead { font-size: var(--fs-lg); }
-#view-how code { font: 600 var(--n-s) var(--font-num); background: var(--card); border: 2px solid var(--card-o); border-radius: var(--r-card); padding: 0 6px; }
-#view-how a { color: var(--focus); text-decoration: underline; }
+:is(#view-how, #view-app) h3 { margin: 0; font: 400 var(--tt-m) var(--font-title); }
+:is(#view-how, #view-app) :is(p, li) { margin: 0; color: var(--ink); }
+:is(#view-how, #view-app) .lead { font-size: var(--fs-lg); }
+:is(#view-how, #view-app) code { font: 600 var(--n-s) var(--font-num); background: var(--card); border: 2px solid var(--card-o); border-radius: var(--r-card); padding: 0 6px; }
+:is(#view-how, #view-app) a { color: var(--focus); text-decoration: underline; }
 .legend, .examples { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
 .legend li { display: grid; grid-template-columns: 120px 1fr; gap: 12px; align-items: center; }
 .examples li { display: grid; grid-template-columns: 150px 1fr; gap: 12px; align-items: baseline; }
@@ -2217,7 +2227,7 @@ body:not(.timer-off) #view-how .timer-only, body:not(.appraiser-off) #view-how .
 .how-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: auto 1fr auto; gap: var(--gap) 20px; min-width: 0; }
 .how-step { display: grid; grid-row: span 3; grid-template-rows: subgrid; min-width: 0; }
 .how-n { font: 700 var(--fs-xs) var(--font-num); color: var(--num-big); }
-#view-how h4 { margin: 0; font: 600 var(--fs-md) var(--font-body); color: var(--ink); }
+:is(#view-how, #view-app) h4 { margin: 0; font: 600 var(--fs-md) var(--font-body); color: var(--ink); }
 .how-step .how-mock { align-content: center; max-width: none; }
 .how-step p, .how-card p, .how-from span { font-size: var(--fs-sm); color: var(--muted); }
 .how-btn { justify-self: center; padding: 6px 14px; font: 700 var(--fs-sm) var(--font-body); color: var(--key-ink); background: var(--accent); border: 2px solid var(--key-lo); border-radius: var(--r-card); }
@@ -2532,6 +2542,7 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
     <button id="tab-grind" type="button" role="tab" aria-controls="view-grind" aria-selected="false">Grind</button>
     <button id="tab-boxes" type="button" role="tab" aria-controls="view-boxes" aria-selected="false">NX Crates</button>
     <button id="tab-recipes" type="button" role="tab" aria-controls="view-recipes" aria-selected="false">Recipes</button>
+    <button id="tab-app" type="button" role="tab" aria-controls="view-app" aria-selected="false">Get the app</button>
     <button id="tab-builds" type="button" role="tab" aria-controls="view-builds" aria-selected="false" aria-label="Your Path, soon">Your Path<span class="soon" aria-hidden="true">Soon</span></button>
     <button id="tab-guides" type="button" role="tab" aria-controls="view-guides" aria-selected="false" aria-label="Guides, soon">Guides<span class="soon" aria-hidden="true">Soon</span></button>
     <button id="tab-appraiser" type="button" role="tab" aria-controls="view-appraiser" aria-selected="false" aria-label="Appraiser, soon">Appraiser<span class="soon" aria-hidden="true">Soon</span></button>
@@ -2772,6 +2783,55 @@ body { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
   <p class="small smallprint">Fan made, not affiliated with Nexon. Game art comes from the MapleStory client and belongs to Nexon. Item prices come from Cozy Markets, and damage formulas and drop lists from meowdb and community players.</p>
   </div>
 </main>
+<main id="view-app" role="tabpanel" aria-labelledby="tab-app" hidden>
+  <div class="how-page">
+
+  <div class="how-hero">
+    <h2>Your tools, floating on the game</h2>
+    <p class="lead">The Six Path Crossway app for Windows. No browser to open and no window to share. Open it, press Start and train.</p>
+    <div class="app-get">
+      <a id="app-dl" class="k-btn key" href="https://sixpathcrossway.pages.dev/app/SixPathOverlay_1.0.3_x64-setup.exe">Download for Windows</a>
+      <span class="small"><span id="app-ver">Version 1.0.3</span>. Windows 10 or 11, about 4 MB, free.</span>
+    </div>
+  </div>
+
+  <div class="how-trail">
+  <section>
+  <h3>The app next to the browser</h3>
+  <div class="app-shots">
+    <figure class="app-shot"><img src="shots/overlay-app.png" width="1142" height="195" loading="lazy" alt="The app's overlay on the game: a see through bar with EXP an hour, kills a minute, time to level and profit, with the game showing behind it"><figcaption><b>The app.</b> See through, no window frame, and it sits right on the game.</figcaption></figure>
+    <figure class="app-shot"><img src="shots/overlay-browser.png" width="1262" height="195" loading="lazy" alt="The browser pop-out: the same numbers in a solid window with an address bar on top"><figcaption><b>The browser pop-out.</b> The same numbers, in a solid window with an address bar on top.</figcaption></figure>
+  </div>
+  </section>
+
+  <section>
+  <h3>Why use the app</h3>
+  <div class="how-nums">
+    <div class="how-card"><div class="how-what"><b>Nothing to share</b><p>It finds MapleStory by itself. No browser, no picking a window every time.</p></div></div>
+    <div class="how-card"><div class="how-what"><b>See through</b><p>The game shows through the overlay, so it never hides what's behind it.</p></div></div>
+    <div class="how-card"><div class="how-what"><b>Put it anywhere</b><p>Click and hold the overlay, drag it where you like and let go. It remembers the spot.</p></div></div>
+    <div class="how-card"><div class="how-what"><b>More than an EXP tracker</b><p>Grind, NX Crates, Recipes and your Home page are all inside, with more on the way.</p></div></div>
+    <div class="how-card"><div class="how-what"><b>Set up once</b><p>Sign in with Discord one time and it stays signed in. It updates itself when you close it.</p></div></div>
+    <div class="how-card"><div class="how-what"><b>Same record</b><p>Sign in and your runs and All time record are the same in the app and on the site.</p></div></div>
+  </div>
+  </section>
+
+  <section>
+  <h3>Install it</h3>
+  <ol class="app-steps">
+    <li>Press Download for Windows. If your browser says the file isn't commonly downloaded, choose Keep.</li>
+    <li>Open the file. Windows shows a blue box that says Windows protected your PC.</li>
+    <li>Press <b>More info</b>, then <b>Run anyway</b>.</li>
+    <li>Finish the installer and open Six Path Overlay.</li>
+    <li>Sign in with Discord, open MapleStory and press Start.</li>
+  </ol>
+  <p class="small">Why the warning? The app isn't code signed yet. Signing costs money and this is a free fan project, so Windows doesn't know it.</p>
+  <p class="small">The app only looks at your game window, the way a screen share does. It doesn't touch the game or its files. Rather not install anything? <a href="#grind">Grind works in your browser too</a>.</p>
+  </section>
+  </div>
+
+  </div>
+</main>
 <p id="credit" class="credit">Fan project, not affiliated with or endorsed by Nexon. MapleStory belongs to Nexon. · Prices from <a href="https://cozy.markets" target="_blank" rel="noopener">Cozy Markets</a> · <a href="https://meowdb.com" target="_blank" rel="noopener">meowdb</a> · <span id="credit-ver"></span><span id="credit-appwrap" hidden> · <span id="credit-app"></span></span></p>
 <button id="flag" class="flag k-btn key" type="button" aria-label="Report a problem"><span class="flag-ico" aria-hidden="true"></span><span class="flag-txt">Report a problem</span></button>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
@@ -2785,7 +2845,7 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-25f',
+  version: '2026-11-25g',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
@@ -3523,7 +3583,7 @@ function viewNow() {
   const how = /^#how(\/|$)/.test(location.hash);
   // the app opens on Home when no tab is asked for; the installed app's own start is site#grind (grind-app main.js START), so its
   // first load in a window's session is sent to #home below, and a #grind after that (a restored hash, a reload) is a real #grind
-  const view = how ? 'how' : APP && !location.hash ? 'home' : { '#home': 'home', '#builds': PATH_ON ? 'builds' : 'how', '#appraiser': 'appraiser', '#grind': 'grind' }[location.hash]
+  const view = how ? 'how' : APP && !location.hash ? 'home' : { '#home': 'home', '#app': 'app', '#builds': PATH_ON ? 'builds' : 'how', '#appraiser': 'appraiser', '#grind': 'grind' }[location.hash]
     || (/^#boxes(\/|$)/.test(location.hash) ? 'boxes' : /^#recipes(\/|$)/.test(location.hash) ? 'recipes' : GUIDES_ON && /^#guides(\/|$)/.test(location.hash) ? 'guides' : TIMER_ON ? 'timer' : 'how');
   const tabs = appTabs();
   return tabs && !how && !tabs.includes(view) ? 'grind' : view;
@@ -3543,7 +3603,7 @@ const recipesItem = () => { const m = location.hash.match(/^#recipes\/(\d+)$/); 
 const guidesJob = () => { const j = location.hash.split('/')[2]; return ['fp', 'il', 'cleric'].includes(j) ? j : 'fp'; };
 let lastViewSent = null;
 // Anonymous button counts (names only, never anything typed or read): one delegated listener so the tabs' own code stays untouched.
-const TRACKED = [['#b-readbtn', 'read_from_game'], ['#b-savebtn', 'save_build'], ['#g-pop', 'pop_out'], ['#g-sharearea button', 'share_game_window'],
+const TRACKED = [['#b-readbtn', 'read_from_game'], ['#b-savebtn', 'save_build'], ['#g-pop', 'pop_out'], ['#app-dl', 'app_download'], ['#g-sharearea button', 'share_game_window'],
   ['#g-loot', 'count_my_loot'], ['#flag', 'something_off']];
 document.addEventListener('click', e => {
   try {
@@ -3554,9 +3614,21 @@ document.addEventListener('click', e => {
     for (const [sel, name] of TRACKED) if (t.matches(sel)) return window.track(name, { view: viewNow(), app: APP ? 1 : 0 });
   } catch { /* tracking never breaks the page */ }
 }, true);
+// Get the app's button follows the newest installer the site holds (app/latest.json); until that answers it keeps the one written in the page
+let askedDownload = false;
+function freshDownload() {
+  if (askedDownload) return;
+  askedDownload = true;
+  fetch('app/latest.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(j => {
+    const url = j && j.platforms && j.platforms['windows-x86_64-nsis'] && j.platforms['windows-x86_64-nsis'].url;
+    if (!url || !/^https:\/\/sixpathcrossway\.pages\.dev\/app\/[\w.-]+\.exe$/.test(url)) return;
+    $('app-dl').href = url;
+    if (/^[\d.]+$/.test(j.version)) $('app-ver').textContent = 'Version ' + j.version;
+  }).catch(() => { /* the written one stays */ });
+}
 function showView() {
   const view = viewNow();
-  for (const v of ['home', 'timer', 'builds', 'guides', 'appraiser', 'grind', 'boxes', 'recipes', 'how']) {
+  for (const v of ['home', 'app', 'timer', 'builds', 'guides', 'appraiser', 'grind', 'boxes', 'recipes', 'how']) {
     $('view-' + v).hidden = v !== view;
     if ($('tab-' + v)) $('tab-' + v).setAttribute('aria-selected', String(v === view));
   }
@@ -3570,6 +3642,7 @@ function showView() {
   // Home borrows Grind's All time window while it shows (one window, so the two pages can't disagree) and gives it back to Grind's fold after
   if (view !== 'home') giveBackRecord();
   if (view === 'home') showHome();
+  if (view === 'app') freshDownload();
   if (view === 'grind') loadGrind();
   if (view === 'boxes') loadBoxes().then(() => boxesView && boxesView.show(boxesCrate()));
   if (view === 'recipes') loadRecipes().then(() => recipesView && recipesView.show(recipesItem()));
@@ -3781,6 +3854,7 @@ $('flag').addEventListener('click', () => {
     .catch(() => { $('flag').disabled = false; });
 });
 $('tab-appraiser').addEventListener('click', () => { if (location.hash !== '#appraiser') location.hash = '#appraiser'; });
+$('tab-app').addEventListener('click', () => { if (location.hash !== '#app') location.hash = '#app'; });
 $('tab-home').addEventListener('click', () => { if (location.hash !== '#home') location.hash = '#home'; });
 $('home-boxes').addEventListener('click', () => { if (!state.session) signIn(); });
 $('home-boxes').addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && !state.session) { e.preventDefault(); signIn(); } });
