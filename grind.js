@@ -795,9 +795,13 @@ function mount(root, deps) {
   // names that two maps share keep their region on the closed pick
   const shortCount = {};
   for (const id of Object.keys(data.maps)) shortCount[shortMap(id)] = (shortCount[shortMap(id)] || 0) + 1;
+  // an area whose maps name only their street (the Forgotten Hollow's are Shallow Passage, Deep Passage and Hidden Street, so
+  // nobody found them, Rimmah's first run there, 2026-11-21) gets its own group, by the map id's first digits
+  const AREAS = [['10006', 'Forgotten Hollow']];
   const regions = new Map();
   for (const id of Object.keys(data.maps)) {
-    const n = mapName(id), reg = / : /.test(n) ? n.replace(/ : .*$/, '') : 'Other';
+    const n = mapName(id), area = AREAS.find(([pre]) => String(id).startsWith(pre));
+    const reg = area ? area[1] : / : /.test(n) ? n.replace(/ : .*$/, '') : 'Other';
     if (!regions.has(reg)) regions.set(reg, []);
     regions.get(reg).push([shortCount[shortMap(id)] > 1 ? n : shortMap(id), id]);
   }
