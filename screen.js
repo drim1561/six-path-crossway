@@ -813,10 +813,33 @@ function confirmBox(src, x0, yRow, len) {
   if (b.score < 0.5) return null;
   return { x: x0, y: img.y + b.y, w: Math.round(G.fw * s), h: Math.round(G.fh * s), s, score: b.score };
 }
+// the remembered spot is only where to look. The label still matches a few px off, so a spot saved a pixel off was kept
+// for good and every slot sat a little off with it (Rimmah's app, 2026-11-25: 137 read as 37, 100 as 0, most pictures
+// unsure, Use and Etc orange through a whole flip). So the box's white field is measured again each time: the longest
+// white run over its rows (the rows above and below the digits are whole). A run that reaches the edge of the look, or
+// is far from the spot's own width (a tooltip over it), says nothing and the spot stands
+function snapHome(src, c) {
+  const pad = 6, img = region(src, c.x - pad, c.y + 1, c.w + 2 * pad, Math.max(1, c.h - 2)), d = img.data;
+  let top = null;
+  for (let y = 0; y < img.h; y++) {
+    let st = -1;
+    for (let x = 0; x <= img.w; x++) {
+      const k = (y * img.w + x) * 4, on = x < img.w && Math.min(d[k], d[k + 1], d[k + 2]) >= 236;
+      if (on && st < 0) st = x;
+      if (on || st < 0) continue;
+      if (st > 0 && x < img.w && (!top || x - st > top.len)) top = { st, len: x - st, y };
+      st = -1;
+    }
+  }
+  if (!top || Math.abs(top.len - (c.w - 1)) > 4) return c;
+  const x0 = img.x + top.st;
+  if (x0 === c.x && top.len === c.w - 1) return c;
+  return confirmBox(src, x0, img.y + top.y, top.len) || c;
+}
 function atHome(src) {
   if (!lastBox || !invGeometry()) return null;
   const c = confirmBox(src, lastBox.x, lastBox.y + Math.round(lastBox.h / 2), lastBox.w - 1);
-  if (c) return c;
+  if (c) return snapHome(src, c);
   // an item's tooltip over the MESOS label (Rimmah's Etc flip, 2026-11-24: the inventory was gone for most of it, the
   // flip closing each time): the box's empty left third still white across the middle and an open tab above it are the
   // window. covered: its total may be half hidden, so it's never read
