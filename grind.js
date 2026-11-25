@@ -109,7 +109,7 @@ function health(f) {
     : f.hasSession ? say('idle', 'Share stopped', 'Share stopped. Share the game window again to carry on') : say('idle', 'Not sharing yet', 'Share the game window to start');
   // f.noGame: a share in a browser has gone many frames without ever finding the game's bar, so it is most likely the wrong window
   // (this page, the browser) or a full screen game the window list can't offer; reshare opens the picker again
-  if (f.noGame && !app) return say('bad', "Can't find MapleStory", "Grind can't find MapleStory in what you shared. Pick the game window itself, or Entire Screen if the game is full screen. Firefox often can't do this: try Edge or Chrome, or the EXP Tracker app", { reshare: true });
+  if (f.noGame && !app) return say('bad', "Can't find MapleStory", "Grind can't find MapleStory in what you shared. Pick the game window itself, or Entire Screen if the game is full screen. Firefox often can't do this: try Edge or Chrome, or the Six Path Overlay app", { reshare: true });
   if (C.exp.state === 'bad') return say('bad', "Can't see EXP bar", app ? "Can't see your EXP bar, paused. Is the game open, with the bar showing?" : "Can't see your EXP bar, paused. Is the game still shared, with the bar showing?");
   // f.cut: the EXP number reads, but no level fits it, three reads running: something sits over part of it. In a browser
   // that is Chrome's or Edge's "sharing a window" bar when the game's bottom edge is the screen's (a friend's report, 2026-11-21)
@@ -668,7 +668,7 @@ function mount(root, deps) {
   // as the app's windows are. The text is sized with the panel open (so ▾ and ▴ change only the height) and without the one
   // thing to do (and Column's light, on its own plank), and the height without the one thing to do, so neither moves when
   // it comes and goes
-  const overlay = window.GrindOverlay.create({ strip, home: root, app, title: app ? 'Six Path EXP Tracker overlay' : 'Grind', setTitle: 'Six Path EXP Tracker settings',
+  const overlay = window.GrindOverlay.create({ strip, home: root, app, title: app ? 'Six Path Overlay pop-out' : 'Grind', setTitle: 'Six Path Overlay settings',
     width: () => Math.round((WIDTHS[strip.dataset.layout] || WIDTHS[layout])[potCount() === 2 ? 2 : 1] * scale / 100), room: ROOM,
     font: () => FONT * scale / 100,
     wide: () => { const was = strip.dataset.open; strip.dataset.open = '1'; return () => { strip.dataset.open = was; }; },

@@ -18,6 +18,9 @@
   // an <img> with no src yet (Grind's Lemon tile before a potion runs down, on the page and in the pop out) would be
   // fetched as the page itself and sink the drawing, so it's left out
   const drawable = n => !(n.tagName === 'IMG' && !n.getAttribute('src'));
+  // hidden parts of the page (the other tabs) add nothing to the picture and made it take many seconds, so they're left out.
+  // SVG is always kept, and so is a box holding a sprite: icons point into symbols and defs that don't show themselves
+  const onScreen = n => n.nodeType !== 1 || n.namespaceURI !== 'http://www.w3.org/1999/xhtml' || getComputedStyle(n).display !== 'none' || !!n.querySelector('symbol, defs');
   const SHOT_ID = { page: 'flag-shot-page', game: 'flag-shot-game', popout: 'flag-shot-pop' };
   const PAGE_WIDTH = 1600;      // the page picture is for people to look at, so it's scaled down to about this wide
   const TOAST_MS = 8000;
@@ -65,7 +68,7 @@
   async function drawPage(skip) {
     const H = await loadLib();
     const w = Math.max(1, document.documentElement.clientWidth);
-    const filter = n => !skip.includes(n) && drawable(n);
+    const filter = n => !skip.includes(n) && drawable(n) && onScreen(n);
     // the page's color fills the canvas under the drawing, and the drawn body itself is clear: the night scene is a fixed element behind
     // everything (z-index -1), and an opaque body in the drawing would paint over it, leaving bare paper in the picture
     const opts = ratio => ({ pixelRatio: ratio, filter, imagePlaceholder: BLANK, backgroundColor: getComputedStyle(document.body).backgroundColor, style: { backgroundColor: 'transparent' } });
