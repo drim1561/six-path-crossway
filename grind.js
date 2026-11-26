@@ -896,8 +896,9 @@ function mount(root, deps) {
   function openProfile() {
     toMain();
     try { window.focus(); } catch (e) { /* the browser keeps the focus where it is */ }
-    if (!life.hidden) setFold('g-life', true);
-    (life.hidden ? nowCard.el : life).scrollIntoView({ block: 'start', behavior: 'smooth' });
+    if (appView) appView.open(life.hidden ? null : 'life');   // All time is under More in the one window
+    else if (!life.hidden) setFold('g-life', true);
+    (appView ? appView.el : life.hidden ? nowCard.el : life).scrollIntoView({ block: 'start', behavior: 'smooth' });
   }
   const mapNote = el('p', { class: 'g-note' });
   let mapMobs = [], drops = null, mobSprites = null;   // the map's monsters, most numerous first; the card's data files, once they arrive   // the card's data files, once they arrive
@@ -1048,12 +1049,12 @@ function mount(root, deps) {
   // one dotted trail, and the small print off it
   root.replaceChildren(el('div', { class: 'k-col g-col' }, status, el('div', { class: 'g-trail', id: 'g-trail' }, nowCard.el, detail, life, runsWin, record),
     el('div', { class: 'g-print' }, el('p', { class: 'g-note' }, 'Item and UI pictures are from MapleStory, which belongs to Nexon.'), verLine)), strip);
-  // the app window (grind-app-view.js, 2026-11-24): the same nodes laid out as one window in the trail's place, What it earned and the
-  // other stops under its More row. The site in a browser never builds it
-  const appView = app && window.GrindAppView ? window.GrindAppView.build({ el, K: fmtK, pic: id => lootIdx && lootIdx.items[id] ? cellPic(lootIdx.items[id][3]) : null,
+  // the one window (grind-app-view.js, 2026-11-24; in the browser too since 2026-11-26, where window.BT_ONEWINDOW = false brings the trail back): the same nodes laid out in the trail's
+  // place, What it earned and the other stops under its More row. The class picker rides in the Drops here head on the site only
+  const appView = window.GrindAppView && (app || window.BT_ONEWINDOW !== false) ? window.GrindAppView.build({ el, K: fmtK, pic: id => lootIdx && lootIdx.items[id] ? cellPic(lootIdx.items[id][3]) : null,
     parts: { strip: nowCard.el.querySelector('.g-ground'), where: nowCard.el.querySelector('.g-ghead'), nums: nowCard.el.querySelector('#g-now'), share: shareArea, pop: popBtn, set: setBtn, quit: quitBtn, runs: runsRow, steps,
-      view: viewBar, lines: [V.problem, V.nudge, V.trade, check], loot: V.resLoot, foot: root.querySelector('.g-print') },
-    more: [{ key: 'summary', label: 'Run summary', el: detail, show: () => setFold('g-detail', true), ended: true }, { key: 'earned', label: 'What it earned', el: nowCard.el.querySelector('.g-gres') },
+      view: viewBar, lines: [V.problem, V.nudge, V.trade, check], loot: V.resLoot, foot: root.querySelector('.g-print'), cls: app ? null : classPick },
+    more: [{ key: 'summary', label: 'Run summary', el: detail, show: () => setFold('g-detail', true), ended: !!app }, { key: 'earned', label: 'What it earned', el: nowCard.el.querySelector('.g-gres') },
       { key: 'runs', label: 'Your runs', el: runsWin, show: () => setFold('g-runs', true) }, { key: 'record', label: 'Your record', el: record, show: () => setFold('g-record', true) },
       { key: 'life', label: 'All time', el: life, show: () => setFold('g-life', true) }] }) : null;
   if (appView) { const trail = root.querySelector('#g-trail'); trail.before(appView.el); trail.hidden = true; }
@@ -1999,11 +2000,13 @@ function mount(root, deps) {
     const fm = ids && ids.length === 1 && drops && drops.items[ids[0]] ? drops.items[ids[0]].p : null;
     return fm > 0 ? fm : it.price;
   }
-  // See the run summary: on the site This run opens on the page; the app has no page in the pop-out, so the main window comes up
+  // See the run summary: on the site Run summary opens on the page; the app has no page in the pop-out, so the main window comes up
   function seeSummary() {
     if (app) return backToMain();
     setFold('g-detail', true); showDetail();
-    if (!detail.hidden) detail.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    if (detail.hidden) return;
+    if (appView) appView.open('summary');
+    (appView ? appView.el : detail).scrollIntoView({ block: 'start', behavior: 'smooth' });
   }
   // the biggest number: the window picked, your usual beside it (a saved run says how long it ran over), the arrow, and under
   // them nothing (the trend line is gone). Before 2 minutes it's dots

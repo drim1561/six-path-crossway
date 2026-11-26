@@ -549,13 +549,19 @@ body.path-off .path-only, body.guides-off .guides-only, body.appraiser-off .appr
 /* Your Path joins them when the app switches it on (window.BT_PATH, set by the app's startup script from 1.0.2) */
 body.in-app:not(.path-on) .tabs > :not(#tab-home, #tab-grind, #tab-boxes, #tab-recipes),
 body.in-app.path-on .tabs > :not(#tab-home, #tab-grind, #tab-builds, #tab-boxes, #tab-recipes), body.in-app #g-getapp { display: none; }
-/* the Grind tab in the app window (grind-app-view.js, 2026-11-24): one window, each pane scrolls by itself and keeps 280px (2026-11-25: a
-   window too short for that scrolls the page, fit() works it out) */
+/* the Grind tab as one window (grind-app-view.js, 2026-11-24; the browser too since 2026-11-26): each pane scrolls by itself and keeps
+   280px (2026-11-25: a window too short for that scrolls the page, fit() works it out) */
 #ga-win { display: flex; flex-direction: column; gap: var(--gap); min-height: 0; }
-/* the page around it gives the window its room: the column as wide as the app, no tall foot, the credit kept clear of the flag */
-body.in-app:has(#ga-win) #view-grind .g-col { max-width: none; padding: var(--gap) 0 0; gap: var(--gap); }
-body.in-app:has(#view-grind:not([hidden]) #ga-win) { padding-bottom: var(--gap); }
-body.in-app:has(#view-grind:not([hidden]) #ga-win) .credit { margin: var(--gap) 240px 0 auto; }
+/* the page around it gives the window its room: on the site the column lines up with the header (1088), in the app it takes the whole
+   window; no tall foot, the credit kept clear of the flag */
+body:has(#ga-win) #view-grind .g-col { max-width: 1088px; padding: var(--gap) 0 0; gap: var(--gap); }
+body.in-app:has(#ga-win) #view-grind .g-col { max-width: none; }
+body:has(#view-grind:not([hidden]) #ga-win) { padding-bottom: var(--gap); }
+body:not(.in-app):has(#view-grind:not([hidden]) #ga-win) { padding-bottom: 40px; }   /* the window ends above the Report a problem button */
+body:has(#view-grind:not([hidden]) #ga-win) .credit { margin: var(--gap) 240px 0 auto; }
+body:not(.in-app) #ga-win .ga-where .g-pickt:empty::after { content: 'Pick your map'; }   /* no map known: the pick says what it is */
+#ga-win .ga-ph .g-classpick { margin: 0; }
+#ga-win .ga-ph .g-classpick::after { background: none; }
 #ga-win[hidden], #ga-win [hidden] { display: none !important; }
 #ga-win .ga-strip { flex: none; }
 #ga-win .ga-strip .g-ground { height: 70px; margin-inline: 0; border: 2px solid var(--card-o); border-radius: var(--r-card); }
@@ -2845,7 +2851,7 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-26a',
+  version: '2026-11-26b',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };

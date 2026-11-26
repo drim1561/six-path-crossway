@@ -1,12 +1,12 @@
-// The Grind tab in the Six Path Overlay window (2026-11-24): one window that fills the app. grind.js builds the same nodes as on
-// the site and hands them in; this only lays them out, under body.in-app. Top to bottom: the walking strip, one bar (2026-11-25:
+// The Grind tab as one window (2026-11-24 in the Six Path Overlay app, on the site too since 2026-11-26): grind.js builds the nodes
+// and hands them in; this only lays them out. Top to bottom: the walking strip, one bar (2026-11-25:
 // the map's pick with the light and the run's length under it, EXP an hour, Profit an hour, the run buttons, a thin rule, then
 // Settings and Quit as icon squares), the first time steps and the lines that need you (never the bag's Equip, Use, Etc rows: the
 // overlay asks for the bag), then Drops here beside What you picked up (each scrolls by itself and keeps at least 280px, a window
 // too short for that scrolls the page), a quiet More row, and the small print.
 // window.GrindAppView.build({ el, parts, more, K, pic }) -> { el, update(state), live({ len, profit, tone }), open(key) }
 //   parts = { strip, where, nums, share, pop, set, quit, runs, steps, view, lines, loot, foot }: grind.js's own nodes (loot is What you picked up's
-//   block, view the bar over a run being looked at (Back to live, Delete: it joins the buttons, the line names the run), foot the tab's own small print, which joins the drops' credit)
+//   block, cls the class picker for the Drops here head (null in the app), view the bar over a run being looked at (Back to live, Delete: it joins the buttons, the line names the run), foot the tab's own small print, which joins the drops' credit)
 //   more = [{ key, label, el, show, ended }]: blocks that open one at a time in place of the panes (show() runs as one opens; an
 //   ended one is offered only once a run has ended)
 //   state = { session, sharing, noMap, mobs, D, cls, level, lootOn, log, total, ended }, ended = null | { empty: true, onNew } (a
@@ -58,7 +58,9 @@ function build({ el, parts, more, K, pic }) {
   };
   const dropsSmall = el('small', {});
   const total = el('small', { id: 'ga-total' }), sold = el('small', { id: 'ga-sold', hidden: '' });
-  const drops = pane('ga-drops', 'Drops here', dropsSmall), picked = pane('ga-picked', 'What you picked up', el('span', {}, total, sold));
+  const drops = pane('ga-drops', 'Drops here', dropsSmall);
+  if (parts.cls) dropsSmall.before(parts.cls);
+  const picked = pane('ga-picked', 'What you picked up', el('span', {}, total, sold));
   const wentSmall = el('small', {}), went = pane('ga-went', 'How it went', wentSmall);
   went.sec.hidden = true;
   const lem = el('div', { class: 'ga-lem', role: 'img' }), wentRows = el('div', { class: 'k-rows' });
@@ -77,6 +79,7 @@ function build({ el, parts, more, K, pic }) {
   const home = new Map(more.map(m => [m.key, { parent: m.el.parentNode, next: m.el.nextSibling }]));
 
   let openKey = null, last = null, endId = null;
+  const inBrowser = () => !document.body.classList.contains('in-app');
   function open(key) {
     if (openKey && openKey !== key) { const m = more.find(x => x.key === openKey), h = home.get(openKey); if (h && h.parent) h.parent.insertBefore(m.el, h.next && h.next.parentNode === h.parent ? h.next : null); }
     openKey = key || null;
@@ -139,12 +142,15 @@ function build({ el, parts, more, K, pic }) {
     if (done) { if (endBig.textContent !== E.expHr) endBig.textContent = E.expHr; if (endSmall.textContent !== E.small) endSmall.textContent = E.small; setProfit(E.profit, E.tone); if (len.textContent !== E.len) len.textContent = E.len; drawWent(E); }
     else if (E || !x.session) setProfit('', '');
     if (lbl && done && lbl.textContent !== E.head) lbl.textContent = E.head;
-    const live = !x.noMap && !!(x.session || x.sharing);
+    const going = !!(x.session || x.sharing), live = !x.noMap && going;
     const L = live && !done ? drawDrops(x) : null;
+    // in a browser the lists stay with no map known, so What you picked up is never gone: Drops here asks for the map
+    const ask = inBrowser() && going && !!x.noMap && !done;
+    if (ask && changed('drops', 'ask')) { drops.body.replaceChildren(el('p', { class: 'g-nline ga-none' }, 'Pick your map above to see what drops here.')); dropsSmall.textContent = ''; }
     drops.sec.hidden = done; went.sec.hidden = !done;
     sold.hidden = !done; if (done && sold.textContent !== E.sold) sold.textContent = E.sold;
     total.hidden = done;
-    panes.hidden = !(live || done) || !!openKey;
+    panes.hidden = !(live || done || ask) || !!openKey;
     credit.hidden = panes.hidden || !(L && L.any);
     print.hidden = credit.hidden && !parts.foot;
     noLoot.hidden = !parts.loot.hidden;
@@ -173,6 +179,8 @@ function build({ el, parts, more, K, pic }) {
   // little that a list drops under FLOOR (then the page scrolls)
   function fit() {
     if (!win.isConnected) return;
+    // in a browser a block from More is a normal part of the page: no height of its own, so it never scrolls inside a strip
+    if (openKey && inBrowser()) { if (win.style.height) win.style.height = ''; return; }
     // measured around the window, never by shrinking it, so a pane's scroll is never reset
     const r = win.getBoundingClientRect(), b = document.body.getBoundingClientRect(), mb = parseFloat(getComputedStyle(document.body).marginBottom) || 0;
     let h = Math.max(320, Math.floor(innerHeight - (r.top + scrollY) - (b.bottom - r.bottom) - mb));
