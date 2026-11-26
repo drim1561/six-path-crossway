@@ -12,7 +12,7 @@ const MS = () => window.MapleScreen, GS = () => window.GrindSession;
 const MAP_SEARCH_MS = 5000;
 const KEY_OPEN = 'grind.open', KEY_LOCAL = 'grind.local', KEY_PRICES = 'grind.prices', KEY_HOME = 'grind.mesoHome';
 // (no window sizes are kept since round 2: the pop-out fits what it shows, so grind.layoutSizes3 is left behind, never read)
-const KEY_LAYOUT = 'grind.layout', KEY_LOOT = 'grind.loot', KEY_POPMESO = 'grind.popMesoHr', KEY_WINDOW = 'grind.expWindow', KEY_CLASS = 'grind.class';
+const KEY_LAYOUT = 'grind.layout', KEY_LOOT = 'grind.loot', KEY_CLASS = 'grind.class';
 // the app's overlay: See-through (25 to 100%, in fives) and Size (60 to 160%, in tens), kept on this device
 const KEY_SEE = 'grind.seeThrough', KEY_SCALE = 'grind.overlayScale';
 // the shop window is looked for over the whole frame this often (ticks) until it's been seen, then where it was each tick
@@ -477,7 +477,7 @@ function mount(root, deps) {
   // own window width for one potion tile and for two (Bar's second tile sits in the row, so it's wider, the mockup's 1230),
   // and the window is as tall as the panel shows, plus ROOM above it (round 2: the window fits what's showing)
   const SP = {};
-  const WIDTHS = { tile: { 1: 264, 2: 264 }, bar: { 1: 998, 2: 1135 }, column: { 1: 344, 2: 344 } };
+  const WIDTHS = { tile: { 1: 264, 2: 264 }, bar: { 1: 1000, 2: 1000 }, column: { 1: 344, 2: 344 } };
   // the text is never bigger than the mockups' 14 px (times the app's Size): a layout whose lines are shorter than its width
   // (Column) keeps the room beside them rather than taking a bigger font, one whose lines are longer (Tile) takes a smaller one
   const FONT = 16;
@@ -506,17 +506,15 @@ function mount(root, deps) {
   // EXP gained, Kills so far and Per 1% left the pop-out (Grind refresh, 2026-11-18; the page keeps them): hidden, still filled
   const hid = t => { t.hidden = true; return t; };
   const perTile = () => { const t = kTile('per', 'Per 1%'); t.replaceChild(el('div', { class: 'g-kn g-ppr' }, SP.perN[0].box, SP.perN[1].box, SP.perUs = el('span', { class: 'g-us', hidden: '' })), SP.per); return t; };
-  // a potion tile: a little glass that drains with the potion's picture in it, beside its clock, how many went down and
-  // what's left, and a caption under them
+  // a potion is a bottle lying on its side (2026-11-26, mockup D): the glass is the bar, a neck and a cork on its right end.
+  // Inside it, left to right, the potion's picture, the clock and what's left; the juice fills from the left to how full
+  // it is. The counts and the caption are in its hover
   const potTile = () => {
     const P = {};
     P.box = el('div', { class: 'g-pot none' },
-      el('div', { class: 'g-vial' }, P.juice = el('div', { class: 'g-juice', hidden: '' }), P.img = el('img', { alt: '', hidden: '' })),
-      // round 9: one cell, how many and the name then "last" and the clock (95 Lemons last 23:44); the old lines stay for
-      // the page's hover words and are hidden in the pop-out
-      el('div', { class: 'g-pwords' }, P.lbl = el('span', { class: 'g-plbl' }), P.clock = el('span', { class: 'g-pclock' }, '··:··'),
-        P.left = el('div', { class: 'g-pleft', hidden: '' }, P.n = el('b', {}), P.verb = el('span', { class: 'g-pv' }), P.dot = el('span', { class: 'g-pdot' }), P.lf = el('span', { class: 'g-plf' })),
-        P.cap = el('div', { class: 'g-pcap' })));
+      el('div', { class: 'g-vial' }, P.juice = el('div', { class: 'g-juice k-juice', hidden: '' }),
+        el('div', { class: 'g-pin' }, P.img = el('img', { alt: '', hidden: '' }), P.clock = el('span', { class: 'g-pclock' }, '··:··'), P.lf = el('span', { class: 'g-plf' }))),
+      el('span', { class: 'g-neck', 'aria-hidden': 'true' }), el('span', { class: 'g-cork k-cork', 'aria-hidden': 'true' }));
     return P;
   };
   SP.pots = [potTile(), potTile()];
@@ -541,12 +539,6 @@ function mount(root, deps) {
   const layWrap = el('span', { class: 'g-layw', onpointerenter: () => layRow(true, 120), onpointerleave: () => layRow(false, 300),
     onkeydown: e => { if (e.key === 'Escape' && !SP.layRow.hidden) { layRow(false); SP.lay.focus(); } },
     onfocusout: e => { if (!layWrap.contains(e.relatedTarget)) layRow(false, 300); } }, SP.lay, SP.layRow);
-  // EXP an hour's switch, always showing (round 8): 5m, 10m, the run, and since 11:46 once Start fresh made a mark
-  const segBtn = (w, ...kids) => el('button', { type: 'button', 'data-w': w, 'aria-pressed': 'false', onclick: () => pickWindow(w) }, ...kids);
-  SP.segs = [segBtn('5', '5m'), segBtn('10', '10m'), segBtn('run', 'run'), segBtn('since', 'since ', SP.sinceAt = el('span', {}))];
-  SP.segs[3].hidden = true;
-  // Start fresh: a little refresh icon beside the EXP/hr label (2026-11-21, in place of round 8's underlined words)
-  SP.fresh = el('button', { type: 'button', class: 'g-fresh', title: 'Start the average fresh from now', 'aria-label': 'Start fresh', onclick: () => resetAverage() }, lineIcon('reset'));
   // the foot of every view (round 7): New run and End run as plain words. End run waits for the run's first EXP and greys
   // once it's ended. Tile puts them at the panel's foot, Bar in its one right cell under the light and the icons
   SP.runs = el('div', { class: 'g-runs' },
@@ -579,18 +571,19 @@ function mount(root, deps) {
         app ? el('button', { type: 'button', class: 'g-close g-x k-sq', title: 'Back to the main window', 'aria-label': 'Back to the main window', onclick: () => backToMain() }, lineIcon('close')) : null))),
     SP.body = el('div', { class: 'g-body' }, SP.rate,
       el('div', { class: 'g-k-exp' },
-        SP.kh = el('div', { class: 'g-kh' }, el('span', { class: 'g-kl' }, 'EXP/hr'), SP.fresh),
-        el('div', { class: 'g-kv' }, SP.exp = el('span', { class: 'g-kn' }, '·'),
+        SP.kh = el('div', { class: 'g-kh' }, el('span', { class: 'g-kl' }, 'EXP/hr')),
+        SP.kv = el('div', { class: 'g-kv' }, SP.exp = el('span', { class: 'g-kn' }, '·'),
           // the line under it: ▲ 4% (words, never a pill), "over usual" in Tile only, then "· usual 121K" everywhere else
           SP.chip = el('span', { class: 'g-chip' }, SP.expD = el('span', { class: 'g-d' }), SP.expOv = el('span', { class: 'g-over' })),
-          SP.expUs = el('span', { class: 'g-us', hidden: '' }, SP.expUn = el('span', {}))),
-        // the switch under the number, always showing
-        SP.winRow = el('span', { class: 'g-win' }, SP.seg = el('span', { class: 'g-seg', role: 'group', 'aria-label': 'EXP an hour over' }, SP.segs))),
-      // closed: EXP an hour with its line, Kills a minute, Lv in, Profit, the timers. The ▾ button opens the rest (the little columns)
-      kTile('kills', 'Kills/min'), kTile('lv', 'Level in'), kTile('profit', 'Profit'),
+          SP.expUs = el('span', { class: 'g-us', hidden: '' }, SP.expUn = el('span', {})))),
+      // closed (2026-11-26): EXP an hour with its line, Level in, Mesos per 1%, the bottles. The ▾ button opens the rest:
+      // Profit and Profit an hour over its three parts, then Kills a minute (the 5m 10m run switch and Start fresh left)
+      kTile('lv', 'Level in'), kTile('profit', 'Mesos per 1%'),
       hid(kTile('mhr', 'Mesos/hr')), hid(kTile('sold', 'If you sold everything')),
       SP.grid = el('div', { class: 'g-grid' }, hid(kTile('gain', 'EXP gained')), hid(kTile('ksf', 'Kills so far')), hid(perTile()),
+        kTile('ptot', 'Profit'), kTile('phr', 'Profit/hr'),
         SP.partsBox = el('div', { class: 'g-parts' }, ...[['pMesos', 'Mesos'], ['pLoot', 'Loot'], ['pPots', 'Potions']].map(([k, w]) => el('div', { class: 'g-part' }, el('span', { class: 'g-pl' }, w), SP[k] = el('b', { class: 'g-pn' }, '·')))),
+        kTile('kills', 'Kills/min'),
         SP.town = el('div', { class: 'g-town', hidden: '' })),
       SP.tilesBox = el('div', { class: 'g-tiles' }, SP.pots[0].box, SP.quip = el('div', { class: 'g-quip', hidden: '' }, SP.quipB = el('b', {}), SP.quipS = el('span', {}))),
       SP.sumLink),
@@ -601,27 +594,20 @@ function mount(root, deps) {
     el('span', { class: 'g-omc', 'aria-hidden': 'true' }, el('span', { class: 'g-hop' }, SP.shroom = el('i', { class: 'g-om' }))),
     SP.bubble = el('div', { class: 'g-bub', role: 'status' }));
   if (!ROOMY) strip.classList.add('g-noroom');
-  // Mesos: the run's total, or a small switch beside the label makes it the hour rate (kept on the device)
-  let mesoHr = store.get(KEY_POPMESO) === '1', lastP = null;
-  SP.profitL.replaceChildren(el('span', {}, 'Profit'), SP.mesoSw = el('button', { type: 'button', class: 'g-mesosw', 'aria-pressed': String(mesoHr),
-    onclick: () => { mesoHr = !mesoHr; store.set(KEY_POPMESO, mesoHr ? '1' : '0'); renderMeso(lastP); } }, mesoHr ? 'An hour' : 'Total'));
-  // Profit: the session card's total (GrindSession.profitOf, so the two always agree), or an hour once 10 minutes are counted.
-  // Its small line says whether loot is in it
+  // Mesos per 1% (2026-11-26): the counted total over the EXP % gained in the same window (result().perPct), green when
+  // it pays and red when it costs, a dot until 1% is gained. Its small line says whether loot is in it. Opened: Profit and
+  // Profit an hour (the session card's, GrindSession.profitOf, so the two always agree) over the three parts
   const sgnK = n => (n >= 0 ? '+' : '−') + fmtK(Math.abs(n));
   function renderMeso(P) {
-    lastP = P;
-    SP.mesoSw.setAttribute('aria-pressed', String(mesoHr));
-    put(SP.mesoSw, mesoHr ? 'An hour' : 'Total');
-    SP.mesoSw.title = SP.mesoSw.ariaLabel = mesoHr ? 'Showing profit an hour, show the total' : 'Showing the total, show profit an hour';
-    const v = !P ? null : mesoHr ? P.perHr : P.total;
-    const pv = v == null ? '·' : mesoHr ? sgnK(v) + '/hr' : signed(v);
+    const v = P ? P.perPct : null, pv = v == null ? '·' : sgnK(v);
     put(SP.profit, pv);
-    // a million or more is a long number: Tile draws it smaller in its half, so the whole panel's text doesn't shrink for it
-    SP.profit.classList.toggle('g-long', pv.length >= 10);
+    attr(SP.profit, 'class', 'g-kn' + (v == null ? '' : v >= 0 ? ' pos' : ' neg'));
     // the small line only once loot is in it (Rimmah, 2026-11-17: no hints in the tiles, the light says what it wants)
     // (a rough Profit from pickup lines says about and how old its check is from the first pickup)
     put(SP.profitSub, P && (P.lootCounted || P.sure) ? GS().profitWords(P, Date.now()) : '');
-    // opened: the three parts it is made of, each a word over its number (loot is a dot until a bag is counted)
+    put(SP.ptot, !P || P.total == null ? '·' : Math.abs(P.total) < 1e6 ? signed(P.total) : sgnK(P.total));   // a million and up in K and M, to fit its column
+    put(SP.phr, !P || P.perHr == null ? '·' : sgnK(P.perHr) + '/hr');
+    // the three parts it is made of, each a word over its number (loot is a dot until a bag is counted)
     const part = (e, v) => put(e, !P || v == null ? '·' : sgnK(v));
     part(SP.pMesos, P && P.mesos); part(SP.pLoot, P && P.loot); part(SP.pPots, !P || P.potions == null ? null : -P.potions);
   }
@@ -655,7 +641,7 @@ function mount(root, deps) {
       if (SP.el.nextSibling !== SP.rate) SP.rate.before(SP.el);
       if (SP.runs.parentNode !== SP.body || SP.body.lastChild !== SP.runs) SP.body.append(SP.runs);
     } else if (layout === 'tile') {
-      if (SP.el.previousSibling !== SP.winRow) SP.winRow.after(SP.el);
+      if (SP.el.previousSibling !== SP.kv) SP.kv.after(SP.el);
       if (SP.runs.parentNode !== SP.body || SP.body.lastChild !== SP.runs) SP.body.append(SP.runs);
     } else {
       if (SP.runs.parentNode !== SP.right) SP.right.append(SP.runs);
@@ -1497,7 +1483,7 @@ function mount(root, deps) {
     if (!session) { setStatus('Start grinding first, then reset the average.'); return; }
     const now = Date.now();
     GS().mark(session, now);
-    sinceFor = session.id;   // its window is picked, for this session only (the switch's kept choice stays as it is)
+    sinceFor = session.id;   // its window is picked, for this session only
     setStatus('New average from ' + timeOfDay(now) + '. The session average keeps going.');
     render();
   }
@@ -1864,14 +1850,9 @@ function mount(root, deps) {
   const attr = (e, k, v) => { if (e.getAttribute(k) !== v) e.setAttribute(k, v); };
   const hoverText = (e, text) => { if (e.title !== text) e.title = text; };
   const picTo = (img, pic, alt) => { if (pic && img.getAttribute('src') !== pic) img.src = pic; show(img, !!pic); if (img.alt !== alt) img.alt = alt; };
-  // EXP an hour's window: the one kept on the device (written only by a click on the switch), or since Reset average for
-  // the session it was pressed in
-  let expWin = ['5', '10', 'run'].includes(store.get(KEY_WINDOW)) ? store.get(KEY_WINDOW) : '10', sinceFor = null;
-  function pickWindow(w) {
-    if (w === 'since') sinceFor = session && session.id;
-    else { sinceFor = null; expWin = w; store.set(KEY_WINDOW, w); }
-    render();
-  }
+  // EXP an hour's window in the pop-out: always the last 5 minutes, the run's rate until 5 minutes exist (expPick). sinceFor:
+  // the session Start fresh was pressed in, for the page's lead
+  let sinceFor = null;
   // no run yet: the panel waits with dots
   const NO_RUN = { exp: 0, pct: 0, mins: 0, expHr: null, pace: {}, markT: null, since: null, mesosEarned: null, profit: null, mesoLooks: 0, per1: null, hrsToLevel: null, expToLevel: null, deaths: 0 };
   function renderStrip(stats, mains = []) {
@@ -1902,7 +1883,7 @@ function mount(root, deps) {
     renderMeso(P);
     // the app window's bar: the run's length beside the light and Profit an hour, the pop-out's own number (a saved run's come from endedOf)
     if (appView && !saved) appView.live({ len: s ? fmtDur(o.mins) : '', profit: !s ? '' : P.perHr != null ? sgnK(P.perHr) : '·', tone: !s || !P.perHr ? '' : P.perHr > 0 ? 'pos' : 'neg' });
-    // Kills a minute: the number the switch shows, over the map's average EXP a kill. No map known, no average: a dot. A saved run has no window
+    // Kills a minute (opened): EXP an hour's number, over the map's average EXP a kill. No map known, no average: a dot. A saved run has no window
     const avg = s ? avgExp(mapOfNow(s)) : null, kp = !saved && avg ? killsPerMin(ep.value, avg) : null;
     show(SP.killsBox, !saved && !isEnd);
     put(SP.kills, kp ? fmtKills(kp.perMin) : '·');
@@ -2012,16 +1993,7 @@ function mount(root, deps) {
   // them nothing (the trend line is gone). Before 2 minutes it's dots
   function renderExp(s, o, saved, now) {
     const usual = s && !saved ? GS().standing(lastRows, { mapId: mapOfNow(s), exceptId: s.id, metric: 'expHr', value: null }).usual : null;
-    const p = expPick(o, saved ? 'run' : s && sinceFor === s.id ? 'since' : expWin, usual);
-    show(SP.winRow, !saved);
-    for (const b of SP.segs) {
-      const w = p.windows.find(x => x.key === b.dataset.w);
-      show(b, !!w);
-      if (!w) continue;
-      attr(b, 'aria-pressed', String(w.on));
-      if (b.disabled !== w.off) b.disabled = w.off;
-      if (w.key === 'since') { put(SP.sinceAt, w.label.replace(/^since /, '')); attr(b, 'aria-label', w.label); }
-    }
+    const p = expPick(o, saved ? 'run' : '5', usual);
     // a live run with no EXP gained yet has nothing to measure: say so instead of leaving a bare dot (a 16d report read the bare
     // dots as "no numbers are populating"); .wait lets Tile, which hides the usual, show these words
     const waiting = !saved && !!s && p.value == null && !(o.exp > 0);
@@ -2060,22 +2032,12 @@ function mount(root, deps) {
     (SP.tiles || [null]).forEach((tile, i) => {
       const P = SP.pots[i], x = potionTile(tile, now, saved), pic = tile ? pictures.Icons[tile.id] : SP.main && pictures.Icons[SP.main.id];
       show(P.juice, x.juice > 0);
-      if (P.juice.style.height !== x.juice + '%') P.juice.style.height = x.juice + '%';
+      if (P.juice.style.width !== x.juice + '%') P.juice.style.width = x.juice + '%';
       picTo(P.img, pic, tile ? tile.name : SP.main ? SP.main.name : '');
       put(P.clock, x.clock);
-      show(P.left, !!(x.n || x.left));
-      put(P.n, x.n); put(P.verb, x.verb ? ' ' + x.verb : ''); put(P.dot, x.n && x.left ? ' · ' : ''); put(P.lf, x.left); put(P.cap, x.cap);
-      // the one line each tile reads as: 95 Lemons last (the clock beside it), 95 Lemons left with no clock yet, 40 Lemons drunk
-      // for a saved run, or the caption when there's no count
-      const nm = k => k === 1 ? tile.name : plural(tile.name), c = tile && tile.cd;
-      // a caption in the label's place (starts once you drink, off your quickslots...) wraps inside its tile and never sets the
-      // panel's width, so the text is the same size on a fresh run and mid run (capl; the count lines keep their one line)
-      const capLbl = !tile || (saved ? !tile.used : !c && tile.count == null);
-      attr(P.box, 'class', 'g-pot ' + x.kind + (x.low ? ' low' : '') + (capLbl ? ' capl' : ''));
-      put(P.lbl, !tile ? x.cap : saved ? (tile.used ? fmt(tile.used) + ' ' + nm(tile.used) + ' ' + x.verb : x.cap)
-        : c ? fmt(c.left) + ' ' + nm(c.left) + ' last' : tile.count != null ? fmt(tile.count) + ' ' + nm(tile.count) + ' left' : x.cap);
-      // each layout shows only some of these (Tile and Column the clock and what's left, Bar the clock and how many drunk),
-      // so the whole line stays in the hover title
+      put(P.lf, x.left);
+      attr(P.box, 'class', 'g-pot ' + x.kind + (x.low ? ' low' : ''));
+      // the bottle shows the clock and what's left; how many went down and the caption are in the hover
       hoverText(P.box, [x.n && x.n + (x.verb ? ' ' + x.verb : ''), x.left, x.cap].filter(Boolean).join(' · '));
     });
     // the mushroom comes out with the one line worth saying (out, low, a level up inside 5 minutes; nothing for a saved

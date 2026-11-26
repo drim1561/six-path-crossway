@@ -1097,11 +1097,11 @@ function townOf(s, t) {
   if (tw.open == null) return { trips: tw.trips, ms: tw.ms };
   return { trips: tw.trips + 1, ms: tw.ms + Math.max(0, s.activeMs - tw.open) };
 }
-// the Profit tile's parts, all from result(). lootTabs: how many tabs have had every row looked at since the last
+// the Profit tile's parts and Mesos per 1%, all from result(). lootTabs: how many tabs have had every row looked at since the last
 // sale (null without loot); lookT: the latest meso look, which is how old the number is
 function profitOf(s, t) {
   const o = result(s, t);
-  return { total: o.total, perHr: o.perHr, mesos: o.window ? o.pickedUp + o.sold - o.otherBuys : null, loot: o.loot ? o.loot.value : null, potions: o.potions, lootCounted: !!o.loot,
+  return { total: o.total, perHr: o.perHr, perPct: o.perPct, mesos: o.window ? o.pickedUp + o.sold - o.otherBuys : null, loot: o.loot ? o.loot.value : null, potions: o.potions, lootCounted: !!o.loot,
     lootTabs: o.loot ? o.loot.tabs : null, lootOn: s.mode === 'loot', lootStarted: !!(s.bag && s.bag.startT), lookT: o.sure ? o.lookT : s.meso && s.meso.last ? s.meso.last.t : null, sure: o.sure };
 }
 // the small line under Profit: how much of the loot is in it, and from 5 minutes how old it is. With no loot in it yet it
