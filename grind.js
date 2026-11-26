@@ -674,7 +674,7 @@ function mount(root, deps) {
     wide: () => { const was = strip.dataset.open; strip.dataset.open = '1'; return () => { strip.dataset.open = was; }; },
     hide: () => [SP.l3, strip.dataset.layout === 'column' && SP.lamp], alert: () => SP.l3,
     // the window closed (Settings with it, if it was open); the share and the session go on
-    onClose: () => { SP.gear.setAttribute('aria-pressed', 'false'); showPop(); },
+    onClose: () => { SP.gear.setAttribute('aria-pressed', 'false'); showPop(); popGone.slice().forEach(cb => { try { cb(); } catch (e) { setTimeout(() => { throw e; }); } }); },
     // the app's Settings window closed by itself, as its × does
     onSettingsClose: () => SP.gear.setAttribute('aria-pressed', 'false'),
     // a button takes the click from the game only while clicks pass through. Asked only while the mouse is on a button: if
@@ -1577,7 +1577,7 @@ function mount(root, deps) {
   const LOST = 'Lost the game window. Press Start to try again.';
   // the site's line while a share starts; the first EXP line read clears it (frame)
   const WATCHING = 'Watching. Pick the Window tab and MapleStory if you haven\'t.';
-  const capture = window.Reader.capture(shareArea, { el, prefix: 'g-', raw: true, limit: 0, keepWhenHidden: true, full: true, drop: false, every: 500,
+  const capture = window.Reader.capture(shareArea, { el, prefix: 'g-', join: true, raw: true, limit: 0, keepWhenHidden: true, full: true, drop: false, every: 500,
     // failed: the reader's own note when a share won't start would talk about pasting a screenshot, which the app hasn't
     copy: app ? { share: 'Start', stop: 'Stop', failed: LOST } : { share: 'Share game window', stop: 'Stop sharing' },
     beforeStart: app ? findGame : null,
@@ -2151,6 +2151,24 @@ function mount(root, deps) {
   }
 
   /* ----- the pop out over the game: the slim strip moves into a small window that stays on top; the card stays here ----- */
+  // the window lent to NX Crates (one pop-out, 2026-11-26; index.html hands it to BoxOdds.mount as o.pop): its rows are a
+  // guest in this window while crates are opened. can: this browser or app has a window to pop out. open(el), inside the
+  // click on the site: with Grind sharing, Grind's own window if none is up (el waits for show); with no Grind share, the
+  // window for el alone at 340 by 420, the panel never showing. show(el) puts the guest up in the window that's open
+  // (false without one), hide() gives the window back to the panel, close() shuts it. grinding(): Grind is reading the game. onGone(cb):
+  // the window closed. None of these start, stop or save a Grind run
+  const popGone = [];
+  const pop = {
+    can: app ? !appOld : !!window.documentPictureInPicture,
+    open: g => {
+      if (st.sharing) return overlay.win() ? Promise.resolve(true) : popOut().then(() => !!overlay.win());
+      return overlay.open({ el: g, width: 340, height: 420 }).then(() => { showPop(); return true; }, () => false);
+    },
+    isOpen: () => !!overlay.win(),
+    show: g => overlay.showGuest(g), hide: () => overlay.hideGuest(), close: () => overlay.close(),
+    grinding: () => !!st.sharing,
+    onGone: cb => { popGone.push(cb); },
+  };
   // in the app the overlay opens by itself when the share starts (and from Show the overlay), in the last layout
   function popOut() {
     return overlay.open().then(() => showPop(),
@@ -2539,7 +2557,7 @@ function mount(root, deps) {
   if (session) setStatus('Carrying on your session from ' + timeOfDay(session.t0) + (app ? '. Press Start to carry on.' : '. Share the game window to keep going.'));
   window.Grind.debug = { noteFrame, session: () => session, state: () => ({ reads: st.reads, ticks: st.ticks, line: st.line, m: st.m, level: st.level }),
     // the overlay, opened as Start opens it (the app's own test); resolves to whether it's open
-    overlay: () => (overlay.win() ? Promise.resolve() : popOut()).then(() => !!overlay.win()),
+    overlay: () => (overlay.win() ? Promise.resolve() : popOut()).then(() => !!overlay.win()), pop,
     // End run and New run as their buttons press them; read: one reading through the reading path (a share's frame stood in for)
     endRun, newRun, ended: () => ended, read: r => takeReading(Object.assign({ counts: [] }, r), null),
     setCheck, save: () => save(true), load: row => { viewing = GS().fromRow(row, eatCfg()); render(); setFold('g-detail', true); }, capture: () => capture, mesoLine, lootReady: () => lootReady,
@@ -2571,6 +2589,7 @@ function mount(root, deps) {
   allTimeWin = alltime.el; showDetail();
   reporter.allTime = { el: alltime.el, home: alltime.el.parentNode };
   reporter.who = () => claims.ign();
+  reporter.pop = pop;
   reporter.listed = firstList;   // the first listing of runs: until it lands, Home doesn't say there is no record
   reporter.refresh = () => listSessions();
   // the header's Sign out: the run you were looking at and this device's runs go with the player; a run still going stays

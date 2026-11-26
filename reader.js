@@ -605,12 +605,47 @@ var SEEDS = {"glyphs":{"0":[{"g":[21,83,153,177,177,164,115,22,90,154,206,222,22
   // browser for the window at full size; drop false leaves out the paste and drop area.
   // opts.beforeStart (the Windows app finding the game itself): awaited before the browser is asked for the window; false,
   // or a rejection, puts the buttons back with no onState call.
+  // opts.join (the Grind tab and NX Crates): captures that join share one stream. One that starts while another is
+  // sharing runs its beforeStart, skips the browser's picker and reads the same frames at its own pace. Stop on one
+  // only leaves the share; the tracks stop when the last one leaves. The track ending reaches each as 'ended'. A capture
+  // without join is alone: starting it stops whatever is sharing, and a joiner starting over it stops it.
   var IS_MAC = /Mac/i.test((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '');
   var CAPTURE_COPY = { share: 'Share the game window', stop: 'Stop',
     drop: IS_MAC ? 'Or paste a screenshot here (Cmd+Shift+4, then Cmd+V)' : 'Or paste a screenshot here (Win+Shift+S, then Ctrl+V)',
     notPicture: "That file isn't a picture.",
     failed: "Couldn't start sharing the game window. Try again, or paste a screenshot instead." + (IS_MAC ? ' On a Mac, allow your browser under System Settings, Privacy & Security, Screen Recording, then restart it.' : '') };
-  var activeShare = null; // the one capture that is sharing right now
+  var shares = [];      // every capture that is sharing right now, oldest first
+  var joinFeed = null;  // the stream the joining captures share, while one of them is sharing
+  // a feed is one shared window: its stream, its track and the newest frame, for the n captures reading it
+  function openFeed(stream, track) {
+    var f = { stream: stream, track: track, n: 0, open: true, latest: null, frames: null, video: null };
+    // A background tab still gets frames from MediaStreamTrackProcessor, so use it when the browser has one.
+    if (typeof MediaStreamTrackProcessor === 'function') {
+      try {
+        f.frames = new MediaStreamTrackProcessor({ track: track }).readable.getReader();
+        (function pump() {
+          f.frames.read().then(function (r) {
+            if (r.done) return;
+            if (!f.open) { r.value.close(); return; }
+            if (f.latest) f.latest.close();
+            f.latest = r.value; pump();
+          }).catch(function () {});
+        })();
+      } catch (e) { f.frames = null; }
+    }
+    if (!f.frames) { f.video = document.createElement('video'); f.video.muted = true; f.video.srcObject = stream; f.video.play().catch(function () {}); }
+    return f;
+  }
+  // one capture less on a feed; the last one out ends it: frames and every track
+  function leaveFeed(f) {
+    if (--f.n > 0 || !f.open) return;
+    f.open = false;
+    if (joinFeed === f) joinFeed = null;
+    if (f.frames) f.frames.cancel().catch(function () {});
+    if (f.latest) f.latest.close();
+    if (f.video) f.video.srcObject = null;
+    f.stream.getTracks().forEach(function (t) { t.stop(); });
+  }
   function capture(root, opts) {
     var o = Object.assign({ prefix: 'r-', every: 500, limit: 120000, onState: function () {}, say: function () {} }, opts);
     var copy = Object.assign({}, CAPTURE_COPY, o.copy), E = o.el, id = function (n) { return o.prefix + n; };
@@ -621,7 +656,7 @@ var SEEDS = {"glyphs":{"0":[{"g":[21,83,153,177,177,164,115,22,90,154,206,222,22
     if (!canShare) share.hidden = true;
     root.append(E('div', { class: 'r-bar' }, share, stopBtn));
     if (drop) root.append(drop);
-    var s = null;     // the share: {starting} while the browser's prompt is open, then {stream, track, frames, latest, video, worker, interval, limit, t0, busy}
+    var s = null;     // the share: {starting} while the browser's prompt is open, then {feed, track, worker, interval, limit, t0, busy}
     var dead = false; // destroyed: a prompt that answers late is turned down
     var me = { stop: function () { stop('stop'); } };
     // the frame the share last gave, on a canvas of its own size, for a Something off? report (Reader.grab); null when
@@ -629,8 +664,8 @@ var SEEDS = {"glyphs":{"0":[{"g":[21,83,153,177,177,164,115,22,90,154,206,222,22
     me.grab = function () {
       var cur = s;
       if (!cur || cur.starting) return null;
-      var src = cur.frames ? cur.latest : cur.video;
-      if (!src || (cur.video && cur.video.readyState < 2)) return null;
+      var src = cur.feed.frames ? cur.feed.latest : cur.feed.video;
+      if (!src || (cur.feed.video && cur.feed.video.readyState < 2)) return null;
       var w = src.displayWidth || src.videoWidth, h = src.displayHeight || src.videoHeight;
       if (!w || !h) return null;
       var c = document.createElement('canvas'); c.width = w; c.height = h;
@@ -649,6 +684,8 @@ var SEEDS = {"glyphs":{"0":[{"g":[21,83,153,177,177,164,115,22,90,154,206,222,22
       function back() { if (s === pending) { s = null; idleButtons(); } }
       function ask() {
         if (dead || s !== pending) return;
+        // a joining capture with a share already running: no picker, the same stream
+        if (o.join && joinFeed) return begin(joinFeed);
         var video = o.full ? { frameRate: 5, width: { ideal: 7680 }, height: { ideal: 4320 } } : { frameRate: 5 };
         // the picker opens on its Window list, where the game is, and leaves this tab out (a page can't pick the window
         // itself: the browser makes the player choose). Entire screen stays, as some games only share that way in full screen
@@ -658,26 +695,26 @@ var SEEDS = {"glyphs":{"0":[{"g":[21,83,153,177,177,164,115,22,90,154,206,222,22
           if (dead || s !== pending) { stream.getTracks().forEach(function (t) { t.stop(); }); return; }
           var track = stream.getVideoTracks()[0];
           if (!track) return failed('failed');
-          // one share at a time across every reader panel on the page
-          if (activeShare && activeShare !== me) activeShare.stop();
-          activeShare = me;
-          cur = s = { stream: stream, track: track, t0: Date.now(), busy: false, latest: null };
-          track.addEventListener('ended', function () { if (s === cur) stop('ended'); });
-          // A background tab still gets frames from MediaStreamTrackProcessor, so use it when the browser has one.
-          if (typeof MediaStreamTrackProcessor === 'function') {
-            try {
-              cur.frames = new MediaStreamTrackProcessor({ track: track }).readable.getReader();
-              (function pump() {
-                cur.frames.read().then(function (r) {
-                  if (r.done) return;
-                  if (s !== cur) { r.value.close(); return; }
-                  if (cur.latest) cur.latest.close();
-                  cur.latest = r.value; pump();
-                }).catch(function () {});
-              })();
-            } catch (e) { cur.frames = null; }
-          }
-          if (!cur.frames) { cur.video = document.createElement('video'); cur.video.muted = true; cur.video.srcObject = stream; cur.video.play().catch(function () {}); }
+          // another joiner's picker was answered first: this window isn't needed, read theirs
+          if (o.join && joinFeed) { stream.getTracks().forEach(function (t) { t.stop(); }); return begin(joinFeed); }
+          // one window at a time across every reader panel on the page: whatever else is sharing stops
+          shares.slice().forEach(function (c) { if (c !== me) c.stop(); });
+          var feed = openFeed(stream, track);
+          if (o.join) joinFeed = feed;
+          begin(feed);
+        }, function (e) {
+          // the prompt itself said no: a denied prompt stays quiet, anything else says so
+          if (s !== pending) return;
+          failed(e && e.name === 'NotAllowedError' ? 'denied' : 'failed');
+        });
+      }
+      // this capture starts reading a feed, at its own pace
+      function begin(feed) {
+        try {
+          feed.n++;
+          cur = s = { feed: feed, track: feed.track, t0: Date.now(), busy: false };
+          shares.push(me);
+          feed.track.addEventListener('ended', function () { if (s === cur) stop('ended'); });
           // ticks from a worker, since a hidden tab slows the page's own timers down to once a minute
           try {
             var url = URL.createObjectURL(new Blob(['setInterval(function () { postMessage(0); }, ' + o.every + ');'], { type: 'text/javascript' }));
@@ -687,18 +724,12 @@ var SEEDS = {"glyphs":{"0":[{"g":[21,83,153,177,177,164,115,22,90,154,206,222,22
           if (o.limit) cur.limit = setTimeout(function () { if (s === cur) stop('time'); }, o.limit);
           share.hidden = true; share.disabled = false; stopBtn.hidden = false;
           o.onState('sharing');
-        }).catch(function (e) {
-          if (got === null) {
-            // the prompt itself said no: a denied prompt stays quiet, anything else says so
-            if (s !== pending) return;
-            return failed(e && e.name === 'NotAllowedError' ? 'denied' : 'failed');
-          }
+        } catch (e) {
           // a bug after the share started (onState threw, say): clean up so the panel isn't stuck, then show the error
           if (s === cur && cur) teardown(); else if (s === pending) s = null;
-          got.getTracks().forEach(function (t) { t.stop(); });
           idleButtons();
           setTimeout(function () { throw e; });
-        });
+        }
       }
       // back to idle without a share; 'failed' also gets a short note
       function failed(why) {
@@ -711,16 +742,13 @@ var SEEDS = {"glyphs":{"0":[{"g":[21,83,153,177,177,164,115,22,90,154,206,222,22
       }
     }
     function idleButtons() { share.hidden = !canShare; share.disabled = false; stopBtn.hidden = true; }
-    // ends the running share: worker, timers, frames and every track
+    // ends this capture's share: its worker and timers, and its place on the feed (the last one out stops the tracks)
     function teardown() {
       var cur = s; s = null;
-      if (activeShare === me) activeShare = null;
+      var i = shares.indexOf(me); if (i >= 0) shares.splice(i, 1);
       if (cur.worker) cur.worker.terminate();
       clearInterval(cur.interval); clearTimeout(cur.limit);
-      if (cur.frames) cur.frames.cancel().catch(function () {});
-      if (cur.latest) cur.latest.close();
-      if (cur.video) cur.video.srcObject = null;
-      cur.stream.getTracks().forEach(function (t) { t.stop(); });
+      leaveFeed(cur.feed);
     }
     function stop(why) {
       if (!s || s.starting) return;
@@ -735,8 +763,8 @@ var SEEDS = {"glyphs":{"0":[{"g":[21,83,153,177,177,164,115,22,90,154,206,222,22
       if (cur.track.readyState === 'ended') return stop('ended');
       // the panel was taken off the page or its tab was left
       if (!root.isConnected || (!o.keepWhenHidden && !root.getClientRects().length)) return stop('hidden');
-      var src = cur.frames ? cur.latest : cur.video;
-      if (!src || (cur.video && cur.video.readyState < 2)) return;
+      var src = cur.feed.frames ? cur.feed.latest : cur.feed.video;
+      if (!src || (cur.feed.video && cur.feed.video.readyState < 2)) return;
       cur.busy = true;
       give(src, 'share').then(function (done) { cur.busy = false; if (done && s === cur) stop('done'); });
     }
@@ -796,7 +824,7 @@ var SEEDS = {"glyphs":{"0":[{"g":[21,83,153,177,177,164,115,22,90,154,206,222,22
     setIcons: function (json, img) { ICONS = iconSet(json, img, function (id) { return jobOf(id) > 0; }); },
     findSkills: findSkills, skillView: skillView, levelBox: levelBox, readSkills: readSkills, readAll: readAll,
     capture: capture,
-    grab: function () { return activeShare && activeShare.grab ? activeShare.grab() : null; },
+    grab: function () { for (var i = shares.length - 1; i >= 0; i--) { var c = shares[i].grab(); if (c) return c; } return null; },
     setSeeds: function (s) { SEEDS = { glyphs: (s && s.glyphs) || {}, letters: (s && s.letters) || {} }; window.Reader.SEEDS = SEEDS; },
     SEEDS: SEEDS,
     limits: { MAX_DIST: MAX_DIST, RATIO: RATIO, LEAD_MAX: LEAD_MAX, GAP_MAX: GAP_MAX, SPACE_MAX: SPACE_MAX, SCALE_MIN: SCALE_MIN, SCALE_MAX: SCALE_MAX, RESAMPLE_TOL: RESAMPLE_TOL, ICON_MAX: ICON_MAX, MIN_ROWS: MIN_ROWS }

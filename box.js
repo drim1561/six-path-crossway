@@ -23,21 +23,27 @@
   var priceText = function (price, est) { return price == null ? '' : (est ? 'est. ' : '') + mes(price); };
 
   // the pop-out's inside: this round's pulls, newest on top (picture, name, chance, the price saved with the pull), then
-  // how many crates and their worth by the round's own rules (roundTotal), and a line for pulls the reader couldn't read
-  function popView(pulls, c, missed) {
+  // how many crates and their worth by the round's own rules (roundTotal), and a line for pulls the reader couldn't read.
+  // Rows come with a Done button beside the title. over: the round is finished, so only its foot stays, with a line
+  // asking for the next crate (the window with no Grind run, one pop-out 2026-11-26). close: a Close button too, for the
+  // app's overlay while Grind's panel, which has the overlay's own close, is not in it
+  function popView(pulls, c, missed, over, close) {
     var byId = {};
     (c ? c.items : []).forEach(function (i) { byId[i.id] = i; });
     var list = (pulls || []).slice().sort(function (a, b) { return b.ts - a.ts; });
-    var html = '<h3 class="bx-pop-h">' + esc(c ? c.name || c.short : 'NX Crates') + '</h3>';
-    if (!list.length) html += '<p class="bx-pop-wait">Open a crate in the game.</p>';
-    html += list.map(function (p) {
+    var rows = list.length && !over;
+    var html = '<div class="bx-pop-top"><h3 class="bx-pop-h">' + esc(c ? c.name || c.short : 'NX Crates') + '</h3>' +
+      (rows ? '<button type="button" class="k-btn sm" id="bx-pop-done">Done</button>' : '') +
+      (close ? '<button type="button" class="k-btn sm" id="bx-pop-x" title="Stop sharing and close">Close</button>' : '') + '</div>';
+    if (!rows) html += '<p class="bx-pop-wait">' + (list.length ? 'Open a crate to start another.' : 'Open a crate in the game.') + '</p>';
+    else html += '<div class="bx-pop-rows">' + list.map(function (p) {
       var it = byId[p.itemId];
       var price = p.mine != null ? 'yours ' + mes(p.mine) : priceText(p.price, p.est === true);
       return '<div class="bx-pop-r">' + (it && it.icon ? '<img src="' + it.icon + '" alt="" width="32" height="32">' : '<i></i>') +
         '<span class="name">' + esc(it ? it.name : 'Unknown item') + '<small>' + (it ? esc(it.rate) + '% chance' : '') + '</small></span>' +
         '<span class="num">' + esc(price) + '</span></div>';
-    }).join('');
-    if (missed) html += '<p class="bx-pop-miss">Couldn\'t read ' + missed + '. Tap ' + (missed === 1 ? 'it' : 'them') + ' on the site.</p>';
+    }).join('') + '</div>';
+    if (missed && !over) html += '<p class="bx-pop-miss">Couldn\'t read ' + missed + '. Tap ' + (missed === 1 ? 'it' : 'them') + ' on the site.</p>';
     if (list.length) {
       var t = roundTotal(list, byId, false), n = list.length;
       html += '<p class="bx-pop-foot"><span>' + n + (n === 1 ? ' crate' : ' crates') + '</span><span>worth <b>' + esc(mes(t.total)) + '</b></span></p>';
@@ -432,14 +438,19 @@
       });
     }
     function finish(rnd) {
+      // a round the reader filled stays on show in the window once it's done (crates with no Grind run)
+      if (pop.pulled === rnd) pop.last = { pulls: roundPulls(), crate: round ? round.crate : state.crate };
       round = null; saveRound(); past.fresh = String(rnd); past.open.add(String(rnd)); past.view = 'rounds';
       $('bx-cost-in').value = ''; costUnit = 'nx';
       var bad = $('bx-cost-bad'); bad.hidden = true; bad.textContent = '';
       clearTransient(); render();
     }
-    function done() {
+    // quiet: Done from the window, the quiet minute or the window closing. A cost typed on the tab goes with it; one
+    // that can't be read is left out, since nobody is at the tab to fix it
+    function done(quiet) {
       if (!round || busy) return;
       var typed = costOf($('bx-cost-in').value), bad = $('bx-cost-bad'), rnd = round.round;
+      if (typed.bad && quiet) typed = { none: true };
       if (typed.bad) { bad.textContent = BAD; bad.hidden = false; return; }
       bad.hidden = true; bad.textContent = '';
       if (typed.none) { finish(rnd); return; }
@@ -658,59 +669,86 @@
       drawPop();
     }
 
-    // ---------- the pop-out: Start opening shares the game and opens a small window over it with each pull ----------
-    // One click asks for both (Chrome allows it, 2026-11-25 spike); a browser that refuses the window gets a Pop out button
-    // once sharing. Closing the window stops the share and finishes the round, as Done with no cost.
-    var pop = { win: null, failed: false, live: false, pulled: false, html: '', leaving: false };   // live: the game was shared while this window was up; pulled: a crate was read in that time
-    var canPop = !!window.documentPictureInPicture && !o.app;
+    // ---------- the window over the game (one pop-out, 2026-11-26) ----------
+    // The rows are a guest in Grind's window (o.pop, from grind.js: can, open, isOpen, show, hide, close, grinding,
+    // onGone); this file opens no window of its own. Start opening shares the game and, in the same click, opens the
+    // window if none is up. What it shows:
+    //   Grind sharing: Grind, until a pull is read in a round; then the rows with Done; Grind again after Done
+    //   no Grind run:  "Open a crate in the game.", then the rows with Done, then the finished round's foot
+    // A round the reader filled finishes itself after a quiet minute (no Surprise window for o.quiet ms). Closing the
+    // window: with Grind sharing nothing here changes; crates alone, the share stops and the round is finished as Done.
+    // pulled: the round a pull was read into during this share. last: that round once finished. mine: opened for crates alone
+    var P = null, canPop = false, QUIET = +o.quiet > 0 ? +o.quiet : 60000;
+    var pop = { el: null, up: false, failed: false, pulled: null, last: null, mine: false, html: '', leaving: false, quiet: 0 };
+    var taken = function () { return !!round && pop.pulled === round.round && roundPulls().length > 0; };
     function drawPop() {
-      if (!pop || !pop.win) return;
-      var body = pop.win.document.getElementById('bx-pop');
-      var h = popView(roundPulls(), byKey.get(round ? round.crate : state.crate), read.missed);
-      if (body && h !== pop.html) { body.innerHTML = h; pop.html = h; }
+      if (!P || !pop.el || !P.isOpen()) { pop.up = false; return; }
+      if (pop.mine && P.grinding()) pop.mine = false;   // Grind joined: the window is Grind's from here on
+      // mine: opened for crates alone, so it has the rows from the start, while the browser still asks for the game
+      var on = (read.on || pop.mine) && (taken() || !P.grinding());
+      if (!on) { if (pop.up) { pop.up = false; P.hide(); } return; }
+      // the app's overlay has no frame: without Grind's panel in it, the rows carry its Close
+      var x = !!o.app && !P.grinding();
+      var h = taken() ? popView(roundPulls(), byKey.get(round.crate), read.missed, false, x)
+        : pop.last ? popView(pop.last.pulls, byKey.get(pop.last.crate), 0, true, x)
+        : popView([], byKey.get(state.crate), read.missed, false, x);
+      var body = pop.el.firstChild;
+      if (h !== pop.html) { body.innerHTML = h; pop.html = h; }
+      if (!pop.up) pop.up = P.show(pop.el) !== false;
     }
     function openPop() {
-      if (!canPop || pop.win) return;
+      if (!canPop) return;
       pop.failed = false;
-      Promise.resolve().then(function () { return window.documentPictureInPicture.requestWindow({ width: 340, height: 420 }); }).then(function (win) {
-        pop.win = win; pop.html = '';
-        if (read.on) pop.live = true;
-        var d = win.document;
-        for (var i = 0; i < document.styleSheets.length; i++) {
-          try { var s = d.createElement('style'); s.textContent = Array.from(document.styleSheets[i].cssRules).map(function (r) { return r.cssText; }).join('\n'); d.head.append(s); } catch (e) { /* a stylesheet from another site */ }
-        }
-        try { var inl = document.documentElement.style; for (var k = 0; k < inl.length; k++) if (inl[k].indexOf('--night-') === 0) d.documentElement.style.setProperty(inl[k], inl.getPropertyValue(inl[k])); } catch (e) { /* the data pictures stay */ }
-        d.title = 'NX Crates';
-        d.body.className = 'bx-pip';
-        d.body.innerHTML = '<div id="view-boxes"><div class="bx-pop" id="bx-pop"></div></div>';
-        win.addEventListener('pagehide', function () { popGone(win); });
-        window.addEventListener('pagehide', function () { pop.leaving = true; }, { once: true });
+      var was = P.isOpen(), fail = function () { pop.failed = true; popButton(); };
+      var w; try { w = P.open(pop.el); } catch (e) { fail(); return; }
+      Promise.resolve(w).then(function (ok) {
+        if (!ok) { fail(); return; }
+        if (!was && !P.grinding()) pop.mine = true;
         drawPop(); popButton();
-      }, function () { pop.failed = true; popButton(); });
+      }, fail);
     }
-    // the window closed (by the player, or by the share ending): the share stops and the round is finished
-    function popGone(win) {
-      if (pop.win !== win) return;
-      pop.win = null;
-      var live = pop.live && pop.pulled; pop.live = false; pop.pulled = false;
-      if (read.on && read.share) read.share.stop();
-      // as Done: a cost typed on the tab goes with it; a round tapped before sharing, or the page itself closing, stays open
-      if (live && !pop.leaving && round && roundPulls().length) done();
+    // crates left the share: a window opened for crates alone goes, Grind's own window only gets its panel back
+    function closePop() {
+      if (!P || !P.isOpen()) { pop.up = false; pop.mine = false; return; }
+      var shut = pop.mine && !P.grinding();
+      pop.mine = false;
+      if (shut) { pop.up = false; P.close(); }
+      else if (pop.up) { pop.up = false; P.hide(); }
+    }
+    // the player closed the window
+    function popGone() {
+      pop.up = false; pop.mine = false; pop.html = '';
+      if (pop.el) pop.el.firstChild.innerHTML = '';
+      if (P.grinding() || !read.on) { popButton(); return; }
+      if (read.share) read.share.stop();   // crates alone: the share ends with it, and the round below (onState)
       popButton();
     }
-    function closePop() { var w = pop.win; if (w) { try { w.close(); } catch (e) { /* already gone */ } popGone(w); } }
     // while sharing with no window up, an amber Pop out opens it
     function popButton() {
       var bar = $('bx-read-bar'), b = $('bx-pop-btn');
-      var want = canPop && read.on && !pop.win;
+      var want = canPop && read.on && !P.isOpen();
       if (want && !b && bar) { b = button('bx-pop-btn', 'Pop out over the game', 'k-btn sm key'); b.onclick = openPop; bar.querySelector('.r-bar').append(b); }
       if (b) b.hidden = !want;
+    }
+    function popSetup(p) {
+      if (!p || !p.can || typeof p.open !== 'function') return;
+      P = p; canPop = true;
+      pop.el = document.createElement('div'); pop.el.className = 'bx-guest';
+      pop.el.innerHTML = '<div class="bx-pop" id="bx-pop"></div>';
+      pop.el.addEventListener('click', function (e) {
+        if (!e.target.closest) return;
+        if (e.target.closest('#bx-pop-done')) { done(true); drawPop(); }
+        // Close: the window goes, and popGone ends the crates' share and the round with it
+        else if (e.target.closest('#bx-pop-x')) P.close();
+      });
+      P.onGone(popGone);
+      window.addEventListener('pagehide', function () { pop.leaving = true; }, { once: true });
     }
     // a pull read off the game goes in like a tap; a save of another kind in flight (an undo) is waited out
     function readIn(id, key, tries) {
       if (key !== state.crate) { read.missed++; readNote(); return; }
       if (session && !adding && !ready() && tries < 20) { setTimeout(function () { readIn(id, key, tries + 1); }, 300); return; }
-      logOne(id, function (saved) { if (saved) { read.count++; if (pop.live) pop.pulled = true; } else read.missed++; readNote(); });
+      logOne(id, function (saved) { if (saved) { read.count++; if (read.on && round) { pop.pulled = round.round; pop.last = null; } } else read.missed++; readNote(); });
     }
     function readFrame(src, m) {
       if (read.crate !== state.crate) {
@@ -727,6 +765,10 @@
       read.state = now - read.seen < 3000 ? 'watching' : 'looking';
       read.missed += r.missed || 0;
       if (r.pulls) { r.pulls.forEach(function (id) { readIn(id, state.crate, 0); }); }
+      // the quiet minute: a round the reader filled, with no Surprise window for a minute, finishes itself
+      // (a Done that didn't take, a save in flight or a cost that wouldn't save, waits another quiet minute)
+      if (taken() && read.state === 'looking') { if (!pop.quiet) pop.quiet = now; else if (now - pop.quiet >= QUIET) { pop.quiet = now; done(true); } }
+      else pop.quiet = 0;
       readNote();
     }
     function readSetup(dep) {
@@ -737,6 +779,7 @@
       readNote();
       read.share = dep.capture($('bx-read-bar'), { prefix: 'bx-', raw: true, limit: 0, keepWhenHidden: true, full: true, drop: false, every: 200,
         el: function (t, a) { var k = [].slice.call(arguments, 2); return o.el.apply(null, [t, t === 'button' ? Object.assign({}, a, { class: 'k-btn sm' }) : a].concat(k)); },
+        join: true,   // one share with Grind: whichever starts second reads the same stream, with no picker
         copy: { share: canPop ? 'Start opening' : 'Share game window', stop: 'Stop sharing', failed: "Couldn't start sharing the game window. Try again." },
         // the Windows app finds the game itself; a browser asks the player
         beforeStart: function () {
@@ -751,22 +794,34 @@
         onImage: readFrame, say: function (t) { if (t) readSay(t); },
         onState: function (s, why) {
           read.on = s === 'sharing';
-          if (read.on) { read.count = 0; read.missed = 0; read.state = 'looking'; read.seen = -1e9; read.crate = null; read.set = false; read.reader.reset(); }
+          if (read.on) { read.count = 0; read.missed = 0; read.state = 'looking'; read.seen = -1e9; read.crate = null; read.set = false; read.reader.reset(); pop.pulled = null; pop.last = null; pop.quiet = 0; }
           if (read.on || (why !== 'denied' && why !== 'failed')) readNote();
-          if (read.on && pop.win) pop.live = true;
-          if (!read.on) closePop();
+          // the app: the overlay opens once the game is found and shared, as Grind's does (a window opened in the
+          // click would be left over the screen when the game isn't running)
+          if (read.on && app && canPop && !P.isOpen()) openPop();
+          if (!read.on) {
+            // crates alone: the share is over, so a round the reader filled is finished as Done (the page itself
+            // closing leaves it open). With Grind sharing the round stays open on the tab. The game going away ends the
+            // share for Grind too, whichever of the two hears it first, so that counts as alone
+            var alone = !P || !P.grinding() || why === 'ended', live = taken();
+            closePop();
+            if (alone && live && !pop.leaving) done(true);
+            pop.pulled = null; pop.last = null; pop.html = '';
+          }
           popButton();
         } });
-      // Start opening: the window opens in the same click that asks for the game (signed out, only the sign in shows)
+      // Start opening: on the site the window opens in the same click that asks for the game (signed out, only the sign
+      // in shows); in the app the overlay opens once sharing (onState)
       if (canPop) {
         var sb = $('bx-share');
         if (sb) sb.classList.add('key');
         $('bx-read-bar').addEventListener('click', function (e) {
-          if (e.target.closest && e.target.closest('#bx-share') && session && !read.on && !app) openPop();
+          if (e.target.closest && e.target.closest('#bx-share') && session && !read.on && !app && !P.isOpen()) openPop();
         }, true);
       }
     }
-    if (o.reader && o.el) Promise.resolve(o.reader).then(readSetup, function () {});
+    // the window comes with Grind's code, which may still be loading or fail: the share waits for the answer either way
+    if (o.reader && o.el) Promise.resolve(o.pop).then(popSetup, function () {}).then(function () { return o.reader; }).then(readSetup, function () {});
 
     refresh(session);
     scrollStrip();

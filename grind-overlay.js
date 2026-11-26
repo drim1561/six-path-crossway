@@ -1,7 +1,13 @@
 // The window the Grind panel lives in. On the site it is a Document Picture-in-Picture window; in the Windows app (app: the
 // bridge) a window of its own the shell makes frameless and transparent, opened with window.open.
 // window.GrindOverlay = { create({ strip, home, app, title, setTitle, width, room, font, wide, hide, alert, onClose, onSettingsClose, passing }) }
-//   -> { open(), win(), resize(w, h), fit(), close(), showSettings(el), hideSettings(), swapSettings(el), settingsOpen(), solid() }
+//   -> { open(guest), win(), resize(w, h), fit(), close(), showSettings(el), hideSettings(), swapSettings(el), settingsOpen(), solid(),
+//        showGuest(el), hideGuest(), guest() }
+// A guest (NX Crates' rows, 2026-11-26) is an element that takes the window over in place of the panel: showGuest(el) puts
+// it in (class g-guest, which the page's CSS lays over the whole window) and hides the panel, which stays in the window and
+// keeps drawing underneath; hideGuest() takes it out and shows the panel again. While a guest is up the window keeps the
+// size it has: nothing fits or resizes it. open({ el, width, height }) opens the window for a guest alone at that size, the
+// panel never showing; with a window already up it only puts the guest in. The window closing takes the guest out (onClose).
 // The window fits what's showing (round 2): fit() measures the panel as it is now, open or closed, at the width width()
 // asks for (its text sized so its longest lines fill it), and the window becomes the panel plus room, a fixed space above
 // it for the mushroom and its bubble (the room is the page's own, above the panel: on the site the pop-out's body color,
@@ -35,6 +41,8 @@ function create(o) {
   let setEl = null, setWin = null;
   // in the app: the mouse on a button is holding the overlay's clicks
   let holding = false;
+  // the guest while one is up: the element that has the window in place of the panel
+  let guestEl = null;
   // in the app: puts g-solid on the panel or takes it off (a no-op while no app window is open)
   let solidNow = () => {};
   // on the site, the size asked for that the window hasn't reached yet, and the press that will try it again. onWay is a
@@ -98,7 +106,7 @@ function create(o) {
   // the room above it (and Settings under it on the site)
   function fit() {
     const w = strip.ownerDocument.defaultView;
-    if (!pipWin || strip.hidden || !w || w === window) return;
+    if (!pipWin || guestEl || strip.hidden || !w || w === window) return;
     const [pw, ph] = measure(), want = outer(pw, ph);
     if (reached(pipWin, want)) { unmet = null; onWay = null; }
     else if (!same(onWay, want) && !same(unmet, want)) sizeTo(...want);
@@ -137,22 +145,25 @@ function create(o) {
     const W = Math.round(o.width ? o.width() : 300);
     return s && s[1] > 0 ? outer(s[0], s[1]) : [W, Math.round(W * 1.6) + room];
   }
-  function open() {
-    if (o.app) return openApp();
+  // g (optional): a guest to open for, { el, width, height }. A window that's up with a guest in it, or asked for one, is
+  // kept (on the site a second ask would close the first window, and tell the guest's owner it was closed)
+  function open(g) {
+    if (pipWin && !pipWin.closed && (g || guestEl)) { if (g) showGuest(g.el); return Promise.resolve(pipWin); }
+    if (o.app) return openApp(g);
     if (!window.documentPictureInPicture) return Promise.reject(new Error('no-window'));
-    const [w0, h0] = firstSize();
-    return documentPictureInPicture.requestWindow({ width: w0, height: h0 }).then(pip => adopt(pip, 'g-pip'));
+    const [w0, h0] = g ? [g.width, g.height] : firstSize();
+    return documentPictureInPicture.requestWindow({ width: w0, height: h0 }).then(pip => adopt(pip, 'g-pip', g));
   }
   // the app: a window named sixpath-overlay, which the shell makes frameless, transparent and on top of the game. Its
   // closing is seen by pagehide, and should that not come, by the window being closed (checked every second)
-  function openApp() {
+  function openApp(g) {
     // already open: opening a window by the same name again would load a blank page over the panel
     if (pipWin && !pipWin.closed) return Promise.resolve(pipWin);
-    const [w0, h0] = firstSize();
+    const [w0, h0] = g ? [g.width, g.height] : firstSize();
     let win = null;
     try { win = window.open('about:blank', 'sixpath-overlay', 'width=' + w0 + ',height=' + h0); } catch (e) { /* refused */ }
     if (!win) return Promise.reject(new Error('no-window'));
-    adopt(win, 'g-ov');
+    adopt(win, 'g-ov', g);
     // Clicks pass through (Rimmah, 2026-11-04): the app still tells the page where the mouse is, and the mouse on a
     // button (or ⇆'s row of layouts) lets the overlay take the click; off one, the clicks go back to the game GIVE_BACK ms
     // later, so the way from ⇆ over to its pictures keeps them, and the mouse leaving gives them back at once. Alt to click
@@ -237,8 +248,8 @@ function create(o) {
     d.body.className = cls;
     return d;
   }
-  // the panel moves into a new window
-  function adopt(pip, cls) {
+  // the panel moves into a new window (g: opened for a guest, which has it from the start)
+  function adopt(pip, cls, g) {
     pipWin = pip;
     const d = dress(pip, cls, o.title);
     strip.hidden = false;
@@ -250,7 +261,7 @@ function create(o) {
     if (!o.app) {
       const press = () => {
         clearTimeout(pressT);
-        pressT = setTimeout(() => { if (pipWin === pip && unmet && !reached(pip, unmet)) sizeTo(...unmet); }, PRESS_ROOM);
+        pressT = setTimeout(() => { if (pipWin === pip && !guestEl && unmet && !reached(pip, unmet)) sizeTo(...unmet); }, PRESS_ROOM);
       };
       d.addEventListener('pointerup', press, true);
       d.addEventListener('keydown', press, true);
@@ -264,12 +275,40 @@ function create(o) {
       if (onWay && (o.app || reached(pip, onWay))) onWay = null;
       fit();
     });
+    if (g) showGuest(g.el);
     fit();
     return pip;
+  }
+  // the guest takes the window in place of the panel, at the size the window has
+  function showGuest(el) {
+    if (!pipWin || !el) return false;
+    if (guestEl === el) return true;
+    if (guestEl) dropGuest();
+    guestEl = el;
+    el.classList.add('g-guest');
+    strip.style.display = 'none';
+    strip.after(el);
+    return true;
+  }
+  function dropGuest() {
+    const el = guestEl;
+    guestEl = null;
+    if (!el) return;
+    try { el.remove(); } catch (e) { /* its window is gone */ }
+    el.classList.remove('g-guest');
+    strip.style.display = '';
+  }
+  // the panel has its window back, and the window fits it again (the same size, unless the panel changed underneath)
+  function hideGuest() {
+    if (!guestEl) return;
+    dropGuest();
+    unmet = null; onWay = null;
+    fit();
   }
   // the window closed: the panel goes back to the page (once, however it was seen), and Settings closes with it
   function gone(pip) {
     if (pipWin !== pip) return;
+    dropGuest();
     pipWin = null; strip.hidden = true; strip.style.fontSize = ''; strip.style.minHeight = '';
     clearTimeout(pressT); clearTimeout(waitT); unmet = null; onWay = null;
     if (holding) { holding = false; strip.classList.remove('g-hold'); }   // its window is gone, and the app's hold with it
@@ -308,7 +347,7 @@ function create(o) {
     return [W, h + sh + room];
   }
   function resize(w, h) {
-    if (!pipWin) return false;
+    if (!pipWin || guestEl) return false;
     return sizeTo(...outer(w, h));
   }
   // Settings: on the site under the panel, inside the pop-out, which grows to fit it; hideSettings() shrinks it back to
@@ -380,7 +419,8 @@ function create(o) {
     return true;
   }
   const close = () => { if (pipWin) { try { pipWin.close(); } catch (e) { /* already gone */ } } };
-  return { open, win: () => pipWin, resize, fit, close, showSettings, hideSettings, swapSettings, settingsOpen: () => !!setEl, solid: () => solidNow() };
+  return { open, win: () => pipWin, resize, fit, close, showSettings, hideSettings, swapSettings, settingsOpen: () => !!setEl, solid: () => solidNow(),
+    showGuest, hideGuest, guest: () => guestEl };
 }
 window.GrindOverlay = { create };
 })();

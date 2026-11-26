@@ -1254,6 +1254,8 @@ html:has(body.g-pip), body.g-pip { overflow: hidden; scrollbar-width: none; }
 body.g-pip { margin: 0; padding: 0; background: var(--wood-o); }
 body.g-pip::-webkit-scrollbar { display: none; }
 body.g-pip #view-grind { max-width: none; }
+/* a guest in Grind's window (NX Crates' rows, grind-overlay.js showGuest): it has the whole window while it's up */
+#view-grind > .g-guest { position: fixed; inset: 0; box-sizing: border-box; overflow: hidden; }
 /* the app's overlay, a transparent window of its own (grind-app/): the game shows through around the panel, which draws
    its own frame, and a press anywhere on it but its buttons moves the window (grind-overlay.js, by script: a
    drag region would be a title bar to Windows, with no hover over it). The site's pop out is unchanged */
@@ -1959,22 +1961,23 @@ a.cozy:hover { border-color: var(--muted); }
 #view-boxes .bx-info { display: grid; gap: 2px; }
 #view-boxes .bx-info p { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
 #view-boxes .bx-info p[hidden] { display: none; }
-/* the NX Crates pop-out over the game (box.js popView): one row per pull, newest on top, the round's worth at the foot */
-body.bx-pip { margin: 0; padding: 0; background: var(--wood-o); }
-body.bx-pip .credit { display: none; }
-body.bx-pip #view-boxes { max-width: none; min-height: 100vh; box-sizing: border-box; padding: 12px; background: var(--surface); }
-#view-boxes .bx-pop { display: grid; gap: 12px; }
-#view-boxes .bx-pop-h { margin: 0; font: 400 var(--fs-lg) var(--font-title); color: var(--ink); }
-#view-boxes .bx-pop-r { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding-top: 12px; border-top: 1px solid var(--at-line); }
-#view-boxes .bx-pop-h + .bx-pop-r { padding-top: 0; border-top: 0; }
-#view-boxes .bx-pop-r img { image-rendering: pixelated; }
-#view-boxes .bx-pop-r i { width: 32px; height: 32px; }
-#view-boxes .bx-pop-r .name { min-width: 0; font: 700 var(--fs-md) var(--font-body); color: var(--ink); overflow-wrap: anywhere; }
-#view-boxes .bx-pop-r small { display: block; font: 400 var(--fs-sm) var(--font-body); color: var(--muted); }
-#view-boxes .bx-pop-r .num { font: 600 var(--n-s) var(--font-num); color: var(--num); text-align: right; white-space: nowrap; }
-#view-boxes .bx-pop-wait, #view-boxes .bx-pop-miss { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
-#view-boxes .bx-pop-foot { margin: 0; display: flex; justify-content: space-between; gap: 12px; padding-top: 12px; border-top: 1px solid var(--at-line); color: var(--muted); font-size: var(--fs-sm); }
-#view-boxes .bx-pop-foot b { font: 700 var(--n-s) var(--font-num); color: var(--ink); }
+/* NX Crates' rows as a guest in Grind's window (one pop-out, 2026-11-26): the title with Done, the newest rows that fit
+   (a row that doesn't fit whole wraps out of sight), the foot pinned at the bottom. The window keeps its size */
+.bx-guest { padding: 12px; background: var(--surface); color: var(--ink); font-family: var(--font-body); }
+.bx-guest .bx-pop { height: 100%; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+.bx-guest .bx-pop-top { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.bx-guest .bx-pop-h { flex: 1 1 0; margin: 0; min-width: 0; font: 400 var(--fs-lg) var(--font-title); color: var(--ink); }
+.bx-guest .bx-pop-rows { flex: 1 1 0; min-height: 0; overflow: hidden; display: flex; flex-flow: column wrap; align-content: flex-start; column-gap: 24px; }
+.bx-guest .bx-pop-r { width: 100%; box-sizing: border-box; display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px 0 0; margin-top: 12px; border-top: 1px solid var(--at-line); }
+.bx-guest .bx-pop-r:first-child { padding-top: 0; margin-top: 0; border-top: 0; }
+.bx-guest .bx-pop-r img { image-rendering: pixelated; }
+.bx-guest .bx-pop-r i { width: 32px; height: 32px; }
+.bx-guest .bx-pop-r .name { min-width: 0; font: 700 var(--fs-md) var(--font-body); color: var(--ink); overflow-wrap: anywhere; }
+.bx-guest .bx-pop-r small { display: block; font: 400 var(--fs-sm) var(--font-body); color: var(--muted); }
+.bx-guest .bx-pop-r .num { font: 600 var(--n-s) var(--font-num); color: var(--num); text-align: right; white-space: nowrap; }
+.bx-guest .bx-pop-wait, .bx-guest .bx-pop-miss { flex: none; margin: 0; color: var(--muted); font-size: var(--fs-sm); }
+.bx-guest .bx-pop-foot { flex: none; margin: auto 0 0; display: flex; justify-content: space-between; gap: 12px; padding-top: 12px; border-top: 1px solid var(--at-line); color: var(--muted); font-size: var(--fs-sm); }
+.bx-guest .bx-pop-foot b { font: 700 var(--n-s) var(--font-num); color: var(--ink); }
 #view-boxes a { color: var(--focus); text-decoration: underline; }
 #view-boxes .bx-read { display: grid; gap: 6px; }
 #view-boxes .bx-read[hidden], #view-boxes .bx-read [hidden] { display: none !important; }
@@ -2851,7 +2854,7 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-26b',
+  version: '2026-11-26c',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
@@ -3751,6 +3754,8 @@ function loadBoxes() {
   const data = fetch('data/box.json').then(r => { if (!r.ok) throw new Error('box.json'); return r.json(); });
   boxesLoading = Promise.all([script, data]).then(([, d]) => {
     boxesView = reporters.boxes = window.BoxOdds.mount($('boxes-root'), { el, store, api, data: d, session: state.session, signIn: () => signIn(), crate: boxesCrate(), reader: crateReader, app: APP,
+      // the window over the game is Grind's (one pop-out): its code loads beside this tab, so Start opening can open it in the click
+      pop: loadGrind().then(() => (reporters.grind && reporters.grind.pop) || null), quiet: window.BT_CRATE_QUIET,
       report: async (words, details) => {
         const fd = new FormData();
         fd.append('kind', 'wrong'); fd.append('text', words); fd.append('details', details);
