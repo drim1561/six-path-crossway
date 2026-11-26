@@ -340,6 +340,9 @@ function measure(src, line, frameH) {
   // own size (a 1024x768 window's share is 800 tall when its title bar is 32, 1.042, and that scan settled on the LV text)
   const guesses = [frameH / 768, line.digitH / 6.4];
   if (!guesses.some(g => atBase('level', g))) guesses.push(1);
+  // last, the EXP digits are 7 px drawn: a 2880 x 1800 laptop draws the HUD at 2x, where the window says 2.34 and the
+  // digits over 6.4 say 2.19, both too big to fine tune down to it (Lok, 2026-11-25)
+  guesses.push(line.digitH / 7);
   for (const g0 of guesses) {
     const a = levelArea(line, g0), img = region(src, a.x, a.y, a.w, a.h), set = setAt('level', g0), t0 = set['0'];
     if (!t0) break;
