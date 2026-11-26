@@ -1976,6 +1976,7 @@ a.cozy:hover { border-color: var(--muted); }
 .bx-guest .bx-pop-r small { display: block; font: 400 var(--fs-sm) var(--font-body); color: var(--muted); }
 .bx-guest .bx-pop-r .num { font: 600 var(--n-s) var(--font-num); color: var(--num); text-align: right; white-space: nowrap; }
 .bx-guest .bx-pop-wait, .bx-guest .bx-pop-miss { flex: none; margin: 0; color: var(--muted); font-size: var(--fs-sm); }
+.bx-guest .bx-pop-cost { flex: none; display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: var(--fs-sm); }
 .bx-guest .bx-pop-foot { flex: none; margin: auto 0 0; display: flex; justify-content: space-between; gap: 12px; padding-top: 12px; border-top: 1px solid var(--at-line); color: var(--muted); font-size: var(--fs-sm); }
 .bx-guest .bx-pop-foot b { font: 700 var(--n-s) var(--font-num); color: var(--ink); }
 #view-boxes a { color: var(--focus); text-decoration: underline; }
@@ -2026,7 +2027,8 @@ a.cozy:hover { border-color: var(--muted); }
 #view-boxes .bx-costlab small { color: var(--muted); font-weight: 400; margin-left: 6px; }
 #view-boxes .bx-costrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 #view-boxes .bx-costrow input { min-width: 0; width: 9em; padding: 7px 10px; border-radius: var(--r-card); border: 2px solid var(--card-o); background: var(--card); color: var(--ink); font: 600 var(--fs-sm) var(--font-num); }
-#view-boxes .bx-units { display: inline-flex; gap: 6px; }
+#view-boxes .bx-units, #view-boxes .bx-picks { display: inline-flex; gap: 6px; }
+#view-boxes .bx-picks:empty { display: none; }
 #view-boxes .bx-bad { margin: 0; color: var(--bad); font-size: var(--fs-sm); }
 #view-boxes .bx-past { display: grid; gap: 8px; }
 #view-boxes .bx-past[hidden] { display: none; }
@@ -2854,7 +2856,7 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-26c',
+  version: '2026-11-26d',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };

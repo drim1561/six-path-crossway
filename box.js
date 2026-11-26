@@ -27,7 +27,7 @@
   // Rows come with a Done button beside the title. over: the round is finished, so only its foot stays, with a line
   // asking for the next crate (the window with no Grind run, one pop-out 2026-11-26). close: a Close button too, for the
   // app's overlay while Grind's panel, which has the overlay's own close, is not in it
-  function popView(pulls, c, missed, over, close) {
+  function popView(pulls, c, missed, over, close, pick) {
     var byId = {};
     (c ? c.items : []).forEach(function (i) { byId[i.id] = i; });
     var list = (pulls || []).slice().sort(function (a, b) { return b.ts - a.ts; });
@@ -44,6 +44,7 @@
         '<span class="num">' + esc(price) + '</span></div>';
     }).join('') + '</div>';
     if (missed && !over) html += '<p class="bx-pop-miss">Couldn\'t read ' + missed + '. Tap ' + (missed === 1 ? 'it' : 'them') + ' on the site.</p>';
+    if (rows) html += pickRow(costChoices(c, list.length), pick, '<div class="bx-pop-cost"><span>Cost</span>', '</div>');
     if (list.length) {
       var t = roundTotal(list, byId, false), n = list.length;
       html += '<p class="bx-pop-foot"><span>' + n + (n === 1 ? ' crate' : ' crates') + '</span><span>worth <b>' + esc(mes(t.total)) + '</b></span></p>';
@@ -83,7 +84,7 @@
       '<div class="bx-costbar" id="bx-cost" hidden><div class="bx-cost-edit">' +
         '<span class="bx-costlab">What did these cost?<small>optional</small></span>' +
         '<div class="bx-costrow"><input id="bx-cost-in" type="text" inputmode="text" autocomplete="off" aria-label="What these crates cost" placeholder="35,000">' +
-        '<span class="bx-units" id="bx-cost-unit" role="group" aria-label="Unit"></span><button type="button" class="k-btn sm" id="bx-cost-chip" hidden></button></div>' +
+        '<span class="bx-units" id="bx-cost-unit" role="group" aria-label="Unit"></span><span class="bx-picks" id="bx-cost-picks" role="group" aria-label="Crate price"></span></div>' +
         '<p class="bx-bad" id="bx-cost-bad" role="alert" hidden></p></div></div>' +
       '<div class="bx-donebar" id="bx-donebar"></div></section>' +
     '<section class="bx-past" id="bx-past" hidden><h3>Past rounds</h3>' +
@@ -137,6 +138,7 @@
     var session = o.session || null, logs = [], logState = 'off', busy = false, gen = 0, lastRound = 0;
     var adding = false, waiting = [];   // one save at a time: taps made during a save wait their turn
     var costs = new Map();                                   // round -> { cost, unit }, the player's box_rounds rows
+    var costPick = null, pickFor = null;                     // 'buy' or 'pack': the tapped price, following the count of round pickFor
     var costUnit = 'nx', BAD = "That doesn't look like a number.";
     var past = { view: 'rounds', rounds: 5, items: 20, fresh: null, open: new Set(), edit: null, editUnit: 'nx', editText: '', editErr: '', pe: null, del: null, thanks: null };
     var say = function (msg) { $('bx-note').textContent = msg || ''; };
@@ -223,6 +225,25 @@
         return '<button type="button" class="k-btn sm bx-unit" data-unit="' + u + '" aria-pressed="' + (u === unit) + '">' + (u === 'nx' ? 'NX' : 'Mesos') + '</button>';
       }).join('');
     }
+    // the tapped price for the round as it stands now: { id, cost } or null. A pick is its own round's only. A pack
+    // pick on full packs, where the pack price is the buy price, is that one price
+    function picked() {
+      if (!costPick || !round || round.round !== pickFor) return null;
+      var all = costChoices(byKey.get(round.crate), roundPulls().length);
+      return all.filter(function (ch) { return ch.id === costPick; })[0] || (costPick === 'pack' && all[0]) || null;
+    }
+    function pickedCost() { var hit = picked(); return hit ? hit.cost : null; }
+    // the pick goes, and the price it put in the tab's box with it
+    function dropPick() { costPick = null; pickFor = null; $('bx-cost-in').value = ''; }
+    // a tap on a price: it lights and fills the tab's box in NX; a tap on the lit one takes it off again
+    function setPick(id) {
+      if (!round) return;
+      var lit = picked();
+      if (lit && lit.id === id) dropPick();
+      else { costPick = id; pickFor = round.round; costUnit = 'nx'; }
+      var bad = $('bx-cost-bad'); bad.hidden = true; bad.textContent = '';
+      render();
+    }
     // typed cost: { none } for empty or 0, { bad }, or { cost }
     function costOf(text) {
       text = String(text == null ? '' : text).trim();
@@ -302,7 +323,7 @@
             '<input class="bx-costin" type="text" autocomplete="off" aria-label="What these crates cost" value="' + esc(past.editText) + '">' +
             '<span class="bx-units">' + ['nx', 'mesos'].map(function (u) {
               return '<button type="button" class="k-btn sm bx-unit" data-unit="' + u + '" aria-pressed="' + (u === past.editUnit) + '">' + (u === 'nx' ? 'NX' : 'Mesos') + '</button>';
-            }).join('') + '</span><button type="button" class="k-btn sm key bx-cost-save">Save</button><button type="button" class="k-btn sm bx-cost-cancel">Cancel</button></div>' +
+            }).join('') + '</span>' + pickRow(costChoices(c, n), null, '<span class="bx-picks">', '</span>') + '<button type="button" class="k-btn sm key bx-cost-save">Save</button><button type="button" class="k-btn sm bx-cost-cancel">Cancel</button></div>' +
             '<p class="bx-bad" role="alert"' + (past.editErr ? '' : ' hidden') + '>' + esc(past.editErr) + '</p></div>';
         } else {
           html += '<div class="bx-chgrow"><button type="button" class="k-btn sm bx-chg">' + (cost ? 'Change cost' : 'Add cost') + '</button></div>';
@@ -384,9 +405,9 @@
       bar.append(button('bx-done', 'Done', 'k-btn key'));
       costBox.hidden = false;
       drawUnits($('bx-cost-unit'), costUnit);
-      var sug = suggestCost(c, n), chip = $('bx-cost-chip');
-      chip.hidden = sug == null;
-      chip.textContent = sug == null ? '' : fmt(sug) + ' NX';
+      var hit = picked();
+      if (hit) $('bx-cost-in').value = fmt(hit.cost);
+      $('bx-cost-picks').innerHTML = pickRow(costChoices(c, n), hit && hit.id, '', '');
       var tot = roundTotal(pulls, byId, false);
       $('bx-round-foot').textContent = 'So far ' + mes(tot.total) +
         (tot.estimated ? ', ' + tot.estimated + (tot.estimated === 1 ? ' price is' : ' prices are') + ' estimated' : '') +
@@ -394,6 +415,7 @@
     }
     function render() {
       var focused = document.activeElement && root.contains(document.activeElement) && document.activeElement.id;
+      if (costPick && !picked()) dropPick();   // its round went another way than Done (emptied, deleted, not in the log)
       drawCrates(); drawInfo(); drawPrices(); drawList(); drawRound(); drawPast(); drawPop();
       var back = focused && $(focused);
       if (back && back !== document.activeElement) back.focus({ preventScroll: true });
@@ -441,7 +463,7 @@
       // a round the reader filled stays on show in the window once it's done (crates with no Grind run)
       if (pop.pulled === rnd) pop.last = { pulls: roundPulls(), crate: round ? round.crate : state.crate };
       round = null; saveRound(); past.fresh = String(rnd); past.open.add(String(rnd)); past.view = 'rounds';
-      $('bx-cost-in').value = ''; costUnit = 'nx';
+      $('bx-cost-in').value = ''; costUnit = 'nx'; costPick = null; pickFor = null;
       var bad = $('bx-cost-bad'); bad.hidden = true; bad.textContent = '';
       clearTransient(); render();
     }
@@ -449,12 +471,13 @@
     // that can't be read is left out, since nobody is at the tab to fix it
     function done(quiet) {
       if (!round || busy) return;
-      var typed = costOf($('bx-cost-in').value), bad = $('bx-cost-bad'), rnd = round.round;
+      var tapped = pickedCost();
+      var typed = tapped != null ? { cost: tapped } : costOf($('bx-cost-in').value), bad = $('bx-cost-bad'), rnd = round.round;
       if (typed.bad && quiet) typed = { none: true };
       if (typed.bad) { bad.textContent = BAD; bad.hidden = false; return; }
       bad.hidden = true; bad.textContent = '';
       if (typed.none) { finish(rnd); return; }
-      var unit = costUnit, g = gen;
+      var unit = tapped != null ? 'nx' : costUnit, g = gen;
       busy = true; render();
       Promise.resolve().then(function () { return api.setBoxRound(rnd, typed.cost, unit); }).then(function () {
         if (g !== gen) return;
@@ -559,6 +582,7 @@
       // the same player again (a token refresh, the load's second auth event): keep the log and any save in flight
       var uid = uidOf(s);
       if (uid && uid === uidOf(session) && (logState === 'ready' || logState === 'loading')) { session = s; return; }
+      if (costPick) dropPick();
       session = s || null; logs = []; costs = new Map(); past.edit = null; past.pe = null; past.del = null; past.thanks = null; past.fresh = null; past.open = new Set(); busy = false; adding = false; waiting.forEach(function (w) { if (w.fin) w.fin(false); }); waiting = [];
       var g = ++gen;
       if (!session) { logState = 'off'; clearTransient(); render(); return; }
@@ -602,14 +626,15 @@
       if (t.closest('#bx-done')) { done(); return; }
       var u = t.closest('.bx-unit');
       if (u) {
-        if (u.closest('#bx-cost-unit')) { costUnit = u.dataset.unit; drawUnits($('bx-cost-unit'), costUnit); }
+        if (u.closest('#bx-cost-unit')) { costUnit = u.dataset.unit; if (costUnit !== 'nx' && costPick) { dropPick(); render(); } else drawUnits($('bx-cost-unit'), costUnit); }
         else { past.editUnit = u.dataset.unit; render(); }
         return;
       }
-      if (t.closest('#bx-cost-chip')) {
-        var sg = suggestCost(round && byKey.get(round.crate), roundPulls().length);
-        if (sg != null) { $('bx-cost-in').value = fmt(sg); costUnit = 'nx'; drawUnits($('bx-cost-unit'), costUnit); $('bx-cost-bad').hidden = true; }
-        return;
+      var pk = t.closest('.bx-pick');
+      if (pk) {
+        if (pk.closest('#bx-cost-picks')) { setPick(pk.dataset.pick); return; }
+        // a past round's box: the price fills it, Save as ever
+        past.editText = pk.dataset.cost; past.editUnit = 'nx'; past.editErr = ''; render(); return;
       }
       var pv = t.closest('#bx-past-view [data-view]');
       if (pv) { past.view = pv.dataset.view; drawPast(); return; }
@@ -641,7 +666,7 @@
     });
     root.addEventListener('input', function (e) {
       if (e.target.id === 'bx-q') drawList();
-      else if (e.target.id === 'bx-cost-in') { var b = $('bx-cost-bad'); b.hidden = true; b.textContent = ''; }
+      else if (e.target.id === 'bx-cost-in') { var b = $('bx-cost-bad'); b.hidden = true; b.textContent = ''; if (costPick) { costPick = null; pickFor = null; $('bx-cost-picks').innerHTML = pickRow(costChoices(round && byKey.get(round.crate), roundPulls().length), null, '', ''); drawPop(); } }
       else if (e.target.classList && e.target.classList.contains('bx-costin')) past.editText = e.target.value;
       else if (e.target.classList && e.target.classList.contains('bx-mine') && past.pe) {
         past.pe.text = e.target.value;
@@ -689,7 +714,7 @@
       if (!on) { if (pop.up) { pop.up = false; P.hide(); } return; }
       // the app's overlay has no frame: without Grind's panel in it, the rows carry its Close
       var x = !!o.app && !P.grinding();
-      var h = taken() ? popView(roundPulls(), byKey.get(round.crate), read.missed, false, x)
+      var h = taken() ? popView(roundPulls(), byKey.get(round.crate), read.missed, false, x, (picked() || {}).id)
         : pop.last ? popView(pop.last.pulls, byKey.get(pop.last.crate), 0, true, x)
         : popView([], byKey.get(state.crate), read.missed, false, x);
       var body = pop.el.firstChild;
@@ -738,6 +763,7 @@
       pop.el.addEventListener('click', function (e) {
         if (!e.target.closest) return;
         if (e.target.closest('#bx-pop-done')) { done(true); drawPop(); }
+        else if (e.target.closest('.bx-pick')) setPick(e.target.closest('.bx-pick').dataset.pick);
         // Close: the window goes, and popGone ends the crates' share and the round with it
         else if (e.target.closest('#bx-pop-x')) P.close();
       });
@@ -916,10 +942,25 @@
     if (!nx || !(count > 0)) return null;
     return Math.floor(count / 11) * nx.pack + (count % 11) * nx.each;
   }
+  // the prices to tap for a round of count crates (2026-11-26): buy is what buying exactly that many costs, pack is
+  // their share of packs of 11, left out when it comes to the same
+  function costChoices(crate, count) {
+    var buy = suggestCost(crate, count);
+    if (buy == null) return [];
+    var pack = Math.round(count * crate.nx.pack / 11), out = [{ id: 'buy', cost: buy }];
+    if (pack !== buy) out.push({ id: 'pack', cost: pack });
+    return out;
+  }
+  function pickRow(choices, pick, open, shut) {
+    if (!choices.length) return '';
+    return open + choices.map(function (ch) {
+      return '<button type="button" class="k-btn sm bx-pick" data-pick="' + ch.id + '" data-cost="' + ch.cost + '" aria-pressed="' + (ch.id === pick) + '">' + (ch.id === 'pack' ? 'Pack ' : '') + fmt(ch.cost) + ' NX</button>';
+    }).join('') + shut;
+  }
   function ageOf(priced, now) {
     var ms = now - Date.parse(priced);
     return { days: Math.max(0, Math.floor(ms / 86400000)), old: ms > 86400000 };
   }
 
-  window.BoxOdds = { priceOf: priceOf, madeWord: madeWord, parseMesos: parseMesos, rounds: rounds, roundTotal: roundTotal, result: result, allItems: allItems, suggestCost: suggestCost, ageOf: ageOf, statusOf: statusOf, orderCrates: orderCrates, popView: popView, mount: mount, mes: mes };
+  window.BoxOdds = { priceOf: priceOf, madeWord: madeWord, parseMesos: parseMesos, rounds: rounds, roundTotal: roundTotal, result: result, allItems: allItems, suggestCost: suggestCost, costChoices: costChoices, ageOf: ageOf, statusOf: statusOf, orderCrates: orderCrates, popView: popView, mount: mount, mes: mes };
 })();
