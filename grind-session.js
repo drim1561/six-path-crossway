@@ -88,6 +88,18 @@ function cutNumber(exp, pct) {
   if (exp / (pct / 100) >= EXP_TABLE[EXP_TABLE.length - 1] * 1.03) return false;
   return levelOfExp(exp, pct) == null;
 }
+// past 1,000,000 the game draws only the percent (Lok, 2026-11-25), so the number is the percent of the level's size,
+// good to 0.01% of it. Only from 1,000,000: under that the number is drawn, so a missing one is covered and nothing is
+// made up. s is the run so far, or null
+function expFromPct(s, pct, level) {
+  const size = EXP_TABLE[s && s.levelByExp ? s.level : level];
+  if (!size || !(pct >= 0)) return null;
+  const n = Math.round(size * pct / 100);
+  if (n < 1e6 - size / 10000) return null;
+  const last = s && s.last;
+  if (last && last.pct === pct) return last.exp;   // nothing moved that can be seen
+  return last && pct > last.pct ? Math.max(n, last.exp) : n;
+}
 // returns { ok, dExp, dPct }, or { ok: false, cut: true } for a covered number, refused before anything learns from it
 function takeExp(s, t, exp, pct) {
   if (cutNumber(exp, pct)) return { ok: false, cut: true };
@@ -917,7 +929,8 @@ function add(s, r) {
     // covered numbers running (the light says so from 3); any read that counts clears it. Never saved (toRow)
     if (e.cut) s.cut = { n: (s.cut ? s.cut.n : 0) + 1, exp: r.exp, pct: r.pct }; else if (e.ok) s.cut = null;
     // !s.last is the first read after a pause: a level up in the gap makes the old size refuse the new EXP, so EXP answers anyway
-    if (e.ok || !s.last) syncLevel(s, r.exp, r.pct);
+    // a number worked out from the level (r.est) can't be what names the level
+    if (!r.est && (e.ok || !s.last)) syncLevel(s, r.exp, r.pct);
     if (e.ok) {
       if (s.lastValidT != null) { const dt = t - s.lastValidT; if (dt > 0 && dt <= CFG.maxGapMs) s.activeMs += dt; }
       s.lastValidT = t;
@@ -1387,5 +1400,5 @@ function wholeRows(minutes) {
   for (let i = 0; i < xs.length; i += 60) rows.push(xs.slice(i, i + 60));
   return rows;
 }
-window.GrindSession = { CFG, EXP_TABLE, levelOfExp, wholeRows, create, add, stats, expMinOf, idleNow, rated, countdown, countdowns, minuteOf, toRow, fromRow, mark, trade, keepMesos, rebase, lootOf, bagTabs, bagOpening, profitWords, shopOf, learnPrice, result, rateRun, soldAll, townOf, profitOf, usualOf, standing, bagListShows, pickMap, pickups, setWorth, worthOf, logOf, lineMesos };
+window.GrindSession = { CFG, EXP_TABLE, levelOfExp, expFromPct, wholeRows, create, add, stats, expMinOf, idleNow, rated, countdown, countdowns, minuteOf, toRow, fromRow, mark, trade, keepMesos, rebase, lootOf, bagTabs, bagOpening, profitWords, shopOf, learnPrice, result, rateRun, soldAll, townOf, profitOf, usualOf, standing, bagListShows, pickMap, pickups, setWorth, worthOf, logOf, lineMesos };
 })();

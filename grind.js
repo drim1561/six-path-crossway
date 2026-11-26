@@ -1208,7 +1208,13 @@ function mount(root, deps) {
         mark('exp', false); setCheck('exp', 'fix', 'Make sure the bar at the bottom of the game is showing'); render(); return; }
     }
     st.noLine = 0;
-    const exp = S.readExp(src, st.line);
+    let exp = S.readExp(src, st.line);
+    // past 1,000,000 the line shows only the percent: the number comes from the level (the level box, read before this
+    // tick or on an earlier one)
+    if (exp.ok && exp.exp == null) {
+      const n = GS().expFromPct(session, exp.pct, st.level);
+      exp = n == null ? { ok: false } : { ok: true, exp: n, pct: exp.pct, est: true };
+    }
     mark('exp', exp.ok);
     if (exp.ok) {
       st.expMiss = 0; setCheck('exp', 'done', fmt(exp.exp) + ' [' + exp.pct.toFixed(2) + '%]');
@@ -1239,6 +1245,7 @@ function mount(root, deps) {
     }
     guard('the map', () => followMap(src, S, h));
     const reading = { t: Date.now(), exp: exp.ok ? exp.exp : null, pct: exp.ok ? exp.pct : null, level: null, counts: [], party: null, map: st.mapHere };
+    if (exp.est) reading.est = true;
     if (st.m) {
       if (st.ticks >= st.levelAt) {
         st.levelAt = st.ticks + LEVEL_EVERY;

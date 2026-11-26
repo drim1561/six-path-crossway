@@ -172,7 +172,8 @@ function greenProbe(src, fw, fh) {
   }
   return { exact, loose, avg: loose ? [Math.round(r / loose), Math.round(g / loose), Math.round(b / loose)] : null };
 }
-// "EXP 98,856[17.79%]": { ok, exp, pct } or { ok: false, reason }
+// "EXP 98,856[17.79%]": { ok, exp, pct } or { ok: false, reason }. exp is null when nothing is drawn left of the bracket:
+// past 1,000,000 the game shows only "[97.19%]" (Lok, level 58, 2026-11-25), and GrindSession.expFromPct fills it in
 function readExp(src, line) {
   const r = expGlyphs(src, line);
   if (!r.ok) return r;
@@ -180,8 +181,8 @@ function readExp(src, line) {
   if (!all.every(sureGlyph)) return { ok: false, reason: 'unknown glyph' };
   const ex = all.filter(g => g.side === 'exp' && /^\d$/.test(g.label)).map(g => g.label).join('');
   const pc = all.filter(g => g.side === 'pct' && /^\d$/.test(g.label)).map(g => g.label).join('');
-  if (!ex || !pc) return { ok: false, reason: 'incomplete' };
-  return { ok: true, exp: parseInt(ex, 10), pct: parseInt(pc, 10) / 100 };
+  if (!pc || (!ex && all.some(g => g.side === 'exp'))) return { ok: false, reason: 'incomplete' };
+  return { ok: true, exp: ex ? parseInt(ex, 10) : null, pct: parseInt(pc, 10) / 100 };
 }
 // the EXP line cut into its tall glyphs, left to right, each with its best guess: { ok, glyphs: [{ label, dist, second,
 // side ('exp' | 'pct'), grid, aspect }] } (tools/make-exp-seeds.js learns from these)
