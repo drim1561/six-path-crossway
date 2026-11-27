@@ -1162,6 +1162,10 @@ function countScale(src, win, box) {
 // the item in a slot: the nearest pictures by colour, then the best pixel match among them. Named only when it's under
 // the same bar as the potions (75) and clearly ahead of the next picture, so two look alike pictures read as unsure
 const BAG_SURE = 55, BAG_GAP = 4, BAG_FLAT = 0.45;
+// the meso box can put a slot a screen pixel off, and a picture of thin strokes (a Decayed Charm's red on white) then
+// misses the bar: a near miss is looked at again with the slot nudged by a third of a base pixel each way, its few best
+// pictures only, against a tighter bar since they get more tries
+const BAG_NEAR = 80, BAG_NUDGE = 0.33, BAG_NUDGED_SURE = 45, BAG_TRIES = 4;
 // is anything in the slot: the share of its inside that isn't the slot's own pale fill
 // cover: the pointer over the slot (pointerOn); its pixels don't count, and too little left showing is still filled
 function slotFilled(src, rect, s, cover) {
@@ -1220,26 +1224,28 @@ function pointerNear(pt, at) {
 const lumStd = (d, list) => { let a = 0, b = 0; for (const k of list) { const L = lumAt(d, k); a += L; b += L * L; } const m = a / list.length; return Math.sqrt(Math.max(0, b / list.length - m * m)); };
 function bagIcon(src, rect, s, set) {
   const W = 37, H = 37, g = ctx2d(W, H); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
-  g.drawImage(src, rect.x - 3 * s, rect.y - 3 * s, W * s, H * s, 0, 0, W, H);
-  const d = g.getImageData(0, 0, W, H).data, top = [];
+  const cut = (dx, dy) => { g.clearRect(0, 0, W, H); g.drawImage(src, rect.x - 3 * s + dx, rect.y - 3 * s + dy, W * s, H * s, 0, 0, W, H); return g.getImageData(0, 0, W, H).data; };
+  let d = cut(0, 0);
+  const top = [];
   for (let y = 0; y < H - 12; y++) for (let x = 0; x < W; x++) top.push((y * W + x) * 4);
   const hs = hist(d, top);
   // first pass: every picture of the tab on a sample of its pixels and a 2 px grid of spots; the best NEAR go on to the
   // full match (a colour histogram shortlist dropped the right picture for some equips and named a wrong one instead)
-  const near = set.map(t => {
+  const look = step => set.map(t => {
     let b = 1e9;
-    for (let y = 0; y + t.h <= H; y += 2) for (let x = 0; x + t.w <= W; x += 2) {
+    for (let y = 0; y + t.h <= H; y += step) for (let x = 0; x + t.w <= W; x += step) {
       const base = y * W + x; let sum = 0;
       for (const i of t.few) { const k = (base + ((i / t.w) | 0) * W + (i % t.w)) * 4, q = i * 4; sum += Math.abs(d[k] - t.d[q]) + Math.abs(d[k + 1] - t.d[q + 1]) + Math.abs(d[k + 2] - t.d[q + 2]); }
       if (sum < b) b = sum;
     }
     return [b / (t.few.length * 3), t];
-  }).sort((a, b) => a[0] - b[0]).slice(0, NEAR);
+  }).sort((a, b) => a[0] - b[0]);
+  const near = look(2).slice(0, NEAR);
   // plus the nearest by colour, which catches a finely striped picture (a fence) the 2 px grid can miss
   for (const [, t] of set.map(t => { let e = 0; for (let i = 0; i < HBINS; i++) e += Math.abs(t.hist[i] - hs.h[i]); return [e, t]; }).sort((a, b) => a[0] - b[0]).slice(0, NEAR_COLOUR))
     if (!near.some(x => x[1] === t)) near.push([0, t]);
-  let first = { t: null, diff: 1e9 }, second = 1e9;
-  for (const [, t] of near) {
+  // a picture's best spot on what was cut: { t, diff, at, d }
+  const full = (t, d) => {
     let bestT = 1e9, at = 0;
     for (let y = 0; y + t.h <= H; y++) for (let x = 0; x + t.w <= W; x++) {
       const n = t.idx.length, base = y * W + x, cap = bestT * n * 3;
@@ -1250,9 +1256,24 @@ function bagIcon(src, rect, s, set) {
       }
       if (j === n && sum / (n * 3) < bestT) { bestT = sum / (n * 3); at = base; }
     }
-    if (bestT < first.diff) { second = first.diff; first = { t, diff: bestT, at }; } else if (bestT < second) second = bestT;
+    return { t, diff: bestT, at, d };
+  };
+  const tried = near.map(([, t]) => full(t, d)).sort((a, b) => a.diff - b.diff);
+  let first = tried[0] || { t: null, diff: 1e9 }, second = tried[1] ? tried[1].diff : 1e9, bar = BAG_SURE;
+  if (first.diff >= BAG_SURE && first.diff < BAG_NEAR) {
+    // the 2 px grid can leave a thin stroked picture off the shortlist altogether: a 1 px look puts it back
+    for (const [, t] of look(1).slice(0, NEAR)) if (!tried.some(x => x.t === t)) tried.push(full(t, d));
+    tried.sort((a, b) => a.diff - b.diff);
+    const few = tried.slice(0, BAG_TRIES), step = BAG_NUDGE * s;
+    for (const dy of [-step, 0, step]) for (const dx of [-step, 0, step]) {
+      if (!dx && !dy) continue;
+      const nd = cut(dx, dy);
+      few.forEach((had, i) => { const r = full(had.t, nd); if (r.diff < few[i].diff) few[i] = r; });
+    }
+    few.sort((a, b) => a.diff - b.diff);
+    if (few[0].diff < BAG_NUDGED_SURE) { first = few[0]; second = few[1] ? few[1].diff : 1e9; bar = BAG_NUDGED_SURE; d = first.d; }
   }
-  let sure = first.t && first.diff < BAG_SURE && second - first.diff >= BAG_GAP, why = !first.t || first.diff >= BAG_SURE ? 'none' : sure ? 'sure' : 'close';
+  let sure = first.t && first.diff < bar && second - first.diff >= BAG_GAP, why = !first.t || first.diff >= bar ? 'none' : sure ? 'sure' : 'close';
   // a flat patch (a tooltip's dark fill) can sit close to a dark picture's colours: the screen under the picture must
   // have some of the picture's own light and shade
   if (sure) {
