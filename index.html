@@ -1546,7 +1546,7 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
    more grows the window */
 .g-strip:is([data-layout="tile"], [data-layout="column"]):has(> .g-l3:not([hidden])) :is(.g-ks, .g-chip, .g-k-exp .g-us) { display: none; }
 .g-strip[data-layout="tile"]:has(> .g-l3:not([hidden])) :is(.g-k-lv, .g-k-profit) { display: none; }
-/* the layouts. Tile: one narrow column. The light, the map and how long, EXP an hour across, Level in beside Mesos per 1%,
+/* the layouts. Tile: one narrow column. The light, the map and how long, EXP an hour across, Level in beside Mesos an hour,
    the bottles stacked full width, and when opened the rest in a little grid; the alert last.
    The panel itself is the grid here (.g-body steps out of the way) */
 .g-strip[data-layout="tile"] { grid-template: "top top" auto "exp exp" auto "lv profit" auto "tiles tiles" auto "grid grid" auto "alert alert" 1fr "runs runs" auto / minmax(0, 1fr) minmax(0, 1fr); gap: 0; }
@@ -1564,7 +1564,7 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
 .g-strip[data-layout="tile"] .g-l3 { grid-area: alert; align-self: end; margin-top: .4em; }
 .g-strip[data-layout="tile"] .g-chip { flex-wrap: wrap; column-gap: .3em; }
 .g-strip[data-layout="tile"] .g-over { margin-left: 0; }
-/* Tile: every number in its own spot, two across (Level in beside Mesos per 1%), opened Profit beside Profit an hour
+/* Tile: every number in its own spot, two across (Level in beside Mesos an hour), opened Profit beside Mesos per 1%
    with the parts and then Kills a minute across under them. No boxes: one faint line between neighbours, left edges on the panel's own */
 .g-strip[data-layout="tile"] .g-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; border-top: var(--u) solid var(--g-line); }
 .g-strip[data-layout="tile"] .g-grid > :is(.g-parts, .g-k-kills, .g-town) { grid-column: 1 / -1; }
@@ -1679,7 +1679,7 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
 .g-strip[data-layout="bar"] .g-k-lv { grid-area: 1 / 2; } .g-strip[data-layout="bar"] .g-k-profit { grid-area: 1 / 3; }
 .g-strip[data-layout="bar"] .g-tiles { grid-area: 1 / 4; }
 .g-strip[data-layout="bar"] :is(.g-k-kills, .g-k-lv, .g-k-profit, .g-k-mhr, .g-k-sold) { justify-items: center; text-align: center; }
-/* opened: Kills a minute under EXP an hour (both rates), Profit and Profit an hour under Level in and Mesos per 1%, the three
+/* opened: Kills a minute under EXP an hour (both rates), Profit and Mesos per 1% under Level in and Mesos an hour, the three
    parts under the bottles; In town, when there is one, takes a row of its own under them */
 .g-strip[data-layout="bar"] .g-k-kills { grid-area: 2 / 1; } .g-strip[data-layout="bar"] .g-k-ptot { grid-area: 2 / 2; } .g-strip[data-layout="bar"] .g-k-phr { grid-area: 2 / 3; }
 .g-strip[data-layout="bar"] .g-parts { grid-area: 2 / 4; white-space: normal; }
@@ -1721,13 +1721,13 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
 .g-strip[data-layout="bar"] :is(.g-k .g-kl, .g-ks, .g-kv) { font-size: 1em; }
 .g-strip[data-layout="bar"] .g-k .g-kl { font-weight: 700; color: var(--ink); }
 .g-strip[data-layout="bar"] .g-ppr .g-us { font-size: .8em; }
-/* Bar's alert: in the closed row's place of Level in and Mesos per 1%, beside EXP an hour, wrapping in their two columns with its
+/* Bar's alert: in the closed row's place of Level in and Mesos an hour, beside EXP an hour, wrapping in their two columns with its
    buttons at the end. Under the panel it took a third row, which the site's pop-out can't grow into without a press in it, so
    the whole Bar shrank to fit (Rimmah's video, 2026-11-16: down to 8 px) */
 .g-strip[data-layout="bar"]:has(> .g-l3:not([hidden])) :is(.g-k-lv, .g-k-profit) { display: none; }
 .g-strip[data-layout="bar"] .g-alert { grid-area: 1 / 2 / 2 / 4; display: flex; flex-wrap: wrap; align-items: center; align-content: center; gap: .1em .7em; padding: .15em .8em; line-height: 1.15; border: 0; border-left: var(--u) solid var(--g-line); background: none; box-shadow: none; color: var(--ink); white-space: normal; }
 .g-strip[data-layout="bar"] .g-alert > :is(button, .g-l3b) { float: none; margin-left: auto; }
-/* after End run every layout drops the live numbers: Kills a minute, Level in, Mesos per 1%, the bottles, the usual and
+/* after End run every layout drops the live numbers: Kills a minute, Level in, Mesos an hour, the bottles, the usual and
    the opened row */
 .g-strip[data-ended="1"][data-layout] .g-body :is(.g-k-kills, .g-k-lv, .g-k-profit, .g-tiles, .g-grid, .g-chip, .g-us) { display: none; }
 /* Settings (grind-settings.js), opened by ⚙ Settings on the top strip: under the panel inside the pop-out, which grows to
@@ -2903,7 +2903,7 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-27d',
+  version: '2026-11-27e',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };

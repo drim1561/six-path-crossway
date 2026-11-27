@@ -576,12 +576,12 @@ function mount(root, deps) {
           // the line under it: ▲ 4% (words, never a pill), "over usual" in Tile only, then "· usual 121K" everywhere else
           SP.chip = el('span', { class: 'g-chip' }, SP.expD = el('span', { class: 'g-d' }), SP.expOv = el('span', { class: 'g-over' })),
           SP.expUs = el('span', { class: 'g-us', hidden: '' }, SP.expUn = el('span', {})))),
-      // closed (2026-11-26): EXP an hour with its line, Level in, Mesos per 1%, the bottles. The ▾ button opens the rest:
-      // Profit and Profit an hour over its three parts, then Kills a minute (the 5m 10m run switch and Start fresh left)
-      kTile('lv', 'Level in'), kTile('profit', 'Mesos per 1%'),
+      // closed (2026-11-26): EXP an hour with its line, Level in, Mesos an hour, the bottles. The ▾ button opens the rest:
+      // Profit and Mesos per 1% over its three parts, then Kills a minute (the 5m 10m run switch and Start fresh left)
+      kTile('lv', 'Level in'), kTile('profit', 'Mesos/hr'),
       hid(kTile('mhr', 'Mesos/hr')), hid(kTile('sold', 'If you sold everything')),
       SP.grid = el('div', { class: 'g-grid' }, hid(kTile('gain', 'EXP gained')), hid(kTile('ksf', 'Kills so far')), hid(perTile()),
-        kTile('ptot', 'Profit'), kTile('phr', 'Profit/hr'),
+        kTile('ptot', 'Profit'), kTile('phr', 'Mesos per 1%'),
         SP.partsBox = el('div', { class: 'g-parts' }, ...[['pMesos', 'Mesos'], ['pLoot', 'Loot'], ['pPots', 'Potions']].map(([k, w]) => el('div', { class: 'g-part' }, el('span', { class: 'g-pl' }, w), SP[k] = el('b', { class: 'g-pn' }, '·')))),
         kTile('kills', 'Kills/min'),
         SP.town = el('div', { class: 'g-town', hidden: '' })),
@@ -594,19 +594,20 @@ function mount(root, deps) {
     el('span', { class: 'g-omc', 'aria-hidden': 'true' }, el('span', { class: 'g-hop' }, SP.shroom = el('i', { class: 'g-om' }))),
     SP.bubble = el('div', { class: 'g-bub', role: 'status' }));
   if (!ROOMY) strip.classList.add('g-noroom');
-  // Mesos per 1% (2026-11-26): the counted total over the EXP % gained in the same window (result().perPct), green when
-  // it pays and red when it costs, a dot until 1% is gained. Its small line says whether loot is in it. Opened: Profit and
-  // Profit an hour (the session card's, GrindSession.profitOf, so the two always agree) over the three parts
+  // Mesos an hour (2026-11-27, Rimmah: more useful than per 1%, which moved behind ▾): the session card's Profit an hour
+  // (GrindSession.profitOf, so the two always agree), green when it pays and red when it costs, a dot until the counted
+  // window is 10 minutes. Its small line says whether loot is in it. Opened: Profit and Mesos per 1% (the same total over
+  // the EXP % gained, a dot until 1% is gained) over the three parts
   const sgnK = n => (n >= 0 ? '+' : '−') + fmtK(Math.abs(n));
   function renderMeso(P) {
-    const v = P ? P.perPct : null, pv = v == null ? '·' : sgnK(v);
+    const v = P ? P.perHr : null, pv = v == null ? '·' : sgnK(v);
     put(SP.profit, pv);
     attr(SP.profit, 'class', 'g-kn' + (v == null ? '' : v >= 0 ? ' pos' : ' neg'));
     // the small line only once loot is in it (Rimmah, 2026-11-17: no hints in the tiles, the light says what it wants)
     // (a rough Profit from pickup lines says about and how old its check is from the first pickup)
     put(SP.profitSub, P && (P.lootCounted || P.sure) ? GS().profitWords(P, Date.now()) : '');
     put(SP.ptot, !P || P.total == null ? '·' : Math.abs(P.total) < 1e6 ? signed(P.total) : sgnK(P.total));   // a million and up in K and M, to fit its column
-    put(SP.phr, !P || P.perHr == null ? '·' : sgnK(P.perHr) + '/hr');
+    put(SP.phr, !P || P.perPct == null ? '·' : sgnK(P.perPct));
     // the three parts it is made of, each a word over its number (loot is a dot until a bag is counted)
     const part = (e, v) => put(e, !P || v == null ? '·' : sgnK(v));
     part(SP.pMesos, P && P.mesos); part(SP.pLoot, P && P.loot); part(SP.pPots, !P || P.potions == null ? null : -P.potions);
