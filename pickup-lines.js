@@ -332,7 +332,7 @@
   const NH = 14, NAME_WHITE = 170, NAME_OK = 0.8, NAME_MARGIN = 0.06, X_OK = 0.7, REF_W = 36, NAME_GAP = 6;   // a gap wider than a space ends the name (scenery further left is not text)
   const SPACE_GAPS = [4, 5], LETTER_GAPS = [1, 2], X_AT = [[15, 17], [19, 23], [24, 29]];   // x1, x10, x100: the x starts this far left of "earned."
   const NAME_LINE = /^(.+) x\d+ earned\. \((\w+)\)$/;
-  function nameInk(img, row) {
+  function nameInk(img, row, white) {   // white: a lower floor for a labelled line from a soft recording (the templates tool only)
     const W = img.w, H = img.h, d = img.data, k = W / GW, top = rowTop(row) - 2, n = NH + 2, mn = [], mx = [];
     const px = (x, y, c) => d[((y < 0 ? 0 : y >= H ? H - 1 : y) * W + (x < 0 ? 0 : x >= W ? W - 1 : x)) * 4 + c];
     for (let j = 0; j < n; j++) {
@@ -351,7 +351,7 @@
     for (let y = 1; y <= NH; y++) {
       let s = '';
       for (let x = 0; x < GW; x++) {
-        const w = mn[y][x] > NAME_WHITE && mx[y][x] - mn[y][x] < 60;
+        const w = mn[y][x] > (white || NAME_WHITE) && mx[y][x] - mn[y][x] < 60;
         s += w && (dark(x - 1, y) || dark(x + 1, y) || dark(x, y - 1) || dark(x, y + 1) || dark(x - 1, y - 1) || dark(x + 1, y + 1) || dark(x - 1, y + 1) || dark(x + 1, y - 1)) ? '#' : '.';
       }
       out.push(s);
@@ -384,7 +384,8 @@
   }
   // letters from labelled item lines ({ ink: nameInk, text: "Red Potion x1 earned. (Use)" }): a word gives its letters only
   // when it splits into exactly one group per character (so letters that touch never teach a wrong shape); the x of "x1"
-  // comes from every line. Up to 8 shapes per character. 'earned.' is the reference that lines rows up.
+  // comes from every line. touch: ['ry'] on a line names letter pairs the game draws touching (the y tucks under the r of
+  // Fairy's); the pair is learned as one shape under its two letter key. Up to 8 shapes per character. 'earned.' is the reference that lines rows up.
   function learnLetters(lines) {
     const L = {}; let ref = null;
     const add = (ch, g) => { const v = L[ch] || (L[ch] = []); if (v.length < 8 && !v.some(t => t[0].length === g[0].length && diceAt(t, g, 0, 0, 0, 0, g[0].length, NH) > 0.95)) v.push(g); };
@@ -393,7 +394,8 @@
       const ex = TAB_AT[m[2]], raw = inkOf(l.ink);
       if (!ref) ref = cutCols(raw, ex, REF_W);
       const b = lineUp(raw, ex, ref), W = nameWords(nameGroups(b, ex - 2)), nw = m[1].split(' ');
-      if (W.length - 1 === nw.length) nw.forEach((w, i) => { if (W[i].length === w.length) [...w].forEach((ch, j) => add(ch, cutCols(b, W[i][j][0], W[i][j][1]))); });
+      if (W.length - 1 === nw.length) nw.forEach((w, i) => { const tk = []; for (let j = 0; j < w.length; j++) { if ((l.touch || []).includes(w.slice(j, j + 2))) { tk.push(w.slice(j, j + 2)); j++; } else tk.push(w[j]); }
+        if (W[i].length === tk.length) tk.forEach((ch, j) => add(ch, cutCols(b, W[i][j][0], W[i][j][1]))); });
       const xw = W[W.length - 1]; if (xw && xw.length >= 2 && xw[0][1] <= 7) add('x', cutCols(b, xw[0][0], xw[0][1]));
     }
     if (ref) L['earned.'] = [ref];
@@ -419,11 +421,13 @@
   // draw s from its letters right to left, ending a space before the x, each letter at the spot (1 or 2 px after the next,
   // 4 or 5 after a space) where it best fits the ink; then the Dice overlap of the drawing and the ink, from the name's
   // first ink (so a candidate that is only the end of the name leaves ink unexplained) to the x. -1 when a letter is unknown.
-  function placeName(b, s, xpos, L, left) {
+  // A name with a learned touching pair is drawn both ways (letters apart, pair as one shape) and the better one counts.
+  function placeName(b, s, xpos, L, left, pairs) {
+    if (pairs === undefined) { const one = placeName(b, s, xpos, L, left, false); for (let i = 1; i < s.length; i++) if (L[s[i - 1] + s[i]]) return Math.max(one, placeName(b, s, xpos, L, left, true)); return one; }
     const P = b.map(r => new Uint8Array(r.length)); let next = xpos, gaps = SPACE_GAPS, first = xpos;
     for (let i = s.length - 1; i >= 0; i--) {
       const ch = s[i]; if (ch === ' ') { gaps = SPACE_GAPS; continue; }
-      const vs = L[ch]; if (!vs) return -1;
+      const pr = pairs && i > 0 && L[s[i - 1] + ch], vs = pr || L[ch]; if (!vs) return -1; if (pr) i--;   // a touching pair is one shape
       let best = -1e9, bs = 0, bv = null;
       for (const v of vs) for (const g of gaps) {
         const w = v[0].length, st = next - g - w; if (st < 0) continue;
