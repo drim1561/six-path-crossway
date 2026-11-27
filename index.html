@@ -1465,8 +1465,10 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
 .k-juice { background-image: linear-gradient(var(--jt), var(--j) 45%, color-mix(in srgb, var(--j) 70%, var(--page))); }
 .g-juice[hidden] { display: none; }
 .g-juice::after { content: ''; position: absolute; right: 0; top: 0; bottom: 0; width: calc(1.5 * var(--u)); background: var(--jt); animation: g-ripple 1.6s steps(2) infinite; }
-.g-pin { position: relative; display: flex; align-items: center; gap: .35em; height: 100%; padding: 0 .5em 0 .3em; white-space: nowrap; }
-.g-pin img { flex: none; width: auto; height: 1.15em; image-rendering: pixelated; }
+.g-pin { position: relative; display: flex; align-items: center; gap: .4em; height: 100%; padding: 0 .5em 0 .6em; white-space: nowrap; }
+/* the picture is smaller than its art here, so it is scaled smooth (pixelated dropped pixels and read ragged; Rimmah, 2026-11-27),
+   and it stands clear of the glass's round end */
+.g-pin img { flex: none; width: auto; height: 1.3em; }
 .g-pclock { font-family: var(--font-num); font-weight: 700; font-size: 1em; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--num); --halo4: 0 0 3px var(--page), 0 var(--u) 0 var(--page), 0 calc(-1 * var(--u)) 0 var(--page), var(--u) 0 0 var(--page), calc(-1 * var(--u)) 0 0 var(--page); text-shadow: var(--halo4); }
 .g-plf { margin-left: auto; padding-left: .3em; font-family: var(--font-num); font-weight: 700; font-size: .88em; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--num); text-shadow: 0 0 3px var(--page), 0 var(--u) 0 var(--page), 0 calc(-1 * var(--u)) 0 var(--page), var(--u) 0 0 var(--page), calc(-1 * var(--u)) 0 0 var(--page); }
 .g-plf:empty { display: none; }
@@ -1592,7 +1594,7 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
 .g-strip[data-layout="tile"] .g-k-profit .g-ks { justify-self: stretch; }
 /* Bar: Profit's small line wraps inside its tile like Tile's, even at its longest ("about, checked 59 min ago") */
 .g-strip[data-layout="bar"] .g-k-profit .g-ks { justify-self: stretch; contain: inline-size; white-space: normal; overflow-wrap: anywhere; }
-.g-strip[data-layout="tile"] .g-tiles { padding: .45em 0 .35em; border-top: var(--u) solid var(--g-line); }
+.g-strip[data-layout="tile"] .g-tiles { padding: .5em .5em .45em; border-top: var(--u) solid var(--g-line); }
 /* the run buttons at the foot: two plain words side by side, a line over them and between */
 .g-strip[data-layout="tile"] .g-runs { grid-area: runs; border-top: var(--u) solid var(--g-line); margin-top: .2em; }
 /* after End run: the map and how long up top, the Lemons with their words, EXP an hour beside Mesos an hour, if you sold
@@ -1715,7 +1717,7 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
 /* the chip and its percent keep their line's size (.88 of the panel): at the Bar's 14 px a smaller one fell under 11 px */
 .g-strip[data-layout="bar"] .g-chip { grid-row: 2; }
 .g-strip[data-layout="bar"] .g-k-exp :is(.g-d, .g-over) { font-size: 1em; }
-.g-strip[data-layout="bar"] .g-tiles { align-self: center; padding: .2em 0 .2em .8em; }
+.g-strip[data-layout="bar"] .g-tiles { align-self: center; padding: .2em .8em; }
 .g-strip[data-layout="bar"] .g-k .g-kn { font-size: 1.7em; line-height: 1.1; }
 .g-strip[data-layout="bar"] :is(.g-k-ptot, .g-k-phr) .g-kn { font-size: 1.5em; }
 .g-strip[data-layout="bar"] :is(.g-k .g-kl, .g-ks, .g-kv) { font-size: 1em; }
@@ -2903,7 +2905,7 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-27e',
+  version: '2026-11-27f',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
