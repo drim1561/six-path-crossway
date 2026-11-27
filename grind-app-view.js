@@ -7,8 +7,8 @@
 // window.GrindAppView.build({ el, parts, more, K, pic }) -> { el, update(state), live({ len, profit, tone }), open(key) }
 //   parts = { strip, where, nums, share, pop, set, quit, runs, steps, view, lines, loot, foot }: grind.js's own nodes (loot is What you picked up's
 //   block, cls the class picker for the Drops here head (null in the app), view the bar over a run being looked at (Back to live, Delete: it joins the buttons, the line names the run), foot the tab's own small print, which joins the drops' credit)
-//   more = [{ key, label, el, show, ended }]: blocks that open one at a time in place of the panes (show() runs as one opens; an
-//   ended one is offered only once a run has ended)
+//   more = [{ key, label, el, show }]: blocks that open one at a time in place of the panes (show() runs as one opens; a hidden
+//   el is not offered)
 //   state = { session, sharing, noMap, mobs, D, cls, level, lootOn, log, total, ended }, ended = null | { empty: true, onNew } (a
 //   run with no EXP ended: an idle window) | { id, head, expHr, profit, tone, small, lemons, title, lemon, rows: [{ label, value, sub, tone }], sold, onNew } (onNew
 //   only for the run that just ended; null for a saved one)
@@ -158,7 +158,7 @@ function build({ el, parts, more, K, pic }) {
     if (noLoot.textContent !== say) noLoot.textContent = say;
     const t = x.total != null ? K(x.total) : '';
     if (total.textContent !== t) total.textContent = t;
-    for (const m of more) btns[m.key].hidden = (!!m.el.hidden || (!!m.ended && !done)) && m.key !== openKey;
+    for (const m of more) btns[m.key].hidden = !!m.el.hidden && m.key !== openKey;
     fit();
   }
 

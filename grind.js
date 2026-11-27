@@ -1040,7 +1040,7 @@ function mount(root, deps) {
   const appView = window.GrindAppView && (app || window.BT_ONEWINDOW !== false) ? window.GrindAppView.build({ el, K: fmtK, pic: id => lootIdx && lootIdx.items[id] ? cellPic(lootIdx.items[id][3]) : null,
     parts: { strip: nowCard.el.querySelector('.g-ground'), where: nowCard.el.querySelector('.g-ghead'), nums: nowCard.el.querySelector('#g-now'), share: shareArea, pop: popBtn, set: setBtn, quit: quitBtn, runs: runsRow, steps,
       view: viewBar, lines: [V.problem, V.nudge, V.trade, check], loot: V.resLoot, foot: root.querySelector('.g-print'), cls: app ? null : classPick },
-    more: [{ key: 'summary', label: 'Run summary', el: detail, show: () => setFold('g-detail', true), ended: !!app }, { key: 'earned', label: 'What it earned', el: nowCard.el.querySelector('.g-gres') },
+    more: [{ key: 'summary', label: 'Run summary', el: detail, show: () => setFold('g-detail', true) }, { key: 'earned', label: 'What it earned', el: nowCard.el.querySelector('.g-gres') },
       { key: 'runs', label: 'Your runs', el: runsWin, show: () => setFold('g-runs', true) }, { key: 'record', label: 'Your record', el: record, show: () => setFold('g-record', true) },
       { key: 'life', label: 'All time', el: life, show: () => setFold('g-life', true) }] }) : null;
   if (appView) { const trail = root.querySelector('#g-trail'); trail.before(appView.el); trail.hidden = true; }

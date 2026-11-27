@@ -1529,6 +1529,10 @@ body.g-ov .g-strip { transition: opacity .15s ease, --g-see .35s ease; }
 /* Tile's four small buttons are a little smaller, so the light's words (Idle, Open your bag, Bag counted) have a line to themselves */
 .g-strip[data-layout="tile"] .g-btns { gap: .1em; }
 .g-strip[data-layout="tile"] .g-btns .k-sq { width: calc(11 * var(--u)); height: calc(11 * var(--u)); padding-bottom: calc(1 * var(--u)); }
+/* Tile: the light's row is one height whatever it says. Words that wrap (Timing your EXP, Can't read quickslots) sit
+   closer and spill evenly above and below it, so the window keeps its size */
+.g-strip[data-layout="tile"] .g-lamp { height: calc(14 * var(--u)); }
+.g-strip[data-layout="tile"] .g-lt { line-height: 1.1; }
 .g-strip[data-layout="column"] .g-el { grid-area: 2 / 1; }
 .g-strip:is([data-layout="column"], [data-layout="tile"]) .g-el { width: auto; min-width: 0; contain: inline-size; flex-wrap: wrap; column-gap: 0; line-height: 1.25; white-space: normal; }
 .g-strip:is([data-layout="column"], [data-layout="tile"]) .g-elm { overflow: visible; }
@@ -2899,7 +2903,7 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-27a',
+  version: '2026-11-27b',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
