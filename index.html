@@ -2020,6 +2020,7 @@ a.cozy:hover { border-color: var(--muted); }
 #view-boxes .bx-thanks { grid-column: 1 / -1; color: var(--lime); font-size: var(--fs-sm); }
 #view-boxes .bx-delrow { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; padding-top: 4px; }
 #view-boxes .bx-delq { color: var(--bad); font-size: var(--fs-sm); }
+#view-boxes .bx-joinq { font-size: var(--fs-sm); }
 /* Recipes (#recipes, recipes.js): frameless on the forest, a 1120 column. List (one line a recipe, the open one's panel
    right under it) or Shelf (a picture grid with the open recipe in a sticky column beside it); word tabs for the view,
    the craft and the level; rows are one faint --at-line under each, no boxes; profit lime when up, --bad when down. */
@@ -2905,7 +2906,7 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-27h',
+  version: '2026-11-28a',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
@@ -3228,6 +3229,8 @@ function makeSupabaseApi(cfg) {
     async removeBoxOpen(id) { check(await sb.from('box_opens').delete().eq('id', id)); },
     async setBoxOpenMine(id, mine) { check(await sb.from('box_opens').update({ mine }).eq('id', id)); },
     async removeBoxRoundOpens(round) { check(await sb.from('box_opens').delete().eq('round', round)); },
+    // Join with the round before: needs grant update (round) from box-rounds.sql
+    async moveBoxRoundOpens(from, to) { check(await sb.from('box_opens').update({ round: to }).eq('round', from)); },
     // what a round cost (box-rounds.sql): own rows, one per round; a null cost takes the row away
     async listBoxRounds() {
       const { data, error } = await sb.from('box_rounds').select('round, cost, unit').order('round', { ascending: false }).limit(1000);

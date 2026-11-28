@@ -140,7 +140,7 @@
     var costs = new Map();                                   // round -> { cost, unit }, the player's box_rounds rows
     var costPick = null, pickFor = null;                     // 'buy' or 'pack': the tapped price, following the count of round pickFor
     var costUnit = 'nx', BAD = "That doesn't look like a number.";
-    var past = { view: 'rounds', rounds: 5, items: 20, fresh: null, open: new Set(), edit: null, editUnit: 'nx', editText: '', editErr: '', pe: null, del: null, thanks: null };
+    var past = { view: 'rounds', rounds: 5, items: 20, fresh: null, open: new Set(), edit: null, editUnit: 'nx', editText: '', editErr: '', pe: null, del: null, join: null, thanks: null };
     var say = function (msg) { $('bx-note').textContent = msg || ''; };
     var clearTransient = function () { var n = $('bx-note'); if (TRANSIENT.indexOf(n.textContent) >= 0 || n.querySelector('#bx-signin') || n.querySelector('#bx-done')) say(''); };
     var num = function (x) { return x == null || x === '' || !isFinite(+x) ? null : +x; };
@@ -286,7 +286,8 @@
       }
       return html + '</div>';
     }
-    function pastRound(g) {
+    // before: the round under it in the list (the next older one), for Join
+    function pastRound(g, before) {
       var c = byKey.get(g.crate), byId = {};
       (c ? c.items : []).forEach(function (i) { byId[i.id] = i; });
       var key = g.early ? 'e:' + g.crate : String(g.round), n = g.pulls.length;
@@ -312,11 +313,17 @@
         return pullRow(x, byId[x.itemId], byId, g.early);
       }).join('');
       if (!g.early) {
-        if (past.del === key) {
+        // a round the quiet minute split in two goes back together: only onto the same crate's round just under it
+        var canJoin = typeof api.moveBoxRoundOpens === 'function' && before && !before.early && before.crate === g.crate;
+        if (canJoin && past.join === key) {
+          html += '<div class="bx-delrow"><span class="bx-joinq">Join these ' + crates + ' with the ' + esc(day(before.round)) + ' round?</span>' +
+            '<button type="button" class="k-btn sm bx-join-yes" data-into="' + before.round + '">Join</button><button type="button" class="k-btn sm bx-join-no">Keep apart</button></div>';
+        } else if (past.del === key) {
           html += '<div class="bx-delrow"><span class="bx-delq">Delete this round of ' + n + "? This can't be undone.</span>" +
             '<button type="button" class="k-btn sm bx-del-yes">Delete</button><button type="button" class="k-btn sm bx-del-no">Keep</button></div>';
         } else {
-          html += '<div class="bx-delrow"><button type="button" class="k-btn sm bx-del">Delete round</button></div>';
+          html += '<div class="bx-delrow">' + (canJoin ? '<button type="button" class="k-btn sm bx-join">Join with the round before</button>' : '') +
+            '<button type="button" class="k-btn sm bx-del">Delete round</button></div>';
         }
         if (past.edit === key) {
           html += '<div class="bx-cost-edit"><span class="bx-costlab">What did these cost?</span><div class="bx-costrow">' +
@@ -359,7 +366,7 @@
           (spent.length ? ' · spent ' + spent.join(' and ') : '') +
           (nx.cost > 0 ? ' · your NX rounds average ' + mes(Math.round(nx.worth / (nx.cost / 1000))) + ' per 1,000 NX' : '');
         all = gs.length; shown = Math.min(all, past.rounds);
-        list.innerHTML = gs.slice(0, shown).map(pastRound).join('');
+        list.innerHTML = gs.slice(0, shown).map(function (g, i) { return pastRound(g, gs[i + 1]); }).join('');
       } else {
         var items = allItems(done, CRATES), wsum = 0, cn = 0;
         items.forEach(function (x) { wsum += x.worth; cn += x.count; });
@@ -564,6 +571,28 @@
         clearTransient(); render();
       }, function (e) { if (g !== gen) return; fail(e); render(); });
     }
+    // Join: the later round's pulls move into the earlier one. The cost: the earlier round's stays; only the later one
+    // has a cost, it's carried over; both in the same unit, they add up. The later round's cost row goes either way
+    function joinRound(into) {
+      var from = +past.join, g = gen;
+      past.join = null;
+      if (!isFinite(from) || !isFinite(into)) { render(); return; }
+      var a = costs.get(into), b = costs.get(from);
+      var next = !b ? null : !a ? b : a.unit === b.unit ? { cost: a.cost + b.cost, unit: a.unit } : null;
+      Promise.resolve().then(function () { return api.moveBoxRoundOpens(from, into); }).then(function () {
+        if (g !== gen) return;
+        logs.forEach(function (d) { if (d.round === from) d.round = into; });
+        past.open.delete(String(from)); past.open.add(String(into)); past.pe = null; past.del = null; past.edit = null;
+        clearTransient(); render();
+        if (!b || typeof api.setBoxRound !== 'function') return;
+        Promise.resolve().then(function () { return next ? api.setBoxRound(into, next.cost, next.unit) : null; }).then(function () {
+          if (g !== gen) return;
+          if (next) costs.set(into, next);
+          costs.delete(from); render();
+          return api.setBoxRound(from, null, null);
+        }).then(null, function (e) { if (g !== gen) return; fail(e); render(); });
+      }, function (e) { if (g !== gen) return; fail(e); render(); });
+    }
     var uidOf = function (s) { return s && s.user && s.user.id || null; };
     // the server sends at most PAGE rows a request (Supabase's Max rows), so a long log comes in pages until a short one
     var PAGE = 1000;
@@ -583,7 +612,7 @@
       var uid = uidOf(s);
       if (uid && uid === uidOf(session) && (logState === 'ready' || logState === 'loading')) { session = s; return; }
       if (costPick) dropPick();
-      session = s || null; logs = []; costs = new Map(); past.edit = null; past.pe = null; past.del = null; past.thanks = null; past.fresh = null; past.open = new Set(); busy = false; adding = false; waiting.forEach(function (w) { if (w.fin) w.fin(false); }); waiting = [];
+      session = s || null; logs = []; costs = new Map(); past.edit = null; past.pe = null; past.del = null; past.join = null; past.thanks = null; past.fresh = null; past.open = new Set(); busy = false; adding = false; waiting.forEach(function (w) { if (w.fin) w.fin(false); }); waiting = [];
       var g = ++gen;
       if (!session) { logState = 'off'; clearTransient(); render(); return; }
       logState = 'loading'; clearTransient(); render();
@@ -658,9 +687,12 @@
       if (t.closest('.bx-save')) { savePrice(); return; }
       if (t.closest('.bx-clear')) { var pc = past.pe && findPull(past.pe.id); if (pc && pc.mine != null) setMine(pc, null, false); else { past.pe = null; render(); } return; }
       if (t.closest('.bx-remove')) { removePull(); return; }
+      if (t.closest('.bx-join-yes')) { joinRound(+t.closest('.bx-join-yes').dataset.into); return; }
+      if (t.closest('.bx-join-no')) { past.join = null; render(); return; }
+      if (t.closest('.bx-join')) { past.join = t.closest('.bx-pr').dataset.key; past.del = null; render(); return; }
       if (t.closest('.bx-del-yes')) { deleteRound(); return; }
       if (t.closest('.bx-del-no')) { past.del = null; render(); return; }
-      if (t.closest('.bx-del')) { past.del = t.closest('.bx-pr').dataset.key; render(); return; }
+      if (t.closest('.bx-del')) { past.del = t.closest('.bx-pr').dataset.key; past.join = null; render(); return; }
       var g = t.closest('.bx-log');
       if (g) { logOne(+g.closest('.bx-row').dataset.id); return; }
     });
@@ -700,10 +732,11 @@
     // window if none is up. What it shows:
     //   Grind sharing: Grind, until a pull is read in a round; then the rows with Done; Grind again after Done
     //   no Grind run:  "Open a crate in the game.", then the rows with Done, then the finished round's foot
-    // A round the reader filled finishes itself after a quiet minute (no Surprise window for o.quiet ms). Closing the
+    // With Grind sharing, a round the reader filled finishes itself after a quiet wait (no Surprise window for o.quiet ms,
+    // five minutes); crates alone wait for Done. Closing the
     // window: with Grind sharing nothing here changes; crates alone, the share stops and the round is finished as Done.
     // pulled: the round a pull was read into during this share. last: that round once finished. mine: opened for crates alone
-    var P = null, canPop = false, QUIET = +o.quiet > 0 ? +o.quiet : 60000;
+    var P = null, canPop = false, QUIET = +o.quiet > 0 ? +o.quiet : 300000;
     var pop = { el: null, up: false, failed: false, pulled: null, last: null, mine: false, html: '', leaving: false, quiet: 0 };
     var taken = function () { return !!round && pop.pulled === round.round && roundPulls().length > 0; };
     function drawPop() {
@@ -791,9 +824,11 @@
       read.state = now - read.seen < 3000 ? 'watching' : 'looking';
       read.missed += r.missed || 0;
       if (r.pulls) { r.pulls.forEach(function (id) { readIn(id, state.crate, 0); }); }
-      // the quiet minute: a round the reader filled, with no Surprise window for a minute, finishes itself
-      // (a Done that didn't take, a save in flight or a cost that wouldn't save, waits another quiet minute)
-      if (taken() && read.state === 'looking') { if (!pop.quiet) pop.quiet = now; else if (now - pop.quiet >= QUIET) { pop.quiet = now; done(true); } }
+      // the quiet wait: with Grind sharing too, a round the reader filled finishes itself after five minutes with no Surprise
+      // window, so Grind's panel comes back (a Done that didn't take, a save in flight or a cost that wouldn't save, waits
+      // another five). Crates shared alone never finish on their own: Done, Stop sharing or closing the window does it,
+      // since a trip to buy more crates split one round in two (2026-11-28, 11 opens as 1 and 10)
+      if (P && P.grinding() && taken() && read.state === 'looking') { if (!pop.quiet) pop.quiet = now; else if (now - pop.quiet >= QUIET) { pop.quiet = now; done(true); } }
       else pop.quiet = 0;
       readNote();
     }
