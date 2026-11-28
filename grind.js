@@ -1178,14 +1178,13 @@ function mount(root, deps) {
       search = st.ticks % (home && !lost && !asking && !st.mesoUnclear ? MESO_SEARCH_EVERY : 3) === 1;   // unclear at its spot: look around soon
     if (home || search) {
       const mr = S.readMesos(src, { search });
-      st.mesoOpen = mr.reason !== 'no inventory';
-      if (st.mesoOpen) st.mesoSeen = Date.now();
+      sawBag(mr);
       st.mesoUnclear = !mr.ok && st.mesoOpen;
       if (mr.ok) {
         mesos = mr.value; st.mesos = mr.value; setCheck('mesos', 'done', fmt(mr.value) + ' at ' + timeOfDay(Date.now()));
         if (!home || Math.abs(home.x - mr.box.x) > 3 || Math.abs(home.y - mr.box.y) > 3) jset(KEY_HOME, { w, h, box: mr.box });
       }
-      else if (st.mesoOpen) setCheck('mesos', 'fix', "Can't read your mesos clearly (a tooltip over them, or a digit it hasn't learned yet)");
+      else if (st.mesoOpen) { if (!st.mesoGot) setCheck('mesos', 'fix', "Can't read your mesos clearly (a tooltip over them, or a digit it hasn't learned yet)"); }
       else if (st.mesos == null) setCheck('mesos', '', 'Not seen yet');   // the nudge is the one place that asks for them
     }
     if (mesos != null && session) GS().add(session, { t: Date.now(), mesos });
@@ -1358,13 +1357,21 @@ function mount(root, deps) {
     if (r.id !== mapId) putMap(r.id); else st.mapHere = mapId;
     st.noted.map = null; noteOf('map', 'done', 'Map: ' + shortMap(r.id));
   }
+  // what a look at the meso box says about the bag. mesoGot: the total has read since the bag opened, so a tooltip over
+  // it afterwards asks for nothing (Rimmah hovering items, 2026-11-27). Only a bag gone a few seconds has closed: a
+  // tooltip can hide the whole box for a moment
+  function sawBag(mr) {
+    const now = Date.now();
+    st.mesoOpen = mr.reason !== 'no inventory';
+    if (st.mesoOpen) { st.mesoSeen = now; if (mr.ok) st.mesoGot = true; }
+    else if (now - (st.mesoSeen || -Infinity) >= BAG_NEAR_MS) st.mesoGot = false;
+  }
   // a tick between full reads: the meso box and the bag where the inventory is, the shop where it was seen
   function quick(src) {
     const S = MS();
     if (S.mesoHome()) {
       const mr = S.readMesos(src, { search: false });
-      st.mesoOpen = mr.reason !== 'no inventory';
-      if (st.mesoOpen) st.mesoSeen = Date.now();
+      sawBag(mr);
       if (mr.ok) { st.mesos = mr.value; GS().add(session, { t: Date.now(), mesos: mr.value }); }
     }
     readLoot(src, S, true);   // the next full read draws it
@@ -1483,7 +1490,7 @@ function mount(root, deps) {
   // the quick reset: forget where the game was (bars, size, which potion sits on each key, the inventory) and look again;
   // the session and every number in it stay
   function refind() {
-    Object.assign(st, { line: null, m: null, measureAt: 0, levelAt: 0, expMiss: 0, slots: {}, mesoOpen: false, homeTried: true, h: fresh() });
+    Object.assign(st, { line: null, m: null, measureAt: 0, levelAt: 0, expMiss: 0, slots: {}, mesoOpen: false, mesoGot: false, homeTried: true, h: fresh() });
     MS().mesoHome(null); store.set(KEY_HOME, '');
     setStatus('Looking for your game again. Your session and its numbers are kept.');
     render();
@@ -1783,7 +1790,7 @@ function mount(root, deps) {
     const bagNow = opening && !(opening.countedT != null && Date.now() - opening.countedT >= BAG_COUNTED_MS) ? opening : null;
     const h = lastHealth = health({ t: Date.now(), app: !!app, sharing: st.sharing, stopped: !!st.stopped, hasSession: !!s, ended: !!ended, noGame: !st.reads && (st.noLine || 0) >= NO_GAME_TICKS, exp: st.h.exp, level: st.h.level, levelNow: st.level,
       size: st.h.size, counts: st.h.counts, potNone: st.potNone, potCount: st.potCount, slotsHidden: !!st.slotsHidden, killed: !!s && (s.gainExp > 0 || s.gainPct > 0), idle: !!s && GS().idleNow(s), timing: !!s && !GS().rated(s), cut: !!(s && s.cut && s.cut.n >= 3),
-      meso: { at: s && s.meso && s.meso.last ? s.meso.last.t : null, unclear: !!(st.mesoOpen && st.mesoUnclear) },
+      meso: { at: s && s.meso && s.meso.last ? s.meso.last.t : null, unclear: !!(st.mesoOpen && st.mesoUnclear && !st.mesoGot) },
       loot: { on: lootOn, pictures: lootReady, started: !!(s && s.bag && s.bag.startT), rough: !!GS().CFG.ROUGH, bagOpen: !!bagNow } });
     // the pill over the buttons goes by what the core numbers need (mesos only ever ask)
     const core = ['exp', 'level', 'potions'].map(k => h.checks[k].state);
