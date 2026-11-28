@@ -2006,6 +2006,24 @@ a.cozy:hover { border-color: var(--muted); }
 #view-boxes .bx-it { display: grid; grid-template-columns: 1fr auto auto auto; align-items: baseline; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--at-line); }
 #view-boxes .bx-it .name { font: 700 var(--fs-md) var(--font-body); color: var(--ink); }
 #view-boxes .bx-it .rate { color: var(--muted); font-size: var(--fs-sm); }
+/* My Deco (deco.js): one total, a quiet split line, one list sorted by price in the row pattern (picture, name, right
+   aligned number, one quiet line under it) */
+#view-boxes .bx-deco { display: grid; gap: var(--gap); }
+#view-boxes .bx-deco[hidden] { display: none; }
+#view-boxes .bx-dhead { display: flex; align-items: baseline; justify-content: space-between; gap: var(--gap); }
+#view-boxes .bx-dhead h3 { margin: 0; font: 400 var(--tt-m) var(--font-title); color: var(--ink); }
+#view-boxes .bx-dwhen, #view-boxes .bx-dsplit, #view-boxes .bx-dnote { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
+#view-boxes .bx-dsum { display: flex; align-items: baseline; justify-content: space-between; gap: var(--gap); }
+#view-boxes .bx-dsum .name { font: 700 var(--fs-md) var(--font-body); color: var(--ink); }
+#view-boxes .bx-dsum .num { font: 600 var(--n-m, var(--n-s)) var(--font-num); color: var(--num); }
+#view-boxes .bx-dlist { display: grid; }
+#view-boxes .bx-dr { display: grid; grid-template-columns: 32px 1fr auto; align-items: center; gap: var(--gap); padding: 6px 0; border-bottom: 1px solid var(--at-line); }
+#view-boxes .bx-dr img, #view-boxes .bx-dr i { width: 32px; height: 32px; image-rendering: pixelated; }
+#view-boxes .bx-dr .mid { display: grid; min-width: 0; }
+#view-boxes .bx-dr .name { font: 700 var(--fs-md) var(--font-body); color: var(--ink); overflow-wrap: anywhere; }
+#view-boxes .bx-dr .made { color: var(--muted); font-size: var(--fs-xs); }
+#view-boxes .bx-dr .num { font: 600 var(--n-s) var(--font-num); color: var(--num); text-align: right; }
+#view-boxes .bx-dbar { display: flex; }
 #view-boxes .bx-morerow { display: flex; justify-content: center; }
 #view-boxes .bx-price { font: 600 var(--n-s) var(--font-num); color: var(--num); background: none; border: 0; padding: 2px 4px; cursor: pointer; min-width: 4ch; text-align: right; border-radius: var(--r-card); }
 #view-boxes .bx-price:hover, #view-boxes .bx-price:focus-visible { background: var(--at-line); }
@@ -2906,7 +2924,7 @@ const CONFIG = {
   claimUrl: 'https://sixpathcrossway.pages.dev/api/claim',
   discordInvite: 'https://discord.gg/sHupB2U7tD',
   // which version is live, in every report: the date and a letter, bumped on every ship
-  version: '2026-11-28b',
+  version: '2026-11-28c',
   // where the Windows app downloads from (its releases page); Get the app shows on the site only once this is set
   appDownload: null,
 };
@@ -3817,12 +3835,18 @@ function loadBoxes() {
     fetch('data/crate-window.json').then(r => { if (!r.ok) throw new Error('crate-window.json'); return r.json(); })])
     .then(([, , art]) => window.CrateReader.create(art)).then(reader => ({ capture: window.Reader.capture, reader }));
   crateReader.catch(() => window.track('load_failed', { what: 'crate-reader' }));
-  const script = new Promise((resolve, reject) => {
-    document.head.append(el('script', { src: 'box.js', onload: resolve, onerror: () => reject(new Error('box.js')) }));
-  });
+  const load = src => new Promise((resolve, reject) => { document.head.append(el('script', { src, onload: resolve, onerror: () => reject(new Error(src)) })); });
+  const script = Promise.all([load('box.js'), load('deco.js').catch(() => {})]);   // without deco.js the tab still works, My Deco stays away
   const data = fetch('data/box.json').then(r => { if (!r.ok) throw new Error('box.json'); return r.json(); });
+  // My Deco (deco.js): the bag reader from Grind's screen.js, the slot namer fed every crate item picture, the page joiner
+  const deco = Promise.all([crateReader, data, loadGrind()]).then(([, d]) => Promise.all([load('deco-tab.js'), load('deco-reader.js')]).then(() => {
+    const items = new Map();
+    d.crates.forEach(c => c.items.forEach(i => { if (i.icon && !items.has(i.id)) items.set(i.id, { id: i.id, icon: i.icon }); }));
+    return window.DecoReader.create([...items.values()]);
+  })).then(reader => { if (!window.MapleScreen) throw new Error('screen.js'); return { screen: window.MapleScreen, reader, tab: window.DecoTab }; });
+  deco.catch(() => window.track('load_failed', { what: 'deco' }));
   boxesLoading = Promise.all([script, data]).then(([, d]) => {
-    boxesView = reporters.boxes = window.BoxOdds.mount($('boxes-root'), { el, store, api, data: d, session: state.session, signIn: () => signIn(), crate: boxesCrate(), reader: crateReader, app: APP,
+    boxesView = reporters.boxes = window.BoxOdds.mount($('boxes-root'), { el, store, api, data: d, session: state.session, signIn: () => signIn(), crate: boxesCrate(), reader: crateReader, deco, app: APP,
       // the window over the game is Grind's (one pop-out): its code loads beside this tab, so Start opening can open it in the click
       pop: loadGrind().then(() => (reporters.grind && reporters.grind.pop) || null), quiet: window.BT_CRATE_QUIET,
       report: async (words, details) => {

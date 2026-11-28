@@ -87,6 +87,7 @@
         '<span class="bx-units" id="bx-cost-unit" role="group" aria-label="Unit"></span><span class="bx-picks" id="bx-cost-picks" role="group" aria-label="Crate price"></span></div>' +
         '<p class="bx-bad" id="bx-cost-bad" role="alert" hidden></p></div></div>' +
       '<div class="bx-donebar" id="bx-donebar"></div></section>' +
+    '<section class="bx-deco" id="bx-deco" hidden></section>' +
     '<section class="bx-past" id="bx-past" hidden><h3>Past rounds</h3>' +
       '<div class="bx-views" id="bx-past-view" role="group" aria-label="View"></div><p class="bx-past-head" id="bx-past-head"></p>' +
       '<div id="bx-past-list"></div><div class="bx-morerow" id="bx-morerow"></div></section>' +
@@ -714,6 +715,7 @@
 
     // ---------- the crate reader: while the game is shared, every pull logs itself (crate-reader.js) ----------
     // o.reader is a promise of { capture: Reader.capture, reader: a CrateReader }; without it the share area stays away
+    var deco = null;   // My Deco, once the share is set up (readSetup)
     var read = { on: false, reader: null, crate: null, set: false, count: 0, missed: 0, state: 'looking', seen: -1e9 };
     var readSay = function (msg) { $('bx-read-note').textContent = msg; };
     function readNote() {
@@ -810,6 +812,7 @@
       logOne(id, function (saved) { if (saved) { read.count++; if (read.on && round) { pop.pulled = round.round; pop.last = null; } } else read.missed++; readNote(); });
     }
     function readFrame(src, m) {
+      if (deco) { try { deco.frame(src); } catch (e) { /* My Deco never stops the crate read */ } }
       if (read.crate !== state.crate) {
         var key = read.crate = state.crate;
         read.set = false;
@@ -837,6 +840,12 @@
       if (!dep || !dep.capture || !dep.reader || (app && typeof app.findGame !== 'function')) return;
       read.reader = dep.reader;
       $('bx-read').hidden = false;
+      // My Deco (deco.js): reads the bag's Deco tab off the same share; its button starts the share without the pop-out
+      if (o.deco && window.MyDeco) {
+        $('bx-deco').hidden = false;
+        deco = window.MyDeco.mount($('bx-deco'), { crates: CRATES, priceOf: priceFor, store: store, deps: o.deco,
+          start: function () { var b = $('bx-share'); if (!b || read.on) return; read.decoStart = true; try { b.click(); } finally { read.decoStart = false; } } });
+      }
       readNote();
       read.share = dep.capture($('bx-read-bar'), { prefix: 'bx-', raw: true, limit: 0, keepWhenHidden: true, full: true, drop: false, every: 200,
         el: function (t, a) { var k = [].slice.call(arguments, 2); return o.el.apply(null, [t, t === 'button' ? Object.assign({}, a, { class: 'k-btn sm' }) : a].concat(k)); },
@@ -855,6 +864,7 @@
         onImage: readFrame, say: function (t) { if (t) readSay(t); },
         onState: function (s, why) {
           read.on = s === 'sharing';
+          if (deco) deco.sharing(read.on);
           if (read.on) { read.count = 0; read.missed = 0; read.state = 'looking'; read.seen = -1e9; read.crate = null; read.set = false; read.reader.reset(); pop.pulled = null; pop.last = null; pop.quiet = 0; }
           if (read.on || (why !== 'denied' && why !== 'failed')) readNote();
           // the app: the overlay opens once the game is found and shared, as Grind's does (a window opened in the
@@ -877,7 +887,7 @@
         var sb = $('bx-share');
         if (sb) sb.classList.add('key');
         $('bx-read-bar').addEventListener('click', function (e) {
-          if (e.target.closest && e.target.closest('#bx-share') && session && !read.on && !app && !P.isOpen()) openPop();
+          if (e.target.closest && e.target.closest('#bx-share') && session && !read.on && !app && !P.isOpen() && !read.decoStart) openPop();
         }, true);
       }
     }

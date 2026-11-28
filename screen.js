@@ -1147,7 +1147,7 @@ function readScroll(src, win) {
   const r = real[0], len = (r.b - r.a + 1) / s;
   if (len < SCR.min || len > SCR.max) return null;   // a tooltip over the track is far longer than the thumb
   const span = (SCR.y1 - SCR.y0) - len;
-  return { at: Math.max(0, Math.min(1, (r.a / s) / span)), top: r.a / s <= 2, bottom: (H - 1 - r.b) / s <= 2 };
+  return { at: Math.max(0, Math.min(1, (r.a / s) / span)), top: r.a / s <= 2, bottom: (H - 1 - r.b) / s <= 2, a: r.a / s, b: r.b / s };
 }
 // the count digits' own stretch on this window, fine tuned once per window size on the slots that have a number
 function countScale(src, win, box) {
@@ -1300,16 +1300,65 @@ function samePixels(a, b) {
   return true;
 }
 const histNear = (a, b) => { let e = 0; for (let i = 0; i < HBINS; i++) e += Math.abs(a[i] - b[i]); return e < 0.12; };
+// The Deco tab (My Deco): every slot carries a 1 and a badge in its bottom right corner, a red coin with a yellow C (can be
+// traded) or a blue disc with a white A (worn once, never tradable). The badge sits at base (19.5..30, 18.5..29.5) of
+// the slot (measured on Rimmah's 2026-11-28 screenshots at 2560 x 1440); its inside is looked at, a disc of 3.5 base px
+// round its middle, so the item's own colours at the rim don't count. Neither colour clearly there (the pointer, a
+// tooltip): null, unsure.
+const DECO_BADGE = { x: 24.75, y: 24, r: 3.5, sure: 0.35, other: 0.1 };
+function decoBadge(src, rect, s) {
+  const B = DECO_BADGE, img = region(src, rect.x + (B.x - B.r) * s, rect.y + (B.y - B.r) * s, 2 * B.r * s, 2 * B.r * s), d = img.data;
+  const cx = img.w / 2, cy = img.h / 2, R2 = (B.r * s) * (B.r * s);
+  let red = 0, blue = 0, n = 0;
+  for (let y = 0; y < img.h; y++) for (let x = 0; x < img.w; x++) {
+    if ((x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2 > R2) continue;
+    const k = (y * img.w + x) * 4, r = d[k], g = d[k + 1], b = d[k + 2];
+    n++;
+    if (r > 150 && g < 90 && b < 90) red++;
+    else if (b > 150 && b > r + 20 && b > g + 20) blue++;
+  }
+  if (!n) return null;
+  red /= n; blue /= n;
+  return red >= B.sure && blue <= B.other ? 'coin' : blue >= B.sure && red <= B.other ? 'blue' : null;
+}
+// A recoloured item (the All Color Series coupon) has a prism, a little cube of red, green, blue and yellow, in the slot's
+// bottom left corner. Three of those colours, each clearly there, in that corner
+const DECO_PRISM = { x0: 0, y0: 18, x1: 13, y1: 31, each: 0.04 };
+function decoPrism(src, rect, s) {
+  const P = DECO_PRISM, img = region(src, rect.x + P.x0 * s, rect.y + P.y0 * s, (P.x1 - P.x0) * s, (P.y1 - P.y0) * s), d = img.data;
+  const hue = { r: 0, g: 0, b: 0, y: 0 }, n = img.w * img.h;
+  for (let i = 0; i < n; i++) {
+    const r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2], hi = Math.max(r, g, b), lo = Math.min(r, g, b);
+    if (hi - lo < 90) continue;
+    if (r > 180 && g > 160 && b < 90) hue.y++;
+    else if (r === hi && g < 100) hue.r++;
+    else if (g === hi && r < 140) hue.g++;
+    else if (b === hi && r < 140) hue.b++;
+  }
+  return Object.values(hue).filter(v => v / n >= P.each).length >= 3;
+}
+function decoSlots(src, win) {
+  const s = win.s, slots = [];
+  for (let r = 0; r < SLOT.rows; r++) for (let c = 0; c < SLOT.cols; c++) {
+    const rect = slotRect(win, r, c), box4 = { x: Math.round(rect.x), y: Math.round(rect.y), w: Math.round(rect.w), h: Math.round(rect.h) };
+    if (!slotFilled(src, rect, s)) { slots.push({ r, c, empty: true, rect: box4 }); continue; }
+    slots.push({ r, c, empty: false, badge: decoBadge(src, rect, s), prism: decoPrism(src, rect, s), rect: box4 });
+  }
+  return slots;
+}
 // { ok, tab, box, scroll: { at, top, bottom } | null, slots: [{ r, c, value, cell, diff, rect }] } or { ok: false, reason }.
+// On Deco: { ok, tab, box, scroll, win, slots: [{ r, c, empty, badge: 'coin' | 'blue' | null, prism, rect }] }
 // r and c are the slot on the page as shown; how far down the tab that page is comes from scroll (the engine lines pages
 // up by their overlap). Equip slots carry a 1 in this client, so every counted tab reads the same way
 function readBag(src) {
   const box = findMesoBox(src);
   if (!box) return { ok: false, reason: 'no inventory' };
-  if (!loot) return { ok: false, reason: 'no loot pictures', box };
   const win = windowOf(box), tab = readTab(src, win);
   if (!tab) return { ok: false, reason: 'no tab', box };
+  if (!loot && tab !== 'Deco') return { ok: false, reason: 'no loot pictures', box };
   const scroll = readScroll(src, win);
+  // Deco needs no loot pictures: My Deco (deco-reader.js) names its slots against the crate pictures
+  if (tab === 'Deco') return { ok: true, tab, box, scroll, win: { x: win.x, y: win.y, s: win.s }, slots: decoSlots(src, win) };
   if (!loot.sets[tab]) return { ok: true, tab, box, scroll, slots: [] };   // Set-up, Cash, Deco: not counted
   // the cache holds while the bag sits still: the same tab, spot and scroll position (a scroll moves other items into a
   // slot, and every equip and scroll shows a 1)

@@ -53,6 +53,74 @@
     return y < 60 || x < 68 || x >= 342;
   }
 
+  function decodeAll(list) { return Promise.all((list || []).map(function (it) { return decode(it.icon).then(function (im) { return { id: it.id, im: im }; }); })); }
+
+  // ---------- the item matcher, shared with My Deco (deco-reader.js) ----------
+  // Item pictures, each stretched by the game's stretch once and kept. match() slides every picture around an area of
+  // pixels, scored on the picture's solid pixels: in colour, or with shape on, in light and dark only, each measured
+  // from its own average (a recoloured item keeps its outline and shading, not its hue or brightness). The nearest
+  // few are tried again at quarter pixel shifts. { id, e, next, top: the four nearest [{ id, e }] }
+  function Matcher() {
+    var items = [], scaled = { s: 0, items: null, list: [] };
+    // an item's picture stretched s, starting a part of a pixel (fx, fy) in: the game's stretch doesn't land a
+    // picture on whole pixels, and a thin one (a pair of shades) only lines up when ours is shifted the same way
+    function stretched(it, s, fx, fy) {
+      var w = Math.ceil(it.im.width * s + fx), h = Math.ceil(it.im.height * s + fy), c = canvas(w, h), g = ctx(c);
+      g.drawImage(it.im, fx, fy, it.im.width * s, it.im.height * s);
+      var data = g.getImageData(0, 0, w, h).data;
+      // a small game gets every pixel looked at, a big one every second; solid is how many of them there are
+      var step = s >= 1.6 ? 2 : 1, solid = 0;
+      for (var y = 0; y < h; y += step) for (var x = 0; x < w; x += step) if (data[(y * w + x) * 4 + 3] >= 200) solid++;
+      return { id: it.id, it: it, w: w, h: h, data: data, step: step, solid: solid, parts: null };
+    }
+    function pictures(s) {
+      if (scaled.s === s && scaled.items === items) return scaled.list;
+      scaled = { s: s, items: items, list: items.map(function (it) { return stretched(it, s, 0, 0); }) };
+      return scaled.list;
+    }
+    function match(r, area, s, skip, opts) {
+      var d = r.data, ix = area.x, iy = area.y, iw = area.w, ih = area.h, shape = !!(opts && opts.shape);
+      var lum = function (a, k) { return 0.3 * a[k] + 0.59 * a[k + 1] + 0.11 * a[k + 2]; };
+      var scanner = function (t, best) {
+        return function (ox0, ox1, oy0, oy1, step) {
+          for (var oy = oy0; oy <= oy1; oy += step) for (var ox = ox0; ox <= ox1; ox += step) {
+            var e = 0, n = 0, st = 0, sd = 0, lt = shape ? [] : null, ld = shape ? [] : null;
+            for (var y = 0; y < t.h; y += t.step) for (var x = 0; x < t.w; x += t.step) {
+              var k = (y * t.w + x) * 4;
+              if (t.data[k + 3] < 200) continue;
+              var X = ox + x, Y = oy + y;
+              if (X < 0 || Y < 0 || X >= iw || Y >= ih || (skip && skip(X, Y))) continue;
+              var j = ((iy + Y) * r.w + ix + X) * 4;
+              if (shape) { var a = lum(t.data, k), b = lum(d, j); lt.push(a); ld.push(b); st += a; sd += b; }
+              else e += Math.abs(t.data[k] - d[j]) + Math.abs(t.data[k + 1] - d[j + 1]) + Math.abs(t.data[k + 2] - d[j + 2]);
+              n++;
+            }
+            if (n < 12 || n < t.solid * 0.5) continue;   // most of the picture has to sit inside the area
+            if (shape) { st /= n; sd /= n; for (var i = 0; i < n; i++) e += Math.abs(lt[i] - st - (ld[i] - sd)); e /= n; }
+            else e /= n * 3;
+            if (e < best.e) { best.e = e; best.ox = ox; best.oy = oy; }
+          }
+        };
+      };
+      var res = pictures(s).map(function (t) {
+        var best = { e: 1e9, ox: 0, oy: 0 }, scan = scanner(t, best);
+        scan(-4, iw - t.w + 4, -4, ih - t.h + 4, 3);
+        if (best.e < 1e9) scan(best.ox - 2, best.ox + 2, best.oy - 2, best.oy + 2, 1);
+        return { id: t.id, e: best.e, ox: best.ox, oy: best.oy, t: t };
+      }).sort(function (a, b) { return a.e - b.e; });
+      // the three nearest again, shifted by quarters of a pixel
+      res.slice(0, 3).forEach(function (m) {
+        if (m.e >= 1e9) return;
+        if (!m.t.parts) { m.t.parts = []; for (var fy = 0; fy < 4; fy++) for (var fx = 0; fx < 4; fx++) if (fx || fy) m.t.parts.push(stretched(m.t.it, s, fx / 4, fy / 4)); }
+        m.t.parts.forEach(function (p) { var best = { e: m.e }; scanner(p, best)(m.ox - 1, m.ox + 1, m.oy - 1, m.oy + 1, 1); if (best.e < m.e) m.e = best.e; });
+      });
+      res.sort(function (a, b) { return a.e - b.e; });
+      var a = res[0], b = res[1];
+      return { id: a && a.e < 1e9 ? a.id : null, e: a ? a.e : 1e9, next: b ? b.e : 1e9, top: res.slice(0, 4).map(function (m) { return { id: m.id, e: +m.e.toFixed(1) }; }) };
+    }
+    return { set: function (l) { items = l; }, size: function () { return items.length; }, match: match };
+  }
+
   function create(art) {
     return Promise.all([decode(art.bg.uri), decode(art.slot.uri)]).then(function (ims) {
       var bg = pixelsOf(ims[0], BG_W, BG_H), slotPic = pixelsOf(ims[1], SLOT, SLOT);
@@ -70,7 +138,7 @@
         if (slotPic.data[k + 3] >= 250) fpts.push(x, y, slotPic.data[k], slotPic.data[k + 1], slotPic.data[k + 2]);
       }
 
-      var items = [], scaled = { s: 0, list: [] };
+      var pics = Matcher();
       var win = null, lastWide = -1e9, turn = 0, lastGood = [], itemsCall = 0;
       var armed = false, counted = false, zero = 0, lastFp = null, lastN = 0, tries = 0, unread = 0;
       var full = null, fullG = null;
@@ -164,63 +232,14 @@
       }
       function moved(a, b) { if (!a || !b || a.length !== b.length) return 1e9; var e = 0; for (var i = 0; i < a.length; i++) e += Math.abs(a[i] - b[i]); return e / a.length; }
 
-      function pictures(s) {
-        if (scaled.s === s && scaled.items === items) return scaled.list;
-        scaled = { s: s, items: items, list: items.map(function (it) {
-          return stretched(it, s, 0, 0);
-        }) };
-        return scaled.list;
-      }
-      // an item's picture stretched s, starting a part of a pixel (fx, fy) in: the game's stretch doesn't land a
-      // picture on whole pixels, and a thin one (a pair of shades) only lines up when ours is shifted the same way
-      function stretched(it, s, fx, fy) {
-        var w = Math.ceil(it.im.width * s + fx), h = Math.ceil(it.im.height * s + fy), c = canvas(w, h), g = ctx(c);
-        g.drawImage(it.im, fx, fy, it.im.width * s, it.im.height * s);
-        var data = g.getImageData(0, 0, w, h).data;
-        // a small game gets every pixel looked at, a big one every second; solid is how many of them there are
-        var step = s >= 1.6 ? 2 : 1, solid = 0;
-        for (var y = 0; y < h; y += step) for (var x = 0; x < w; x += step) if (data[(y * w + x) * 4 + 3] >= 200) solid++;
-        return { id: it.id, it: it, w: w, h: h, data: data, step: step, solid: solid, parts: null };
-      }
-      // the item in one frame: every picture slid around inside it, scored on its solid pixels in colour, leaving out
-      // the cash marker (bottom right) and the count (bottom left) the game draws over it
+      // the item in one frame, leaving out the cash marker (bottom right) and the count (bottom left) the game draws over it
       function match(r, bx) {
-        var s = win.s, in0 = Math.round(3 * s), d = r.data;
-        var ix = Math.round(win.x + bx * s) + in0 - r.x, iy = Math.round(win.y + SLOT_Y * s) + in0 - r.y, iw = Math.round(SLOT * s) - 2 * in0, ih = iw;
-        var skip = function (x, y) { return y > ih - s * 16 && (x > iw - s * 17 || x < s * 8); };
-        var scanner = function (t, best) {
-          return function (ox0, ox1, oy0, oy1, step) {
-            for (var oy = oy0; oy <= oy1; oy += step) for (var ox = ox0; ox <= ox1; ox += step) {
-              var e = 0, n = 0;
-              for (var y = 0; y < t.h; y += t.step) for (var x = 0; x < t.w; x += t.step) {
-                var k = (y * t.w + x) * 4;
-                if (t.data[k + 3] < 200) continue;
-                var X = ox + x, Y = oy + y;
-                if (X < 0 || Y < 0 || X >= iw || Y >= ih || skip(X, Y)) continue;
-                var j = ((iy + Y) * r.w + ix + X) * 4;
-                e += Math.abs(t.data[k] - d[j]) + Math.abs(t.data[k + 1] - d[j + 1]) + Math.abs(t.data[k + 2] - d[j + 2]); n++;
-              }
-              if (n < 12 || n < t.solid * 0.5) continue;   // most of the picture has to sit inside the frame
-              e /= n * 3;
-              if (e < best.e) { best.e = e; best.ox = ox; best.oy = oy; }
-            }
-          };
-        };
-        var res = pictures(s).map(function (t) {
-          var best = { e: 1e9, ox: 0, oy: 0 }, scan = scanner(t, best);
-          scan(-4, iw - t.w + 4, -4, ih - t.h + 4, 3);
-          if (best.e < 1e9) scan(best.ox - 2, best.ox + 2, best.oy - 2, best.oy + 2, 1);
-          return { id: t.id, e: best.e, ox: best.ox, oy: best.oy, t: t };
-        }).sort(function (a, b) { return a.e - b.e; });
-        // the three nearest again, shifted by quarters of a pixel
-        res.slice(0, 3).forEach(function (m) {
-          if (m.e >= 1e9) return;
-          if (!m.t.parts) { m.t.parts = []; for (var fy = 0; fy < 4; fy++) for (var fx = 0; fx < 4; fx++) if (fx || fy) m.t.parts.push(stretched(m.t.it, s, fx / 4, fy / 4)); }
-          m.t.parts.forEach(function (p) { var best = { e: m.e }; scanner(p, best)(m.ox - 1, m.ox + 1, m.oy - 1, m.oy + 1, 1); if (best.e < m.e) m.e = best.e; });
-        });
-        res.sort(function (a, b) { return a.e - b.e; });
-        var a = res[0], b = res[1];
-        return { id: a ? a.id : null, e: a ? a.e : 1e9, next: b ? b.e : 1e9, ok: !!a && a.e <= T_ITEM && (!b || b.e >= a.e * T_LEAD) };
+        var s = win.s, in0 = Math.round(3 * s);
+        var area = { x: Math.round(win.x + bx * s) + in0 - r.x, y: Math.round(win.y + SLOT_Y * s) + in0 - r.y, w: Math.round(SLOT * s) - 2 * in0 };
+        area.h = area.w;
+        var skip = function (x, y) { return y > area.h - s * 16 && (x > area.w - s * 17 || x < s * 8); };
+        var m = pics.match(r, area, s, skip);
+        return { id: m.id, e: m.e, next: m.next, ok: !!m.id && m.e <= T_ITEM && m.next >= m.e * T_LEAD };
       }
 
       function tick(src, W, H, now) {
@@ -267,8 +286,7 @@
         tick: tick,
         setItems: function (list) {
           var call = ++itemsCall;
-          return Promise.all((list || []).map(function (it) { return decode(it.icon).then(function (im) { return { id: it.id, im: im }; }); }))
-            .then(function (l) { if (call === itemsCall) items = l; });
+          return decodeAll(list).then(function (l) { if (call === itemsCall) pics.set(l); });
         },
         reset: function () { win = null; lastWide = -1e9; armed = false; counted = false; zero = 0; lastFp = null; lastN = 0; tries = 0; unread = 0; lastGood = []; },
         // for tests and tuning
@@ -291,5 +309,9 @@
     });
   }
 
-  window.CrateReader = { create: create };
+  window.CrateReader = {
+    create: create,
+    // the matcher alone, for My Deco: matcher().setItems([{ id, icon }]) then match(pixels, area, s, skip, { shape })
+    matcher: function () { var m = Matcher(), call = 0; return { setItems: function (list) { var n = ++call; return decodeAll(list).then(function (l) { if (n === call) m.set(l); }); }, match: m.match, size: function () { return m.size(); } }; }
+  };
 })();
