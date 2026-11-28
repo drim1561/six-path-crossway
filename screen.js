@@ -860,7 +860,10 @@ function findMesoBox(src) {
 }
 // where the inventory was last seen: mesoHome() reads it, mesoHome(box) sets it (kept from an earlier session), null forgets
 function mesoHome(box) { if (arguments.length) lastBox = box || null; return lastBox; }
-// every box shape on the frame, top to bottom, handed to take until it returns something
+// every box shape on the frame, top to bottom, handed to take until it returns something. A search wants a surer label
+// than a look at a known spot: the window's white title bar with scenery beside it matched at 0.51 (2026-11-28), real
+// labels 0.84 and up
+const FOUND_SURE = 0.75;
 function scanBoxes(src, take) {
   const G = invGeometry(); if (!G) return null;
   const { w: W, h: H } = sizeOf(src);
@@ -881,7 +884,7 @@ function scanBoxes(src, take) {
       const tall = s >= 0.7 && s <= 3.4 ? whiteRun(st + Math.max(2, Math.round(2 * s)), y) : 0;
       if (tall >= 0.6 * G.fh * s && tall <= 1.4 * G.fh * s && !tried.some(q => Math.abs(q[0] - st) < 4 && Math.abs(q[1] - len) < 4 && Math.abs(q[2] - y) < 40)) {
         tried.push([st, len, y]);
-        const c = confirmBox(src, st, y, len), r = c && take(c);
+        const c = confirmBox(src, st, y, len), r = c && c.score >= FOUND_SURE && take(c);
         if (r) return r;
       }
       st = -1;
