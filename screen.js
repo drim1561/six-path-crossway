@@ -1098,7 +1098,14 @@ function readInventory(src) {
 // its solid pixels above the bottom 12 rows (where a count is drawn) and a colour histogram of them, so a slot is first
 // narrowed to the few pictures with the nearest colours and only those are matched pixel by pixel.
 let loot = null;
-const HBINS = 64, NEAR = 32, NEAR_COLOUR = 16;
+const HBINS = 64, NEAR = 32, NEAR_COLOUR = 16, BAG_CUT = 37;   // BAG_CUT: a slot and its margin, in base px
+// a picture's listed pixels laid out for a W wide cut: where each one sits from the top left spot, and its colour, so
+// the match loops don't work them out again at every spot (a full Equip page took 1.6 s, 2026-11-28)
+function packed(d, w, list, W) {
+  const off = Int32Array.from(list, i => (((i / w) | 0) * W + (i % w)) * 4), rgb = new Uint8Array(list.length * 3);
+  list.forEach((i, j) => rgb.set(d.subarray(i * 4, i * 4 + 3), j * 3));
+  return { off, rgb, n: list.length };
+}
 const bgLike = (r, g, b) => Math.abs(r - 229) + Math.abs(g - 231) + Math.abs(b - 219) < 40 || (r > 240 && g > 240 && b > 240);
 function hist(d, list) {
   const h = new Float32Array(HBINS); let n = 0;
@@ -1119,7 +1126,7 @@ function loadLoot(sheet, index) {
     for (let i = 0; i < c.w * Math.max(1, c.h - 12); i++) if (d[i * 4 + 3] > 200) idx.push(i);
     if (idx.length < 8) return;
     // every 7th solid pixel for the quick first pass over all pictures, then every pixel for the few left
-    const t = { cell: k, w: c.w, h: c.h, d, idx, few: idx.filter((_, j) => j % 7 === 0), hist: hist(d, idx.map(i => i * 4)).h };
+    const t = { cell: k, w: c.w, h: c.h, d, idx, all: packed(d, c.w, idx, BAG_CUT), some: packed(d, c.w, idx.filter((_, j) => j % 7 === 0), BAG_CUT), hist: hist(d, idx.map(i => i * 4)).h };
     for (const tab of tabs[k]) sets[tab].push(t);
   });
   loot = { sets };
@@ -1194,17 +1201,21 @@ function pointerOn(src, rect, s) {
       const d = g.getImageData(0, 0, w, h).data, few = [], cover = new Uint8Array(w * h);
       for (let i = 0; i < w * h; i++) if (d[i * 4 + 3] > 200 && i % 3 === 0) few.push(i);
       for (let i = 0; i < w * h; i++) if (d[i * 4 + 3] > 0) cover[i] = 1;
-      return { w, h, d, few, cover };
+      // the sum is the same whatever order the pixels come in, so the darkest and lightest take turns going first and a
+      // wrong spot is given up after fewer of them (the whole slot grid took 0.4 s, 2026-11-28)
+      const dark = few.slice().sort((a, b) => lumAt(d, a * 4) - lumAt(d, b * 4));
+      return { w, h, d, few: dark.map((_, j) => dark[j % 2 ? dark.length - 1 - (j >> 1) : j >> 1]), cover };
     }) };
   }
   let best = null;
   for (const t of pointerPics.list) {
     const ax = Math.round(rect.x - t.w), ay = Math.round(rect.y - t.h), img = region(src, ax, ay, rect.w + 2 * t.w, rect.h + 2 * t.h), D = img.data;
+    const { off, rgb, n } = packed(t.d, t.w, t.few, img.w);
     for (let y = 1; y + t.h < img.h; y += 2) for (let x = 1; x + t.w < img.w; x += 2) {
-      const cap = (best ? best.diff : POINTER_SURE) * t.few.length * 3;
+      const cap = (best ? best.diff : POINTER_SURE) * n * 3, base = (y * img.w + x) * 4;
       let sum = 0, j = 0;
-      for (; j < t.few.length && sum <= cap; j++) { const i = t.few[j], k = ((y + ((i / t.w) | 0)) * img.w + x + (i % t.w)) * 4, q = i * 4; sum += Math.abs(D[k] - t.d[q]) + Math.abs(D[k + 1] - t.d[q + 1]) + Math.abs(D[k + 2] - t.d[q + 2]); }
-      if (j === t.few.length && sum <= cap) best = { diff: sum / (t.few.length * 3), x: ax + x, y: ay + y, t };
+      for (; j < n && sum <= cap; j++) { const k = base + off[j], q = j * 3; sum += Math.abs(D[k] - rgb[q]) + Math.abs(D[k + 1] - rgb[q + 1]) + Math.abs(D[k + 2] - rgb[q + 2]); }
+      if (j === n && sum <= cap) best = { diff: sum / (n * 3), x: ax + x, y: ay + y, t };
     }
   }
   if (!best) return null;
@@ -1226,7 +1237,7 @@ function pointerNear(pt, at) {
 }
 const lumStd = (d, list) => { let a = 0, b = 0; for (const k of list) { const L = lumAt(d, k); a += L; b += L * L; } const m = a / list.length; return Math.sqrt(Math.max(0, b / list.length - m * m)); };
 function bagIcon(src, rect, s, set) {
-  const W = 37, H = 37, g = ctx2d(W, H); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+  const W = BAG_CUT, H = BAG_CUT, g = ctx2d(W, H); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
   const cut = (dx, dy) => { g.clearRect(0, 0, W, H); g.drawImage(src, rect.x - 3 * s + dx, rect.y - 3 * s + dy, W * s, H * s, 0, 0, W, H); return g.getImageData(0, 0, W, H).data; };
   let d = cut(0, 0);
   const top = [];
@@ -1235,13 +1246,15 @@ function bagIcon(src, rect, s, set) {
   // first pass: every picture of the tab on a sample of its pixels and a 2 px grid of spots; the best NEAR go on to the
   // full match (a colour histogram shortlist dropped the right picture for some equips and named a wrong one instead)
   const look = step => set.map(t => {
+    const { off, rgb, n } = t.some;
     let b = 1e9;
     for (let y = 0; y + t.h <= H; y += step) for (let x = 0; x + t.w <= W; x += step) {
-      const base = y * W + x; let sum = 0;
-      for (const i of t.few) { const k = (base + ((i / t.w) | 0) * W + (i % t.w)) * 4, q = i * 4; sum += Math.abs(d[k] - t.d[q]) + Math.abs(d[k + 1] - t.d[q + 1]) + Math.abs(d[k + 2] - t.d[q + 2]); }
+      const base = (y * W + x) * 4; let sum = 0;
+      // a spot is given up once it's no better than the picture's best so far
+      for (let j = 0; j < n && sum < b; j++) { const k = base + off[j], q = j * 3; sum += Math.abs(d[k] - rgb[q]) + Math.abs(d[k + 1] - rgb[q + 1]) + Math.abs(d[k + 2] - rgb[q + 2]); }
       if (sum < b) b = sum;
     }
-    return [b / (t.few.length * 3), t];
+    return [b / (n * 3), t];
   }).sort((a, b) => a[0] - b[0]);
   const near = look(2).slice(0, NEAR);
   // plus the nearest by colour, which catches a finely striped picture (a fence) the 2 px grid can miss
@@ -1249,13 +1262,14 @@ function bagIcon(src, rect, s, set) {
     if (!near.some(x => x[1] === t)) near.push([0, t]);
   // a picture's best spot on what was cut: { t, diff, at, d }
   const full = (t, d) => {
+    const { off, rgb, n } = t.all;
     let bestT = 1e9, at = 0;
     for (let y = 0; y + t.h <= H; y++) for (let x = 0; x + t.w <= W; x++) {
-      const n = t.idx.length, base = y * W + x, cap = bestT * n * 3;
+      const base = y * W + x, cap = bestT * n * 3;
       let sum = 0, j = 0;
       for (; j < n && sum <= cap; j++) {
-        const i = t.idx[j], k = (base + ((i / t.w) | 0) * W + (i % t.w)) * 4, q = i * 4;
-        sum += Math.abs(d[k] - t.d[q]) + Math.abs(d[k + 1] - t.d[q + 1]) + Math.abs(d[k + 2] - t.d[q + 2]);
+        const k = base * 4 + off[j], q = j * 3;
+        sum += Math.abs(d[k] - rgb[q]) + Math.abs(d[k + 1] - rgb[q + 1]) + Math.abs(d[k + 2] - rgb[q + 2]);
       }
       if (j === n && sum / (n * 3) < bestT) { bestT = sum / (n * 3); at = base; }
     }
