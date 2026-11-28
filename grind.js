@@ -577,7 +577,9 @@ function mount(root, deps) {
         SP.kv = el('div', { class: 'g-kv' }, SP.exp = el('span', { class: 'g-kn' }, '·'),
           // the line under it: ▲ 4% (words, never a pill), "over usual" in Tile only, then "· usual 121K" everywhere else
           SP.chip = el('span', { class: 'g-chip' }, SP.expD = el('span', { class: 'g-d' }), SP.expOv = el('span', { class: 'g-over' })),
-          SP.expUs = el('span', { class: 'g-us', hidden: '' }, SP.expUn = el('span', {})))),
+          SP.expUs = el('span', { class: 'g-us', hidden: '' }, SP.expUn = el('span', {})),
+          // "62% from party" (partyLine), only in a party
+          SP.expParty = el('span', { class: 'g-party', hidden: '' }))),
       // closed (2026-11-26): EXP an hour with its line, Level in, Mesos an hour, the bottles. The ▾ button opens the rest:
       // Profit and Mesos per 1% over its three parts, then Kills a minute (the 5m 10m run switch and Start fresh left)
       kTile('lv', 'Level in'), kTile('profit', 'Mesos/hr'),
@@ -913,8 +915,9 @@ function mount(root, deps) {
   // page G's left column: the lead (the big EXP an hour, against your usual, and Start fresh), then plain rows; before the first EXP one line
   V.nowLead = el('div', { class: 'g-glead' }); V.nowRows = el('div', { class: 'k-rows g-grows' }); V.nowSay = el('p', { class: 'g-nm', hidden: '' });
   V.nowClock = el('span', { class: 'g-gclock', hidden: '' });   // the idle line (clockLine), a line of its own under the number, only when there is idle time
+  V.nowParty = el('span', { class: 'g-gclock', id: 'g-party', hidden: '' });   // the party line (partyLine), a line of its own under the number, only in a party
   V.nowSmall = el('span', { class: 'g-gsmall', hidden: '' });   // the app window's one quiet line under the number (time, kills a minute) in place of the rows
-  V.now = el('div', { class: 'g-nowv' }, el('div', { class: 'g-gleadrow' }, V.nowLead, V.freshBtn, V.nowClock, V.nowSmall), V.nowRows, V.nowSay);
+  V.now = el('div', { class: 'g-nowv' }, el('div', { class: 'g-gleadrow' }, V.nowLead, V.freshBtn, V.nowClock, V.nowParty, V.nowSmall), V.nowRows, V.nowSay);
   // the folds (page G): Run summary, All time, Your runs and Your record are rows on the trail, every one closed on load (never kept),
   // and a press opens only that one
   const foldOpen = {}, folds = {};
@@ -1087,6 +1090,8 @@ function mount(root, deps) {
   // every 1.4 s would miss some), fed to the tracker, and each new line is read: an item line for its tab and count (its name
   // stays unread for now), a mesos line for its amount. Display only: GrindSession keeps them beside the bag, never in the money
   const PICKUPS = window.BT_PICKUPS !== false && !!window.PickupLines;
+  // Party Kills (spec 2026-11-28): the EXP and bonus lines go to the session, which splits your kills from the party's
+  const PARTYKILLS = window.BT_PARTYKILLS !== false;
   // the rough Profit from pickup lines (off: the bag alone); it runs on the lines, so no lines means no rough Profit
   window.GrindSession.CFG.ROUGH = window.BT_ROUGH !== false && PICKUPS;
   let pickTracker = null, pickCv = null, pickKey = '';
@@ -1141,7 +1146,10 @@ function mount(root, deps) {
       if (rows[i] === 'I') { const r = PL.readItem(img, i), name = PL.nameOf(img, i, names); items.push(Object.assign({ tab: r.tab, qty: r.qty, name }, pickupItem(name, r.tab))); }
       else if (rows[i] === 'M') mesos.push(PL.readMesos(img, i).amount);
     }
-    GS().add(session, { t: now, pickup: { items, mesos, lines: items.length + mesos.length } });
+    // the EXP and bonus rows born, top to bottom (null for one that didn't read), with the EXP of each monster on the map
+    const eRows = PARTYKILLS ? born.filter(i => rows[i] === 'E') : [], ex = eRows.length ? PL.readExp(img) : null;
+    const exp = ex ? eRows.map(i => ex[i]) : [], mobs = exp.length ? mobsOf(mapOfNow(session)).map(m => m.exp) : undefined;
+    GS().add(session, { t: now, pickup: { items, mesos, lines: items.length + mesos.length, exp, mobs } });
   }
 
   /* ----- one frame from the share ----- */
@@ -1695,7 +1703,7 @@ function mount(root, deps) {
     renderResult(s, R);
     guard('the session card', () => renderSessionCard(s, o, R));
     V.expHr.textContent = o.expHr != null ? fmtK(o.expHr) : '·';
-    V.sub.textContent = o.expMin != null ? fmt(o.expMin) + ' a minute · ' + o.pctHr.toFixed(2) + '% an hour' : 'Needs 2 minutes of EXP first';
+    V.sub.textContent = (o.expMin != null ? fmt(o.expMin) + ' a minute · ' + o.pctHr.toFixed(2) + '% an hour' : 'Needs 2 minutes of EXP first') + (partyLine(s, !!viewing) ? ' · ' + partyLine(s, !!viewing) : '');
     // Pace: the last 5 minutes is the number, and the rest (the last 10, and since Reset average) is its small line. A saved run has no pace
     const pace = viewing ? [] : paceParts(o);
     V.paceV.parentNode.hidden = !!viewing;
@@ -1970,6 +1978,7 @@ function mount(root, deps) {
     const vsUsual = o.expHr != null && usual ? Math.round((o.expHr / usual - 1) * 100) : null;
     E.rows.replaceChildren(row('EXP', fmt(o.exp)),
       row('EXP an hour', o.expHr != null ? fmtK(o.expHr) + (vsUsual ? ', ' + Math.abs(vsUsual) + '% ' + (vsUsual > 0 ? 'over' : 'under') + ' your usual' : '') : '·', vsUsual > 0 ? 'pos' : ''),
+      ...(partyLine(e, true) ? [row('From the party', partyLine(e, true).replace(/ from party$/, ''))] : []),
       row('Mesos an hour', P.perHr != null ? sgnK(P.perHr) : '·', tone(P.perHr)),
       row('Mesos spent per 1%', o.per1 != null ? fmtK(o.per1) : '·'));
     if (whole.parentNode !== E.whole) E.whole.append(whole);
@@ -2023,6 +2032,8 @@ function mount(root, deps) {
     if (SP.expD.dataset.t !== vsText) { SP.expD.dataset.t = vsText; arrowed(SP.expD, vsText); }
     attr(SP.expD, 'class', 'g-d' + (p.vs ? (p.vs.up ? ' up' : ' down') : ''));
     put(SP.expOv, p.vs && usual != null && !saved ? (p.vs.up ? 'over usual' : 'under usual') : '');
+    const party = partyLine(s, saved);
+    show(SP.expParty, !!party); put(SP.expParty, party);
     attr(SP.expOv, 'class', 'g-over' + (p.vs ? (p.vs.up ? ' up' : ' down') : ''));
     return p;
   }
@@ -2101,18 +2112,33 @@ function mount(root, deps) {
       ...(rows.length === 1 ? [el('div', { class: 'g-wends' }, el('span', {}, at(0)), el('span', {}, at(ms.length)))] : []));
     whole.hidden = !rows.length;
   }
+  // the quiet line under EXP an hour (spec 2026-11-28-party-kills): "62% from party" (GrindSession.partyKills), only in a
+  // party, once 20 kills are read and while the frames come fast enough to catch every line. A saved run says it from its
+  // minutes' seventh number (no kill count, no frames). Worked out again only when a kill is added
+  let partyMemo = { s: null, n: -1, v: '' };
+  function partyLine(s, saved) {
+    if (!s || !PARTYKILLS || (!saved && st.pickupSlow)) return '';
+    const n = s.kills ? s.kills.ev.length : -2;
+    if (partyMemo.s !== s || partyMemo.n !== n) {
+      const P = GS().partyKills(s);
+      partyMemo = { s, n, v: P.fromParty == null || !(P.size > 1) || (P.kills != null && P.kills < 20) ? '' : Math.round(P.fromParty * 100) + '% from party' };
+    }
+    return partyMemo.v;
+  }
   // average EXP a minute solo against partied on this map, from this session and the sessions kept on this device
   function compareParty(s) {
     const map = mapOfNow(s), pools = { 1: [], more: {} };
     const minutesOf = [s.minutes].concat(jget(KEY_LOCAL, []).filter(r => map != null && r.map_id === map && r.id !== s.id && r.minutes).map(r => GS().fromRow(r).minutes));
     for (const list of minutesOf) for (const m of list) {
       if (!(m.exp > 0) || !m.party) continue;
-      if (m.party === 1) pools[1].push(m.exp); else (pools.more[m.party] = pools.more[m.party] || []).push(m.exp);
+      // the bonus lines can't tell 4 from 6, so 4 and up are one pool, 4 or more
+      const k = Math.min(4, m.party);
+      if (k === 1) pools[1].push(m.exp); else (pools.more[k] = pools.more[k] || []).push(m.exp);
     }
     const avgOf = xs => fmt(xs.reduce((a, x) => a + x, 0) / xs.length);
     const parts = [];
     if (pools[1].length) parts.push('solo ' + avgOf(pools[1]) + ' a minute');
-    for (const [k, xs] of Object.entries(pools.more)) parts.push('party of ' + k + ' ' + avgOf(xs) + ' a minute');
+    for (const [k, xs] of Object.entries(pools.more)) parts.push('party of ' + k + (+k === 4 ? ' or more ' : ' ') + avgOf(xs) + ' a minute');
     if (!parts.length) return '';
     const total = pools[1].length + Object.values(pools.more).reduce((a, x) => a + x.length, 0);
     return 'On ' + mapName(map) + ': ' + parts.join(', ') + ' (from ' + total + ' minutes)' + (parts.length === 1 ? '. Grind the other way too to compare.' : '.');
@@ -2392,7 +2418,7 @@ function mount(root, deps) {
     const pick = expPick(o, sinceFor === s.id ? 'since' : 'run', usual), main = mains[0];
     const count = (ids, name) => ({ pic: ids.find(id => pictures.Icons[id]), label: name, v: fmt(ids.reduce((a, id) => a + usedOf(s, id), 0)) });
     const avg = app ? avgExp(mapOfNow(s)) : null, kp = avg && pick.value != null ? killsPerMin(pick.value, avg) : null;
-    return { lead: { v: pick.value != null ? fmtK(pick.value) : '·', vs: pick.vs && { up: pick.vs.up, text: pick.vs.text + ' vs usual' }, clock: clockLine(o),
+    return { lead: { v: pick.value != null ? fmtK(pick.value) : '·', vs: pick.vs && { up: pick.vs.up, text: pick.vs.text + ' vs usual' }, clock: clockLine(o), party: partyLine(s),
       small: app ? fmtDur(o.mins) + (kp ? ' · ' + fmtKills(kp.perMin) + ' kills a minute' : '') : null },
       rows: [{ label: 'Time', v: fmtDur(o.mins) }, { label: 'EXP', v: fmt(o.exp) }, count(LEMON_IDS, 'Lemons'), count(MEAT_IDS, 'Meat'),
         main && !LEMON_IDS.includes(+main.id) && !MEAT_IDS.includes(+main.id) ? count([+main.id], plural(main.name)) : null,
@@ -2409,6 +2435,7 @@ function mount(root, deps) {
     if (parts.lead) V.nowLead.replaceChildren(el('b', { class: 'g-gbig' }, parts.lead.v), el('span', { class: 'g-glbl' }, 'EXP an hour'),
       ...(parts.lead.vs ? [arrowed(el('em', { class: parts.lead.vs.up ? 'up' : 'down' }), parts.lead.vs.text)] : []));
     V.nowClock.hidden = !(parts.lead && parts.lead.clock); V.nowClock.textContent = parts.lead && parts.lead.clock || '';
+    V.nowParty.hidden = !(parts.lead && parts.lead.party); V.nowParty.textContent = parts.lead && parts.lead.party || '';
     V.nowSmall.hidden = !(parts.lead && parts.lead.small); V.nowSmall.textContent = parts.lead && parts.lead.small || '';
     V.nowRows.replaceChildren(...(parts.rows || []).map(r => el('div', { class: 'k-row' },
       el('span', { class: 'g-nl' }, ...(r.pic ? [iconOf(r.pic, r.label)] : []), r.label), el('span', { class: 'g-nv' }, r.v))));
@@ -2545,6 +2572,8 @@ function mount(root, deps) {
     // a share stood in for (no frames, no checks; read: with every reading check passed, so the light gets past Looking for game), for a test whose run carried in with use() is being read, as a level up line needs
     // the minimap read as another map (what followMap does with a new read)
     mapRead: id => { putMap(id); render(); },
+    // the frames stood in as too slow to catch every pickup line (noteFrame works it out from the gaps)
+    pickupSlow: on => { st.pickupSlow = !!on; render(); },
     sharing: (on, read) => { st.sharing = !!on; if (read) for (const k of ['exp', 'level', 'size', 'counts']) st.h[k].ok = Date.now(); render(); },
     // a reader stood in as missing for longer than the light waits (k: exp, level, size or counts), so the red light and its line come up
     missing: k => { st.h[k].fail = Date.now() - STUCK_MS - 1000; render(); } };

@@ -22,10 +22,12 @@
   // a digit (where two outlines overlap) and its drop shadow stay dark, and a digit's outer strokes have dark on one side only.
   // The mesos digits read from it; the row kinds and item lines keep white.
   function toGame(img) {
-    const k = img.w / GW, white = new Float32Array(GW * GH), yellow = new Float32Array(GW * GH), edge = new Float32Array(GW * GH), d = img.data;
-    const W = img.w, H = img.h, n = W * H, R = Math.ceil(k) + 1, kind = new Uint8Array(n), dark = new Uint8Array(n), bright = new Uint8Array(n);
+    const k = img.w / GW, white = new Float32Array(GW * GH), yellow = new Float32Array(GW * GH), edge = new Float32Array(GW * GH), yedge = new Float32Array(GW * GH), faint = new Float32Array(GW * GH), d = img.data;
+    const W = img.w, H = img.h, n = W * H, R = Math.ceil(k) + 1, kind = new Uint8Array(n), dark = new Uint8Array(n), bright = new Uint8Array(n), gold = new Uint8Array(n), dim = new Uint8Array(n);
     for (let p = 0; p < n; p++) {
       const i = p * 4, r = d[i], g = d[i + 1], b = d[i + 2], mn = Math.min(r, g, b), mx = Math.max(r, g, b);
+      if (r > 160 && g > 140 && b < 160 && r - b > 50) gold[p] = 1;   // yellow edge ink: the EXP and bonus digits
+      if ((r > 120 && g > 100 && r - b > 30) || (mn > 130 && mx - mn < 60)) dim[p] = 1;   // faint ink: a second look at EXP digits
       if (mn > WHITE_T) bright[p] = 1;   // edge ink takes any bright pixel: the video's colour bleed tints white strokes over sand
       if (mx < DARK) dark[p] = 1; else if (mn > WHITE_T && mx - mn < 50) kind[p] = 1; else if (r > 170 && g > 170 && b < 140 && r - b > 65) kind[p] = 2;
     }
@@ -43,16 +45,18 @@
     }
     for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++) {
       const x0 = Math.round(gx * k), x1 = Math.max(x0 + 1, Math.round((gx + 1) * k)), y0 = Math.round(gy * k), y1 = Math.max(y0 + 1, Math.round((gy + 1) * k));
-      let w = 0, y = 0, s = 0, c = 0;
+      let w = 0, y = 0, s = 0, ys = 0, fs = 0, c = 0;
       for (let yy = y0; yy < y1 && yy < H; yy++) for (let xx = x0; xx < x1 && xx < W; xx++) {
         const p = yy * W + xx; c++;
         if (bright[p] && edged[p]) s++;
+        if (gold[p] && edged[p]) ys++;
+        if (dim[p] && edged[p]) fs++;
         if (!framed[p]) continue;
         if (kind[p] === 1) w++; else if (kind[p] === 2) y++;
       }
-      white[gy * GW + gx] = c ? w / c : 0; yellow[gy * GW + gx] = c ? y / c : 0; edge[gy * GW + gx] = c ? s / c : 0;
+      white[gy * GW + gx] = c ? w / c : 0; yellow[gy * GW + gx] = c ? y / c : 0; edge[gy * GW + gx] = c ? s / c : 0; yedge[gy * GW + gx] = c ? ys / c : 0; faint[gy * GW + gx] = c ? fs / c : 0;
     }
-    return { white, yellow, edge };
+    return { white, yellow, edge, yedge, faint };
   }
   const INK = 0.3, WHITE_T = 185, DARK = 150;
   const rowTop = i => Math.round(YC0 + PITCH * i - BAND), BH = BAND * 2;
@@ -93,7 +97,7 @@
     const a = slide(w, ms), b = slide(w, g);
     return Math.max(a.score + slide(w, g, a.x - PAIR_GAP - 3, a.x - PAIR_GAP + 3).score, b.score + slide(w, ms, b.x + PAIR_GAP - 3, b.x + PAIR_GAP + 3).score) / 2;
   }
-  // 6 chars, index 0 top, 5 newest: E yellow (EXP) line, I item line, M mesos line, ? ink that is none of those (a fading
+  // 6 chars, index 0 top, 5 newest: E an EXP or bonus line (yellow, or a white EXP line), I item line, M mesos line, ? ink that is none of those (a fading
   // line, another tab ending, a window over it), . nothing
   // rows: the 6 letters; sig: each row's ink as white or yellow pixels per column (6 arrays of GW counts, 0 to BH), which
   // the tracker compares between reads to tell how far the stack moved
@@ -113,7 +117,9 @@
         const sc = n => T.words[n] ? slide(w, T.words[n]).score : 0, e = sc('earned.'), m = Math.max(sc('gained'), sc('mesos'));
         if (m >= 0.55 && m - e >= 0.15 && pairOf(w) >= PAIR_OK) { out.push('M'); continue; }
         if (tabOf(w)) { out.push('I'); continue; }
-        out.push('?'); continue;
+        // a white EXP line (your own killing hit): its right end reads as "EXP (+n)"
+        const x = readExpInk(bothInk(rowInk(g.edge, i), rowInk(g.yedge, i)), undefined, rowInk(g.faint, i));
+        out.push(x && x.word === 'EXP' ? 'E' : '?'); continue;
       }
       out.push(wn + yn >= 12 ? '?' : '.');
     }
@@ -262,6 +268,131 @@
   }
   function mesosInk(img, row) { return rowInk(toGame(img).edge, row); }   // a mesos line's row, from the one sided edge ink
   function readMesos(img, row) { return readMesosInk(mesosInk(img, row)); }
+
+  // ---- EXP and bonus lines: "You received EXP (+47)" and "Bonus EXP for PARTY (+14)" ----
+  // Both are right aligned like every pickup line, so the number is read from the right end: ")" last, the digits, "+" and "("
+  // before them, each matched to the mesos glyphs (white and yellow digits are one font). The word just left of "(" says the
+  // kind: "EXP" (caps, about 21 game px) or "PARTY" (caps, about 33), so a line whose left end is covered by a window still
+  // reads. The colour is the ink of that right end: white (Rimmah landed the killing hit) or yellow (a party member did); the
+  // bonus line is always yellow. Anything doubtful is left out (null), never guessed.
+  const EXP_W = [17, 26], PARTY_W = [29, 37], CAPS_OK = 0.6, COLOUR_LEAD = 2;
+  const digitScores = (glyphs, g) => Object.keys(glyphs).filter(d => /\d/.test(d)).map(d => [d, Math.max(...glyphs[d].map(t => dice(t, g)))]).sort((a, b) => b[1] - a[1]);
+  function framePiece(glyphs, g, k) {   // g is the frame piece k: it fits k well and clearly better than any digit
+    if (!glyphs[k]) return false;
+    const sc = Math.max(...glyphs[k].map(t => dice(t, g))), dg = digitScores(glyphs, g);
+    return sc >= FRAME_OK && sc - (dg.length ? dg[0][1] : 0) >= 0.04;
+  }
+  // Thick yellow strokes often join a glyph to its neighbour ("14)" as one group). A group wider than any one glyph is split
+  // at the column where both halves fit some glyph best, as long as both fit well (DIGIT_OK); otherwise it stays whole.
+  const GLYPH_W = 7, DIGIT_H = 8, DIGIT_W = 4;
+  const bestFit = (glyphs, g) => Math.max(0, ...Object.keys(glyphs).filter(k => k !== 'x').map(k => Math.max(...glyphs[k].map(t => dice(t, g)))));
+  function cutGroup(g, a, b) {   // columns a..b-1 of group g, trimmed to its ink
+    const on = x => g.rows.some(r => r[x] === '#'); while (a < b && !on(a)) a++; while (b > a && !on(b - 1)) b--;
+    return a < b ? { x: g.x + a, w: b - a, rows: g.rows.map(r => r.slice(a, b)) } : null;
+  }
+  function splitGroup(glyphs, g, depth) {
+    if (g.w <= GLYPH_W || depth > 3) return [g];
+    let best = null;
+    for (let c = 2; c <= g.w - 2; c++) {
+      const L = cutGroup(g, 0, c), R = cutGroup(g, c, g.w); if (!L || !R || L.w > GLYPH_W + 2 || R.w > 3 * GLYPH_W) continue;
+      const sc = Math.min(bestFit(glyphs, L), R.w <= GLYPH_W ? bestFit(glyphs, R) : 1);
+      if (!best || sc > best.sc) best = { sc, L, R };
+    }
+    if (!best || best.sc < DIGIT_OK) return [g];
+    const rest = splitGroup(glyphs, best.R, depth + 1);
+    return rest.length === 1 && best.R.w > GLYPH_W ? [g] : [best.L, ...rest];
+  }
+  // ink: BH rows of the line's number ink (white and yellow edge ink together). { amount, word: 'EXP' | 'PARTY' | null,
+  // x0: where that word starts } or null
+  function readExpInk(rows, glyphs, faintRows) {
+    glyphs = glyphs || T.expAll || T.glyphs; const ink = inkOf(rows), gs = [], faint = faintRows && inkOf(faintRows);
+    for (const g of groupsOf(ink, 0)) gs.push(...(g.x >= GW - 60 ? splitGroup(glyphs, g, 0) : [g]));
+    if (gs.length < 5 || !framePiece(glyphs, gs[gs.length - 1], ')')) return null;
+    let i = gs.length - 2; const ds = [];
+    for (; i >= 1 && ds.length <= 6; i--) {
+      if (gs[i + 1].x - gs[i].x > MAX_ADVANCE) return null;
+      if (framePiece(glyphs, gs[i], '+')) break;
+      ds.unshift(gs[i]);
+    }
+    if (i < 1 || !ds.length || ds.length > 6 || gs[i].x - gs[i - 1].x > MAX_ADVANCE || !framePiece(glyphs, gs[i - 1], '(')) return null;
+    let n = 0;
+    for (const g of ds) {
+      // a digit stands the full height (9 rows): the top half of a 2 is the top half of a 3, so a line caught half in this
+      // row (mid scroll) or half covered must not read
+      const tall = g.rows.reduce((a, r, y) => r.includes('#') ? [Math.min(a[0], y), Math.max(a[1], y)] : a, [BH, -1]);
+      if (tall[1] - tall[0] + 1 < DIGIT_H) return null;
+      const sc = digitScores(glyphs, g);
+      if (!sc.length || sc[0][1] < DIGIT_OK || (sc[1] && sc[0][1] - sc[1][1] < DIGIT_MARGIN)) return null;
+      // and every digit but 1 is about 5 wide: the right half of a broken 8 is a 3 narrowed to 3 columns
+      if (sc[0][0] !== '1' && g.w < DIGIT_W) return null;
+      // a second look in the faint ink: a thin 8 whose left strokes are lost reads as a 3 (a 3 is an 8 less two strokes,
+      // a 9 an 8 less one), so the faint ink of the same columns must not fit another digit clearly better
+      if (faint) {
+        const fg = cutGroup({ x: g.x - 1, w: g.w + 2, rows: faint.map(r => Array.from(r.slice(Math.max(0, g.x - 1), g.x + g.w + 1), v => v ? '#' : '.').join('')) }, 0, g.w + 2);
+        if (fg) { const fsc = digitScores(glyphs, fg), mine = (fsc.find(d => d[0] === sc[0][0]) || [0, 0])[1]; if (fsc[0][0] !== sc[0][0] && fsc[0][1] - mine >= DIGIT_MARGIN) return null; }
+      }
+      n = n * 10 + +sc[0][0];
+    }
+    const left = gs[i - 1].x;
+    // the word left of "(": groups closer than a space, after a space's gap
+    let j = i - 2;
+    if (j < 0 || left - (gs[j].x + gs[j].w) < SPACE_GAPS[0]) return { amount: n, word: null };
+    let x0 = gs[j].x; const x1 = gs[j].x + gs[j].w;
+    for (j--; j >= 0 && x0 - (gs[j].x + gs[j].w) < SPACE_GAPS[0]; j--) x0 = gs[j].x;
+    // capitals: ink in the top rows across most of the word ("mesos" is all x height)
+    let top = 0, cols = 0;
+    for (let x = x0; x < x1; x++) { if (!ink.some(r => r[x])) continue; cols++; if (ink[0][x] || ink[1][x] || ink[2][x]) top++; }
+    const w = x1 - x0, caps = cols && top / cols >= CAPS_OK;
+    const word = !caps ? null : w >= EXP_W[0] && w <= EXP_W[1] ? 'EXP' : w >= PARTY_W[0] && w <= PARTY_W[1] ? 'PARTY' : null;
+    return { amount: n, word, x0 };
+  }
+  // the EXP and bonus lines of a strip: 6 rows, top to bottom, each null or { kind: 'E' (You received EXP) or 'B' (Bonus EXP
+  // for PARTY), colour: 'white' or 'yellow', amount }
+  const bothInk = (e, y) => e.map((row, j) => row.map((v, x) => v || y[j][x] ? 1 : 0));
+  function expInk(img, row) { const g = toGame(img); return bothInk(rowInk(g.edge, row), rowInk(g.yedge, row)); }
+  function expFaint(img, row) { return rowInk(toGame(img).faint, row); }
+  // glyphs for EXP and bonus lines: the mesos glyphs and the ones learned from EXP lines (yellow strokes come out a little
+  // thicker than white ones), up to 8 of each
+  function mergeGlyphs(a, b) {
+    const out = {}; for (const src of [a || {}, b || {}]) for (const k in src) { const l = out[k] || (out[k] = []); for (const g of src[k]) if (l.length < 16) l.push(g); }
+    return out;
+  }
+  // learn glyphs from labelled EXP and bonus lines ({ ink: expInk rows, amount }): only a line whose right end cuts by blank
+  // columns into exactly ( + digits ), with a space before "(", teaches its shapes
+  const LEARN_OK = 0.75;
+  function learnExpDigits(lines, base) {
+    const glyphs = {}; base = base === undefined ? T.glyphs : base;
+    const keep = (k, g) => { const list = glyphs[k] || (glyphs[k] = []); if (!list.some(o => dice(o, g) > 0.95) && list.length < 8) list.push({ w: g.w, rows: g.rows }); };
+    for (const l of lines) {
+      const ink = inkOf(l.ink), gs = groupsOf(ink, 0), want = String(l.amount), n = want.length + 3;
+      if (gs.length < n + 1) continue;
+      const tail = gs.slice(-n), before = gs[gs.length - n - 1];
+      if (tail.some(g => g.w > GLYPH_W) || tail[0].x - (before.x + before.w) < SPACE_GAPS[0]) continue;
+      if (tail.some((g, i) => i && g.x - tail[i - 1].x > MAX_ADVANCE)) continue;
+      // every piece must already look like what the label says (by the mesos glyphs), so a thin or broken stroke never
+      // teaches a shape that half of another digit could fit
+      const keys = ['(', '+', ...want, ')'];
+      if (base && tail.some((g, i) => !base[keys[i]] || Math.max(...base[keys[i]].map(t => dice(t, g))) < LEARN_OK)) continue;
+      tail.forEach((g, i) => keep(keys[i], g));
+    }
+    return glyphs;
+  }
+  function readExp(img, glyphs) {
+    const g = toGame(img), out = [];
+    glyphs = glyphs || T.expAll;
+    for (let r = 0; r < ROWS; r++) {
+      const e = rowInk(g.edge, r), y = rowInk(g.yedge, r), ink = bothInk(e, y);
+      const got = readExpInk(ink, glyphs, rowInk(g.faint, r));
+      if (!got || !got.word) { out.push(null); continue; }
+      let wn = 0, yn = 0;
+      for (let j = 0; j < BH; j++) for (let x = got.x0; x < GW; x++) { if (e[j][x]) wn++; if (y[j][x]) yn++; }
+      const colour = yn >= COLOUR_LEAD * wn ? 'yellow' : wn >= COLOUR_LEAD * yn ? 'white' : null;
+      // the bonus line is only ever yellow: a white "PARTY" is not a line we know
+      if (!colour || (got.word === 'PARTY' && colour !== 'yellow')) { out.push(null); continue; }
+      out.push({ kind: got.word === 'EXP' ? 'E' : 'B', colour, amount: got.amount });
+    }
+    return out;
+  }
 
   // ---- item lines: "<name> x<qty> earned. (<tab>)" ----
   // Item lines are right aligned, so "earned." starts at a set spot for each tab ending and the ending sits 45 to its right.
@@ -463,7 +594,11 @@
     return a && a.d >= NAME_OK && (!s || a.d - s.d >= NAME_MARGIN) ? a.c : null;
   }
 
-  function setTemplates(t) { T = { words: {}, glyphs: {}, ...t }; for (const k in T.words) delete T.words[k].mask; for (const k in T.glyphs) for (const g of T.glyphs[k]) delete g.mask; }
+  function setTemplates(t) {
+    T = { words: {}, glyphs: {}, ...t }; for (const k in T.words) delete T.words[k].mask;
+    for (const set of [T.glyphs, T.expGlyphs || {}]) for (const k in set) for (const g of set[k]) delete g.mask;
+    T.expAll = mergeGlyphs(T.glyphs, T.expGlyphs);
+  }
 
   // ---- for tools/make-pickup-templates.js: cut a labelled row into words ----
   function wordsOf(img, row, text) {
@@ -480,5 +615,5 @@
     return { words: want.map((t, i) => ({ text: t, x: spans[i][0], w: spans[i][1] - spans[i][0] + 1, rows: ink.map(r => Array.from(r.slice(spans[i][0], spans[i][1] + 1), v => v ? '#' : '.').join('')) })) };
   }
 
-  root.PickupLines = { mesosOn: () => T.mesosGate !== false, stripArea, toGame, rowsOf, readRows, setTemplates, wordsOf, births, createTracker, learnDigits, readMesosInk, mesosInk, readMesos, readItem, matchName, nameInk, learnLetters, nameOf, MESOS_GATE, ROWS, GW, GH, _slide: slide, _tpl: () => T, _rowInk: rowInk, _readItemInk: readItemInk, _itemGroups: (rows) => itemGroups(inkOf(rows)), _xRegion: (rows, d0) => xRegion(inkOf(rows), d0), _dice: dice, _groupsOf: groupsOf };
+  root.PickupLines = { mesosOn: () => T.mesosGate !== false, stripArea, toGame, rowsOf, readRows, setTemplates, wordsOf, births, createTracker, learnDigits, readMesosInk, mesosInk, readMesos, readExp, readExpInk, expInk, expFaint, learnExpDigits, mergeGlyphs, readItem, matchName, nameInk, learnLetters, nameOf, MESOS_GATE, ROWS, GW, GH, _slide: slide, _tpl: () => T, _rowInk: rowInk, _readItemInk: readItemInk, _itemGroups: (rows) => itemGroups(inkOf(rows)), _xRegion: (rows, d0) => xRegion(inkOf(rows), d0), _dice: dice, _groupsOf: groupsOf };
 })(typeof window !== 'undefined' ? window : globalThis);

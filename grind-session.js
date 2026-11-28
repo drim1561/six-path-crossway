@@ -870,6 +870,7 @@ function takePickup(s, t, p) {
   for (const m of p.mesos || []) { K.mev.push([t, m == null ? null : m]); if (m == null) K.mesos.unsure++; else K.mesos.sum += m; }
   if (p.lines > 0) { K.lines += p.lines; K.lastLineT = t; }
   K.cum.push([t, K.counted]);
+  if (p.exp && p.exp.length) takeExpLines(s, t, p.exp, p.mobs);
 }
 // the live loot log: a row per item, newest first, each at its worth; lines it couldn't name are counts with no value
 function logOf(s) {
@@ -897,6 +898,136 @@ function countedBy(s, t) {
 function pickups(s) {
   const K = s.pick || { items: {}, unnamed: { Equip: 0, Use: 0, Etc: 0 }, equips: 0, mesos: { sum: 0, unsure: 0 }, lines: 0, lastLineT: null };
   return { items: Object.values(K.items).map(x => Object.assign({}, x)), unnamed: Object.assign({}, K.unnamed), equips: K.equips, mesos: Object.assign({}, K.mesos), lines: K.lines, lastLineT: K.lastLineT };
+}
+
+// ---- party kills (spec 2026-11-28-party-kills-design.md): how much of your EXP came from the party ----
+// The pickup record's exp is the EXP and bonus rows born in that read, top to bottom (PickupLines.readExp: { kind E or B,
+// colour, amount } or null for one it couldn't read), and mobs the EXP of each monster on the map. The two lines of a kill
+// come together, the EXP line first: a bonus line in the same read or the next (within KILL.pairMs) pairs with it, a row
+// that couldn't be read breaks the pair, and a bonus whose percent fits no party (10% to 55%, one point either way) is out.
+// An EXP line with no bonus line is a solo kill, all yours, but only when no bonus line came in the last minute (in a
+// party it is a bonus line missed). Each kill: [t, share, bonus or null, white 1 or 0, bonus percent, party size, segment].
+// The party size is from the most common bonus percent of the last 10 kills (mostly one hitter; a small share's percent
+// can't be told within a point, so only a share of 15 or more counts and an odd one mustn't move it): 10% or 15% is 2,
+// 20% or 25% 3, 30% and up 4 or more.
+// The kills split by segment (party size, level and the map's monsters, since each changes the floor); see fitSeg.
+// s.kills is live only and plain JSON; toRow keeps the split as each minute's seventh number.
+const KILL = { pairMs: 1500, soloMs: 60000, window: 10, sizeShare: 15 };
+const BONUS_PCT = [10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+function bonusPct(e, b) {
+  let best = null;
+  for (const p of BONUS_PCT) { const d = Math.abs(b - e * p / 100); if (d <= 1 && (best == null || d < best.d)) best = { p, d }; }
+  return best ? best.p : null;
+}
+const sizeOfPct = p => p >= 30 ? 4 : p >= 20 ? 3 : 2;
+// the most common value (a tie goes to the lower)
+function modeOf(xs) { const n = {}; for (const x of xs) n[x] = (n[x] || 0) + 1; return +Object.keys(n).sort((a, b) => n[b] - n[a] || a - b)[0]; }
+// a segment's plain bonus percent (one hitter): the lowest one at least 15% of its kills carry (an odd small share can read low)
+function plainOf(list) { const n = {}; for (const k of list) n[k[4]] = (n[k[4]] || 0) + 1; const need = Math.max(1, 0.15 * list.length); return Math.min(...Object.keys(n).filter(p => n[p] >= need).map(Number)); }
+function killBook(s) { return s.kills || (s.kills = { ev: [], pend: null, lastBonusT: null, recent: [], fit: {} }); }
+function lineParty(s, t, size) { const b = bucket(s, t); b.lineParty = Math.max(b.lineParty || 0, size); b.party = b.lineParty; }
+function loneKill(s, K) {
+  const x = K.pend; K.pend = null;
+  if (K.lastBonusT != null && x.t - K.lastBonusT <= KILL.soloMs) return;
+  K.ev.push([x.t, x.e, null, x.w, 0, 1, '1|' + (s.level || 0) + '|' + x.set]); lineParty(s, x.t, 1);
+}
+function takeExpLines(s, t, exp, mobs) {
+  const K = killBook(s), set = (mobs || []).filter(x => x > 0).sort((a, b) => a - b).join(',');
+  for (const x of exp) {
+    if (K.pend && t - K.pend.t > KILL.pairMs) loneKill(s, K);
+    if (!x || x.amount == null) { K.pend = null; continue; }
+    if (x.kind === 'E') { if (K.pend) loneKill(s, K); K.pend = { t, e: x.amount, w: x.colour === 'white' ? 1 : 0, set }; continue; }
+    if (x.kind !== 'B') continue;
+    K.lastBonusT = t;   // any bonus line read says you are in a party, paired or not
+    if (!K.pend) continue;
+    const k = K.pend, p = bonusPct(k.e, x.amount); K.pend = null;
+    if (p == null) continue;
+    if (k.e >= KILL.sizeShare) { K.recent.push(p); if (K.recent.length > KILL.window) K.recent.shift(); }
+    // a small share before any size is known waits for the kills around it (splitKills)
+    const size = K.recent.length ? sizeOfPct(modeOf(K.recent)) : null;
+    K.ev.push([k.t, k.e, x.amount, k.w, p, size, size ? size + '|' + (s.level || 0) + '|' + k.set : null]); if (size) lineParty(s, k.t, size);
+  }
+}
+// The floor (0.8 x your level / eligible levels) is the share of a kill you did no damage to, over the monster's EXP; your
+// part of a kill's damage is (share / monster EXP - floor) / 0.2. With one hitter (the segment's plain bonus percent) a
+// yellow line is the party's whole (part 0) and a white one yours (part 1); with more, any part. Each plain kill offers a
+// floor for each monster (share / EXP, or that less 0.2 for a white one), and the floor kept is the one that fits the most
+// kills (part within 0 to 1, one point of slack on the share), then the one whose parts sit closest to what their colour
+// says. A kill goes to the monster that fits it best; one no monster fits is left out, as is one whose bonus percent is
+// under the plain one (more hitters only add to it). Kept per segment until it grows.
+function partOf(f, e, X, plain, w) {
+  const part = (e / X - f) / 0.2, tol = 1 / (0.2 * X);
+  if (part < -tol || part > 1 + tol) return null;
+  return { part: Math.max(0, Math.min(1, part)), cost: !plain ? Math.min(Math.abs(part), Math.abs(1 - part)) : w ? Math.abs(1 - part) : Math.abs(part) };
+}
+function bestPart(f, e, mobs, plain, w) {
+  let best = null;
+  for (const X of mobs) { const r = partOf(f, e, X, plain, w); if (r && (!best || r.cost < best.cost)) best = r; }
+  return best;
+}
+function fitSeg(K, seg, list) {
+  const c = K.fit[seg];
+  if (c && c[0] === list.length) return c[1];
+  const mobs = seg.split('|')[2].split(',').filter(Boolean).map(Number);
+  let f = null;
+  if (mobs.length) {
+    const low = plainOf(list), groups = {};
+    for (const k of list) { if (k[4] < low) continue; const key = k[1] + '|' + k[3] + '|' + (k[4] === low ? 1 : 0); (groups[key] || (groups[key] = { e: k[1], w: k[3], plain: k[4] === low, n: 0 })).n++; }
+    const G = Object.values(groups), cand = new Set();
+    for (const g of G) if (g.plain) for (const X of mobs) { const r = g.e / X - (g.w ? 0.2 : 0); if (r > 0 && r <= 0.8) cand.add(Math.round(r * 1e5) / 1e5); }
+    let best = null;
+    for (const fc of cand) {
+      let fits = 0, cost = 0;
+      for (const g of G) { const r = bestPart(fc, g.e, mobs, g.plain, g.w); if (r) { fits += g.n; cost += g.n * r.cost; } }
+      if (!best || fits > best.fits || (fits === best.fits && cost < best.cost - 1e-9)) best = { f: fc, fits, cost };
+    }
+    f = best ? best.f : null;
+  }
+  K.fit[seg] = [list.length, f];
+  return f;
+}
+// each kill read and its split: [{ t, own, all }] for the kills that fit, plus the floor and size of the latest kill
+function splitKills(s) {
+  const K = s.kills, out = [];
+  if (!K || !K.ev.length) return { kills: out, floor: null, size: null };
+  // an EXP line still waiting for its bonus line shows as a solo kill when it would be one
+  let ev = K.pend && (K.lastBonusT == null || K.pend.t - K.lastBonusT > KILL.soloMs) ? K.ev.concat([[K.pend.t, K.pend.e, null, K.pend.w, 0, 1, '1|' + (s.level || 0) + '|' + K.pend.set]]) : K.ev;
+  // a kill read before the party size was known takes the segment of the first party kill after it that knew it, and
+  // waits (left out) until there is one
+  if (ev.some(k => k[6] == null)) { let next = null; ev = ev.slice().reverse().map(k => k[6] == null ? (next ? k.slice(0, 5).concat([next[5], next[6]]) : k) : (k[2] != null && (next = k), k)).reverse().filter(k => k[6] != null); }
+  if (!ev.length) return { kills: out, floor: null, size: null };
+  const segs = {};
+  for (const k of ev) if (k[2] != null) (segs[k[6]] || (segs[k[6]] = [])).push(k);
+  const floors = {}, lows = {};
+  for (const [seg, list] of Object.entries(segs)) { floors[seg] = fitSeg(K, seg, list); lows[seg] = plainOf(list); }
+  for (const k of ev) {
+    const all = k[1] + (k[2] || 0);
+    if (k[2] == null) { out.push({ t: k[0], own: all, all }); continue; }
+    const f = floors[k[6]]; if (f == null || k[4] < lows[k[6]]) continue;
+    const r = bestPart(f, k[1], k[6].split('|')[2].split(',').filter(Boolean).map(Number), k[4] === lows[k[6]], k[3]);
+    if (r) out.push({ t: k[0], own: r.part * all, all });
+  }
+  const last = ev[ev.length - 1];
+  return { kills: out, floor: last[2] != null ? floors[last[6]] : null, size: last[5] };
+}
+// the split for the Grind window: kills read, your own kills' EXP and all the lines' EXP, the part from the party (null
+// with no lines read), the party size (1 solo, 4 for 4 or more) and the floor. A saved run has only its minutes' seventh
+// number: the part is from those minutes' bar EXP, and an older run has none
+function partyKills(s) {
+  if (s.kills && s.kills.ev.length) {
+    const S = splitKills(s), own = S.kills.reduce((a, k) => a + k.own, 0), all = S.kills.reduce((a, k) => a + k.all, 0);
+    return { kills: S.kills.length, own: Math.round(own), all, fromParty: all ? (all - own) / all : null, size: S.size, floor: S.floor };
+  }
+  const ms = (s.minutes || []).filter(m => m.own != null), all = ms.reduce((a, m) => a + (m.exp || 0), 0), own = ms.reduce((a, m) => a + m.own, 0);
+  return { kills: null, own: ms.length ? own : null, all: ms.length ? all : null, fromParty: all > 0 ? Math.max(0, (all - own) / all) : null,
+    size: ms.length ? Math.max(...ms.map(m => m.party || 1)) : null, floor: null };
+}
+// each minute's own EXP: its bar EXP times your part of its lines' EXP, null for a minute with no line read
+function ownByMinute(s) {
+  if (!s.kills || !s.kills.ev.length) return s.minutes.map(m => m.own != null ? m.own : null);
+  const own = [], all = [];
+  for (const k of splitKills(s).kills) { const m = minuteOf(s, k.t); own[m] = (own[m] || 0) + k.own; all[m] = (all[m] || 0) + k.all; }
+  return s.minutes.map((m, i) => all[i] ? Math.round(Math.max(0, m.exp) * own[i] / all[i]) : null);
 }
 
 // ---- buff lines: the buff row in the game's top right corner (MapleScreen.readBuffs), for the mushroom ----
@@ -1023,7 +1154,12 @@ function add(s, r) {
     else if (s.partyPend === r.party) { s.partyNow = r.party; s.partyPend = null; s.party.push([t, r.party]); }
     else s.partyPend = r.party;
   }
-  if (s.partyNow) b.party = s.partyNow;
+  // a minute whose kills' bonus lines said the party size keeps that (the party list reader mostly says solo)
+  // and a minute with none read takes the last kill line's size for a minute after it (a kill whose lines were missed)
+  if (!b.lineParty) {
+    const ev = s.kills && s.kills.ev, k = ev && ev[ev.length - 1];
+    if (k && k[5] && t - k[0] <= KILL.soloMs) b.party = k[5]; else if (s.partyNow) b.party = s.partyNow;
+  }
   s.tLast = Math.max(s.tLast, t);
   keepTrail(s, t);
   return s;
@@ -1416,9 +1552,10 @@ function toRow(s) {
     // active minutes to 0.001 (a coarser cut shifts the rates of a short session)
     exp: Math.round(s.gainExp), pct: r2(s.gainPct), active_min: Math.round(s.activeMs / 60) / 1000, exp_min: Math.round(expMsOf(s) / 60) / 1000, deaths: s.deaths, potions,
     mesos_earned: mesosOf(s).earned, meso_min: mesosOf(s).min, etc_value: etcOf(s).value, etc_min: etcOf(s).min,
-    // [minute, EXP, percent, party, { itemId: used }, grinding seconds]. The sixth marks a run saved since the grinding
-    // clock: its exp_min is used as saved (expMinOf)
-    minutes: s.minutes.map(m => [m.m, Math.round(m.exp), r2(m.pct), m.party, m.used, Math.min(60, Math.round((m.g || 0) / 1000))]) };
+    // [minute, EXP, percent, party, { itemId: used }, grinding seconds, own EXP]. The sixth marks a run saved since the
+    // grinding clock: its exp_min is used as saved (expMinOf). The seventh is the EXP from your own kills (partyKills),
+    // null in a minute with no EXP line read; the party number there is from the bonus lines (4 is 4 or more)
+    minutes: (own => s.minutes.map((m, i) => [m.m, Math.round(m.exp), r2(m.pct), m.party, m.used, Math.min(60, Math.round((m.g || 0) / 1000)), own[i]]))(ownByMinute(s)) };
 }
 // a saved session, for its charts and numbers (it can't take more readings). eat: as create's, for its Lemon and Meat
 function fromRow(row, eat) {
@@ -1432,7 +1569,7 @@ function fromRow(row, eat) {
   if (row.mesos_earned != null) s.meso = { saved: true, looks: 2, pend: null, first: { t: s.t0, v: 0, bought: 0 }, last: { t: s.t0 + row.meso_min * 60000, v: row.mesos_earned, bought: 0 } };
   // a saved session keeps only the etc value and its minutes: stand them in as one item worth 1 a piece
   if (row.etc_value != null) s.etcs = { looks: 2, pend: null, first: { t: s.t0, key: '', items: { v: { n: 0, price: 1 } } }, last: { t: s.t0 + row.etc_min * 60000, key: 'v', items: { v: { n: row.etc_value, price: 1 } } } };
-  s.minutes = (row.minutes || []).map(([m, exp, pct, party, used, g]) => ({ m, exp, pct, party, used: used || {}, idle: !exp, g: (g || 0) * 1000 }));
+  s.minutes = (row.minutes || []).map(([m, exp, pct, party, used, g, own]) => ({ m, exp, pct, party, used: used || {}, idle: !exp, g: (g || 0) * 1000, own: own != null ? own : null }));
   s.mode = row.loot_mode || 'track';
   if (row.card && row.card.mode) s.savedCard = row.card;   // it opens to the card it showed
   else if (row.mesos_earned != null) s.savedCard = olderCard(s, row);
@@ -1455,5 +1592,5 @@ function wholeRows(minutes) {
   for (let i = 0; i < xs.length; i += 60) rows.push(xs.slice(i, i + 60));
   return rows;
 }
-window.GrindSession = { CFG, buffNow, buffsNow, EXP_TABLE, levelOfExp, expFromPct, wholeRows, create, add, stats, expMinOf, idleNow, rated, countdown, countdowns, minuteOf, toRow, fromRow, mark, trade, keepMesos, rebase, lootOf, bagTabs, bagOpening, profitWords, shopOf, learnPrice, result, rateRun, soldAll, townOf, profitOf, usualOf, standing, bagListShows, pickMap, pickups, setWorth, worthOf, logOf, lineMesos };
+window.GrindSession = { CFG, buffNow, buffsNow, EXP_TABLE, levelOfExp, expFromPct, wholeRows, create, add, stats, expMinOf, idleNow, rated, countdown, countdowns, minuteOf, toRow, fromRow, mark, trade, keepMesos, rebase, lootOf, bagTabs, bagOpening, profitWords, shopOf, learnPrice, result, rateRun, soldAll, townOf, profitOf, usualOf, standing, bagListShows, pickMap, pickups, setWorth, worthOf, logOf, lineMesos, partyKills };
 })();
