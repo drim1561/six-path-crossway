@@ -1434,6 +1434,148 @@ function readShop(src, opts) {
   return r.ok ? r : { ok: false, reason: r.reason, box };
 }
 
+/* ---------- the buff row: icons in the top right corner, and the yellow seconds of a buff's last minute ---------- */
+
+// The game puts every buff on one row in its top right corner, 32 base pixels apart, about 3 in from the top and right
+// edges, a new one on the left (Rimmah's recording, 2026-11-27). Each icon carries its minutes at the bottom left in small
+// white digits, a grey shade that climbs as it runs down (all grey in the last minute), and in the last minute a big yellow
+// number counting the seconds (QuickSlot.img skillCooldownNumber), gone again in the last 5. readBuffs walks the row from
+// the right until a spot holds no icon, names each by its picture (data/buff-pictures.json, npm run boss:buffs), and reads
+// the seconds. The icons are matched at base size in brightness (a grey shade is close to a straight dimming, which
+// correlation doesn't see), leaving out the minutes corner and the yellow number; the digits are matched stretched up.
+let buffRaw = null, buffIcons = null;
+function loadBuffs(pics) {
+  const img = u => new Promise(res => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = u; });
+  const r = { skill: {}, item: {}, digit: {} }, jobs = [];
+  for (const [kind, set] of [['skill', pics.Skills], ['item', pics.Items]]) for (const [k, u] of Object.entries(set || {})) jobs.push(img(u).then(i => { if (i) r[kind][k] = i; }));
+  for (const [s, ds] of Object.entries(pics.Digits || {})) { r.digit[s] = {}; for (const [d, u] of Object.entries(ds)) jobs.push(img(u).then(i => { if (i) r.digit[s][d] = i; })); }
+  return Promise.all(jobs).then(() => { buffRaw = r; buffIcons = null; digitCache.clear(); });
+}
+const BUFF = { pitch: 32, right: 3, top: 3, size: 32, most: 10, pad: 3, mins: { x: 11, y: 19 } };
+function buffIconSet() {
+  if (buffIcons) return buffIcons;
+  buffIcons = [];
+  for (const kind of ['skill', 'item']) for (const [id, im] of Object.entries(buffRaw[kind])) {
+    const w = im.width, h = im.height, g = ctx2d(w, h); g.drawImage(im, 0, 0);
+    const d = g.getImageData(0, 0, w, h).data, L = new Float32Array(w * h), chroma = new Float32Array(w * h);
+    for (let i = 0; i < w * h; i++) { const k = i * 4; L[i] = lumAt(d, k); chroma[i] = Math.max(d[k], d[k + 1], d[k + 2]) - Math.min(d[k], d[k + 1], d[k + 2]); }
+    // icons sit on the bottom left of a 32 square (origin 0, 32)
+    // the pixels it is scored on: solid ones outside the minutes corner, as [column, row in the 32 square, brightness]
+    const oy = BUFF.size - h, px = [];
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) if (d[(j * w + i) * 4 + 3] >= 200 && !(i < BUFF.mins.x && oy + j >= BUFF.mins.y)) px.push(i, oy + j, L[j * w + i]);
+    buffIcons.push({ id, kind, w, h, oy, d, L, chroma, px });
+  }
+  return buffIcons;
+}
+// masked correlation of an icon against the band (base size) with its top left at x, y; skip marks band pixels to leave out
+function iconNcc(band, t, x, y, skip) {
+  const W = band.w, H = band.h, L = band.L, px = t.px; let n = 0, sa = 0, sb = 0, saa = 0, sbb = 0, sab = 0;
+  for (let j = 0; j < px.length; j += 3) {
+    const bx = x + px[j], by = y + px[j + 1]; if (bx < 0 || by < 0 || bx >= W || by >= H) continue;
+    const bi = by * W + bx; if (skip[bi]) continue;
+    const a = L[bi], b = px[j + 2]; n++; sa += a; sb += b; saa += a * a; sbb += b * b; sab += a * b;
+  }
+  if (n < 120) return { score: 0, n };
+  const va = saa / n - (sa / n) ** 2, vb = sbb / n - (sb / n) ** 2;
+  return { score: va < 30 || vb < 30 ? 0 : (sab / n - sa / n * sb / n) / Math.sqrt(va * vb), n };
+}
+const yellowAt = (d, k) => d[k] > 170 && d[k + 1] > 150 && d[k + 2] < 110 && d[k] - d[k + 2] > 90;
+const digitCache = new Map();
+function digitSets(s) {
+  const key = s.toFixed(3);
+  if (!digitCache.has(key)) {
+    if (digitCache.size > 6) digitCache.clear();
+    const out = {}; for (const [set, ds] of Object.entries(buffRaw.digit)) { out[set] = {}; for (const [d, im] of Object.entries(ds)) out[set][d] = stretched(im, s); }
+    digitCache.set(key, out);
+  }
+  return digitCache.get(key);
+}
+// the yellow number on one icon (screen box x, y, size), or null: each yellow run of columns is a digit, scored against
+// every size of the client's digits; the size that fits the runs best is the one the game drew
+function buffSeconds(src, x, y, size, s) {
+  const r = region(src, x, y, size, size), d = r.data, cols = new Array(r.w).fill(0);
+  let y0 = r.h, y1 = -1, n = 0;
+  for (let j = 0; j < r.h; j++) for (let i = 0; i < r.w; i++) if (yellowAt(d, (j * r.w + i) * 4)) { cols[i]++; n++; if (j < y0) y0 = j; if (j > y1) y1 = j; }
+  if (n < 6 * s * s) return null;
+  const runs = []; let a = -1, gap = 0;
+  for (let i = 0; i <= r.w; i++) {
+    const on = i < r.w && cols[i] > 0;
+    if (on) { if (a < 0) a = i; gap = 0; } else if (a >= 0 && ++gap > Math.max(1, Math.round(s * 0.6))) { runs.push([a, i - gap]); a = -1; gap = 0; }
+  }
+  const wide = runs.filter(([p, q]) => q - p + 1 >= 1.5 * s);
+  if (!wide.length || wide.length > 2) return { secs: null, why: wide.length + ' runs' };
+  const sets = digitSets(s);
+  let pick = null;
+  for (const [set, ts] of Object.entries(sets)) {
+    let total = 0; const got = [];
+    for (const [p, q] of wide) {
+      let bestD = null, bs = -1, second = -1;
+      for (const [dg, t] of Object.entries(ts)) {
+        // the template's yellow sits about a base pixel in from its edges (the dark outline)
+        let top = -1;
+        const cx = (p + q) / 2 - t.w / 2, cy = (y0 + y1) / 2 - t.h / 2;
+        for (let yy = Math.round(cy - s); yy <= Math.round(cy + s); yy++) for (let xx = Math.round(cx - s); xx <= Math.round(cx + s); xx++) top = Math.max(top, ncc(r, xx, yy, t));
+        if (top > bs) { second = bs; bs = top; bestD = dg; } else if (top > second) second = top;
+      }
+      got.push({ d: bestD, score: bs, second }); total += bs;
+    }
+    if (!pick || total > pick.total) pick = { set, total, got };
+  }
+  const weak = pick.got.find(g => g.score < 0.7 || g.score - g.second < 0.04);
+  const digits = pick.got.map(g => g.d + '@' + g.score.toFixed(2)).join(',');
+  return weak ? { secs: null, digits, set: pick.set } : { secs: +pick.got.map(g => g.d).join(''), digits, set: pick.set };
+}
+// [{ id, kind, score, second, secs, yellow, grey, x }] from the right edge leftward; id null when the icon is there but no
+// picture clearly fits; yellow when a yellow number shows, secs null when it can't be read. A potion's id is i<item id>. opts.s: the stretch (frame height / 768 by default).
+const BUFF_HAS = 0.55, BUFF_NAME = 0.72, BUFF_GAP = 0.08, BUFF_GREY = 0.5;
+function readBuffs(src, opts = {}) {
+  if (!buffRaw) return [];
+  const { w: FW, h: FH } = sizeOf(src), s = opts.s || FH / 768, I = buffIconSet();
+  const BW = BUFF.right + BUFF.pitch * BUFF.most + BUFF.pad, BH = BUFF.top + BUFF.size + BUFF.pad;
+  const g = ctx2d(BW, BH); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+  g.drawImage(src, FW - BW * s, 0, BW * s, BH * s, 0, 0, BW, BH);
+  const d = g.getImageData(0, 0, BW, BH).data, L = new Float32Array(BW * BH), skip = new Uint8Array(BW * BH);
+  for (let i = 0; i < BW * BH; i++) L[i] = lumAt(d, i * 4);
+  // the yellow number and its outline, left out of the icon match
+  for (let i = 0; i < BW * BH; i++) if (yellowAt(d, i * 4)) {
+    const x = i % BW, y = (i / BW) | 0;
+    for (let yy = Math.max(0, y - 2); yy <= Math.min(BH - 1, y + 2); yy++) for (let xx = Math.max(0, x - 2); xx <= Math.min(BW - 1, x + 2); xx++) skip[yy * BW + xx] = 1;
+  }
+  const band = { w: BW, h: BH, L, d }, out = [];
+  let rightEdge = BW - BUFF.right, rowY = BUFF.top, pad = BUFF.pad;   // where the next icon to the left ends; once the first icon is found the rest sit in line with it
+  for (let k = 0; k < BUFF.most; k++) {
+    const ex = rightEdge - BUFF.size, ey = rowY;
+    let top = { score: -1 }, second = -1;
+    for (const t of I) {
+      let bt = { score: -1 };
+      for (let y = ey - pad; y <= ey + pad; y++) for (let x = ex - pad; x <= ex + pad; x++) {
+        const r = iconNcc(band, t, x, y, skip); if (r.score > bt.score) bt = { score: r.score, x, y };
+      }
+      if (bt.score > top.score) { if (top.t && top.t.id !== t.id) second = Math.max(second, top.score); top = Object.assign(bt, { t }); } else if (bt.score > second) second = bt.score;
+    }
+    if (top.score < BUFF_HAS) break;
+    const named = top.score >= BUFF_NAME && top.score - second >= BUFF_GAP;
+    // grey: the shade flattens the icon, so in its top rows the screen's brightness moves far less than the picture's
+    // (the slope of one against the other, about 0.9 on a clear icon, under 0.6 under the shade)
+    let slope = null;
+    if (named) {
+      const t = top.t; let n = 0, sa = 0, sb = 0, sab = 0, sbb = 0;
+      for (let j = 0; j < 10 && j < t.h; j++) for (let i = 0; i < t.w; i++) {
+        const q = j * t.w + i, bx = top.x + i, by = top.y + t.oy + j; if (t.d[q * 4 + 3] < 200 || bx < 0 || by < 0 || bx >= BW || by >= BH || skip[by * BW + bx]) continue;
+        const A = L[by * BW + bx], B = t.L[q]; n++; sa += A; sb += B; sab += A * B; sbb += B * B;
+      }
+      const vb = sbb / n - (sb / n) ** 2; slope = n > 40 && vb > 30 ? (sab / n - sa / n * sb / n) / vb : null;
+    }
+    const sx = FW - (BW - top.x) * s, sy = top.y * s;
+    const num = buffSeconds(src, sx, sy, BUFF.size * s, s);
+    const secs = num ? num.secs : null, grey = !!num || (slope != null && slope < BUFF_GREY);
+    out.push({ id: named ? (top.t.kind === 'item' ? 'i' + top.t.id : top.t.id) : null, kind: named ? top.t.kind : null, score: +top.score.toFixed(2), second: +second.toFixed(2),
+      secs, yellow: !!num, grey, slope: slope == null ? null : +slope.toFixed(2), digits: num && num.digits, x: Math.round(sx) });
+    rightEdge = top.x - (BUFF.pitch - BUFF.size); rowY = top.y; pad = 1;
+  }
+  return out;
+}
+
 /* ---------- which map: the minimap window ---------- */
 
 // The minimap window sits at the top left with its picture's top at y 72, centred across a window as wide as the picture or
@@ -1676,5 +1818,5 @@ function readMap(src, frameH, opts) {
 function mapHome(spot) { if (arguments.length) mapSpot = spot || null; return mapSpot; }
 
 window.MapleScreen = { expSeeds: s => (s ? (EXP_SEEDS = s) : EXP_SEEDS), loadMaps, readMap, mapHome, load, sizeOf, findExpLine, greenProbe, readExp, expGlyphs, measure, readLevel, readCounts, slotBar, readIcon, readParty, levelArea, slotArea, partyArea,
-  findMesoBox, mesoHome, mesoGlyphs, readMesos, invGeometry, readInventory, loadLoot, readBag, readScroll, readShop, shopHome };
+  findMesoBox, mesoHome, mesoGlyphs, readMesos, invGeometry, readInventory, loadLoot, readBag, readScroll, readShop, shopHome, loadBuffs, readBuffs };
 })();

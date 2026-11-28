@@ -214,12 +214,14 @@ function killsPerMin(expHr, avgExp) {
   return { perMin, every: 60 / perMin };
 }
 function fmtKills(perMin) { return perMin < 10 ? (Math.round(perMin * 10) / 10).toFixed(1) : String(Math.round(perMin)); }
-// the mushroom's one line, in order: out, low, level up inside 5 minutes. A saved session says nothing
-function shroomLine(tiles, saved, hrsToLevel) {
+// the mushroom's one line, in order: out, a buff ran out, a buff ends soon, low, level up inside 5 minutes. A saved session says
+// nothing. buff is { kind: 'out' | 'soon', name } (GrindSession.buffNow with the game name), or null
+function shroomLine(tiles, saved, hrsToLevel, buff) {
   if (saved) return null;
   const list = (tiles || []).filter(Boolean);
   const out = list.find(t => t.cd ? t.cd.left <= 0 : t.count === 0);
   if (out) return 'Out of ' + plural(out.name) + '!';
+  if (buff) return (buff.name || 'A buff') + (buff.kind === 'out' ? ' ran out!' : ' ends soon!');
   const low = list.find(t => potionTile(t, 0, false).low);
   if (low) { const n = low.cd ? low.cd.left : low.count; return fmt(n) + ' ' + (n === 1 ? low.name : plural(low.name)) + ' left. Repot!'; }
   if (hrsToLevel != null && hrsToLevel * 60 < 5) return 'Level up in ' + Math.max(1, Math.ceil(hrsToLevel * 60)) + ' min!';
@@ -1149,7 +1151,7 @@ function mount(root, deps) {
   function frame(src, info) {
     if (!picturesReady) return;
     readPickups(src, info);
-    if (!st.mapsAsked) { st.mapsAsked = true; loadMaps(); }
+    if (!st.mapsAsked) { st.mapsAsked = true; loadMaps(); loadBuffs(); }
     const since = st.lastFull ? Date.now() - st.lastFull : Infinity;   // a clock set back (a replay) reads in full
     if (since >= 0 && since < 1400) {
       // a bag missed a moment ago (a tooltip over its mesos) is still looked for at every tick: a page shown for a
@@ -1232,6 +1234,7 @@ function mount(root, deps) {
       else { st.measureAt = st.ticks + 10; setCheck('size', 'fix', "Couldn't measure the game size (best match " + m.score.toFixed(2) + ' on a ' + w + '×' + h + ' share)'); }
     }
     guard('the map', () => followMap(src, S, h));
+    guard('the buffs', () => { if (st.buffsReady && session) GS().add(session, { t: Date.now(), buffs: S.readBuffs(src) }); });
     const reading = { t: Date.now(), exp: exp.ok ? exp.exp : null, pct: exp.ok ? exp.pct : null, level: null, counts: [], party: null, map: st.mapHere };
     if (exp.est) reading.est = true;
     if (st.m) {
@@ -1335,6 +1338,11 @@ function mount(root, deps) {
   function loadMaps() {
     const pic = new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = 'data/minimaps.png'; });
     Promise.all([fetch('data/minimaps.json').then(r => r.json()), pic]).then(([index, im]) => { MS().loadMaps(im, index); st.mapsReady = true; }).catch(() => { /* the map stays a pick by hand */ });
+  }
+  // the buff row in the game's top right corner (data/buff-pictures.json): the mushroom says when one ends soon or ran out.
+  // Read at every full read, kept on the session but never saved. No pictures: no buff lines, nothing else changes
+  function loadBuffs() {
+    fetch('data/buff-pictures.json').then(r => r.json()).then(p => MS().loadBuffs(p).then(() => { st.buffNames = p.Names || {}; st.buffsReady = true; })).catch(() => {});
   }
   function followMap(src, S, h) {
     if (!st.mapsReady) return;
@@ -2041,9 +2049,10 @@ function mount(root, deps) {
       // the bottle shows the clock and what's left; how many went down and the caption are in the hover
       hoverText(P.box, [x.n && x.n + (x.verb ? ' ' + x.verb : ''), x.left, x.cap].filter(Boolean).join(' · '));
     });
-    // the mushroom comes out with the one line worth saying (out, low, a level up inside 5 minutes; nothing for a saved
+    // the mushroom comes out with the one line worth saying (out, a buff ran out or ends soon, low, a level up inside 5 minutes; nothing for a saved
     // run) and ducks back when it's no longer true. Its words stay while it ducks, so the bubble never empties on its way out
-    const line = shroomLine(SP.tiles, saved, st.sharing ? SP.hrs : null);   // a level up is only near while EXP is being read
+    const bn = !saved && s && GS().buffNow(s, now), buff = bn ? { kind: bn.kind, name: bn.id && (st.buffNames || {})[bn.id] } : null;
+    const line = shroomLine(SP.tiles, saved, st.sharing ? SP.hrs : null, buff);   // a level up is only near while EXP is being read
     if (line) put(SP.bubble, line);
     if (strip.classList.contains('g-out') !== !!line) strip.classList.toggle('g-out', !!line);
     // no map known: the spot stays empty, and how long runs on its own

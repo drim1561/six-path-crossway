@@ -899,8 +899,63 @@ function pickups(s) {
   return { items: Object.values(K.items).map(x => Object.assign({}, x)), unnamed: Object.assign({}, K.unnamed), equips: K.equips, mesos: Object.assign({}, K.mesos), lines: K.lines, lastLineT: K.lastLineT };
 }
 
+// ---- buff lines: the buff row in the game's top right corner (MapleScreen.readBuffs), for the mushroom ----
+// Each buff is followed by its picture, never its place (the row closes up when one ends, a new one joins on the left).
+// It ends soon from 15 seconds left: the yellow number reads 15 or less, or the icon is all grey with no number (its last
+// 5 seconds, only after a number showed), or, with a number that can't be read, 45 seconds after one first showed (that is 60 left). It ran out when
+// its icon is gone two reads running after it was in its last minute; an icon gone with minutes left (a window over the
+// corner, a map change, a death) says nothing, as does one gone well before its number said it would. Ran out lasts 30
+// seconds or until it's cast again. A potion's icon whose bottle the panel shows is left to the bottle. Never saved: it
+// lives on s.buffs, which toRow doesn't copy, and a pause of over 30 seconds in the reads forgets it.
+const BUFF = { soon: 15, minute: 60, unread: 45000, outMs: 30000, early: 8000, gone: 2 };
+function takeBuffs(s, t, list) {
+  const B = s.buffs && t - s.buffs.t <= CFG.maxGapMs ? s.buffs : { t, on: {} };
+  B.t = t;
+  const pots = potIds(s), seen = new Set();
+  list.forEach((r, i) => {
+    if (r.kind === 'item' && pots.has(+String(r.id).slice(1))) return;
+    const key = r.id || 'unnamed' + i;   // an unnamed icon can only be followed by its place
+    seen.add(key);
+    const b = B.on[key] || (B.on[key] = { id: r.id || null, item: r.kind === 'item' });
+    if (b.outT != null) { b.outT = null; b.minuteT = null; b.endsAt = null; }   // cast again after running out
+    b.miss = 0; b.lastT = t;
+    // grey with no number is the last 5 seconds only after a yellow number: before one, it is a long buff's shade near
+    // the top of its icon or a fading screen, and counts as minutes left
+    if (r.yellow || (r.grey && b.minuteT != null)) {
+      if (b.minuteT == null) {
+        b.minuteT = r.secs != null ? t - (BUFF.minute - r.secs) * 1000 : t;
+        // an unread number seen from its first showing (the icon had minutes a moment ago): it ends a minute from here
+        if (r.secs == null && b.clear) b.endsAt = t + BUFF.minute * 1000;
+      }
+      if (r.secs != null) b.endsAt = t + r.secs * 1000;
+      else if (!r.yellow) b.endsAt = Math.min(b.endsAt == null ? t : b.endsAt, t + 5000);   // the last 5 seconds
+      b.last = true;
+      b.soon = r.secs != null ? r.secs <= BUFF.soon : !r.yellow || (b.endsAt != null ? b.endsAt - t <= BUFF.soon * 1000 : t - b.minuteT >= BUFF.unread);
+      if (r.yellow && r.secs == null && b.endsAt == null && b.soon) b.endsAt = b.minuteT + BUFF.minute * 1000;
+    } else { b.last = false; b.soon = false; b.minuteT = null; b.endsAt = null; b.clear = true; }   // minutes on it: fresh, or recast
+  });
+  for (const [key, b] of Object.entries(B.on)) {
+    if (seen.has(key)) continue;
+    if (b.outT != null) { if (t - b.outT >= BUFF.outMs) delete B.on[key]; continue; }
+    if (++b.miss < BUFF.gone) continue;
+    // gone: ran out if it was in its last minute and not well before its number said
+    if (b.last && !(b.endsAt != null && b.lastT < b.endsAt - BUFF.early)) { b.outT = t; b.soon = false; } else delete B.on[key];
+  }
+  s.buffs = B;
+}
+// every buff worth a line now, most urgent first: ran out (the newest first), then ends soon (the closest to its end first)
+function buffsNow(s, t) {
+  const B = s.buffs; if (!B || t - B.t > CFG.maxGapMs) return [];
+  const all = Object.values(B.on);
+  const out = all.filter(b => b.outT != null && t - b.outT < BUFF.outMs).sort((a, b) => b.outT - a.outT).map(b => ({ kind: 'out', id: b.id, item: b.item }));
+  const soon = all.filter(b => b.outT == null && b.soon && b.miss === 0).sort((a, b) => (a.endsAt == null ? t : a.endsAt) - (b.endsAt == null ? t : b.endsAt)).map(b => ({ kind: 'soon', id: b.id, item: b.item }));
+  return out.concat(soon);
+}
+// { kind: 'out' | 'soon', id, item } for the mushroom, or null
+function buffNow(s, t) { return buffsNow(s, t)[0] || null; }
 function add(s, r) {
   const t = r.t;
+  if (r.buffs) { takeBuffs(s, t, r.buffs); if (Object.keys(r).every(k => k === 't' || k === 'buffs')) return s; }
   if (r.pickup) { takePickup(s, t, r.pickup); if (Object.keys(r).every(k => k === 't' || k === 'pickup')) return s; }
   // a running session kept from before the EXP clock (no expFrom at all): the clock covers all of it, as its EXP does
   if (!('expFrom' in s)) { s.expFrom = s.gainExp || s.gainPct ? 0 : null; s.expTo = s.expFrom == null ? null : s.activeMs; }
@@ -1400,5 +1455,5 @@ function wholeRows(minutes) {
   for (let i = 0; i < xs.length; i += 60) rows.push(xs.slice(i, i + 60));
   return rows;
 }
-window.GrindSession = { CFG, EXP_TABLE, levelOfExp, expFromPct, wholeRows, create, add, stats, expMinOf, idleNow, rated, countdown, countdowns, minuteOf, toRow, fromRow, mark, trade, keepMesos, rebase, lootOf, bagTabs, bagOpening, profitWords, shopOf, learnPrice, result, rateRun, soldAll, townOf, profitOf, usualOf, standing, bagListShows, pickMap, pickups, setWorth, worthOf, logOf, lineMesos };
+window.GrindSession = { CFG, buffNow, buffsNow, EXP_TABLE, levelOfExp, expFromPct, wholeRows, create, add, stats, expMinOf, idleNow, rated, countdown, countdowns, minuteOf, toRow, fromRow, mark, trade, keepMesos, rebase, lootOf, bagTabs, bagOpening, profitWords, shopOf, learnPrice, result, rateRun, soldAll, townOf, profitOf, usualOf, standing, bagListShows, pickMap, pickups, setWorth, worthOf, logOf, lineMesos };
 })();
